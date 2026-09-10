@@ -172,6 +172,16 @@ In Algebra mode these values are passed together as
 Inside a ``BuildSheet`` context, operations obtain ``sheet_parameters`` from
 the builder automatically and the argument must be omitted.
 
+The sheet itself is a ``Shell``, and what makes a shell a sheet - flats and
+bends, meaning planar and cylindrical faces, sewn into one connected manifold
+shell - is enforced by :meth:`~topology.Shell.make_sheet`. It is what
+``BuildSheet`` calls to take faces in, and the way to assemble a sheet from
+faces in Algebra mode; ``merge_coplanar`` joins touching coplanar pieces, as
+the builder does for material arriving in pieces, while by default a seam
+between coplanar faces is kept because on a sheet it may be a fold line.
+:meth:`~topology.Shell.cut_sheet` trims a sheet with solids, which cut every
+face they pass through, or with faces coplanar with one of its flats.
+
 *****************
 Folding
 *****************

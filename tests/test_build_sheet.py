@@ -90,37 +90,64 @@ class TestBuildSheetBase(unittest.TestCase):
                 len(builder.faces(Select.LAST)),
             )
 
-    def test_result_face_normalization(self):
-        face = Face.make_rect(10, 10)
-        shell = Shell(face)
-        self.assertEqual(BuildSheet._result_faces(face), [face])
-        self.assertEqual(BuildSheet._result_faces(shell), list(shell.faces()))
-        self.assertEqual(BuildSheet._result_faces([shell]), list(shell.faces()))
-
-    def test_shell_validation_errors(self):
-        self.assertFalse(BuildSheet._validated_shell([]))
+    def test_sheet_invariant_errors(self):
+        """The sheet invariant lives on Shell, for Builder and Algebra mode alike."""
+        self.assertFalse(Shell.make_sheet([]))
         sphere = Solid.make_sphere(1).faces()[0]
         with self.assertRaisesRegex(ValueError, "planar and cylindrical"):
-            BuildSheet._validated_shell([sphere])
+            Shell.make_sheet([sphere])
 
         cylinder = Solid.make_cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0]
         with patch.object(Face, "radius", new_callable=PropertyMock, return_value=0):
             with self.assertRaisesRegex(ValueError, "positive radius"):
-                BuildSheet._validated_shell([cylinder])
+                Shell.make_sheet([cylinder])
 
         face = Face.make_rect(10, 10)
         with patch.object(
             Shell, "is_valid", new_callable=PropertyMock, return_value=False
         ):
             with self.assertRaisesRegex(ValueError, "invalid shell"):
-                BuildSheet._validated_shell([face])
+                Shell.make_sheet([face])
 
         with patch(
-            "build123d.build_sheet.topo_explore_connected_faces",
+            "build123d.topology.two_d.topo_explore_connected_faces",
             return_value=[face, face, face],
         ):
             with self.assertRaisesRegex(ValueError, "non-manifold"):
-                BuildSheet._validated_shell([face])
+                Shell.make_sheet([face])
+
+        with self.assertRaisesRegex(ValueError, "one connected shell"):
+            Shell.make_sheet([face, Pos(50, 0) * Face.make_rect(10, 10)])
+
+    def test_make_sheet_records_the_sewing(self):
+        """A sheet made in Algebra mode knows what became of its faces."""
+        base = Face.make_rect(20, 20)
+        wall = Face.make_rect(
+            20, 10, Plane(origin=(10, 0, 5), x_dir=(0, 1, 0), z_dir=(1, 0, 0))
+        )
+        sheet = Shell.make_sheet([base, wall])
+        self.assertEqual(len(sheet.faces()), 2)
+        sheet._history.with_inputs([base.wrapped], [wall.wrapped])
+        self.assertEqual(len(sheet.faces(Select.LAST)), 1)
+        self.assertAlmostEqual(sheet.faces(Select.LAST)[0].area, 200, 5)
+        # a sewn shell is not the same object as its faces; the record joins them
+        self.assertEqual(len(sheet.edges(Select.LAST)), 4)
+
+    def test_cut_sheet(self):
+        """Solids cut every face they pass through, faces only where coplanar."""
+        with BuildSheet(thickness=1) as bs:
+            with BuildSketch():
+                Rectangle(40, 20)
+            flange(bs.edges().sort_by(Axis.X)[-1], length=10)
+        sheet = bs.sheet
+        pierced = sheet.cut_sheet(Cylinder(1, 40, rotation=(0, 90, 0)))
+        self.assertTrue(pierced.is_valid)
+        self.assertLess(pierced.area, sheet.area)
+        self.assertEqual(len(pierced.bends()), 1)
+        notched = sheet.cut_sheet(Pos(0, 5) * Face.make_rect(4, 4))
+        self.assertAlmostEqual(notched.area, sheet.area - 16, 5)
+        with self.assertRaisesRegex(ValueError, "coplanar"):
+            sheet.cut_sheet(Pos(0, 0, 3) * Face.make_rect(4, 4))
 
     def test_context_modes_and_empty_inputs(self):
         builder = BuildSheet(thickness=1)
@@ -150,7 +177,10 @@ class TestBuildSheetBase(unittest.TestCase):
     def test_merge_coplanar_faces_leaves_non_face_fuse_result(self):
         faces = [Face.make_rect(10, 10), Pos(10, 0) * Face.make_rect(10, 10)]
         with patch.object(Face, "fuse", return_value=Compound(faces)):
-            self.assertEqual(BuildSheet._merge_coplanar_faces(faces), faces)
+            self.assertEqual(
+                len(Shell.make_sheet(faces, merge_coplanar=True).faces()), 2
+            )
+        self.assertEqual(len(Shell.make_sheet(faces, merge_coplanar=True).faces()), 1)
 
     def test_base_from_sketch(self):
         with BuildSheet(thickness=1) as bs:

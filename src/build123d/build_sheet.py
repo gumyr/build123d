@@ -28,23 +28,20 @@ license:
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 
 from build123d.build_common import Builder
 from build123d.build_enums import GeomType, Mode, Select, SheetSurface
-from build123d.geometry import TOLERANCE, Location, Plane
+from build123d.geometry import Location, Plane
 from build123d.sheet_utils import SheetMetalParameters
 from build123d.topology import (
     Compound,
     Edge,
     Face,
-    Shape,
     ShapeHistory,
     ShapeList,
     Shell,
     Solid,
     Wire,
-    topo_explore_connected_faces,
 )
 
 
@@ -196,131 +193,6 @@ class BuildSheet(Builder[Shell]):
         """
         return self._sheet
 
-    @staticmethod
-    def _result_faces(result: Shape | Iterable[Shape]) -> list[Face]:
-        """Extract faces from a surface boolean result."""
-        if isinstance(result, Face):
-            return [result]
-        if isinstance(result, Shape):
-            return list(result.faces())
-        return [face for shape in result for face in shape.faces()]
-
-    @staticmethod
-    def _merge_coplanar_faces(faces: list[Face]) -> list[Face]:
-        """Union touching coplanar faces while preserving other faces."""
-        merged = list(faces)
-        changed = True
-        while changed:
-            changed = False
-            for i, first in enumerate(merged):
-                if first.geom_type != GeomType.PLANE:
-                    continue
-                for j in range(i + 1, len(merged)):
-                    second = merged[j]
-                    if (
-                        second.geom_type != GeomType.PLANE
-                        or not first.is_coplanar(Plane(second))
-                        or first.distance_to(second) > TOLERANCE
-                    ):
-                        continue
-                    fused = first.fuse(second)
-                    if isinstance(fused, Face):
-                        merged[i] = fused
-                        merged.pop(j)
-                        changed = True
-                        break
-                if changed:
-                    break
-        return merged
-
-    @classmethod
-    def _cut_with_solids(cls, faces: list[Face], solids: list[Solid]) -> list[Face]:
-        """Trim sheet faces with solid cutters.
-
-        A Solid cuts every face it passes through, planar and cylindrical
-        alike, so a cutout may cross a bend. Trimming changes the boundary of
-        a face without changing its supporting surface, so the sheet keeps its
-        planar and cylindrical geometry.
-
-        The cutter must reach the reference surface, which for
-        ``SheetSurface.INSIDE`` or ``OUTSIDE`` is one side of the material
-        rather than the middle.
-        """
-        remaining: list[Face] = []
-        for face in faces:
-            remaining.extend(cls._result_faces(face.cut(*solids)))
-        return remaining
-
-    @classmethod
-    def _cut_with_faces(cls, faces: list[Face], cutters: list[Face]) -> list[Face]:
-        """Trim planar sheet faces with coplanar planar cutters.
-
-        A Face only removes area from the sheet where the two are coplanar, so
-        a cutter that matches no sheet face is rejected rather than silently
-        ignored.
-        """
-        remaining: list[Face] = []
-        used: set[int] = set()
-        for face in faces:
-            matching = [
-                cutter
-                for cutter in cutters
-                if face.geom_type == GeomType.PLANE
-                and cutter.geom_type == GeomType.PLANE
-                and face.is_coplanar(Plane(cutter))
-            ]
-            used.update(id(cutter) for cutter in matching)
-            remaining.extend(
-                cls._result_faces(face.cut(*matching)) if matching else [face]
-            )
-
-        if len(used) != len({id(cutter) for cutter in cutters}):
-            raise ValueError(
-                "A Face cutter must be coplanar with a planar sheet face - use "
-                "a Solid to cut across bends or curved faces"
-            )
-        return remaining
-
-    @classmethod
-    def _merged_shell(cls, faces: list[Face]) -> Shell:
-        """Sew and validate sheet faces, joining touching coplanar ones.
-
-        For material that arrives in pieces and is meant to read as one face -
-        two sketch regions that happen to touch, or a mirror taken across an
-        edge. Everywhere else a seam between coplanar faces is kept, because
-        on a sheet it may be a fold line rather than an accident.
-        """
-        return cls._validated_shell(cls._merge_coplanar_faces(faces))
-
-    @classmethod
-    def _validated_shell(cls, faces: list[Face]) -> Shell:
-        """Sew candidate sheet faces and check they make a usable shell."""
-        if not faces:
-            return Shell()
-
-        for face in faces:
-            if face.geom_type not in (GeomType.PLANE, GeomType.CYLINDER):
-                raise ValueError(
-                    "BuildSheet only supports planar and cylindrical faces"
-                )
-            if face.geom_type == GeomType.CYLINDER and (
-                face.radius is None or face.radius <= 0
-            ):
-                raise ValueError("BuildSheet cylindrical faces need a positive radius")
-
-        try:
-            shell = Shell(faces)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("Sheet faces must sew into one connected shell") from exc
-
-        if not shell.is_valid:
-            raise ValueError("Sheet faces produced an invalid shell")
-        if any(
-            len(topo_explore_connected_faces(edge, shell)) > 2 for edge in shell.edges()
-        ):
-            raise ValueError("Sheet faces produced non-manifold topology")
-        return shell
-
     def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
         """Store edges supplied by line builders."""
         self.pending_edges.extend(obj for obj in objects if isinstance(obj, Edge))
@@ -377,38 +249,31 @@ class BuildSheet(Builder[Shell]):
         existing_faces = list(self._sheet.faces()) if self._sheet else []
         before = [self._sheet.wrapped] if self._sheet else []
 
+        # The sheet invariant - flats and bends sewn into one manifold shell -
+        # lives on Shell; the builder only decides what goes in. Material
+        # arriving in pieces is joined up; a replacement is a shell an
+        # operation has already settled, so its coplanar seams are deliberate
         if mode == Mode.ADD:
-            candidate_faces = existing_faces + incoming_faces
+            new_shell = Shell.make_sheet(
+                existing_faces + incoming_faces, merge_coplanar=True
+            )
         elif mode == Mode.SUBTRACT:
             if not existing_faces:
                 raise RuntimeError("Nothing to subtract from")
-            candidate_faces = existing_faces
-            if incoming_solids:
-                candidate_faces = self._cut_with_solids(
-                    candidate_faces, incoming_solids
-                )
-            if incoming_faces:
-                candidate_faces = self._cut_with_faces(candidate_faces, incoming_faces)
+            new_shell = self._sheet.cut_sheet(*incoming_solids, *incoming_faces)
         elif mode == Mode.REPLACE:
-            candidate_faces = incoming_faces
+            new_shell = Shell.make_sheet(incoming_faces)
         elif mode == Mode.INTERSECT:
             raise ValueError("BuildSheet does not yet support Mode.INTERSECT")
         else:  # pragma: no cover - defensive for future Mode values
             raise ValueError(f"Unsupported BuildSheet mode {mode}")
 
-        # Mode.REPLACE hands back a shell an operation has already settled, so
-        # its coplanar seams are deliberate; only material arriving in pieces
-        # is joined up
-        new_shell = (
-            self._validated_shell(candidate_faces)
-            if mode == Mode.REPLACE
-            else self._merged_shell(candidate_faces)
-        )
         self._sheet = new_shell
-        # Sewing does not yet report what it did to each face (that comes with
-        # moving the sheet invariant onto Shell), so the sheet carries an empty
-        # record: whatever is still identical to before is untouched, and the
-        # rest is what the operation brought in or created
-        self._sheet._made_by(
-            ShapeHistory(before=before, brought=(f.wrapped for f in incoming_faces))
+        # the shell's record says what became of each face; the builder says
+        # which faces were there before and which the operation brought in
+        record = (
+            new_shell._history if new_shell._history is not None else ShapeHistory()
+        )
+        new_shell._made_by(
+            record.with_inputs(before, (f.wrapped for f in incoming_faces))
         )

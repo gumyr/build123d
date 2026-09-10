@@ -73,6 +73,7 @@ from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakeWire,
+    BRepBuilderAPI_Sewing,
 )
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
@@ -175,7 +176,13 @@ from build123d.sheet_utils import (
 )
 
 from .history import ShapeHistory
-from .one_d import Edge, Mixin1D, Wire, _split_edge_at_vertex
+from .one_d import (
+    Edge,
+    Mixin1D,
+    Wire,
+    _split_edge_at_vertex,
+    topo_explore_connected_faces,
+)
 from .shape_core import (
     TOPODS,
     Shape,
@@ -3093,6 +3100,142 @@ class Shell(Mixin2D[TopoDS_Shell]):
         """
         return self.faces().filter_by(GeomType.CYLINDER)
 
+    @classmethod
+    def make_sheet(cls, faces: Iterable[Face], merge_coplanar: bool = False) -> Shell:
+        """Sew faces into a sheet metal reference shell.
+
+        A sheet is a shell of flats and bends - planar and cylindrical faces -
+        sewn into one connected, manifold, valid shell. That is the invariant
+        every sheet operation keeps, and this is where it is enforced, in
+        Builder and Algebra mode alike.
+
+        With ``merge_coplanar`` touching coplanar faces are joined first, for
+        material that arrives in pieces and is meant to read as one face - two
+        sketch regions that happen to touch, or a mirror taken across an edge.
+        By default a seam between coplanar faces is kept, because on a sheet it
+        may be a fold line rather than an accident.
+
+        The shell carries the record of what became of each face, so
+        ``Select.LAST`` and ``Select.NEW`` can read through the sewing.
+
+        Args:
+            faces (Iterable[Face]): the faces of the sheet
+            merge_coplanar (bool, optional): join touching coplanar faces.
+                Defaults to False.
+
+        Raises:
+            ValueError: a face is neither planar nor cylindrical, a cylindrical
+                face has no positive radius, or the faces do not sew into one
+                valid manifold shell
+
+        Returns:
+            Shell: the sheet
+        """
+        face_list = list(faces)
+        records: list[ShapeHistory] = []
+        if merge_coplanar:
+            face_list, records = _merge_coplanar_faces(face_list)
+        return cls._sewn_sheet(face_list, records)
+
+    def cut_sheet(self, *cutters: Shape) -> Shell:
+        """Trim this sheet with cutters, keeping its flats and bends.
+
+        A ``Solid`` cuts every face it passes through, planar and cylindrical
+        alike, so a cutout may cross a bend; trimming changes a face's boundary
+        without changing its surface, so the sheet stays a sheet. The cutter
+        has to reach the reference surface, which for ``SheetSurface.INSIDE``
+        or ``OUTSIDE`` is one side of the material rather than the middle. A
+        ``Face`` removes area only where it is coplanar with a planar sheet
+        face, and one that matches no face is rejected rather than ignored.
+
+        Args:
+            cutters (Shape): solids, or faces coplanar with sheet faces
+
+        Raises:
+            ValueError: a face cutter is coplanar with no planar sheet face
+
+        Returns:
+            Shell: the trimmed sheet
+        """
+        remaining = list(self.faces())
+        records: list[ShapeHistory] = []
+        solids = [cutter for cutter in cutters if cutter._dim == 3]
+        planes = [cutter for cutter in cutters if isinstance(cutter, Face)]
+        if solids:
+            trimmed: list[Face] = []
+            for face in remaining:
+                result = face.cut(*solids)
+                trimmed.extend(_faces_of(result))
+                if (record := ShapeHistory.of(result)) is not None:
+                    records.append(record)
+            remaining = trimmed
+        if planes:
+            trimmed = []
+            used: set[int] = set()
+            for face in remaining:
+                matching = [
+                    cutter
+                    for cutter in planes
+                    if face.geom_type == GeomType.PLANE
+                    and cutter.geom_type == GeomType.PLANE
+                    and face.is_coplanar(Plane(cutter))
+                ]
+                used.update(id(cutter) for cutter in matching)
+                if not matching:
+                    trimmed.append(face)
+                    continue
+                result = face.cut(*matching)
+                trimmed.extend(_faces_of(result))
+                if (record := ShapeHistory.of(result)) is not None:
+                    records.append(record)
+            if len(used) != len({id(cutter) for cutter in planes}):
+                raise ValueError(
+                    "A Face cutter must be coplanar with a planar sheet face - use "
+                    "a Solid to cut across bends or curved faces"
+                )
+            remaining = trimmed
+        return Shell._sewn_sheet(remaining, records)
+
+    @classmethod
+    def _sewn_sheet(cls, faces: list[Face], records: list[ShapeHistory]) -> Shell:
+        """Sew faces into a sheet, check the invariant, and record the sewing.
+
+        ``records`` are the histories of whatever booleans made ``faces`` from
+        the sheet's previous faces; the sewing's own record is chained after
+        them.
+        """
+        if not faces:
+            return cls()
+        for face in faces:
+            if face.geom_type not in (GeomType.PLANE, GeomType.CYLINDER):
+                raise ValueError("a sheet has only planar and cylindrical faces")
+            if face.geom_type == GeomType.CYLINDER and (
+                face.radius is None or face.radius <= 0
+            ):
+                raise ValueError("a sheet's cylindrical faces need a positive radius")
+
+        sewing = BRepBuilderAPI_Sewing()
+        for face in faces:
+            sewing.Add(face.wrapped)
+        sewing.Perform()
+        sewn = downcast(sewing.SewedShape())
+        if isinstance(sewn, TopoDS_Face):
+            shell = cls(Face(sewn))  # one face is a sheet of one face
+        elif isinstance(sewn, TopoDS_Shell):
+            shell = cls(sewn)
+        else:
+            raise ValueError("Sheet faces must sew into one connected shell")
+        if not shell.is_valid:
+            raise ValueError("Sheet faces produced an invalid shell")
+        if any(
+            len(topo_explore_connected_faces(edge, shell)) > 2 for edge in shell.edges()
+        ):
+            raise ValueError("Sheet faces produced non-manifold topology")
+
+        record = ShapeHistory.of(*records) or ShapeHistory()
+        record.merge(ShapeHistory.from_sewing(sewing, [f.wrapped for f in faces]))
+        return shell._made_by(record)
+
     def flats(self) -> ShapeList[Face]:
         """The planar faces of this Shell.
 
@@ -3318,6 +3461,44 @@ def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
         )
 
     return return_value
+
+
+def _faces_of(result: Shape | None) -> list[Face]:
+    """The faces a surface boolean left, if any."""
+    if result is None or not result:
+        return []
+    return list(result.faces())
+
+
+def _merge_coplanar_faces(faces: list[Face]) -> tuple[list[Face], list[ShapeHistory]]:
+    """Union touching coplanar faces, and the records of the fuses that did it."""
+    merged = list(faces)
+    records: list[ShapeHistory] = []
+    changed = True
+    while changed:
+        changed = False
+        for i, first in enumerate(merged):
+            if first.geom_type != GeomType.PLANE:
+                continue
+            for j in range(i + 1, len(merged)):
+                second = merged[j]
+                if (
+                    second.geom_type != GeomType.PLANE
+                    or not first.is_coplanar(Plane(second))
+                    or first.distance_to(second) > TOLERANCE
+                ):
+                    continue
+                fused = first.fuse(second)
+                if isinstance(fused, Face):
+                    merged[i] = fused
+                    merged.pop(j)
+                    if fused._history is not None:
+                        records.append(fused._history)
+                    changed = True
+                    break
+            if changed:
+                break
+    return merged, records
 
 
 Shape.register_shape_constructor(ta.TopAbs_FACE, Face)

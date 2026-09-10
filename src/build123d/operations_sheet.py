@@ -147,7 +147,7 @@ def _target_shell(context: BuildSheet | None, edges: list[Edge]) -> Shell:
     if isinstance(parent, Face):
         return Shell(parent)
     if isinstance(parent, Sketch):
-        return BuildSheet._validated_shell(list(parent.faces()))
+        return Shell.make_sheet(parent.faces())
     raise ValueError("edges must belong to a sheet Face, Sketch, or Shell")
 
 
@@ -230,7 +230,10 @@ def _apply_faces(
     if context is not None:
         context._add_to_context(*additions, mode=mode)
         return context.sheet_local
-    return BuildSheet._validated_shell(list(target.faces()) + additions)
+    joined = Shell.make_sheet(list(target.faces()) + additions)
+    if joined._history is not None:
+        joined._history.with_inputs([target.wrapped], (a.wrapped for a in additions))
+    return joined
 
 
 def flange(
@@ -603,7 +606,7 @@ def miter(
         new_face = Face(Wire.make_polygon(points), face.inner_wires())
         new_faces.append(_orient_face(new_face, face.normal_at(face.center())))
 
-    result = BuildSheet._validated_shell(new_faces)
+    result = Shell.make_sheet(new_faces)
     if context is not None:
         context._add_to_context(*new_faces, mode=Mode.REPLACE)
         return context.sheet_local
@@ -2890,4 +2893,4 @@ def _fold(
         if other.is_same(face) or other.is_same(partner):
             continue
         faces.append(folded(other) if any(other.is_same(m) for m in moving) else other)
-    return BuildSheet._validated_shell(faces)
+    return Shell.make_sheet(faces)

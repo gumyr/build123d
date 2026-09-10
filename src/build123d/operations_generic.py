@@ -410,7 +410,7 @@ def chamfer(
         if isinstance(context, BuildSheet):
             context._add_to_context(*new_faces, mode=Mode.REPLACE)
             return context.sheet_local
-        return BuildSheet._validated_shell(new_faces)
+        return Shell.make_sheet(new_faces)
 
     if target._dim == 3:
         # Convert BasePartObject into Part so casting into Part during construction works
@@ -541,7 +541,7 @@ def fillet(
         if isinstance(context, BuildSheet):
             context._add_to_context(*new_faces, mode=Mode.REPLACE)
             return context.sheet_local
-        return BuildSheet._validated_shell(new_faces)
+        return Shell.make_sheet(new_faces)
 
     if target._dim == 3:
         # Convert BasePartObject in Part so casting into Part during construction works
@@ -660,7 +660,7 @@ def mirror(
             -copy_module.deepcopy(face).mirror(about) for face in source_faces
         ]
         if mode == Mode.PRIVATE:
-            return BuildSheet._merged_shell(mirrored_faces)
+            return Shell.make_sheet(mirrored_faces, merge_coplanar=True)
         context._add_to_context(*mirrored_faces, mode=mode)
         return context.sheet_local
 
@@ -1110,7 +1110,7 @@ def split(
                     split_faces.extend(piece.faces())
 
         untouched_faces = [face for face in current_faces if face not in selected_faces]
-        result = BuildSheet._validated_shell(untouched_faces + split_faces)
+        result = Shell.make_sheet(untouched_faces + split_faces)
         if not result:
             raise ValueError("split removed the entire sheet")
         if mode == Mode.REPLACE:
