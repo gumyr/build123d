@@ -101,6 +101,7 @@ from build123d.topology import (
     Wire,
     topo_explore_connected_faces,
 )
+from build123d.topology.shape_core import find_same_topods
 
 
 def _orient_face(face: Face, desired_normal: Vector) -> Face:
@@ -137,10 +138,32 @@ def _outward_direction(edge: Edge, support: Face) -> tuple[Vector, Vector]:
     return outward, normal
 
 
+def _current_sheet(context: BuildSheet, shapes: list, what: str) -> Shell:
+    """The builder's sheet, after checking the selection is part of it.
+
+    Every operation resews the shell, so a selection made before an earlier
+    operation names shapes the sheet no longer contains. Left alone that fails
+    one operation later as a geometry problem - an edge with no adjacent face -
+    so it is caught here and called what it is.
+    """
+    sheet = context.sheet_local
+    for shape in shapes:
+        candidates = getattr(
+            sheet, {Vertex: "vertices", Edge: "edges"}.get(type(shape), "faces")
+        )()
+        if find_same_topods(shape.wrapped, (c.wrapped for c in candidates)) is None:
+            raise ValueError(
+                f"{what} are not part of the current sheet. Every operation "
+                "resews the shell, so a selection made before an earlier operation "
+                "is stale - select again from the sheet as it is now"
+            )
+    return sheet
+
+
 def _target_shell(context: BuildSheet | None, edges: list[Edge]) -> Shell:
     """Resolve a Face, Sketch, or Shell target for Builder or Algebra mode."""
     if context is not None:
-        return context.sheet_local
+        return _current_sheet(context, edges, "the selected edges")
     parent: Shape | None = edges[0].topo_parent
     if isinstance(parent, Shell):
         return parent
@@ -307,7 +330,7 @@ def flange(
 def _owning_shell(context: BuildSheet | None, shapes: list, what: str) -> Shell:
     """Resolve the shell some shapes belong to, in Builder or Algebra mode."""
     if context is not None:
-        return context.sheet_local
+        return _current_sheet(context, shapes, what)
     parents = [shape.topo_parent for shape in shapes]
     sheet_parents = [parent for parent in parents if isinstance(parent, Shell)]
     if not sheet_parents or len(sheet_parents) != len(parents):

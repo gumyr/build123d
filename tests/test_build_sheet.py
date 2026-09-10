@@ -1234,6 +1234,28 @@ class TestBendOutline(unittest.TestCase):
         self.assertEqual(kinds, ["BSPLINE", "BSPLINE", "LINE", "LINE"])
 
 
+class TestStaleSelections(unittest.TestCase):
+    """Every operation resews the shell, so a selection made before one is stale
+    afterwards; the next operation says so instead of failing on geometry."""
+
+    def test_a_stale_rim_is_named_as_stale(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(40, 20)
+            flange(bs.edges().sort_by(Axis.X)[-1], length=10)
+            wall = bs.flats().sort_by(Axis.Z)[-1]
+            rim = wall.rims().sort_by(Axis.Z)[-1]
+            miter(rim.vertices(), 10)  # rebuilds the wall, and its rim with it
+            with self.assertRaisesRegex(ValueError, "not part of the current sheet"):
+                flange(rim, length=5)
+            with self.assertRaisesRegex(ValueError, "not part of the current sheet"):
+                miter(rim.vertices(), 10)
+            # the same selection made again is fine
+            fresh = bs.flats().sort_by(Axis.Z)[-1].rims().sort_by(Axis.Z)[-1]
+            flange(fresh, length=5)
+            self.assertEqual(len(bs.bends()), 2)
+
+
 class TestSheetSelectors(unittest.TestCase):
     """fold_lines() and rims() name the edges the sheet operations work on."""
 
