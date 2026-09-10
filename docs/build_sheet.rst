@@ -235,8 +235,11 @@ than guessed at, because the topology cannot settle it either: both faces are
 equally the edge's own. Selecting the same edge through the face that stays is
 the answer, and it is no more work than reaching for the face separately.
 
-The bend takes a strip of the sheet with it as it rolls up, as wide as its own
-arc on the reference surface, so the sheet keeps the length it was drawn with.
+The bend takes a strip of the sheet with it as it rolls up, as wide as the bend
+allowance - the arc of the neutral axis - so that ``unfold`` gives back the
+length the blank was drawn with. Whatever the blank's outline does across that
+strip - a taper, a corner round, a notch, a hole - rolls into the bend with it;
+the strip need not be the same width at both ends.
 ``BendPosition`` says where that strip sits relative to the fold line:
 ``BEND_OUTSIDE`` puts all of it past the line and leaves the fixed face
 untouched, ``CENTER`` straddles the line, and the two mould line positions put

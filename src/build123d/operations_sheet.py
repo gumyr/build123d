@@ -34,6 +34,12 @@ from typing import Literal, overload
 
 import numpy as np
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Curve2d, BRepAdaptor_Surface
+from OCP.BRepBuilderAPI import (
+    BRepBuilderAPI_GTransform,
+    BRepBuilderAPI_MakeEdge,
+    BRepBuilderAPI_MakeFace,
+    BRepBuilderAPI_MakeWire,
+)
 from OCP.BRepLib import BRepLib
 from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
 from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
@@ -47,7 +53,10 @@ from OCP.Geom2d import (
 )
 from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
 from OCP.Geom2dInt import Geom2dInt_GInter
-from OCP.gp import gp_Ax22d, gp_Dir2d, gp_Pnt, gp_Pnt2d
+from OCP.Geom import Geom_CylindricalSurface, Geom_Plane
+from OCP.GeomProjLib import GeomProjLib
+from OCP.ShapeFix import ShapeFix_Face
+from OCP.gp import gp_Ax3, gp_Ax22d, gp_Dir2d, gp_Pln, gp_Pnt, gp_Pnt2d
 import OCP.TopAbs as ta
 from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
@@ -70,11 +79,12 @@ from build123d.build_enums import (
     Mode,
 )
 from build123d.build_sheet import BuildSheet
-from build123d.geometry import TOLERANCE, Axis, Location, Plane, Vector
+from build123d.geometry import Matrix, TOLERANCE, Axis, Location, Plane, Vector
 from build123d.sheet_utils import (
     MIN_BEND_RADIUS,
     SheetMetalParameters,
     is_positive_bend,
+    _topods_entities,
     bend_allowance,
     neutral_radius,
     reference_radius,
@@ -338,7 +348,9 @@ def bend(
     ``position`` says where that strip sits: ``BEND_OUTSIDE`` puts all of it
     past the line, leaving the fixed face untouched, while ``CENTER`` straddles
     the line and the two mould line positions place the corner of the formed
-    part on it.
+    part on it. Whatever the blank's outline does across that strip - a taper,
+    a corner round, a notch, a hole - rolls into the bend with it, so the strip
+    need not be the same width at both ends and ``unfold`` gives the blank back.
 
     Sizes are measured on the reference surface, as everywhere else in
     ``BuildSheet``, so the sheet is the reference surface of the part you get
@@ -2612,21 +2624,137 @@ def _fold_moving_faces(shell: Shell, face: Face, partner: Face) -> list:
     return moving
 
 
-def _fold_half(
-    face: Face, origin: Vector, across: Vector, beyond: bool, complaint: str
-) -> Face:
-    """The part of a planar face on one side of a line through it."""
+def _fold_pieces(
+    face: Face, origin: Vector, across: Vector, beyond: bool
+) -> list[Face]:
+    """The parts of a planar face on one side of a line through it."""
     plane = Plane(origin=tuple(origin), z_dir=tuple(across))
     piece = face.split(plane, keep=Keep.TOP if beyond else Keep.BOTTOM)
     if piece is None:
-        faces: list[Face] = []
-    elif isinstance(piece, Face):
-        faces = [piece]
-    else:
-        faces = list(piece)
-    if len(faces) != 1:
-        raise ValueError(complaint)
-    return faces[0]
+        return []
+    if isinstance(piece, Face):
+        return [piece]
+    return [p for p in piece if isinstance(p, Face)]
+
+
+def _bent_edge(
+    flat: Geom2d_Curve, first: float, last: float, surface: Geom_CylindricalSurface
+) -> TopoDS_Edge:
+    """An edge on a cylinder from its curve in the cylinder's parameters.
+
+    A segment along one parameter is one of the cylinder's own iso-curves - a
+    line along the axis or an arc about it - and is built from that, so the
+    bend's fold lines and rims stay exact lines and circles whatever form the
+    flat curve arrived in. Any other curve, a slanted end or a hole, gets its
+    3D form from the kernel.
+    """
+    points = [flat.Value(first + (last - first) * step / 4) for step in range(5)]
+    iso = None
+    if all(abs(pt.X() - points[0].X()) < _RELIEF_TOLERANCE for pt in points):
+        # constant angle: a line along the axis
+        iso = (
+            surface.UIso(points[0].X()),
+            Geom2d_Line(gp_Pnt2d(points[0].X(), 0.0), gp_Dir2d(0.0, 1.0)),
+            sorted((points[0].Y(), points[-1].Y())),
+        )
+    elif all(abs(pt.Y() - points[0].Y()) < _RELIEF_TOLERANCE for pt in points):
+        # constant height: an arc about the axis
+        iso = (
+            surface.VIso(points[0].Y()),
+            Geom2d_Line(gp_Pnt2d(0.0, points[0].Y()), gp_Dir2d(1.0, 0.0)),
+            sorted((points[0].X(), points[-1].X())),
+        )
+    if iso is not None:
+        curve3d, pcurve, (low, high) = iso
+        edge = BRepBuilderAPI_MakeEdge(curve3d, low, high).Edge()
+        BRep_Builder().UpdateEdge(edge, pcurve, surface, TopLoc_Location(), TOLERANCE)
+        return edge
+    edge = BRepBuilderAPI_MakeEdge(
+        Geom2d_TrimmedCurve(flat, first, last), surface
+    ).Edge()
+    BRepLib.BuildCurves3d_s(edge)
+    return edge
+
+
+def _face_onto_surface(uv_face: TopoDS_Face, surface: Geom_CylindricalSurface) -> Face:
+    """The face whose outline in ``surface``'s parameters is ``uv_face``.
+
+    The inverse of the development ``unfold`` makes: a planar face drawn in the
+    XY plane, holes and all, becomes the face with that outline on the surface.
+    Each edge's curve is read in the XY plane's own coordinates - a projection
+    that is exact for a curve lying in the plane - and carried over as the
+    pcurve on the surface.
+    """
+    xy_plane = Geom_Plane(gp_Pln())
+
+    def onto(wire: TopoDS_Wire) -> TopoDS_Wire:
+        maker = BRepBuilderAPI_MakeWire()
+        explorer = BRepTools_WireExplorer(wire)
+        while explorer.More():
+            edge = explorer.Current()
+            first, last = BRep_Tool.Range_s(edge)
+            curve3d = BRep_Tool.Curve_s(edge, first, last)
+            flat = GeomProjLib.Curve2d_s(curve3d, first, last, xy_plane)
+            maker.Add(_bent_edge(flat, first, last, surface))
+            explorer.Next()
+        return maker.Wire()
+
+    face_maker = BRepBuilderAPI_MakeFace(
+        surface, onto(BRepTools.OuterWire_s(uv_face)), True
+    )
+    for wire in _topods_entities(uv_face, ta.TopAbs_WIRE):
+        if not wire.IsSame(BRepTools.OuterWire_s(uv_face)):
+            face_maker.Add(onto(TopoDS.Wire(wire)))
+    # the parameter map may mirror the outline, and then the holes run the
+    # wrong way round for the face MakeFace settled on; the kernel puts that right
+    fixer = ShapeFix_Face(face_maker.Face())
+    fixer.Perform()
+    fixer.FixOrientation()
+    return Face(fixer.Face())
+
+
+def _wrap_strip(
+    strip: Face,
+    near: Vector,
+    across: Vector,
+    normal: Vector,
+    angle: float,
+    surface_radius: float,
+    allowance: float,
+) -> Face:
+    """Roll a flat strip of the blank onto the bend's cylinder, exactly.
+
+    A face on a surface is its outline in the surface's parameters, and a
+    planar strip's parameters are flat distances. Rolling it is the affine
+    change from those to the cylinder's: distance past the near line becomes
+    angle about the axis, at ``angle / allowance`` per unit of blank, and
+    distance along the line becomes distance along the axis. So the strip is
+    moved into the frame of the roll, scaled, and given the cylinder as its
+    surface with its outline kept - the reverse of what ``unfold`` does to a
+    bend. Holes, notches, tapers and corner rounds come with it.
+    """
+    sign = 1.0 if angle > 0 else -1.0
+    along = (across.cross(normal) * sign).normalized()  # the cylinder's axis
+    spoke = (-normal * sign).normalized()  # from the axis to the near line
+    axis_point = near + normal * (surface_radius * sign)
+    surface = Geom_CylindricalSurface(
+        gp_Ax3(axis_point.to_pnt(), along.to_dir(), spoke.to_dir()), surface_radius
+    )
+    # the strip in the frame of the roll: x past the near line, y along it
+    frame = Plane(origin=near, x_dir=across, z_dir=across.cross(along))
+    flat = frame.to_local_coords(strip)
+    # distance past the near line becomes angle about the axis
+    turn = radians(abs(angle)) / allowance
+    to_angle = Matrix(
+        [
+            [turn, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    in_parameters = BRepBuilderAPI_GTransform(flat.wrapped, to_angle.wrapped, True)
+    return _face_onto_surface(TopoDS.Face(in_parameters.Shape()), surface)
 
 
 def _fold_setback(
@@ -2650,23 +2778,6 @@ def _fold_setback(
     if position is BendPosition.MATERIAL_INSIDE:
         return radius * reach
     return (radius + thickness) * reach
-
-
-def _tangent_edge(leg: Face, origin: Vector, across: Vector) -> Edge:
-    """The straight edge of a leg lying on the line the bend starts from."""
-    on_line = [
-        edge
-        for edge in leg.edges()
-        if edge.geom_type == GeomType.LINE
-        and all(
-            abs((Vector(edge.position_at(end)) - origin).dot(across))
-            < _RELIEF_TOLERANCE
-            for end in (0.0, 1.0)
-        )
-    ]
-    if len(on_line) != 1:
-        raise ValueError(f"the bend meets the face along {len(on_line)} edges")
-    return on_line[0]
 
 
 def _fold(
@@ -2698,34 +2809,43 @@ def _fold(
         f"the bend does not fit - it takes {allowance:.4g} of sheet past the bend "
         f"line and {setback:.4g} before it"
     )
-    fixed_leg = (
-        face
-        if setback < _RELIEF_TOLERANCE
-        else _fold_half(face, near, across, False, complaint)
+    # The legs are what lies before the near line and beyond the far one; the
+    # strip between them is what rolls into the bend, with whatever the blank's
+    # outline does there - holes, notches, tapers - rolling with it
+    starts_on_line = setback < _RELIEF_TOLERANCE
+    fixed_legs = [face] if starts_on_line else _fold_pieces(face, near, across, False)
+    strip_pieces = (
+        [] if starts_on_line else _fold_pieces(face, near, across, True)
+    ) + _fold_pieces(partner, far, across, False)
+    moving_legs = _fold_pieces(partner, far, across, True)
+    if not fixed_legs or not moving_legs or not strip_pieces:
+        raise ValueError(complaint)
+    strip = (
+        strip_pieces[0].fuse(*strip_pieces[1:])
+        if len(strip_pieces) > 1
+        else strip_pieces[0]
     )
-    moving_leg = _fold_half(partner, far, across, True, complaint)
-    tangent = _tangent_edge(fixed_leg, near, across)
-    if abs(_tangent_edge(moving_leg, far, across).length - tangent.length) > 1e-6:
-        raise ValueError(
-            "the sheet is not the same width across the bend, so the strip it "
-            "consumes does not roll into a cylinder"
-        )
+    strips = [strip] if isinstance(strip, Face) else list(strip.faces())
 
     bend_axis = Axis(
-        Vector(tangent.position_at(0))
-        + normal * surface_radius * (1 if angle > 0 else -1),
+        near + normal * surface_radius * (1 if angle > 0 else -1),
         across.cross(normal),
     )
     spin = Axis((0, 0, 0), bend_axis.direction)
-    bend_face = _orient_face(
-        Face.revolve(tangent, angle, bend_axis), normal.rotate(spin, angle / 2)
-    )
+    inside = normal.rotate(spin, angle / 2)
+    bend_faces = [
+        _orient_face(
+            _wrap_strip(piece, near, across, normal, angle, surface_radius, allowance),
+            inside,
+        )
+        for piece in strips
+    ]
 
     def folded(shape):
         """Slide a moving face up to the bend and swing it round."""
         return shape.translate(-across * allowance).rotate(bend_axis, angle)
 
-    faces = [fixed_leg, bend_face, folded(moving_leg)]
+    faces = fixed_legs + bend_faces + [folded(leg) for leg in moving_legs]
     for other in shell.faces():
         if other.is_same(face) or other.is_same(partner):
             continue

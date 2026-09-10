@@ -4,6 +4,9 @@ import unittest
 from math import asin, degrees, pi, radians, sin, sqrt, tan
 from unittest.mock import PropertyMock, patch
 
+from OCP.BRepGProp import BRepGProp
+from OCP.GProp import GProp_GProps
+
 from build123d import *
 from build123d.operations_sheet import (
     _corner_mirror_plane,
@@ -1109,6 +1112,96 @@ class TestUnfoldOperation(unittest.TestCase):
             unfold(sheet, sheet_parameters=parameters).area * parameters.thickness,
             5,
         )
+
+
+def precise_area(shape) -> float:
+    """Area integrated to 1e-9; the default integrator loses ~1e-4 on B-spline
+    bounded faces, which the rolled bend faces are."""
+    props = GProp_GProps()
+    BRepGProp.SurfaceProperties_s(shape.wrapped, props, 1e-9)
+    return props.Mass()
+
+
+class TestBendOutline(unittest.TestCase):
+    """The strip a bend consumes rolls up with whatever the blank's outline does
+    across it, so folding is an isometry of the blank: the folded NEUTRAL shell
+    has the blank's area, and unfolding any surface gives the blank back."""
+
+    @staticmethod
+    def outlines() -> dict[str, Sketch]:
+        with BuildSketch() as plain:
+            Rectangle(40, 40)
+        with BuildSketch() as tapered:
+            Polygon((-20, -20), (20, -20), (14, 20), (-14, 20), align=None)
+        with BuildSketch() as rounded:
+            Rectangle(40, 40)
+            fillet(rounded.vertices().sort_by_distance((20, -20, 0))[0], 20)
+        with BuildSketch() as notched:
+            Rectangle(40, 40)
+            with Locations((20, 0)):
+                Circle(3, mode=Mode.SUBTRACT)
+        with BuildSketch() as holed:
+            Rectangle(40, 40)
+            Circle(1, mode=Mode.SUBTRACT)
+        return {
+            "plain": plain.sketch,
+            "tapered": tapered.sketch,
+            "rounded": rounded.sketch,
+            "notched": notched.sketch,
+            "holed": holed.sketch,
+        }
+
+    @staticmethod
+    def fold(blank: Sketch, angle: float, surface: SheetSurface) -> BuildSheet:
+        with BuildSheet(
+            thickness=1, bend_radius=2, k_factor=0.4, sheet_surface=surface
+        ) as sheet:
+            insert(blank, mode=Mode.REPLACE)
+            split(sheet.faces()[0], bisect_by=Plane.XZ, keep=Keep.BOTH)
+            fold_line = (
+                sheet.faces()
+                .sort_by(Axis.Y)[-1]
+                .edges()
+                .filter_by(Axis.X)
+                .sort_by(Axis.Y)[0]
+            )
+            bend(fold_line, angle=angle, position=BendPosition.CENTER)
+        return sheet
+
+    def test_folding_is_an_isometry_of_the_blank(self):
+        """Only the NEUTRAL surface bent toward its normal is the neutral fibre
+        itself, so only there does the folded shell keep the blank's area."""
+        for name, blank in self.outlines().items():
+            with self.subTest(outline=name):
+                sheet = self.fold(blank, 90, SheetSurface.NEUTRAL)
+                self.assertTrue(sheet.sheet.is_valid)
+                self.assertAlmostEqual(precise_area(sheet.sheet), blank.area, 6)
+
+    def test_unfolding_returns_the_blank(self):
+        """Every surface, both directions."""
+        for name, blank in self.outlines().items():
+            for surface in (SheetSurface.MID, SheetSurface.INSIDE):
+                for angle in (90, -90):
+                    with self.subTest(outline=name, surface=surface, angle=angle):
+                        sheet = self.fold(blank, angle, surface)
+                        self.assertTrue(sheet.sheet.is_valid)
+                        flat = unfold(sheet.sheet, sheet.sheet_parameters)
+                        self.assertAlmostEqual(precise_area(flat), blank.area, 6)
+
+    def test_the_outline_lands_on_the_bend(self):
+        holed = self.fold(self.outlines()["holed"], 90, SheetSurface.NEUTRAL).sheet
+        # the hole was entirely inside the strip, so it is a hole in the bend
+        (bend_face,) = holed.bends()
+        self.assertEqual(len(bend_face.inner_wires()), 1)
+        self.assertAlmostEqual(bend_face.inner_wires()[0].length, 2 * pi, 4)
+        # a plain strip's bend keeps exact lines along the axis and arcs about it
+        plain = self.fold(self.outlines()["plain"], 90, SheetSurface.NEUTRAL).sheet
+        kinds = sorted(e.geom_type.name for e in plain.bends()[0].edges())
+        self.assertEqual(kinds, ["CIRCLE", "CIRCLE", "LINE", "LINE"])
+        # a tapered strip rolls into a bend whose ends are not arcs
+        tapered = self.fold(self.outlines()["tapered"], 90, SheetSurface.NEUTRAL).sheet
+        kinds = sorted(e.geom_type.name for e in tapered.bends()[0].edges())
+        self.assertEqual(kinds, ["BSPLINE", "BSPLINE", "LINE", "LINE"])
 
 
 class TestBendAllowance(unittest.TestCase):
