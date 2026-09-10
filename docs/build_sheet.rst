@@ -538,6 +538,93 @@ without arguments consumes those pending sheets and creates the physical
     tray_part = thicken(tray.sheet, sheet_parameters=tray.sheet_parameters)
 
 *****************
+Recipes
+*****************
+
+Short worked snippets for the things a sheet metal part usually needs, each
+built from the operations above.
+
+**A tab folded up out of a slot.** A slot cut in the base is a hole, and its
+straight edges are rims, so a flange folds a tab up out of it. ``gaps`` make
+the tab narrower than the slot, which is what leaves clearance at its sides:
+
+.. code-block:: python
+
+    with BuildSheet(thickness=1, bend_radius=1) as bracket:
+        with BuildSketch():
+            Rectangle(100, 60)
+            SlotCenterToCenter(30, 8, mode=Mode.SUBTRACT)
+        slot_edge = bracket.rims().filter_by(Axis.X).sort_by(Axis.Y)[1]
+        flange(slot_edge, length=12, gaps=2)
+
+The tab is 26 wide in a 30 slot and stands 13 high, its bend included. The
+bend rolls up into the slot, so the slot has to be wider than the bend's
+footprint - here the reference radius of 1.
+
+**A cut across a bend from a view direction.** A drawn cutout is a solid, and a
+part object in ``Mode.SUBTRACT`` cuts every face it passes through. A box tall
+enough to reach the sheet on both sides of the drawing plane, centred on the
+bend, cuts a slot through the base, the bend and the wall in one go:
+
+.. code-block:: python
+
+    with BuildSheet(thickness=1, bend_radius=2) as tray:
+        with BuildSketch():
+            Rectangle(100, 60)
+        flange(tray.edges().sort_by(Axis.X)[-1], length=20)
+        with Locations((50, 0)):
+            Box(20, 6, 60, mode=Mode.SUBTRACT)
+
+A cutter built before the context - ``extrude(Pos(50, 0) * Rectangle(20, 6),
+30, both=True)`` - comes in the same way with ``insert(punch,
+mode=Mode.SUBTRACT)``. Either way the cutter must reach the reference surface,
+which for ``SheetSurface.INSIDE`` is the drawn face rather than the middle of
+the material; a cutter spanning both sides of the drawing plane always does.
+
+**Flaring a flange.** ``miter`` with a negative angle extends a flange's sides
+instead of trimming them, and ``through_bend=True`` widens the bend to match,
+so the flare runs from the fold line rather than starting at the bend tangent:
+
+.. code-block:: python
+
+    with BuildSheet(thickness=1, bend_radius=2) as leg:
+        with BuildSketch():
+            Rectangle(40, 20)
+        flange(leg.edges().sort_by(Axis.X)[-1], length=30)
+        wall = leg.flats().sort_by(Axis.Z)[-1]
+        miter(wall.vertices().group_by(Axis.Z)[-1], -15, through_bend=True)
+
+The wall's free end is 38.2 wide on a 20 edge, and the bend has widened to
+22.1. Without ``through_bend`` the bend stays 20 wide and the wall steps out
+from it at the tangent line.
+
+**A flange narrower than its edge.** ``gaps`` leave part of the edge unbent,
+and the face keeps that part of its edge as tabs beside the bend. With a
+set-back ``position`` the face is notched by the setback under the bend only,
+so the tabs still reach the corner the face was drawn to; ``unfold`` shows the
+notch on the blank:
+
+.. code-block:: python
+
+    with BuildSheet(thickness=1, bend_radius=2) as plate:
+        with BuildSketch():
+            Rectangle(100, 60)
+        flange(
+            plate.edges().sort_by(Axis.X)[-1],
+            length=15,
+            gaps=(10, 30),
+            position=BendPosition.MATERIAL_INSIDE,
+        )
+    blank = unfold(plate.sheet, plate.sheet_parameters)
+
+The bend is 20 wide on a 60 edge, the base still reaches ``x = 50`` on the
+tabs either side of it, and the blank carries a notch 2 deep - the inside
+setback of a 90 degree bend at radius 2 - where the bend's strip came out of
+the face. Two flanges meeting at a corner with set-back positions need gaps
+wider than the setback, so their strips do not overlap, and the corner then
+wants :func:`~operations_sheet.corner_relief` as usual.
+
+*****************
 Reference
 *****************
 
