@@ -1,7 +1,7 @@
 """Tests for the surface-native BuildSheet builder and operations."""
 
 import unittest
-from math import asin, degrees, pi, radians, sin, sqrt, tan
+from math import asin, cos, degrees, pi, radians, sin, sqrt, tan
 from unittest.mock import PropertyMock, patch
 
 from OCP.BRepGProp import BRepGProp
@@ -1222,6 +1222,173 @@ class TestFlangeLength(unittest.TestCase):
             # a wall just longer than the setback is a wall
             flange(edge, length=3.001, length_mode=FlangeLength.OUTER_SHARP)
         self.assertEqual(len(bs.sheet.flats()), 2)
+
+
+class TestJog(unittest.TestCase):
+    """Stepping a sheet sideways through two opposite bends."""
+
+    THICKNESS, RADIUS = 1, 2
+
+    def parameters(self) -> SheetMetalParameters:
+        return SheetMetalParameters(thickness=self.THICKNESS, bend_radius=self.RADIUS)
+
+    def jogged(self, offset: float, angle: float = 90, **kwargs) -> BuildSheet:
+        """A 100 x 60 plate split down the middle and jogged along the split."""
+        with BuildSheet(thickness=self.THICKNESS, bend_radius=self.RADIUS) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            split(bs.faces()[0], bisect_by=Plane.YZ, keep=Keep.BOTH)
+            line = bs.flats().sort_by(Axis.X)[0].fold_lines()[0]
+            jog(line, offset=offset, angle=angle, **kwargs)
+        return bs
+
+    def test_the_far_flat_steps_by_the_offset(self):
+        for offset in (10, -10):
+            for angle in (90, 60, 120):
+                with self.subTest(offset=offset, angle=angle):
+                    bs = self.jogged(offset, angle)
+                    flats = bs.sheet.flats().sort_by(Axis.X)
+                    self.assertEqual(len(flats), 3)
+                    self.assertEqual(len(bs.sheet.bends()), 2)
+                    self.assertAlmostEqual(flats[0].center().Z, 0, 6)
+                    self.assertAlmostEqual(flats[-1].center().Z, offset, 6)
+                    self.assertAlmostEqual(flats[-1].normal_at().Z, 1, 6)
+                    self.assertTrue(materialize(bs).is_valid)
+
+    def test_the_run_makes_up_what_the_bends_do_not_climb(self):
+        # both bends of a square jog climb one reference radius each, 2 for the
+        # bend toward the normal and 3 for the one away from it
+        bs = self.jogged(10)
+        run = bs.sheet.flats().sort_by(Axis.X)[1]
+        self.assertAlmostEqual(run.area / 60, 10 - (2 + 3), 6)
+        self.assertAlmostEqual(abs(run.normal_at().X), 1, 6)
+        # at 60 degrees the bends climb (2 + 3)(1 - cos 60) and the run the rest
+        run = self.jogged(10, 60).sheet.flats().sort_by(Axis.X)[1]
+        self.assertAlmostEqual(
+            run.area / 60, (10 - 5 * (1 - cos(radians(60)))) / sin(radians(60)), 6
+        )
+
+    def test_the_blank_round_trips(self):
+        for offset, angle in ((10, 90), (-10, 60), (10, 120)):
+            with self.subTest(offset=offset, angle=angle):
+                bs = self.jogged(offset, angle)
+                flat = unfold(bs.sheet, bs.sheet_parameters)
+                self.assertAlmostEqual(flat.bounding_box().size.X, 100, 6)
+                self.assertAlmostEqual(precise_area(flat), 6000, 4)
+
+    def test_the_far_flat_is_carried_not_turned(self):
+        # what the far flat gives up to the bends and the run, less how far the
+        # jog carries across, is how much it is drawn back
+        bs = self.jogged(10)
+        allowance = (self.RADIUS + 0.5 * self.THICKNESS) * pi / 2
+        consumed = 2 * allowance + 5
+        reach = 2 + 3
+        far = bs.sheet.flats().sort_by(Axis.X)[-1]
+        self.assertAlmostEqual(far.bounding_box().max.X, 50 + reach - consumed, 6)
+        self.assertAlmostEqual(far.bounding_box().min.X, reach, 6)
+
+    def test_a_jog_carries_what_is_attached(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(bs.edges().sort_by(Axis.X)[-1], length=10)
+            split(bs.flats().sort_by(Axis.Z)[0], bisect_by=Plane.YZ, keep=Keep.BOTH)
+            line = bs.flats().sort_by(Axis.X)[0].fold_lines()[0]
+            jog(line, offset=10)
+        wall = bs.sheet.flats().sort_by(Axis.Z)[-1]
+        self.assertAlmostEqual(wall.bounding_box().min.Z, 10 + 2, 6)
+        self.assertEqual(len(bs.sheet.bends()), 3)
+        self.assertTrue(materialize(bs).is_valid)
+
+    def test_position_sets_the_first_bend_back(self):
+        bs = self.jogged(10, position=BendPosition.MATERIAL_INSIDE)
+        near = bs.sheet.flats().sort_by(Axis.X)[0]
+        self.assertAlmostEqual(near.bounding_box().max.X, -2, 6)
+        self.assertAlmostEqual(bs.sheet.flats().sort_by(Axis.X)[-1].center().Z, 10, 6)
+        flat = unfold(bs.sheet, bs.sheet_parameters)
+        self.assertAlmostEqual(precise_area(flat), 6000, 4)
+
+    def test_a_jog_off_a_free_edge_is_a_stepped_flange(self):
+        allowance = (self.RADIUS + 0.5 * self.THICKNESS) * pi / 2
+        for position, setback in (
+            (BendPosition.BEND_OUTSIDE, 0),
+            (BendPosition.MATERIAL_INSIDE, 2),
+        ):
+            with self.subTest(position=position):
+                with BuildSheet(thickness=1, bend_radius=2) as bs:
+                    with BuildSketch():
+                        Rectangle(100, 60)
+                    jog(
+                        right_edge(bs.sheet_local),
+                        offset=10,
+                        length=15,
+                        gaps=5,
+                        position=position,
+                    )
+                self.assertEqual(len(bs.sheet.bends()), 2)
+                self.assertEqual(len(bs.sheet.flats()), 3)
+                far = bs.sheet.flats().sort_by(Axis.X)[-1]
+                self.assertAlmostEqual(far.center().Z, 10, 6)
+                self.assertAlmostEqual(
+                    far.bounding_box().max.X, 50 - setback + 5 + 15, 6
+                )
+                self.assertAlmostEqual(far.bounding_box().size.Y, 50, 6)
+                flat = unfold(bs.sheet, bs.sheet_parameters)
+                self.assertAlmostEqual(
+                    precise_area(flat),
+                    6000 + 50 * (2 * allowance + 5 + 15 - setback),
+                    4,
+                )
+                self.assertTrue(materialize(bs).is_valid)
+
+    def test_algebra_mode(self):
+        halves = Shell.make_sheet(
+            [Pos(-25, 0) * Face.make_rect(50, 60), Pos(25, 0) * Face.make_rect(50, 60)]
+        )
+        line = halves.flats().sort_by(Axis.X)[0].fold_lines()[0]
+        result = jog(line, offset=8, sheet_parameters=self.parameters())
+        self.assertIsInstance(result, Shell)
+        self.assertEqual(len(result.bends()), 2)
+        self.assertAlmostEqual(result.flats().sort_by(Axis.X)[-1].center().Z, 8, 6)
+        stepped = jog(
+            right_edge(halves), offset=8, length=10, sheet_parameters=self.parameters()
+        )
+        self.assertEqual(len(stepped.bends()), 2)
+        self.assertAlmostEqual(stepped.bounding_box().max.X, 50 + 5 + 10, 6)
+        with self.assertRaisesRegex(ValueError, "required in Algebra mode"):
+            jog(line, offset=8)
+
+    def test_validation(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            rim = right_edge(bs.sheet_local)
+            with self.assertRaisesRegex(ValueError, "positive length"):
+                jog(rim, offset=10)
+            with self.assertRaisesRegex(ValueError, "non-zero"):
+                jog(rim, offset=0, length=10)
+            with self.assertRaisesRegex(ValueError, "in \\(0, 180\\)"):
+                jog(rim, offset=10, angle=-90, length=10)
+            with self.assertRaisesRegex(ValueError, "offset must exceed"):
+                jog(rim, offset=1, length=10)
+            with self.assertRaisesRegex(ValueError, "at least one edge"):
+                jog([], offset=10, length=10)
+            with self.assertRaisesRegex(TypeError, "BendPosition"):
+                jog(rim, offset=10, length=10, position="inside")
+            split(bs.faces()[0], bisect_by=Plane.YZ, keep=Keep.BOTH)
+            line = bs.flats().sort_by(Axis.X)[0].fold_lines()[0]
+            with self.assertRaisesRegex(ValueError, "not a fold line"):
+                jog(line, offset=10, length=10)
+            with self.assertRaisesRegex(ValueError, "not a fold line"):
+                jog(line, offset=10, gaps=2)
+            with self.assertRaisesRegex(ValueError, "selected through a face"):
+                jog(bs.fold_lines()[0], offset=10)
+            with self.assertRaisesRegex(ValueError, "single fold line"):
+                jog([line, right_edge(bs.sheet_local)], offset=10)
+            with self.assertRaisesRegex(ValueError, "does not fit"):
+                jog(line, offset=200)
+            with self.assertRaisesRegex(ValueError, "must be straight"):
+                jog(Edge.make_circle(5), offset=10, length=10)
 
 
 class TestUnfoldOperation(unittest.TestCase):

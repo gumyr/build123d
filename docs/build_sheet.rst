@@ -286,6 +286,24 @@ positions put the corner of the formed part on it - the inside corner for
 lines are where the extended faces of the formed part meet, so they are
 undefined for a 180 degree fold, where those faces never do.
 
+:func:`~operations_sheet.jog` steps a sheet sideways: a bend, a straight run
+and a bend back the other way, leaving the far side parallel to where it was.
+It takes a fold line the way ``bend`` does, selected through the face that
+stays, and moves everything on the far side across by ``offset`` - measured
+between the reference surfaces of the two flats, so it is the step between the
+same face of the sheet on either side, positive toward the face normal. Given a
+free edge instead, as ``flange`` takes one, the jog is a stepped flange running
+on for ``length`` beyond the second bend. ``angle`` is how steeply the run
+climbs, 90 for a square step; the two bends climb ``(r1 + r2)(1 - cos angle)``
+between them and the run makes up the rest, so a jog needs at least that much
+offset. Both bends take their allowance of the blank and ``position`` places
+the first one on its line as it does for ``bend``, so ``unfold`` gives the
+blank back:
+
+.. code-block:: python
+
+    jog(sheet.flats().sort_by(Axis.X)[0].fold_lines()[0], offset=10)
+
 A blank has to carry the fold line as a real edge before it can be folded
 along one, which means a shell of coplanar faces rather than a single face.
 How such a blank is produced - imported with its outline, or marked on a
@@ -433,6 +451,9 @@ Reference
     :noindex:
 
 .. autofunction:: operations_sheet.bend
+    :noindex:
+
+.. autofunction:: operations_sheet.jog
     :noindex:
 
 .. autofunction:: operations_sheet.corner_relief

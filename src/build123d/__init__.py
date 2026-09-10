@@ -220,6 +220,7 @@ __all__ = [
     "import_brep",
     "import_dxf",
     "import_step",
+    "jog",
     "import_stl",
     "import_svg",
     "import_svg_as_buildline_code",

@@ -155,6 +155,7 @@ operations_apply_to = {
     "flange": ["BuildSheet"],
     "full_round": ["BuildSketch"],
     "hem": ["BuildSheet"],
+    "jog": ["BuildSheet"],
     "loft": ["BuildPart"],
     "make_brake_formed": ["BuildPart"],
     "make_face": ["BuildSketch"],
