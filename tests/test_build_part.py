@@ -335,7 +335,9 @@ class TestBuildPart(unittest.TestCase):
                 Rectangle(5, 5)
             extrude(amount=5)
         self.assertEqual(len(test.faces()), 11)
-        self.assertEqual(len(test.faces(Select.LAST)), 6)
+        # the extrusion's five exposed faces; the box top it merged into was
+        # only rebuilt, so it is not part of the last operation
+        self.assertEqual(len(test.faces(Select.LAST)), 5)
 
     def test_select_solids(self):
         """Test faces()"""

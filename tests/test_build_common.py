@@ -308,21 +308,134 @@ class TestBuilder(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not accept placement"):
             BuildPart(5)
 
-    def test_select_new_only_applies_to_edges(self):
+    def test_select_last_excludes_faces_the_operation_only_rebuilt(self):
+        """A cylinder standing on a box: the box top gets a circle cut into it
+        but it is not a face the operation created."""
+        with BuildPart() as builder:
+            Box(10, 10, 10)
+            with Locations((0, 0, 5)):
+                Cylinder(2, 5, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            last = builder.faces(Select.LAST)
+            self.assertEqual(len(last), 2)
+            self.assertEqual(
+                {f.geom_type for f in last}, {GeomType.CYLINDER, GeomType.PLANE}
+            )
+            self.assertTrue(all(f.center().Z > 5 for f in last))
+            # the edges of the new faces, including the circle shared with the top
+            self.assertEqual(len(builder.edges(Select.LAST)), 3)
+
+    def test_select_last_and_new_after_a_cut(self):
+        with BuildPart() as builder:
+            Box(10, 10, 10)
+            Hole(1)
+            # the hole wall was brought in by the cutter; the circles are new
+            self.assertEqual(len(builder.faces(Select.LAST)), 1)
+            self.assertEqual(builder.faces(Select.LAST)[0].geom_type, GeomType.CYLINDER)
+            self.assertEqual(len(builder.faces(Select.NEW)), 0)
+            self.assertEqual(len(builder.edges(Select.NEW)), 2)
+            self.assertTrue(
+                all(e.geom_type == GeomType.CIRCLE for e in builder.edges(Select.NEW))
+            )
+
+    def test_select_last_after_a_fillet_is_the_fillet(self):
+        with BuildPart() as builder:
+            Box(10, 10, 10)
+            fillet(builder.edges().filter_by(Axis.Z), 1)
+            last = builder.faces(Select.LAST)
+            self.assertEqual(len(last), 4)
+            self.assertTrue(all(f.geom_type == GeomType.CYLINDER for f in last))
+            self.assertEqual(len(builder.faces(Select.NEW)), 4)
+            # the fillets' seams and arcs, but not the trimmed box edges
+            self.assertEqual(len(builder.edges(Select.NEW)), 16)
+            self.assertEqual(len(builder.edges(Select.LAST)), 16)
+
+    def test_select_last_includes_shared_vertices_of_new_edges(self):
+        """The vertex a new edge shares with an old one belongs to the new edge."""
+        with BuildLine() as builder:
+            Line((0, 0), (1, 0))
+            Line((1, 0), (1, 1))
+            self.assertEqual(len(builder.vertices(Select.LAST)), 2)
+            # but neither vertex is new: both existed on the edge that was added
+            self.assertEqual(len(builder.vertices(Select.NEW)), 0)
+
+    def test_select_without_a_record_treats_the_unfamiliar_as_new(self):
+        """A replacement that arrives with no record of how it was made is
+        compared with what was there: identical sub-shapes are untouched, the
+        rest are new."""
+        with BuildPart() as builder:
+            Box(10, 10, 10)
+            add(Box(20, 20, 20), mode=Mode.REPLACE)
+            self.assertEqual(len(builder.faces(Select.LAST)), 6)
+            self.assertEqual(len(builder.faces(Select.NEW)), 6)
+            self.assertEqual(len(builder.solids(Select.NEW)), 1)
+
+    def test_new_edges_is_deprecated(self):
+        with BuildPart() as builder:
+            Box(1, 1, 1)
+            Cylinder(0.25, 3)
+            with self.assertWarns(DeprecationWarning):
+                self.assertEqual(len(builder.new_edges), 2)
+
+    def test_select_after_a_sketch_chamfer(self):
+        """A 2D chamfer records: the chamfer edges are new, the face was rebuilt."""
+        with BuildSketch() as sketch:
+            Rectangle(10, 10)
+            chamfer(sketch.vertices(), 1)
+            self.assertEqual(len(sketch.edges(Select.NEW)), 4)
+            self.assertEqual(len(sketch.edges(Select.LAST)), 4)
+            self.assertEqual(len(sketch.faces(Select.LAST)), 0)
+
+    def test_select_after_a_sketch_fillet(self):
+        """The custom 2D fillet records: arcs new, trimmed edges and face rebuilt."""
+        with BuildSketch() as sketch:
+            Rectangle(10, 10)
+            fillet(sketch.vertices(), 1)
+            self.assertEqual(len(sketch.edges()), 8)
+            self.assertEqual(len(sketch.edges(Select.NEW)), 4)
+            self.assertEqual(len(sketch.edges(Select.LAST)), 4)
+            self.assertEqual(len(sketch.faces(Select.LAST)), 0)
+            self.assertEqual(len(sketch.vertices(Select.NEW)), 8)
+
+    def test_select_after_a_partial_line_fillet(self):
+        """One corner filleted: one arc and its two ends are new, nothing else."""
+        with BuildLine() as line:
+            Polyline((0, 0), (10, 0), (10, 10), (0, 10), close=True)
+            fillet(line.vertices().sort_by_distance((10, 10, 0))[0:1], 2)
+            self.assertEqual(len(line.edges()), 5)
+            self.assertEqual(len(line.edges(Select.NEW)), 1)
+            self.assertEqual(line.edges(Select.NEW)[0].geom_type, GeomType.CIRCLE)
+            self.assertEqual(len(line.vertices(Select.NEW)), 2)
+            self.assertEqual(len(line.edges(Select.LAST)), 1)
+
+    def test_select_after_a_line_chamfer(self):
+        """The record rides on the wire the operation returns, not on the edges
+        the builder breaks it into."""
+        with BuildLine() as line:
+            Polyline((0, 0), (10, 0), (10, 10), (0, 10), close=True)
+            chamfer(line.vertices(), 1)
+            self.assertEqual(len(line.edges()), 8)
+            self.assertEqual(len(line.edges(Select.NEW)), 4)
+
+    def test_select_new_for_every_shape_type(self):
+        """Select.NEW answers for every type once an operation has a history."""
         with BuildPart() as builder:
             Box(1, 1, 1)
             for selector in (
                 builder.vertices,
-                builder.wires,
+                builder.edges,
                 builder.faces,
                 builder.solids,
             ):
                 with self.subTest(selector=selector.__name__):
-                    with self.assertRaisesRegex(ValueError, "only valid for edges"):
-                        selector(Select.NEW)
+                    self.assertEqual(len(selector(Select.NEW)), 0)
+            Cylinder(0.25, 3)
+            # the two circles where the cylinder meets the box, and the merged solid
+            self.assertEqual(len(builder.edges(Select.NEW)), 2)
+            self.assertEqual(len(builder.vertices(Select.NEW)), 2)
+            self.assertEqual(len(builder.faces(Select.NEW)), 0)
+            self.assertEqual(len(builder.solids(Select.NEW)), 1)
+            self.assertEqual(len(builder.wires(Select.NEW)), 2)
 
-
-class TestBuilderExit(unittest.TestCase):
     def test_multiple(self):
         with BuildPart() as test:
             with BuildLine() as l:

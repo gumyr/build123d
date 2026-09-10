@@ -54,6 +54,7 @@ from build123d.objects_part import BasePartObject
 from build123d.objects_sketch import BaseSketchObject
 from build123d.topology import (
     Compound,
+    ShapeHistory,
     Curve,
     Edge,
     Face,
@@ -421,7 +422,7 @@ def chamfer(
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
-        return Part(Compound([new_part]).wrapped)
+        return Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
 
     if target._dim == 2:
         # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
@@ -439,7 +440,9 @@ def chamfer(
                 )
             else:
                 new_faces.append(face)
-        new_sketch = Sketch(Compound(new_faces).wrapped)
+        new_sketch = Sketch(Compound(new_faces).wrapped)._made_by(
+            ShapeHistory.of(*new_faces)
+        )
 
         if context is not None:
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
@@ -550,7 +553,7 @@ def fillet(
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
-        return Part(Compound([new_part]).wrapped)
+        return Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
 
     if target._dim == 2:
         # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
@@ -567,7 +570,9 @@ def fillet(
                 new_faces.append(face.fillet_2d(radius, vertices_in_face))
             else:
                 new_faces.append(face)
-        new_sketch = Sketch(Compound(new_faces).wrapped)
+        new_sketch = Sketch(Compound(new_faces).wrapped)._made_by(
+            ShapeHistory.of(*new_faces)
+        )
 
         if context is not None:
             context._add_to_context(new_sketch, mode=Mode.REPLACE)

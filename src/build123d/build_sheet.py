@@ -39,10 +39,10 @@ from build123d.topology import (
     Edge,
     Face,
     Shape,
+    ShapeHistory,
     ShapeList,
     Shell,
     Solid,
-    Vertex,
     Wire,
     topo_explore_connected_faces,
 )
@@ -375,6 +375,7 @@ class BuildSheet(Builder[Shell]):
         self.obj_before = self._sheet
         self.to_combine = list(incoming_faces)
         existing_faces = list(self._sheet.faces()) if self._sheet else []
+        before = [self._sheet.wrapped] if self._sheet else []
 
         if mode == Mode.ADD:
             candidate_faces = existing_faces + incoming_faces
@@ -403,10 +404,11 @@ class BuildSheet(Builder[Shell]):
             if mode == Mode.REPLACE
             else self._merged_shell(candidate_faces)
         )
-        pre_faces = set(existing_faces)
-        pre_edges = set(self._sheet.edges()) if self._sheet else set()
         self._sheet = new_shell
-        self.lasts[Face] = ShapeList(set(new_shell.faces()) - pre_faces)
-        self.lasts[Edge] = ShapeList(set(new_shell.edges()) - pre_edges)
-        self.lasts[Vertex] = ShapeList()
-        self.lasts[Solid] = ShapeList()
+        # Sewing does not yet report what it did to each face (that comes with
+        # moving the sheet invariant onto Shell), so the sheet carries an empty
+        # record: whatever is still identical to before is untouched, and the
+        # rest is what the operation brought in or created
+        self._sheet._made_by(
+            ShapeHistory(before=before, brought=(f.wrapped for f in incoming_faces))
+        )

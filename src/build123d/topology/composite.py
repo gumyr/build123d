@@ -87,7 +87,7 @@ from OCP.TopoDS import (
     TopoDS_Iterator,
 )
 from anytree import PreOrderIter
-from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign, Unit
+from build123d.build_enums import Align, CenterOf, FontStyle, Select, TextAlign, Unit
 from build123d.geometry import (
     TOLERANCE,
     Axis,
@@ -101,6 +101,7 @@ from build123d.geometry import (
 from build123d.text import FONT_ASPECT, FontManager
 
 from .one_d import Edge, Wire, Mixin1D
+from .history import ShapeHistory
 from .shape_core import (
     Shape,
     ShapeList,
@@ -496,7 +497,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             curve = Curve() if self._wrapped is None else Curve(self.wrapped)
             sum1d = curve + other
             if isinstance(sum1d, Edge):
-                result1d = Curve([sum1d])
+                result1d = Curve([sum1d])._made_by(ShapeHistory.of(sum1d))
             else:
                 result1d = sum1d
             self.copy_attributes_to(result1d, ["wrapped", "_NodeMixin__children"])
@@ -507,6 +508,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         if not summands:
             return self
 
+        brought = summands
         summands = ShapeList(
             s for s in self.get_top_level_shapes() + summands if s is not None
         )
@@ -518,6 +520,13 @@ class Compound(Mixin3D[TopoDS_Compound]):
             fuse_op.SetFuzzyValue(TOLERANCE)
             self.copy_attributes_to(summands[0], ["wrapped", "_NodeMixin__children"])
             result = self._bool_op(summands[:1], summands[1:], fuse_op)
+            # the fuse ran self's first piece against all the rest; for the
+            # record, everything of self was there before and `other` was brought in
+            if result._history is not None:
+                result._history.with_inputs(
+                    (s.wrapped for s in self.get_top_level_shapes()),
+                    (s.wrapped for s in brought),
+                )
             if not isinstance(result, Compound):
                 result = Shape.make_composite([result], self._dim)
 
@@ -959,9 +968,9 @@ class Curve(Compound):
         """Location on wire operator ^ - only works if continuous"""
         return Wire(self.edges()).location_at(position)
 
-    def wires(self) -> ShapeList[Wire]:  # type: ignore
+    def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:  # type: ignore
         """A list of wires created from the edges"""
-        return Wire.combine(self.edges())
+        return Wire.combine(self.edges(select))
 
 
 class Sketch(Compound):

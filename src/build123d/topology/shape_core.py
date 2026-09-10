@@ -148,6 +148,7 @@ from build123d.build_enums import (
     Convexity,
     GeomType,
     Keep,
+    Select,
     SortBy,
     Transition,
     Unit,
@@ -169,6 +170,9 @@ from build123d.geometry import (
     logger,
 )
 from build123d.pack_utils import _pack2d
+
+from .history import ShapeHistory
+from .kernel import list_shapes
 
 if TYPE_CHECKING:  # pragma: no cover
     from build123d.build_part import BuildPart  # pylint: disable=R0801
@@ -334,6 +338,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # Extracted objects like Vertices and Edges may need to know where they
         # came from, and through what
         self.topo_path: tuple[Shape, ...] = ()
+        # What the operation that made this shape did to its inputs' sub-shapes,
+        # when the kernel reported it (booleans, clean, fillets and chamfers)
+        self._history: ShapeHistory | None = None
 
     # ---- Properties ----
 
@@ -455,6 +462,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
             color = self._material.pbr.interpolate_color()
             if color:
                 self.color = color
+
+    def _made_by(self, history: ShapeHistory | None) -> Self:
+        """Note the record of how this shape was made, for ``Select.LAST``/``NEW``."""
+        self._history = history
+        return self
 
     @property
     def convexity(self) -> Convexity:
@@ -1074,7 +1086,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
         )
         if factory is None:
             raise RuntimeError("Composite factory is not registered")
-        return factory(shape_list)
+        composite = factory(shape_list)
+        # pieces of one operation share its record; wrapping them keeps it
+        records = {id(s._history): s._history for s in shape_list if s._history}
+        if len(records) == 1:
+            composite._made_by(next(iter(records.values())))
+        return composite
 
     @staticmethod
     def _operands(other: None | Shape | Iterable[Shape]) -> list[Shape]:
@@ -1169,10 +1186,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self.wrapped is not None:
             memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
         for key, value in self.__dict__.items():
-            if key == "topo_path":
+            if key in ("topo_path", "_history"):
                 # provenance points at shapes outside the copy, so it is
                 # carried by reference rather than duplicated with it
-                result.topo_path = value
+                setattr(result, key, value)
             else:
                 setattr(result, key, copy.deepcopy(value, memo))
             if key == "joints":
@@ -1342,6 +1359,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         try:
             upgrader.Build()
             self.wrapped = tcast(TOPODS, downcast(upgrader.Shape()))
+            unified = ShapeHistory.from_unify(upgrader)
+            self._history = (
+                unified if self._history is None else self._history.merge(unified)
+            )
         except Exception:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unable to clean {self}", stacklevel=2)
         return self
@@ -1376,6 +1397,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         attrs1 = set(self.__dict__.keys())
         attrs2 = set(target.__dict__.keys())
         common_attrs = attrs1 & attrs2
+        common_attrs.discard("_history")  # says how self was made, not target
         if exceptions is not None:
             common_attrs -= set(exceptions)
 
@@ -1473,12 +1495,41 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Edge"""
         return Shape.get_single_shape(self, "Edge")
 
-    def edges(self) -> ShapeList[Edge]:
-        """edges - all the edges in this Shape - subclasses may override"""
+    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
+        """edges - all the edges in this Shape - subclasses may override
+
+        Args:
+            select (Select, optional): all edges, or those the operation that
+                made this shape brought in or created (``LAST``) or created
+                outright (``NEW``). Defaults to Select.ALL.
+        """
         edge_list = Shape.get_shape_list(self, "Edge")
-        return edge_list.filter_by(
-            lambda e: BRep_Tool.Degenerated_s(e.wrapped), reverse=True
+        return self._select(
+            edge_list.filter_by(
+                lambda e: BRep_Tool.Degenerated_s(e.wrapped), reverse=True
+            ),
+            select,
         )
+
+    def _select(self, shapes: ShapeList[T], select: Select) -> ShapeList[T]:
+        """Narrow a list of this shape's sub-shapes by what the last operation did."""
+        if select == Select.ALL:
+            return shapes
+        if self._history is None:
+            raise ValueError(
+                f"Select.{select.name} needs a record of how this shape was made, "
+                "and this one has none - it is the result of no recorded operation"
+            )
+        record = self._history
+        if select == Select.LAST:
+            return ShapeList(
+                s for s in shapes if record.is_last(tcast(TopoDS_Shape, s.wrapped))
+            )
+        if select == Select.NEW:
+            return ShapeList(
+                s for s in shapes if record.is_new(tcast(TopoDS_Shape, s.wrapped))
+            )
+        raise ValueError(f"Invalid input, must be one of {[s.name for s in Select]}")
 
     def entities(self, topo_type: Shapes) -> list[TopoDS_Shape]:
         """Return all of the TopoDS sub entities of the given type"""
@@ -1490,9 +1541,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Face"""
         return Shape.get_single_shape(self, "Face")
 
-    def faces(self) -> ShapeList[Face]:
-        """faces - all the faces in this Shape"""
-        return Shape.get_shape_list(self, "Face")
+    def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
+        """faces - all the faces in this Shape, or those selected by ``select``"""
+        return self._select(Shape.get_shape_list(self, "Face"), select)
 
     def faces_intersected_by_axis(
         self,
@@ -2053,9 +2104,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Shell"""
         return Shape.get_single_shape(self, "Shell")
 
-    def shells(self) -> ShapeList[Shell]:
-        """shells - all the shells in this Shape"""
-        return Shape.get_shape_list(self, "Shell")
+    def shells(self, select: Select = Select.ALL) -> ShapeList[Shell]:
+        """shells - all the shells in this Shape, or those selected by ``select``"""
+        return self._select(Shape.get_shape_list(self, "Shell"), select)
 
     def show_topology(
         self,
@@ -2111,9 +2162,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Solid"""
         return Shape.get_single_shape(self, "Solid")
 
-    def solids(self) -> ShapeList[Solid]:
-        """solids - all the solids in this Shape"""
-        return Shape.get_shape_list(self, "Solid")
+    def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
+        """solids - all the solids in this Shape, or those selected by ``select``"""
+        return self._select(Shape.get_shape_list(self, "Solid"), select)
 
     @overload
     def split(
@@ -2675,9 +2726,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Wire"""
         return Shape.get_single_shape(self, "Wire")
 
-    def wires(self) -> ShapeList[Wire]:
-        """wires - all the wires in this Shape"""
-        return Shape.get_shape_list(self, "Wire")
+    def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
+        """wires - all the wires in this Shape, or those selected by ``select``"""
+        return self._select(Shape.get_shape_list(self, "Wire"), select)
 
     def _apply_transform(self, transformation: gp_Trsf) -> Self:
         """Private Apply Transform
@@ -2765,6 +2816,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
             if tool.IsEmpty() or arg.IsEmpty():
                 return self.__class__()
 
+        # The arguments were there before and the tools are brought in. An
+        # empty record means every input sub-shape came through untouched,
+        # which is what the shortcuts above produce
+        before = [o._wrapped for o in args if o._wrapped is not None]
+        brought = [o._wrapped for o in tools if o._wrapped is not None]
+        history = ShapeHistory(before=before, brought=brought)
         if topo_result is None:
             operation.SetArguments(arg)
             operation.SetTools(tool)
@@ -2773,6 +2830,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             operation.Build()
 
             topo_result = downcast(operation.Shape())
+            history = ShapeHistory.from_boolean(operation, before, brought)
 
         # Clean
         if SkipClean.clean:
@@ -2782,6 +2840,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             try:
                 upgrader.Build()
                 topo_result = downcast(upgrader.Shape())
+                history.merge(ShapeHistory.from_unify(upgrader))
             except Exception:  # pylint: disable=broad-exception-caught
                 warnings.warn("Boolean operation unable to clean", stacklevel=2)
 
@@ -2796,14 +2855,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
             )
             for result in results:
                 base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+                result._made_by(history)
             result = Shape.make_composite(results, highest_order[1])
             base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
-            return result
+            return result._made_by(history)
 
         result = highest_order[0].cast(topo_result)
         base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
-
-        return result
+        return result._made_by(history)
 
     def _bool_op_list(
         self,
@@ -2829,7 +2888,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if result.is_null:
             return ShapeList()
         if isinstance(result.wrapped, TopoDS_Compound):
-            return result.get_top_level_shapes()
+            pieces = result.get_top_level_shapes()
+            for piece in pieces:
+                piece._made_by(result._history)  # the same operation made them all
+            return pieces
         return ShapeList([result])
 
     def _ocp_section(
@@ -2897,9 +2959,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Vertex"""
         return Shape.get_single_shape(self, "Vertex")
 
-    def vertices(self) -> ShapeList[Vertex]:
-        """vertices - all the vertices in this Shape"""
-        return Shape.get_shape_list(self, "Vertex")
+    def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
+        """vertices - all the vertices in this Shape, or those selected by ``select``"""
+        return self._select(Shape.get_shape_list(self, "Vertex"), select)
 
 
 class Comparable(ABC):
@@ -3153,7 +3215,9 @@ def topo_distance_to(
             if vertex_peer is None:
                 continue
 
-            for edge_wrapped in vertex_edge_map.FindFromKey(vertex_wrapped):
+            for edge_wrapped in list_shapes(
+                vertex_edge_map.FindFromKey(vertex_wrapped)
+            ):
                 edge = TopoDS.Edge(edge_wrapped)
                 vertex0 = TopoDS_Vertex()
                 vertex1 = TopoDS_Vertex()
@@ -3178,7 +3242,7 @@ def topo_distance_to(
         for index in range(connector_peer_map.Extent()):
             connector = connector_peer_map.FindKey(index + 1)
             connected_peers = []
-            for peer_wrapped in connector_peer_map.FindFromKey(connector):
+            for peer_wrapped in list_shapes(connector_peer_map.FindFromKey(connector)):
                 peer = peer_lookup.get(shape_hasher(peer_wrapped))
                 if peer is None:
                     continue

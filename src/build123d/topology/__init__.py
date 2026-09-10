@@ -29,6 +29,7 @@ license:
 
 """
 
+from .history import ShapeHistory
 from .shape_core import (
     Shape,
     Comparable,
@@ -71,6 +72,7 @@ __all__ = [
     "GroupBy",
     "ShapeList",
     "topo_distance_to",
+    "ShapeHistory",
     "Joint",
     "SkipClean",
     "BoundBox",

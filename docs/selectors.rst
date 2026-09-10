@@ -2,26 +2,35 @@ When using a GUI based CAD system the user will often click on a feature to sele
 it for some operation. How does a user "click" when CAD is done entirely in code?
 Selectors are recipes for how to isolate a feature from a design using python
 filter and sorting methods typically implemented as a set of custom python
-operations.
+operations. A selector names a kind of feature, operators refine the list, and the
+criteria they refine by come in three kinds: what a feature is (its type, size and
+direction), how it sits in its shape (its convexity, its neighbours, the route it was
+selected by), and when it came to be (``Select.LAST`` and ``Select.NEW``, read from
+the record every operation leaves on its result). See :doc:`topology_selection` for
+the full account.
 
 Quick Reference
 ---------------
 
 The following tables describes the build123d selectors:
 
-+-------------+-----------------------------------+-------------------+-------------------+
-| Selector    | Applicability                     | Description       | Example           |
-+=============+===================================+===================+===================+
-| vertices()  | BuildLine, BuildSketch, BuildPart | Vertex extraction | `part.vertices()` |
-+-------------+-----------------------------------+-------------------+-------------------+
-| edges()     | BuildLine, BuildSketch, BuildPart | Edge extraction   | `part.edges()`    |
-+-------------+-----------------------------------+-------------------+-------------------+
-| wires()     | BuildLine, BuildSketch, BuildPart | Wire extraction   | `part.wires()`    |
-+-------------+-----------------------------------+-------------------+-------------------+
-| faces()     | BuildSketch, BuildPart            | Face extraction   | `part.faces()`    |
-+-------------+-----------------------------------+-------------------+-------------------+
-| solids()    | BuildPart                         | Solid extraction  | `part.solids()`   |
-+-------------+-----------------------------------+-------------------+-------------------+
++-------------+-----------------------------------------------+-------------------+-------------------+
+| Selector    | Applicability                                 | Description       | Example           |
++=============+===============================================+===================+===================+
+| vertices()  | any Shape; BuildLine, BuildSketch, BuildPart  | Vertex extraction | `part.vertices()` |
++-------------+-----------------------------------------------+-------------------+-------------------+
+| edges()     | any Shape; BuildLine, BuildSketch, BuildPart  | Edge extraction   | `part.edges()`    |
++-------------+-----------------------------------------------+-------------------+-------------------+
+| wires()     | any Shape; BuildLine, BuildSketch, BuildPart  | Wire extraction   | `part.wires()`    |
++-------------+-----------------------------------------------+-------------------+-------------------+
+| faces()     | any Shape; BuildSketch, BuildPart             | Face extraction   | `part.faces()`    |
++-------------+-----------------------------------------------+-------------------+-------------------+
+| solids()    | any Shape; BuildPart                          | Solid extraction  | `part.solids()`   |
++-------------+-----------------------------------------------+-------------------+-------------------+
+
+Each selector takes a ``Select`` argument: ``Select.ALL`` (the default), ``Select.LAST``
+for the features the last operation brought in or created, or ``Select.NEW`` for those
+that existed in no input of it.
 
 .. _selector_operators:
 
@@ -36,7 +45,8 @@ The following tables describes the build123d selectors:
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
 | <<       | SortBy, Axis          | group_by           | Group ShapeList by operand and return first value     | `part.faces() << Axis.Y`                                                  |
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
-| \|       | Axis, Plane, GeomType | filter_by          | Filter and sort ShapeList by Axis, Plane, or GeomType | `part.faces() \| Axis.Z`                                                  |
+| \|       | Axis, Plane, GeomType,| filter_by          | Filter ShapeList by Axis, Plane, GeomType or          | `part.faces() \| Axis.Z`                                                  |
+|          | Convexity             |                    | Convexity                                             |                                                                           |
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
 | []       |                       |                    | Standard python list indexing and slicing             | `part.faces()[-2:]`                                                       |
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+

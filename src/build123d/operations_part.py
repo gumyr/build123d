@@ -36,6 +36,7 @@ from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector, VectorLike
 from build123d.sheet_utils import SheetMetalParameters, material_offsets
 from build123d.topology import (
+    ShapeHistory,
     Compound,
     Curve,
     DraftAngleError,
@@ -107,7 +108,7 @@ def draft(
     if context is not None:
         context._add_to_context(new_solid, clean=False, mode=Mode.REPLACE)
 
-    return Part(Compound([new_solid]).wrapped)
+    return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
 
 
 def extrude(
@@ -365,7 +366,7 @@ def loft(
     elif clean:
         new_solid = new_solid.clean()
 
-    return Part(Compound([new_solid]).wrapped)
+    return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
 
 
 def make_brake_formed(
@@ -475,7 +476,7 @@ def make_brake_formed(
     elif clean:
         new_solid = new_solid.clean()
 
-    return Part(Compound([new_solid]).wrapped)
+    return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
 
 
 def project_workplane(
