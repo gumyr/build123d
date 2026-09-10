@@ -202,6 +202,90 @@ between coplanar faces is kept because on a sheet it may be a fold line.
 face they pass through, or with faces coplanar with one of its flats.
 
 *****************
+Dimensioning
+*****************
+
+A drawing dimensions a folded part to its *virtual sharps* - the corners it
+would have if it were folded sharp, where the extended faces of two legs meet -
+and gives the bend a radius separately. The model is built from flat faces and
+the bends between them, so the question every sheet metal package answers, and
+this section does, is how a drawing's numbers become the sizes the faces are
+drawn with.
+
+Every size in ``BuildSheet`` is measured on the reference surface, the material
+face ``sheet_surface`` names. The material lies to one side of it, and the shell's
+face normal points from the outside material face toward the inside one:
+
+=============  ==================  ====================================
+Surface        Material lies       Where the surface sits
+=============  ==================  ====================================
+``INSIDE``     against the normal  the inside face of the sheet
+``OUTSIDE``    along the normal    the outside face of the sheet
+``MID``        half each way       the middle of the sheet
+``NEUTRAL``    ``k`` toward,       the neutral axis of a bend toward
+               ``1 - k`` against   the normal
+=============  ==================  ====================================
+
+A sheet drawn on ``Plane.XY`` with the default ``INSIDE`` surface has its material
+below the plane, from ``z = 0`` down to ``-thickness``. A positive angle folds
+toward ``+Z``, so the drawn face becomes the inside of the fold and the
+material wraps around the outside of the bend.
+
+Four lengths describe a bend of angle *θ* in a sheet of thickness *t* with
+inside radius *r*, all measured along the sheet from the bend's tangent line -
+the line where the flat stops and the arc begins:
+
+===================================  ====================================
+Quantity                             Value
+===================================  ====================================
+Inside setback, to the inner sharp   ``r · tan(θ / 2)``
+Outside setback, to the outer sharp  ``(r + t) · tan(θ / 2)``
+Bend allowance, flat the arc takes   ``θ · (r + k · t)`` with *θ* in radians
+Bend deduction                       ``2 · outside setback - bend allowance``
+===================================  ====================================
+
+The setbacks say how far a corner of the part lies beyond the tangent line, so
+a leg dimensioned to a sharp is longer than the flat it is drawn with by one
+setback, and a face between two bends is longer by two. The bend allowance is
+what a bend consumes of the blank; ``unfold`` gives exactly that back, and the
+flat pattern's length is the sum of the drawing's outside dimensions less one
+bend deduction per bend. ``reference_radius`` and ``bend_allowance`` in
+``build123d.sheet_utils`` compute the radius a bend is drawn with on the chosen
+surface and the flat it takes.
+
+``flange`` lets the drawing's numbers be used as they are. ``position`` puts
+the corner behind the bend on the edge the face was drawn to, and
+``length_mode`` measures the wall from the corner in front of it, so the
+setbacks are worked out by the flange rather than by hand. A U channel
+dimensioned to its outside faces - 60 wide, 40 high, 100 long, in 2 mm sheet
+bent to an inside radius of 3 - is drawn with exactly those numbers:
+
+.. code-block:: python
+
+    with BuildSheet(thickness=2, bend_radius=3) as channel:
+        with BuildSketch():
+            Rectangle(60, 100)  # the drawing's outside width and length
+        flange(
+            channel.edges().filter_by(Axis.Y),
+            length=40,  # the drawing's outside height
+            position=BendPosition.MATERIAL_OUTSIDE,
+            length_mode=FlangeLength.OUTER_SHARP,
+        )
+
+Thickened, the part measures 60 × 100 × 40 outside. Its flat pattern is
+``60 + 40 + 40 - 2 × 3.717 = 132.566`` long: the outside dimensions less two
+bend deductions, each ``2 × 5 - 6.283`` for the outside setback of
+``(3 + 2) · tan 45°`` and the allowance of ``π/2 · (3 + 0.5 × 2)``.
+
+With the default ``BendPosition.BEND_OUTSIDE`` and ``FlangeLength.TANGENT`` the
+bend starts at the edge and the wall is the flat beyond the bend, so the same
+channel is drawn to its tangent lines: a base of ``60 - 2 × 5`` and walls of
+``40 - 5``, each number shorter by the outside setback. Both give the same
+part; the default is the natural form when the flat sizes are what is known,
+as they are for a blank that already exists, and the drawing form when the
+sharps are.
+
+*****************
 Folding
 *****************
 
