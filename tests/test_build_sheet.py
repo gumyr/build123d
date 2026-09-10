@@ -1994,6 +1994,36 @@ class TestMiter(unittest.TestCase):
                     self.assertEqual(len(wall.vertices()), 3)
                     self.assertAlmostEqual(wall.area, 18 * apex / 2, 6)
 
+    def test_a_miter_keeps_the_rest_of_the_outline(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(40, 20)
+            flange(bs.edges().sort_by(Axis.X)[-1], length=10)
+            wall = bs.flats().sort_by(Axis.Z)[-1]
+            fillet(wall.vertices().group_by(Axis.Z)[-1].sort_by(Axis.Y)[0], 3)
+            with BuildSketch(Plane(bs.flats().sort_by(Axis.Z)[-1]), mode=Mode.SUBTRACT):
+                Circle(2)
+            wall = bs.flats().sort_by(Axis.Z)[-1]
+            miter(wall.vertices().group_by(Axis.Z)[-1].sort_by(Axis.Y)[-1], 20)
+        wall = bs.sheet.flats().sort_by(Axis.Z)[-1]
+        # the filleted corner and the hole survive; only the mitered side moved
+        self.assertEqual(len(wall.edges().filter_by(GeomType.CIRCLE)), 2)
+        self.assertEqual(len(wall.inner_wires()), 1)
+        self.assertTrue(bs.sheet.is_valid)
+
+    def test_a_miter_across_a_hole_is_refused(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(40, 20)
+            flange(bs.edges().sort_by(Axis.X)[-1], length=10)
+            wall = bs.flats().sort_by(Axis.Z)[-1]
+            with BuildSketch(Plane(wall), mode=Mode.SUBTRACT):
+                with Locations((-7, 0)):
+                    Circle(2)
+            wall = bs.flats().sort_by(Axis.Z)[-1]
+            with self.assertRaisesRegex(ValueError, "across a hole"):
+                miter(wall.vertices().group_by(Axis.Z)[-1], 40)
+
     def test_a_lone_miter_leaves_through_the_far_side(self):
         """With no miter at the other end the cut runs past the rim entirely
         and out through the side beyond it, which is a triangle as well."""

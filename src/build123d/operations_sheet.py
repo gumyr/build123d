@@ -601,6 +601,16 @@ def bend(
     ``BuildSheet``, so the sheet is the reference surface of the part you get
     rather than the blank it is cut from - ``unfold`` reports that.
 
+    What a fold needs, and is refused without: a line selected through a face,
+    as above; a planar face across the line, coplanar with the one that stays -
+    a line already at a bend cannot be bent again; enough sheet past the line
+    for the bend allowance, and before it for the setback ``position`` asks
+    for; and material that does not reach round to both sides of the line, as
+    a closed loop of faces would, since that fold would tear the sheet rather
+    than carry it. Whatever is attached to the far side - other bends and
+    flats - swings with it, and the sheet is not checked for running into
+    itself.
+
     Args:
         bend_line: Straight edge of the face that stays where it is, shared
             with a coplanar face, and selected through that face.
@@ -1021,9 +1031,15 @@ def miter(
 ) -> Shell:
     """Angle the sides of planar flanges.
 
-    Each selected vertex must be an endpoint of a free flange rim. A positive
-    angle trims the rim toward its other endpoint; a negative angle extends it.
-    The angle is measured from the side perpendicular to the rim.
+    Each selected vertex must be an endpoint of a free flange rim: the corner
+    where the flange's free end meets a straight side running back to the bend,
+    with the rim parallel to the bend, which is the shape a flange has when it
+    is made and keeps through further miters. A positive angle trims the rim
+    toward its other endpoint; a negative angle extends it. The angle is
+    measured from the side perpendicular to the rim. Only the rim and the side
+    that meet at the corner are redrawn; the rest of the outline, holes
+    included, stays as it is - so a cut that would run across a hole is
+    refused, as is one that would cut a bend into pieces through a hole in it.
 
     By default the cut stops at the bend, leaving it square-ended.
     ``through_bend`` carries it on to the fold line instead, which is what a
@@ -1117,33 +1133,55 @@ def miter(
         if face not in replacements:
             new_faces.append(face)
             continue
-        points = []
-        for edge in face.outer_wire().order_edges():
-            point = edge.position_at(0)
-            replacement = next(
-                (
-                    new_point
-                    for vertex, new_point in replacements[face].items()
-                    if (Vector(vertex) - point).length < 1e-7
-                ),
-                point,
+        new_faces.append(
+            _orient_face(
+                _remodel_flange(face, replacements[face]),
+                face.normal_at(face.center()),
             )
-            points.append(replacement)
-        # two miters that meet inside the flange land on the same point, and
-        # the rim between them is gone
-        points = [
-            point
-            for index, point in enumerate(points)
-            if (point - points[index - 1]).length > TOLERANCE
-        ]
-        new_face = Face(Wire.make_polygon(points), face.inner_wires())
-        new_faces.append(_orient_face(new_face, face.normal_at(face.center())))
+        )
 
     result = Shell.make_sheet(new_faces)
     if context is not None:
         context._add_to_context(*new_faces, mode=Mode.REPLACE)
         return context.sheet_local
     return result
+
+
+def _remodel_flange(face: Face, moved: dict[Vertex, Vector]) -> Face:
+    """A flange with some of its corners moved, the rest of its outline kept.
+
+    Only the edges that end on a moved corner are redrawn, as straight lines
+    between the new corners; every other edge - a filleted corner, a notch,
+    an arc - stays as it was, and the holes come along untouched. Two miters
+    that meet inside the flange land on the same point, and the rim between
+    them is gone.
+    """
+
+    def corner(point: Vector) -> Vector:
+        return next(
+            (
+                new_point
+                for vertex, new_point in moved.items()
+                if (Vector(vertex) - point).length < 1e-7
+            ),
+            point,
+        )
+
+    edges: list[Edge] = []
+    for edge in face.outer_wire().order_edges():
+        start, end = Vector(edge.position_at(0)), Vector(edge.position_at(1))
+        new_start, new_end = corner(start), corner(end)
+        if new_start == start and new_end == end:
+            edges.append(edge)
+        elif (new_end - new_start).length > TOLERANCE:
+            edges.append(Edge.make_line(new_start, new_end))
+    try:
+        remodelled = Face(Wire(edges), face.inner_wires())
+    except Exception as err:  # the kernel's failures share no base class
+        raise ValueError("the miter cuts across a hole in the flange") from err
+    if not remodelled.is_valid:
+        raise ValueError("the miter cuts across a hole in the flange")
+    return remodelled
 
 
 def _bend_beyond(
