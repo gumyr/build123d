@@ -30,16 +30,33 @@ reference shell. ``Mode.SUBTRACT`` regions cut holes and notches. Every
 operation sews and validates the shell before replacing the previous result,
 so selectors always work with current surface geometry.
 
-Sketch objects belong to ``BuildSketch``, so ``Rectangle(100, 60)`` written
-directly inside a ``BuildSheet`` context raises, exactly as it would inside
-``BuildPart``. Build the region in a nested ``BuildSketch`` and let it publish
-into the sheet, or construct plain shapes before the ``BuildSheet`` block and
-bring them in with :func:`~operations_generic.insert`.
+Sheet material is drawn in a nested ``BuildSketch``, which publishes its faces
+into the sheet; plain shapes built before the ``BuildSheet`` block come in with
+:func:`~operations_generic.insert`. A sketch object written directly inside the
+``BuildSheet`` context - ``Rectangle(100, 60)`` on its own - is refused with
+``Mode.ADD``, since a sheet is never drawn from 2D pieces the way a sketch is.
+It is taken as a *cutter*: with ``Mode.SUBTRACT`` it trims the sheet face it
+lies on, and with ``Mode.PRIVATE`` it is simply built where it is used, for a
+later ``insert``. Where it lies is where it cuts, so a circle drawn on the
+default plane trims the base and one placed on a wall's plane trims the wall:
 
-That nesting is what makes hole patterns convenient: a ``BuildSketch`` on the
-plane of a selected face, in ``Mode.SUBTRACT``, cuts the pattern into that face
-alone. The face can only be selected from inside the context, which is exactly
-where the nested sketch lives:
+.. code-block:: python
+
+    with BuildSheet(thickness=1, bend_radius=2) as tray:
+        with BuildSketch():
+            Rectangle(100, 60)
+        flange(tray.edges().filter_by(GeomType.LINE).sort_by(Axis.X)[-1], length=20)
+
+        with GridLocations(30, 30, 2, 2):
+            Circle(3, mode=Mode.SUBTRACT)  # holes in the base
+        with Locations(Plane(tray.flats().sort_by(Axis.Z)[-1])):
+            Circle(3, mode=Mode.SUBTRACT)  # a hole in the wall
+
+A nested ``BuildSketch`` in ``Mode.SUBTRACT`` cuts the same way, and is what
+makes hole patterns on one face convenient: a ``BuildSketch`` on the plane of a
+selected face cuts the pattern into that face alone, and the face can only be
+selected from inside the context, which is exactly where the nested sketch
+lives:
 
 .. code-block:: python
 
@@ -53,8 +70,9 @@ where the nested sketch lives:
             with GridLocations(20, 8, 3, 2):
                 Circle(2)
 
-Cutting this way is limited to the face the sketch plane matches. A cutout that
-has to cross a bend needs a solid cutter, described below.
+Cutting this way is limited to the face the cutter lies on, and a face lying on
+no sheet face is refused rather than ignored. A cutout that has to cross a bend
+needs a solid cutter, described below.
 
 Reusable surface components can be added with :func:`~operations_generic.insert`.
 It accepts faces, sketches, shells, and compatible ``BuildSheet`` builders,
@@ -65,7 +83,8 @@ from materialized objects.
 
 A Solid or Part is accepted as a *cutter* with ``Mode.SUBTRACT``. Unlike a
 face cutter, which only removes area from a sheet face it is coplanar with, a
-solid cuts every face it passes through, so a cutout may cross a bend:
+solid cuts every face it passes through, so a cutout may cross a bend - the
+*drawn cutout*, *normal cut* or *cut across a bend* of sheet metal packages:
 
 .. code-block:: python
 

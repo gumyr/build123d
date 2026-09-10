@@ -590,6 +590,78 @@ class TestSolidCutters(unittest.TestCase):
         self.assertEqual(sum(len(f.inner_wires()) for f in sheet.faces()), 1)
 
 
+class TestSketchObjectCutters(unittest.TestCase):
+    """Sketch objects drawn in a BuildSheet trim the face they lie on, and
+    never add to the sheet."""
+
+    @staticmethod
+    def flanged_tray() -> BuildSheet:
+        bs = BuildSheet(thickness=1, bend_radius=2)
+        bs.__enter__()
+        with BuildSketch():
+            Rectangle(100, 60)
+        flange(bs.edges().sort_by(Axis.X)[-1], length=20)
+        return bs
+
+    def test_a_sketch_object_cuts_a_hole(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            with GridLocations(30, 30, 2, 2):
+                Circle(3, mode=Mode.SUBTRACT)
+        base = bs.sheet.faces()[0]
+        self.assertEqual(len(base.inner_wires()), 4)
+        self.assertAlmostEqual(base.area, 6000 - 4 * pi * 9, 4)
+        self.assertTrue(materialize(bs).is_valid)
+
+    def test_a_cutter_trims_the_face_it_is_drawn_on(self):
+        bs = self.flanged_tray()
+        with bs:
+            wall = bs.flats().sort_by(Axis.Z)[-1]
+            with Locations(Plane(wall)):
+                Circle(3, mode=Mode.SUBTRACT)
+        self.assertEqual(len(bs.sheet.flats().sort_by(Axis.Z)[-1].inner_wires()), 1)
+        self.assertEqual(len(bs.sheet.flats().sort_by(Axis.Z)[0].inner_wires()), 0)
+
+    def test_a_cutter_off_every_face_is_refused(self):
+        # a slot drawn on the base plane but reaching past its edge trims the
+        # base; one lying on no sheet face at all is refused, not ignored
+        bs = self.flanged_tray()
+        with bs:
+            with Locations((50, 0)):
+                Rectangle(20, 6, mode=Mode.SUBTRACT)
+            self.assertEqual(len(bs.bends()), 1)
+            self.assertAlmostEqual(bs.flats().sort_by(Axis.Z)[0].area, 6000 - 60, 4)
+            with self.assertRaisesRegex(ValueError, "use a Solid to cut across"):
+                with Locations(Plane.XY.offset(5)):
+                    Circle(3, mode=Mode.SUBTRACT)
+
+    def test_a_private_sketch_object_is_just_built(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            cutter = SlotCenterToCenter(20, 6, mode=Mode.PRIVATE)
+            self.assertIsInstance(cutter, Sketch)
+            self.assertEqual(len(bs.sheet.faces()[0].inner_wires()), 0)
+            insert(cutter, mode=Mode.SUBTRACT)
+        self.assertEqual(len(bs.sheet.faces()[0].inner_wires()), 1)
+
+    def test_a_sketch_object_never_adds_material(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            for mode in (Mode.ADD, Mode.INTERSECT, Mode.REPLACE):
+                with self.subTest(mode=mode):
+                    with self.assertRaisesRegex(ValueError, "only as a cutter"):
+                        Rectangle(10, 10, mode=mode)
+            self.assertAlmostEqual(bs.sheet.faces()[0].area, 6000, 6)
+
+    def test_a_cutter_needs_a_sheet(self):
+        with BuildSheet(thickness=1):
+            with self.assertRaisesRegex(RuntimeError, "Nothing to subtract"):
+                Circle(3, mode=Mode.SUBTRACT)
+
+
 class TestThickenReferenceSurface(unittest.TestCase):
     """Material is one solid whatever surface the shell represents"""
 

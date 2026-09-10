@@ -29,7 +29,7 @@ license:
 from __future__ import annotations
 
 
-from build123d.build_common import Builder
+from build123d.build_common import BaseObject, Builder
 from build123d.build_enums import GeomType, Mode, Select, SheetSurface
 from build123d.geometry import Location, Plane
 from build123d.sheet_utils import SheetMetalParameters
@@ -37,6 +37,7 @@ from build123d.topology import (
     Compound,
     Edge,
     Face,
+    Shape,
     ShapeHistory,
     ShapeList,
     Shell,
@@ -233,6 +234,30 @@ class BuildSheet(Builder[Shell]):
     def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
         """Store edges supplied by line builders."""
         self.pending_edges.extend(obj for obj in objects if isinstance(obj, Edge))
+
+    def _accept_publication(
+        self, build_product: Shape, source: Builder | None, mode: Mode
+    ) -> None:
+        """Receive a nested Builder's product, or an object drawn in this context.
+
+        A sketch object drawn in a ``BuildSheet`` is a cutter, and only that:
+        with ``Mode.SUBTRACT`` its faces trim the sheet faces they lie on, as a
+        face published by a nested ``BuildSketch`` does, and a face lying on no
+        sheet face is refused. Sheet material is drawn in a nested
+        ``BuildSketch``, so any other mode is refused rather than letting the
+        sheet accumulate 2D pieces the way a sketch does.
+        """
+        if (
+            source is None
+            and isinstance(build_product, BaseObject)
+            and build_product._dim == 2
+            and mode != Mode.SUBTRACT
+        ):
+            raise ValueError(
+                "BuildSheet takes a sketch object only as a cutter, with "
+                "Mode.SUBTRACT - draw sheet material in a nested BuildSketch"
+            )
+        self._add_to_context(build_product, mode=mode)
 
     def _add_to_context(
         self,
