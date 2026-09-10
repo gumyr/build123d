@@ -74,6 +74,7 @@ __all__ = [
     "ContinuityLevel",
     "Convexity",
     "Extrinsic",
+    "FlangeLength",
     "FontStyle",
     "FrameMethod",
     "GeomType",

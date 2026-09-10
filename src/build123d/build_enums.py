@@ -321,6 +321,28 @@ class Mode(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class FlangeLength(Enum):
+    """Where a flange's length is measured from
+
+    A drawing gives a flange's length one of three ways, and this names which.
+    TANGENT measures from the bend's tangent line, so the length is the flat
+    wall alone. The two virtual sharps are the corners the formed part would
+    have if it were folded sharp - where the extended inner faces meet for
+    INNER_SHARP and the extended outer faces for OUTER_SHARP - so a length
+    measured from one is the overall size the drawing dimensions. The sharps
+    sit ``radius * tan(angle / 2)`` and ``(radius + thickness) * tan(angle / 2)``
+    past the tangent line, and are undefined at 180 degrees, where the faces
+    never meet.
+    """
+
+    TANGENT = auto()  # from the bend tangent line: the flat wall
+    INNER_SHARP = auto()  # from the inner virtual sharp
+    OUTER_SHARP = auto()  # from the outer virtual sharp
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class FontStyle(Enum):
     """Text Font Styles"""
 

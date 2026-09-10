@@ -72,6 +72,7 @@ from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_enums import (
     Align,
     BendPosition,
+    FlangeLength,
     ReliefType,
     GeomType,
     HemType,
@@ -397,6 +398,7 @@ def flange(
     radius: float | None = None,
     gaps: float | tuple[float, float] = 0,
     position: BendPosition = BendPosition.BEND_OUTSIDE,
+    length_mode: FlangeLength = FlangeLength.TANGENT,
     sheet_parameters: SheetMetalParameters | None = None,
 ) -> Shell:
     """Create cylindrical bends and planar flanges from free sheet edges.
@@ -414,9 +416,17 @@ def flange(
     notch, a taper - so ``unfold`` gives the blank back. Only the bend's own
     span between the ``gaps`` is taken; the face beside it keeps its edge.
 
+    ``length`` is the flat wall by default, measured from the bend's tangent
+    line. A drawing more often gives the overall size, to the corner the part
+    would have if it were folded sharp, and ``length_mode`` takes it that way:
+    ``INNER_SHARP`` measures from the corner the inner faces make and
+    ``OUTER_SHARP`` from the outer one, leaving the trigonometry to the
+    flange. With ``position`` placing the corner behind the bend on the edge,
+    the drawing's dimensions can be used as they are on both sides of it.
+
     Args:
         edges: Linear free boundary edge or edges.
-        length: Planar flange length measured from the bend tangent.
+        length: Flange length, measured as ``length_mode`` says.
         angle: Signed bend angle in degrees. Defaults to 90.
         radius: Physical inside bend radius. Defaults to the bend radius in
             ``sheet_parameters``.
@@ -424,6 +434,8 @@ def flange(
             specifies ``(edge start, edge end)``. Defaults to 0.
         position: Where the bend sits relative to the edge. Defaults to
             ``BEND_OUTSIDE``, the whole bend past the edge.
+        length_mode: Where ``length`` is measured from. Defaults to
+            ``TANGENT``, the bend's tangent line.
         sheet_parameters: Material and reference-surface parameters. Required
             in Algebra mode and supplied by ``BuildSheet`` in Builder mode.
 
@@ -454,11 +466,28 @@ def flange(
         raise ValueError("gaps can't be negative")
     if not isinstance(position, BendPosition):
         raise TypeError("position must be a BendPosition")
+    if not isinstance(length_mode, FlangeLength):
+        raise TypeError("length_mode must be a FlangeLength")
     parameters = _resolve_sheet_parameters(context, sheet_parameters)
     if radius is None:
         radius = parameters.resolved_bend_radius
     if radius < 0:
         raise ValueError("radius can't be negative")
+    leg_length = length
+    if length_mode is not FlangeLength.TANGENT:
+        to_sharp = _virtual_sharp(
+            angle,
+            radius,
+            parameters.thickness,
+            length_mode is FlangeLength.OUTER_SHARP,
+            length_mode,
+        )
+        leg_length = length - to_sharp
+        if leg_length <= TOLERANCE:
+            raise ValueError(
+                f"length must exceed the {to_sharp:.4g} from the virtual sharp to "
+                "the bend tangent, or the flange has no wall"
+            )
 
     target = _target_shell(context, edge_list)
     additions, replaced = _flange_faces(
@@ -466,7 +495,7 @@ def flange(
         edge_list,
         radius,
         angle,
-        length,
+        leg_length,
         parameters,
         (gap_start, gap_end),
         position,
@@ -2963,15 +2992,29 @@ def _fold_setback(
         return 0.0
     if position is BendPosition.CENTER:
         return allowance / 2
+    return _virtual_sharp(
+        angle, radius, thickness, position is BendPosition.MATERIAL_OUTSIDE, position
+    )
+
+
+def _virtual_sharp(
+    angle: float, radius: float, thickness: float, outer: bool, asked_by: object
+) -> float:
+    """How far past the bend tangent line the virtual sharp lies.
+
+    The virtual sharp is the corner the part would have if it were folded
+    sharp, where the extended faces of its two legs meet - the inner faces for
+    the inner sharp, the outer faces for the outer one. It is the same distance
+    from either tangent line, and does not exist for a fold of 180 degrees or
+    more, where the legs never meet.
+    """
     if abs(angle) >= 180:
         raise ValueError(
-            f"{position} places a mould line on the bend line, and the faces "
-            "of a 180 degree bend never meet to make one"
+            f"{asked_by} needs a mould line, where the extended faces of the "
+            "formed part meet, and the faces of a 180 degree bend never meet"
         )
     reach = tan(radians(abs(angle)) / 2)
-    if position is BendPosition.MATERIAL_INSIDE:
-        return radius * reach
-    return (radius + thickness) * reach
+    return (radius + thickness if outer else radius) * reach
 
 
 def _fold(

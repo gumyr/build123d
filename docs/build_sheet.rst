@@ -203,10 +203,20 @@ is taken, and the face beside it keeps its edge as a tab reaching the corner;
 where two flanged edges meet, each bend's strip would take material the other
 one needs, so the gaps there have to be wider than the setback.
 
+The wall's ``length`` is the flat wall by default, measured from the bend's
+tangent line, where a drawing usually gives the overall size to a virtual sharp
+- the corner the part would have if it were folded sharp. ``length_mode`` takes
+the length the drawing's way, as ``PolarLine`` does with its own ``length_mode``:
+``FlangeLength.INNER_SHARP`` measures from the corner the inner faces make and
+``OUTER_SHARP`` from the outer one, and the flange works out the wall. With
+``position`` placing the other corner on the edge, a part can be modelled from
+its drawing dimensions without working back to tangent lines by hand:
+
 .. code-block:: python
 
-    flange(plate.edges().filter_by(Axis.Y), length=20, gaps=30,
-           position=BendPosition.MATERIAL_INSIDE)
+    flange(plate.edges().filter_by(Axis.Y), length=65, gaps=30, angle=60,
+           position=BendPosition.MATERIAL_OUTSIDE,
+           length_mode=FlangeLength.OUTER_SHARP)
 
 :func:`~operations_sheet.miter` angles the side of a flange. It takes vertices
 at the ends of a free flange rim; positive angles trim the flange and negative

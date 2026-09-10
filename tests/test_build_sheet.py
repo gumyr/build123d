@@ -1149,6 +1149,81 @@ class TestFlangePosition(unittest.TestCase):
         self.assertEqual(len(result.fold_lines()), 0)
 
 
+class TestFlangeLength(unittest.TestCase):
+    """Where a flange's length is measured from: the tangent line or one of
+    the virtual sharps the drawing dimensions to."""
+
+    def flanged(self, length_mode: FlangeLength, angle: float = 90, **kwargs):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            flange(
+                right_edge(bs.sheet_local),
+                length=10,
+                angle=angle,
+                length_mode=length_mode,
+                **kwargs,
+            )
+        return bs
+
+    def test_the_wall_ends_the_length_from_the_sharp(self):
+        # The material lies below the reference surface, z in [-1, 0]. Folded up,
+        # the inner faces meet at z=0, the outer at z=-1 and the tangent line is
+        # z=2; folded down the sheet's other face is inside the bend, so the
+        # inner faces meet at z=-1, the outer at z=0 and the tangent line is z=-3
+        expected = {
+            90: (12, 10, 9),
+            -90: (13, 11, 10),
+        }
+        modes = (
+            FlangeLength.TANGENT,
+            FlangeLength.INNER_SHARP,
+            FlangeLength.OUTER_SHARP,
+        )
+        for angle, tops in expected.items():
+            for length_mode, top in zip(modes, tops):
+                with self.subTest(angle=angle, length_mode=length_mode):
+                    material = materialize(self.flanged(length_mode, angle))
+                    bbox = material.bounding_box()
+                    reach = bbox.max.Z if angle > 0 else -bbox.min.Z
+                    self.assertAlmostEqual(reach, top, 6)
+                    self.assertTrue(material.is_valid)
+
+    def test_an_acute_fold_takes_the_sharp_from_its_tangent(self):
+        bs = self.flanged(FlangeLength.OUTER_SHARP, angle=60)
+        wall = bs.sheet.flats().sort_by(Axis.Z)[-1]
+        self.assertAlmostEqual(wall.area / 60, 10 - 3 * tan(radians(30)), 6)
+        bs = self.flanged(FlangeLength.INNER_SHARP, angle=60)
+        wall = bs.sheet.flats().sort_by(Axis.Z)[-1]
+        self.assertAlmostEqual(wall.area / 60, 10 - 2 * tan(radians(30)), 6)
+
+    def test_drawing_dimensions_on_both_sides_of_the_bend(self):
+        # the plate is drawn to the outer corner and the wall measured from it,
+        # so the part is exactly 50 wide and 10 tall as the drawing says
+        bs = self.flanged(
+            FlangeLength.OUTER_SHARP, position=BendPosition.MATERIAL_OUTSIDE
+        )
+        bbox = materialize(bs).bounding_box()
+        self.assertAlmostEqual(bbox.max.X, 50, 6)
+        self.assertAlmostEqual(bbox.max.Z, 9, 6)
+        self.assertAlmostEqual(bbox.min.Z, -1, 6)
+
+    def test_validation(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+            edge = right_edge(bs.sheet_local)
+            with self.assertRaisesRegex(ValueError, "no wall"):
+                flange(edge, length=3, length_mode=FlangeLength.OUTER_SHARP)
+            with self.assertRaisesRegex(ValueError, "mould line"):
+                flange(edge, length=10, angle=180, length_mode=FlangeLength.INNER_SHARP)
+            with self.assertRaisesRegex(TypeError, "FlangeLength"):
+                flange(edge, length=10, length_mode="sharp")
+            # a wall just longer than the setback is a wall
+            flange(edge, length=3.001, length_mode=FlangeLength.OUTER_SHARP)
+        self.assertEqual(len(bs.sheet.flats()), 2)
+
+
 class TestUnfoldOperation(unittest.TestCase):
     """The operation supplies the parameters the bare method leaves optional"""
 
