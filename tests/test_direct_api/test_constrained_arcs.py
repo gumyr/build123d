@@ -586,6 +586,9 @@ def test_higher_level_constrained_arcs():
     lines = ConstrainedArcs(unit_circle, Axis.Y, radius=1)
     assert len(lines.edges()) == 4
 
+    axis_centered = ConstrainedArcs(Line((0, 0), (4, 0)), radius=1, center_on=Axis.Y)
+    assert len(axis_centered.edges()) == 2
+
     with BuildLine() as drawing:
         ConstrainedArcs(
             unit_circle, Axis.Y, radius=1, selector=lambda a: a.group_by(Axis.Y)[-1]
