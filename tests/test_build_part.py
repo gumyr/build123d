@@ -378,6 +378,24 @@ class TestBuildPart(unittest.TestCase):
                 make_solid()
             self.assertEqual(len(builder_result.pending_faces), len(open_faces))
 
+    def test_make_solid_empty_faces(self):
+        """An explicitly empty face collection cannot define a solid."""
+        with self.assertRaisesRegex(ValueError, "No faces provided"):
+            make_solid([])
+
+    def test_make_solid_non_face_input(self):
+        """Reject mixed topology even when the first input is a face."""
+        box = Box(1, 2, 3)
+        with self.assertRaisesRegex(ValueError, "All objects must be faces"):
+            make_solid([box.faces()[0], box.edges()[0]])
+
+    def test_make_solid_disconnected_faces(self):
+        """Separate closed shells do not define the required single solid."""
+        box = Box(1, 2, 3)
+        other_box = Pos(5, 0, 0) * box
+        with self.assertRaisesRegex(ValueError, "single closed shell"):
+            make_solid([*box.faces(), *other_box.faces()])
+
     def test_add_pending_edges(self):
         with BuildPart() as test:
             Box(100, 100, 100)
