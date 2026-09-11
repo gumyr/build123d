@@ -163,7 +163,7 @@ with BuildPart() as ex7:
 ##########################################
 # 8. Polylines
 # [Ex. 8]
-(L, H, W, t) = (100.0, 20.0, 20.0, 1.0)
+L, H, W, t = (100.0, 20.0, 20.0, 1.0)
 pts = [
     (0, H / 2.0),
     (W / 2.0, H / 2.0),
@@ -782,3 +782,54 @@ with BuildPart() as ex38:
     write_svg()
 
 # show_object(ex38.part)
+
+##########################################
+# 39. Surface Patching
+# [Ex. 39]
+length = 100 * MM
+width = 60 * MM
+thickness = 20 * MM
+corner_radius = 10 * MM
+
+with BuildPart() as ex39:
+    with BuildLine():
+        perimeter = FilletPolyline(
+            (0, 0),
+            (length, 0),
+            (length, width),
+            (0, width),
+            (0, 0),
+            radius=corner_radius,
+        )
+    with BuildSketch(perimeter.location_at(0, x_dir=(-1, 0, 0))):
+        with BuildLine():
+            profile_arc = EllipticalCenterArc(
+                (0, 0),
+                width / 2,
+                thickness / 2,
+                start_angle=320,
+                arc_size=80,
+            )
+            Line(profile_arc @ 0, profile_arc @ 1)
+        make_face()
+
+    perimeter_solid = sweep(mode=Mode.PRIVATE)
+    retained_faces = (
+        perimeter_solid.faces()
+        .filter_by(GeomType.CYLINDER, reverse=True)
+        .filter_by(GeomType.PLANE, reverse=True)
+    )
+    insert(retained_faces)
+
+    top_boundary = retained_faces.edges().group_by(Axis.Z)[-1]
+    top = patch_surface(
+        top_boundary,
+        ContinuityLevel.C1,
+        [(length / 2, width / 2, thickness / 2)],
+    )
+    mirror(top, Plane.XY)
+    make_solid()
+    # [Ex. 39]
+    write_svg()
+
+# show_object(ex39.part)

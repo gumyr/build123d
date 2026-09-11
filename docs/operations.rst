@@ -2,7 +2,7 @@
 Operations
 ##########
 
-Operations are functions that take objects as inputs and transform them into new objects. For example, a 2D Sketch can be extruded to create a 3D Part. All operations are Python functions which can be applied using both the Algebra and Builder APIs. It's important to note that objects created by operations are not affected by ``Locations``, meaning their position is determined solely by the input objects used in the operation.
+Operations are functions that take objects as inputs and transform them into new objects. For example, a 2D Sketch can be extruded to create a 3D Part. Unless noted in their reference, operations can be applied using both the Algebra and Builder APIs. It's important to note that objects created by operations are not affected by ``Locations``, meaning their position is determined solely by the input objects used in the operation.
 
 Here are a couple ways to use :func:`~operations_part.extrude`, in Builder and Algebra mode:
 
@@ -46,9 +46,13 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_sketch.make_hull`         | Create Convex Hull from Edges      |    |    | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_part.make_solid`          | Create a Solid from closed Faces   |    |    |    | ✓  | :ref:`39 <ex 39>`                 |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.mirror`           | Mirror about Plane                 |    | ✓  | ✓  | ✓  | :ref:`15 <ex 15>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.offset`           | Inset or outset Shape              |    | ✓  | ✓  | ✓  | :ref:`25 <ex 25>`                 |
++----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
+| :func:`~operations_generic.patch_surface`    | Create a surface patch             |    |    |    | ✓  | :ref:`39 <ex 39>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.project`          | Project points, lines or Faces     | ✓  | ✓  | ✓  |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
@@ -114,8 +118,10 @@ Reference
 .. autofunction:: operations_part.make_brake_formed
 .. autofunction:: operations_sketch.make_face
 .. autofunction:: operations_sketch.make_hull
+.. autofunction:: operations_part.make_solid
 .. autofunction:: operations_generic.mirror
 .. autofunction:: operations_generic.offset
+.. autofunction:: operations_generic.patch_surface
 .. autofunction:: operations_generic.project
 .. autofunction:: operations_part.project_workplane
 .. autofunction:: operations_part.revolve
