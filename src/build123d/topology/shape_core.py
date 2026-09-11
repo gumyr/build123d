@@ -3020,6 +3020,18 @@ class GroupBy(Generic[T, K]):
             self.groups.append(ShapeList(shapegroup))
             self.key_to_group_index.append((key, i))
 
+    # ---- Properties ----
+
+    @property
+    def first(self) -> ShapeList[T]:
+        """First group. Raises IndexError if there are no groups."""
+        return self[0]
+
+    @property
+    def last(self) -> ShapeList[T]:
+        """Last group. Raises IndexError if there are no groups."""
+        return self[-1]
+
     # ---- Instance Methods ----
 
     def __getitem__(self, key: int):
