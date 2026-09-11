@@ -1829,23 +1829,41 @@ class Shape(NodeMixin, Generic[TOPODS]):
         shape_copy.wrapped.Location(loc.wrapped)
         return shape_copy
 
-    def mesh(self, tolerance: float, angular_tolerance: float = 0.1):
-        """Generate triangulation if none exists.
+    def mesh(
+        self, tolerance: float, angular_tolerance: float = 0.1, *, relative: bool = True
+    ):
+        """Generate or refine the shape's triangulation.
 
         Args:
-          tolerance: float:
-          angular_tolerance: float:  (Default value = 0.1)
+            tolerance: Linear deflection. With relative=True, OCCT scales this
+                value by each edge's size; otherwise it is in model length units.
+            angular_tolerance: Angular deflection in radians. Defaults to 0.1.
+            relative: Scale linear deflection by edge size. Defaults to True.
 
-        Returns:
-
+        Existing finer triangulations may be reused. Cached polygons are discarded
+        when their recorded angle is insufficient or unknown.
         """
         if self._wrapped is None:
             raise ValueError("Cannot mesh an empty shape")
 
-        if not BRepTools.Triangulation_s(self.wrapped, tolerance):
-            BRepMesh_IncrementalMesh(
-                self.wrapped, tolerance, True, angular_tolerance, True
-            )
+        # OCCT checks cached linear deflection, but not angular deflection.
+        for face in self.faces():
+            triangulation = BRep_Tool.Triangulation_s(face.wrapped, TopLoc_Location())
+            if triangulation is None:
+                continue
+            parameters = triangulation.Parameters()
+            if (
+                parameters is None
+                or not parameters.HasAngle()
+                or parameters.Angle() > angular_tolerance
+            ):
+                # Clear shared edge polygons together with the face triangulations.
+                BRepTools.Clean_s(self.wrapped)
+                break
+
+        BRepMesh_IncrementalMesh(
+            self.wrapped, tolerance, relative, angular_tolerance, True
+        )
 
     def mirror(self, mirror_plane: Plane | None = None) -> Self:
         """
@@ -2320,13 +2338,20 @@ class Shape(NodeMixin, Generic[TOPODS]):
         raise ValueError(f"Unsupported Keep value {keep}")  # pragma: no cover
 
     def tessellate(
-        self, tolerance: float, angular_tolerance: float = 0.1
+        self, tolerance: float, angular_tolerance: float = 0.1, *, relative: bool = True
     ) -> tuple[list[Vector], list[tuple[int, int, int]]]:
-        """General triangulated approximation"""
+        """Return vertices and triangle indices approximating the shape.
+
+        Args:
+            tolerance: Linear deflection, scaled by edge size if relative=True,
+                or in model length units if relative=False.
+            angular_tolerance: Angular deflection in radians. Defaults to 0.1.
+            relative: Scale linear deflection by edge size. Defaults to True.
+        """
         if self._wrapped is None:
             raise ValueError("Cannot tessellate an empty shape")
 
-        self.mesh(tolerance, angular_tolerance)
+        self.mesh(tolerance, angular_tolerance, relative=relative)
 
         vertices: list[Vector] = []
         triangles: list[tuple[int, int, int]] = []
@@ -2374,6 +2399,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
         angular_tolerance: float = 0.1,
         atlas_packing: bool = True,
         atlas_gutter: float = 0.0,
+        *,
+        relative: bool = True,
     ) -> tuple[
         list[Vector],
         list[tuple[int, int, int]],
@@ -2392,8 +2419,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         all faces into a single [0, 1] texture atlas.
 
         Args:
-            tolerance: linear deflection for tessellation.
-            angular_tolerance: angular deflection for tessellation. Default 0.1.
+            tolerance: linear deflection, scaled by edge size if relative=True,
+                or in model length units if relative=False.
+            angular_tolerance: angular deflection in radians. Default 0.1.
+            relative: scale linear deflection by edge size. Defaults to True.
             atlas_packing: if True (default), pack per-face UVs into a single
                 texture atlas.  If False, each face's UVs are independently
                 normalized to [0, 1].
@@ -2414,7 +2443,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self._wrapped is None:
             raise ValueError("Cannot tessellate an empty shape")
 
-        self.mesh(tolerance, angular_tolerance)
+        self.mesh(tolerance, angular_tolerance, relative=relative)
 
         all_vertices: list[Vector] = []
         all_triangles: list[tuple[int, int, int]] = []
