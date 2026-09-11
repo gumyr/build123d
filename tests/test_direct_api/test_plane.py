@@ -519,6 +519,36 @@ class TestPlane(unittest.TestCase):
             extrude(amount=-1, mode=Mode.SUBTRACT)
         self.assertAlmostEqual(p.part.volume, b.volume - 2**2 * 1, 5)
 
+    def test_shift_origin_local_tuple(self):
+        plane = Plane((10, 20, 30), x_dir=(0, 1, 0), z_dir=(1, 0, 0))
+        for point, expected in (
+            ((0, 0), (10, 20, 30)),
+            ((1, 2), (10, 21, 32)),
+            ((-2, 3), (10, 18, 33)),
+        ):
+            with self.subTest(point=point):
+                shifted = plane.shift_origin(point)
+                self.assertEqual(shifted.origin, Vector(expected))
+                self.assertEqual(shifted.x_dir, plane.x_dir)
+                self.assertEqual(shifted.z_dir, plane.z_dir)
+        self.assertEqual(plane.origin, Vector(10, 20, 30))
+
+    def test_shift_origin_local_tuple_isometric(self):
+        plane = Plane.isometric.offset(10)
+        shifted = plane.shift_origin((1, 2))
+        self.assertEqual(shifted.origin, plane.origin + plane.x_dir + 2 * plane.y_dir)
+        self.assertEqual(shifted.x_dir, plane.x_dir)
+        self.assertEqual(shifted.z_dir, plane.z_dir)
+
+    def test_shift_origin_global_points(self):
+        plane = Plane((10, 20, 30), x_dir=(0, 1, 0), z_dir=(1, 0, 0))
+        for point in ((10, 1, 2), Vector(10, 1, 2)):
+            with self.subTest(point=point):
+                self.assertEqual(plane.shift_origin(point).origin, Vector(10, 1, 2))
+        for point in ((1, 2, 0), Vector(1, 2)):
+            with self.subTest(point=point), self.assertRaises(ValueError):
+                plane.shift_origin(point)
+
     def test_shift_origin_error(self):
         with self.assertRaises(ValueError):
             Plane.XY.shift_origin(Vertex(1, 1, 1))
