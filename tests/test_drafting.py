@@ -194,6 +194,7 @@ class DimensionLineTestCase(unittest.TestCase):
         bbox = d_line.bounding_box()
         self.assertAlmostEqual(bbox.max.X, 100, 5)
         self.assertAlmostEqual(d_line.dimension, 100, 5)
+        self.assertEqual(d_line.label_str, "100.00mm")
         self.assertEqual(len(d_line.faces()), 10)
 
     def test_three_points(self):
@@ -216,9 +217,15 @@ class DimensionLineTestCase(unittest.TestCase):
 
     def test_label(self):
         d_line = DimensionLine([(0, 0, 0), (100, 0, 0)], label="Test", draft=metric)
+        self.assertEqual(d_line.label_str, "Test")
         bbox = d_line.bounding_box()
         self.assertAlmostEqual(bbox.max.X, 100, 5)
         self.assertEqual(len(d_line.faces()), 6)
+
+    def test_label_with_tolerance(self):
+        d_line = DimensionLine([(0, 0), (30, 0)], draft=metric, tolerance=(0.1, 0.2))
+        self.assertEqual(d_line.label_str, "30.00 +0.10 -0.20mm")
+        self.assertAlmostEqual(d_line.dimension, 30)
 
     def test_face(self):
         with self.assertRaises(ValueError):
@@ -313,6 +320,17 @@ class DimensionLineTestCase(unittest.TestCase):
 
 
 class ExtensionLineTestCase(unittest.TestCase):
+    def test_custom_numeric_label(self):
+        e_line = ExtensionLine([(0, 0), (30, 0)], offset=10, draft=metric, label="99")
+        self.assertEqual(e_line.label_str, "99")
+        self.assertAlmostEqual(e_line.dimension, 30)
+
+    def test_curved_label_uses_border_length(self):
+        border = Edge.make_circle(100, start_angle=0, end_angle=90)
+        e_line = ExtensionLine(border, offset=10, draft=metric)
+        self.assertEqual(e_line.label_str, "157.08mm")
+        self.assertNotAlmostEqual(e_line.dimension, border.length)
+
     def test_min_x(self):
         shape, outer, inner = create_test_sketch()
         e_line = ExtensionLine(
@@ -369,6 +387,7 @@ class ExtensionLineTestCase(unittest.TestCase):
             ext.center(CenterOf.BOUNDING_BOX).Y,
         )
         self.assertEqual(ext.dimension, 100)
+        self.assertEqual(ext.label_str, "100.00mm")
 
     def test_vertical_projection_with_dim_inside_shape(self):
         diagonal_line = Edge.make_line((100, 100), (200, 200))
