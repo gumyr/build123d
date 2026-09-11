@@ -185,7 +185,13 @@ Rather than returning a |ShapeList|, |group_by| returns a ``GroupBy``, a list of
 |ShapeList| objects sorted by the grouping criteria. ``GroupBy`` can be printed to view
 the members of each group, indexed like a list to retrieve a |ShapeList|, and accessed
 by key with the ``group`` method. If the group keys are unknown they can be discovered
-with ``key_to_group_index``.
+with ``key_to_group_index``. The ``first`` and ``last`` properties return the first
+and last |ShapeList| groups, respectively, so selectors can be chained directly::
+
+    part.faces().group_by(SortBy.AREA).first.edges()
+
+These properties follow the group order, including when ``reverse=True`` is passed
+to |group_by|, and raise ``IndexError`` if there are no groups.
 
 If we want only the edges from the smallest faces by area we can get the faces, then
 group by ``SortBy.AREA``. The |ShapeList| of smallest faces is available from the first
