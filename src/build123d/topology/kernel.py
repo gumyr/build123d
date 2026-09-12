@@ -30,18 +30,18 @@ license:
 from __future__ import annotations
 
 from OCP.TopoDS import TopoDS_Shape
-from OCP.TopTools import TopTools_ListOfShape
+from OCP.collections import List_TopoDS_Shape
 
 
-def list_shapes(shapes: TopTools_ListOfShape) -> list[TopoDS_Shape]:
+def list_shapes(shapes: List_TopoDS_Shape) -> list[TopoDS_Shape]:
     """A kernel list as a Python list.
 
-    Iterating a ``TopTools_ListOfShape`` through its Python protocol costs
+    Iterating a ``List_TopoDS_Shape`` through its Python protocol costs
     over a millisecond per list, even an empty one; popping a copy of it
     from the front costs microseconds.
     """
     found: list[TopoDS_Shape] = []
-    remaining = TopTools_ListOfShape()
+    remaining = List_TopoDS_Shape()
     remaining.Assign(shapes)
     while not remaining.IsEmpty():
         found.append(remaining.First())
