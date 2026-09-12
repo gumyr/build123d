@@ -44,7 +44,6 @@ from build123d.topology import (
     Solid,
     Wire,
 )
-from build123d.topology.shape_core import find_same_topods
 
 
 class BuildSheet(Builder[Shell]):
