@@ -1670,7 +1670,7 @@ class Face(Mixin2D[TopoDS_Face]):
             min_deg (int, optional): minimum spline degree. Enforced only when
                 smoothing is None. Defaults to 1.
             max_deg (int, optional): maximum spline degree. Defaults to 3. Raised
-                to 5 when smoothing is used, the lowest degree that can meet the
+                to 6 when smoothing is used, the lowest degree that can meet the
                 C2 continuity the smoothing algorithm requires.
 
         Raises:
@@ -1686,10 +1686,11 @@ class Face(Mixin2D[TopoDS_Face]):
                 points_.SetValue(i + 1, j + 1, Vector(point).to_pnt())
 
         if smoothing:
-            # The smoothing overload asks OCCT for C2 continuity, which its
-            # variational solver cannot reach below degree 5.
+            # The smoothing overload asks OCCT for C2 continuity; its Jacobi
+            # basis needs a work degree of at least 2 * (2 + 1) = 6 for that
+            # (PLib_JacobiPolynomial rejects anything smaller since OCCT 8)
             spline_builder = GeomAPI_PointsToBSplineSurface(
-                points_, *smoothing, DegMax=max(max_deg, 5), Tol3D=tol
+                points_, *smoothing, DegMax=max(max_deg, 6), Tol3D=tol
             )
         else:
             spline_builder = GeomAPI_PointsToBSplineSurface(
