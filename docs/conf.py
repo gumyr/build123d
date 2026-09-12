@@ -78,9 +78,8 @@ napoleon_use_rtype = True
 napoleon_use_keyword = True
 napoleon_custom_sections = None
 
-autodoc_typehints = ["signature"]
-# autodoc_typehints = ["description"]
-# autodoc_typehints = ["both"]
+# Move type annotations off the signature and into each parameter's entry
+autodoc_typehints = "description"
 
 autodoc_default_options = {
     "members": True,

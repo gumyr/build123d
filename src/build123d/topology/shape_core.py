@@ -1093,23 +1093,29 @@ class Shape(NodeMixin, Generic[TOPODS]):
             composite._made_by(next(iter(records.values())))
         return composite
 
+    @staticmethod
+    def _operands(other: None | Shape | Iterable[Shape]) -> list[Shape]:
+        """Flatten a boolean operand into its top-level shapes.
+
+        A single Shape, an iterable of them, or None all reduce to a list;
+        None entries within an iterable are dropped.
+        """
+        if other is None:
+            return []
+        return [
+            shape
+            for o in ([other] if isinstance(other, Shape) else other)
+            if o is not None
+            for shape in o.get_top_level_shapes()
+        ]
+
     @overload
     def __add__(self, other: None) -> Self: ...
     @overload
     def __add__(self, other: Shape | Iterable[Shape]) -> Self | Compound: ...
     def __add__(self, other):
         """fuse shape to self operator +"""
-        # Convert `other` to list of base objects and filter out None values
-        if other is None:
-            summands = []
-        else:
-            summands = [
-                shape
-                # for o in (other if isinstance(other, (list, tuple)) else [other])
-                for o in ([other] if isinstance(other, Shape) else other)
-                if o is not None
-                for shape in o.get_top_level_shapes()
-            ]
+        summands = Shape._operands(other)
         # If there is nothing to add return the original object
         if not summands:
             return self
@@ -1232,17 +1238,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self._wrapped is None:
             raise ValueError("Cannot subtract shape from empty compound")
 
-        # Convert `other` to list of base objects and filter out None values
-        if other is None:
-            subtrahends = []
-        else:
-            subtrahends = [
-                shape
-                # for o in (other if isinstance(other, (list, tuple)) else [other])
-                for o in ([other] if isinstance(other, Shape) else other)
-                if o is not None
-                for shape in o.get_top_level_shapes()
-            ]
+        subtrahends = Shape._operands(other)
         # If there is nothing to subtract return the original object
         if not subtrahends:
             return self
@@ -3670,8 +3666,8 @@ class ShapeList(list[T]):
         from, with the groups in the enum's definition order.
 
         Args:
-            group_by (Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
-                optional): group and sort criteria, or the ``Convexity`` enum itself.
+            group_by (Callable | Axis | Edge | Wire | SortBy | property, optional):
+                group and sort criteria, or the ``Convexity`` enum itself.
                 Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
             tol_digits (int, optional): Tolerance for building the group keys by
@@ -3797,8 +3793,8 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            sort_by (Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
-                optional): sort criteria. Defaults to Axis.Z.
+            sort_by (Callable | Axis | Edge | Wire | SortBy | property, optional):
+                sort criteria. Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
 
         Raises:

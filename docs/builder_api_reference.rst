@@ -29,13 +29,18 @@ Enums
 .. py:module:: build_enums
 
 .. autoclass:: Align
+.. autoclass:: BendPosition
 .. autoclass:: CenterOf
 .. autoclass:: Convexity
+.. autoclass:: FlangeLength
 .. autoclass:: FontStyle
 .. autoclass:: GeomType
+.. autoclass:: HemType
+.. autoclass:: SheetSurface
 .. autoclass:: Keep
 .. autoclass:: Kind
 .. autoclass:: Mode
+.. autoclass:: ReliefType
 .. autoclass:: Select
 .. autoclass:: SortBy
 .. autoclass:: Transition

@@ -503,16 +503,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             self.copy_attributes_to(result1d, ["wrapped", "_NodeMixin__children"])
             return result1d
 
-        summands: ShapeList[Shape]
-        if other is None:
-            summands = ShapeList()
-        else:
-            summands = ShapeList(
-                shape
-                for o in ([other] if isinstance(other, Shape) else other)
-                if o is not None
-                for shape in o.get_top_level_shapes()
-            )
+        summands: ShapeList[Shape] = ShapeList(Shape._operands(other))
         # If there is nothing to add return the original object
         if not summands:
             return self

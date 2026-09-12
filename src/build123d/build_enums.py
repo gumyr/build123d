@@ -90,6 +90,31 @@ class AngularDirection(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class BendPosition(Enum):
+    """Where a bend sits relative to its bend line
+
+    A bend line marks a position on the sheet; this names the feature of the
+    formed bend that lands on it. Everything else follows: the bend reaches
+    from there into the moving side, taking a strip of material with it as it
+    rolls up.
+
+    Measured back from the line toward the fixed side, the bend's near tangent
+    sits at nothing for BEND_OUTSIDE, at ``radius * tan(angle / 2)`` for
+    MATERIAL_INSIDE, at ``(radius + thickness) * tan(angle / 2)`` for
+    MATERIAL_OUTSIDE, and at half the bend's own width for CENTER. The two
+    mould lines are where the extended faces of the formed part meet, so they
+    are undefined at 180 degrees, where those faces never do.
+    """
+
+    CENTER = auto()  # the bend straddles the line
+    MATERIAL_INSIDE = auto()  # the inside mould line falls on the line
+    MATERIAL_OUTSIDE = auto()  # the outside mould line falls on the line
+    BEND_OUTSIDE = auto()  # the whole bend lies past the line
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class CenterOf(Enum):
     """Center Options"""
 
@@ -213,6 +238,30 @@ class HeadType(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class HemType(Enum):
+    """Sheet metal hem styles"""
+
+    FLAT = auto()  # 180° fold flat onto the sheet
+    OPEN = auto()  # 180° fold with a gap (opening)
+    TEARDROP = auto()  # teardrop profile fold
+    ROLLED = auto()  # open rolled curl, no flat leg
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class SheetSurface(Enum):
+    """Reference surface represented by a sheet-metal shell"""
+
+    INSIDE = auto()
+    OUTSIDE = auto()
+    MID = auto()
+    NEUTRAL = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class Intrinsic(Enum):
     """Order to apply intrinsic rotations by axis"""
 
@@ -267,6 +316,28 @@ class Mode(Enum):
     INTERSECT = auto()
     REPLACE = auto()
     PRIVATE = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class FlangeLength(Enum):
+    """Where a flange's length is measured from
+
+    A drawing gives a flange's length one of three ways, and this names which.
+    TANGENT measures from the bend's tangent line, so the length is the flat
+    wall alone. The two virtual sharps are the corners the formed part would
+    have if it were folded sharp - where the extended inner faces meet for
+    INNER_SHARP and the extended outer faces for OUTER_SHARP - so a length
+    measured from one is the overall size the drawing dimensions. The sharps
+    sit ``radius * tan(angle / 2)`` and ``(radius + thickness) * tan(angle / 2)``
+    past the tangent line, and are undefined at 180 degrees, where the faces
+    never meet.
+    """
+
+    TANGENT = auto()  # from the bend tangent line: the flat wall
+    INNER_SHARP = auto()  # from the inner virtual sharp
+    OUTER_SHARP = auto()  # from the outer virtual sharp
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
@@ -386,6 +457,31 @@ class PrecisionMode(Enum):
     GREATEST = 1
     AVERAGE = 0
     LEAST = -1
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class ReliefType(Enum):
+    """Sheet metal relief shapes
+
+    Each value names a shape, not a placement: an operation decides where the
+    shape sits and which way it points, so the same value covers a corner and
+    a bend end. SQUARE means square-cornered rather than equal-sided, since
+    only some operations have a symmetry that makes the sides equal.
+
+    ROUND, SQUARE and OBROUND are cut in the flat pattern, so they keep their
+    shape on the developed blank. CONSTANT_WIDTH is defined by the formed part
+    instead - it continues the gap the flanges already leave - so its width is
+    measured from the sheet rather than supplied. That makes it meaningful only
+    where two flanges meet, so ``corner_relief`` accepts it and other relief
+    operations do not.
+    """
+
+    ROUND = auto()  # circle
+    SQUARE = auto()  # square-cornered, aligned to the fold lines
+    OBROUND = auto()  # slot with rounded ends
+    CONSTANT_WIDTH = auto()  # continues the flange gap through a corner
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
