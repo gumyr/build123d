@@ -104,7 +104,6 @@ from OCP.collections import (
     IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
     List_TopoDS_Shape,
 )
-from typing_extensions import Self
 
 from build123d.build_enums import (
     CenterOf,
