@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import asin, atan, atan2, cos, degrees, pi, radians, sin, sqrt, tan
-from typing import Literal, overload
+from typing import Callable, Literal, overload
 
 import numpy as np
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Curve2d, BRepAdaptor_Surface
@@ -42,7 +42,6 @@ from OCP.BRepBuilderAPI import (
 )
 from OCP.BRepLib import BRepLib
 from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
-from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
 from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.Geom2d import (
     Geom2d_Circle,
@@ -55,6 +54,7 @@ from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
 from OCP.Geom2dInt import Geom2dInt_GInter
 from OCP.Geom import Geom_CylindricalSurface, Geom_Plane, Geom_Surface
 from OCP.GeomProjLib import GeomProjLib
+from OCP.IntTools import IntTools_FClass2d
 from OCP.ShapeFix import ShapeFix_Face
 from OCP.gp import gp_Ax3, gp_Ax22d, gp_Dir2d, gp_Pln, gp_Pnt, gp_Pnt2d
 import OCP.TopAbs as ta
@@ -115,11 +115,55 @@ def _orient_face(face: Face, desired_normal: Vector) -> Face:
     )
 
 
+def _neighbours(edge: Edge, shell: Shell, kind: GeomType | None = None) -> list[Face]:
+    """The faces of a shell that share an edge, optionally of one geometry type."""
+    faces = [
+        Face(raw)
+        for raw in topo_explore_connected_faces(edge, shell)
+        if raw is not None
+    ]
+    return faces if kind is None else [face for face in faces if face.geom_type == kind]
+
+
+def _direction(edge: Edge) -> Vector:
+    """The unit vector from a straight edge's start to its end."""
+    return (Vector(edge.position_at(1)) - Vector(edge.position_at(0))).normalized()
+
+
+def _bend_radius(parameters: SheetMetalParameters, radius: float | None) -> float:
+    """The inside bend radius an operation was given, or the sheet's default."""
+    if radius is None:
+        return parameters.resolved_bend_radius
+    if radius < 0:
+        raise ValueError("radius can't be negative")
+    return radius
+
+
+def _check_bend_angle(angle: float) -> None:
+    """A fold's signed angle: non-zero and no more than three quarters of a turn."""
+    if angle == 0 or abs(angle) > 270:
+        raise ValueError("angle must be in [-270, 270] degrees and non-zero")
+
+
+def _check_position(position: BendPosition) -> None:
+    """Refuse anything but a BendPosition, by type rather than by value."""
+    if not isinstance(position, BendPosition):
+        raise TypeError("position must be a BendPosition")
+
+
+def _publish(context: BuildSheet | None, sheet: Shell) -> Shell:
+    """Hand a rebuilt sheet to the builder, or return it in Algebra mode."""
+    if context is not None:
+        context._add_to_context(sheet, mode=Mode.REPLACE)
+        return context.sheet_local
+    return sheet
+
+
 def _support_face(edge: Edge, target: Shell) -> Face:
     """Return the single sheet face adjacent to a free boundary edge."""
     if edge.geom_type != GeomType.LINE:
         raise ValueError("flange/hem edges must be linear")
-    adjacent = [Face(face) for face in topo_explore_connected_faces(edge, target)]
+    adjacent = _neighbours(edge, target)
     if len(adjacent) != 1:
         raise ValueError(
             "Selected edge must be a free sheet boundary with exactly one "
@@ -130,8 +174,7 @@ def _support_face(edge: Edge, target: Shell) -> Face:
 
 def _outward_direction(edge: Edge, support: Face) -> tuple[Vector, Vector]:
     """Return the outward in-plane direction and oriented support normal."""
-    p0, p1 = edge.position_at(0), edge.position_at(1)
-    tangent = (p1 - p0).normalized()
+    tangent = _direction(edge)
     normal = support.normal_at(edge.position_at(0.5)).normalized()
     outward = tangent.cross(normal).normalized()
     probe_distance = max(edge.length * 1e-5, 1e-5)
@@ -163,9 +206,17 @@ def _current_sheet(context: BuildSheet, shapes: list, what: str) -> Shell:
 
 
 def _target_shell(context: BuildSheet | None, edges: list[Edge]) -> Shell:
-    """Resolve a Face, Sketch, or Shell target for Builder or Algebra mode."""
+    """The sheet some edges belong to, in Builder or Algebra mode.
+
+    In Algebra mode an edge selected through a sheet's faces names that sheet
+    on its route; otherwise the edges come straight off a Shell, a Face or a
+    Sketch, which is the blank.
+    """
     if context is not None:
         return _current_sheet(context, edges, "the selected edges")
+    for step in edges[0].topo_path:
+        if isinstance(step, Shell):
+            return step
     parent: Shape | None = edges[0].topo_parent
     if isinstance(parent, Shell):
         return parent
@@ -265,7 +316,7 @@ def _bend_zone(
     """Place a bend on a free edge of its supporting face."""
     outward, normal = _outward_direction(edge, support)
     p0, p1 = Vector(edge.position_at(0)), Vector(edge.position_at(1))
-    tangent = (p1 - p0).normalized()
+    tangent = _direction(edge)
     if sum(gaps) >= edge.length:
         raise ValueError("gaps leave no bend width on the edge")
     gapped = Edge.make_line(p0 + tangent * gaps[0], p1 - tangent * gaps[1])
@@ -343,14 +394,11 @@ def _bend_and_leg(
     allowance of them into the bend and swings the rest up as the leg, so
     the outline of the blank comes along.
     """
-    sign = 1.0 if angle > 0 else -1.0
     near = Vector(zone.near.position_at(0))
-    bend_axis = Axis(
-        near + zone.normal * radius * sign, zone.outward.cross(zone.normal)
-    )
-    spin = Axis((0, 0, 0), bend_axis.direction)
-    inside = zone.normal.rotate(spin, angle / 2)
     if flat is None:
+        bend_axis = _bend_axis(near, zone.outward, zone.normal, angle, radius)
+        spin = Axis((0, 0, 0), bend_axis.direction)
+        inside = zone.normal.rotate(spin, angle / 2)
         faces = [_orient_face(Face.revolve(zone.near, angle, bend_axis), inside)]
         if leg_length > 0:
             end_edge = zone.near.rotate(bend_axis, angle)
@@ -358,20 +406,53 @@ def _bend_and_leg(
             faces.append(_orient_face(leg, zone.normal.rotate(spin, angle)))
         return faces
     pieces, allowance = flat
+    faces, carry = _roll(
+        pieces, near, zone.outward, zone.normal, angle, radius, allowance
+    )
+    return faces + [
+        carry(piece) for piece in _band(pieces, near, zone.outward, allowance, None)
+    ]
+
+
+def _bend_axis(
+    near: Vector, across: Vector, normal: Vector, angle: float, radius: float
+) -> Axis:
+    """The axis a bend rolls about: a radius from the near line, along it."""
+    sign = 1.0 if angle > 0 else -1.0
+    return Axis(near + normal * radius * sign, across.cross(normal))
+
+
+def _roll(
+    pieces: list[Face],
+    near: Vector,
+    across: Vector,
+    normal: Vector,
+    angle: float,
+    radius: float,
+    allowance: float,
+) -> tuple[list[Face], Callable[[Face], Face]]:
+    """Roll flat material from its near line into a bend.
+
+    ``pieces`` lie in the plane of the flat, from the near line on. The first
+    ``allowance`` of them past the line rolls onto the bend's cylinder, and
+    the outline of the blank comes along - holes, notches, tapers. What lies
+    beyond is not touched here; the returned ``carry`` slides such a piece up
+    to the bend and swings it round, and is what everything attached to the
+    far side of the bend goes through.
+    """
+    axis = _bend_axis(near, across, normal, angle, radius)
+    inside = normal.rotate(Axis((0, 0, 0), axis.direction), angle / 2)
     faces = [
         _orient_face(
-            _wrap_strip(
-                piece, near, zone.outward, zone.normal, angle, radius, allowance
-            ),
-            inside,
+            _wrap_strip(piece, near, across, normal, angle, radius, allowance), inside
         )
-        for piece in _band(pieces, near, zone.outward, 0, allowance)
+        for piece in _band(pieces, near, across, 0, allowance)
     ]
-    for piece in _band(pieces, near, zone.outward, allowance, None):
-        faces.append(
-            piece.translate(-zone.outward * allowance).rotate(bend_axis, angle)
-        )
-    return faces
+
+    def carry(shape: Face) -> Face:
+        return shape.translate(-across * allowance).rotate(axis, angle)
+
+    return faces, carry
 
 
 def _band(
@@ -511,18 +592,13 @@ def flange(
         raise ValueError("flange requires at least one edge")
     if length <= 0:
         raise ValueError("length must be positive")
-    if angle == 0 or abs(angle) > 270:
-        raise ValueError("angle must be in [-270, 270] degrees and non-zero")
+    _check_bend_angle(angle)
     gap_pair = _gap_pair(gaps)
-    if not isinstance(position, BendPosition):
-        raise TypeError("position must be a BendPosition")
+    _check_position(position)
     if not isinstance(length_mode, FlangeLength):
         raise TypeError("length_mode must be a FlangeLength")
     parameters = _resolve_sheet_parameters(context, sheet_parameters)
-    if radius is None:
-        radius = parameters.resolved_bend_radius
-    if radius < 0:
-        raise ValueError("radius can't be negative")
+    radius = _bend_radius(parameters, radius)
     leg_length = length
     if length_mode is not FlangeLength.TANGENT:
         to_sharp = _virtual_sharp(
@@ -634,32 +710,17 @@ def bend(
         raise ValueError("bend requires a bend_line")
     if not isinstance(bend_line, Edge) or bend_line.geom_type != GeomType.LINE:
         raise ValueError("bend_line must be a straight Edge")
-    fixed_face = _selected_face(bend_line)
-    if fixed_face.geom_type != GeomType.PLANE:
-        raise ValueError("bend_line must be selected through a planar face")
-    if angle == 0 or abs(angle) > 270:
-        raise ValueError("angle must be in [-270, 270] degrees and non-zero")
-
+    _check_bend_angle(angle)
+    _check_position(position)
     parameters = _resolve_sheet_parameters(context, sheet_parameters)
-    if radius is None:
-        radius = parameters.resolved_bend_radius
-    if radius < 0:
-        raise ValueError("radius can't be negative")
+    radius = _bend_radius(parameters, radius)
 
-    target = _owning_shell(context, [fixed_face], "the face bend_line came from")
-    face = next((f for f in target.faces() if f.is_same(fixed_face)), None)
-    if face is None:
-        raise ValueError(
-            "the face bend_line was selected from is not part of the sheet "
-            "being bent"
-        )
-
+    target = _owning_shell(
+        context, [_selected_face(bend_line)], "the face bend_line came from"
+    )
+    face = _fold_face(target, bend_line, "bend_line")
     result = _fold(target, face, bend_line, angle, radius, position, parameters)
-
-    if context is not None:
-        context._add_to_context(result, mode=Mode.REPLACE)
-        return context.sheet_local
-    return result
+    return _publish(context, result)
 
 
 def jog(
@@ -723,20 +784,16 @@ def jog(
             "angle must be in (0, 180) degrees - the sign of offset gives the direction"
         )
     gap_pair = _gap_pair(gaps)
-    if not isinstance(position, BendPosition):
-        raise TypeError("position must be a BendPosition")
+    _check_position(position)
     parameters = _resolve_sheet_parameters(context, sheet_parameters)
-    if radius is None:
-        radius = parameters.resolved_bend_radius
-    if radius < 0:
-        raise ValueError("radius can't be negative")
+    radius = _bend_radius(parameters, radius)
     profile = _jog_profile(offset, angle, radius, parameters)
     setback = _fold_setback(
         position, profile.angle, radius, parameters.thickness, profile.allowance_1
     )
 
-    target = _jog_target(context, edge_list)
-    beside = [len(topo_explore_connected_faces(edge, target)) for edge in edge_list]
+    target = _target_shell(context, edge_list)
+    beside = [len(_neighbours(edge, target)) for edge in edge_list]
     if all(count == 1 for count in beside):
         if length is None or length <= 0:
             raise ValueError("a jog off a free edge needs a positive length")
@@ -763,27 +820,9 @@ def jog(
         raise ValueError("length applies to a jog off a free edge, not a fold line")
     if any(gap_pair):
         raise ValueError("gaps apply to a jog off a free edge, not a fold line")
-    fixed_face = _selected_face(edge_list[0])
-    face = next((f for f in target.faces() if f.is_same(fixed_face)), None)
-    if face is None or face.geom_type != GeomType.PLANE:
-        raise ValueError(
-            "the fold line must be selected through a planar face of the sheet"
-        )
+    face = _fold_face(target, edge_list[0], "the fold line")
     result = _jog_fold(target, face, edge_list[0], profile, setback)
-    if context is not None:
-        context._add_to_context(result, mode=Mode.REPLACE)
-        return context.sheet_local
-    return result
-
-
-def _jog_target(context: BuildSheet | None, edges: list[Edge]) -> Shell:
-    """The shell a jog works on, whether its edges are rims or a fold line."""
-    if context is not None:
-        return _current_sheet(context, edges, "the selected edges")
-    for step in edges[0].topo_path:
-        if isinstance(step, Shell):
-            return step
-    return _target_shell(None, edges)
+    return _publish(context, result)
 
 
 @dataclass(frozen=True)
@@ -859,104 +898,57 @@ def _jog_faces(
     translation is returned for anything attached to it.
     """
     start_2, start_3, end = profile.stations
-    bands = [
-        _band(flat, near, across, start, stop)
-        for start, stop in (
-            (0.0, start_2),
-            (start_2, start_3),
-            (start_3, end),
-            (end, None),
-        )
-    ]
-    if not all(bands):
+    spin = Axis((0, 0, 0), across.cross(normal))
+    climb = across.rotate(spin, profile.angle)
+    normal_1 = normal.rotate(spin, profile.angle)
+    shift = across * (profile.reach - profile.consumed) + normal * profile.rise
+
+    # the first bend, and the run swung up onto the incline behind it
+    bend_1, incline = _roll(
+        flat,
+        near,
+        across,
+        normal,
+        profile.angle,
+        profile.surface_1,
+        profile.allowance_1,
+    )
+    run = [incline(piece) for piece in _band(flat, near, across, start_2, start_3)]
+    # the first bend's far tangent line is where the run starts, and the
+    # second bend's near line is at the end of the run; its strip is the next
+    # allowance of the flat, inclined like the run
+    axis_1 = _bend_axis(near, across, normal, profile.angle, profile.surface_1)
+    foot = axis_1.position + (near - axis_1.position).rotate(spin, profile.angle)
+    near_2 = foot + climb * profile.run
+    bend_2, _ = _roll(
+        [incline(piece) for piece in _band(flat, near, across, start_3, None)],
+        near_2,
+        climb,
+        normal_1,
+        -profile.angle,
+        profile.surface_2,
+        profile.allowance_2,
+    )
+    onward = [piece.translate(shift) for piece in _band(flat, near, across, end, None)]
+    if not (bend_1 and run and bend_2 and onward):
         raise ValueError(
             f"the jog does not fit - it takes {profile.consumed:.4g} of sheet "
             "past its line and more beyond"
         )
-    strip_1, run, strip_2, onward = bands
-
-    sign = 1.0 if profile.angle > 0 else -1.0
-    along = across.cross(normal)
-    spin = Axis((0, 0, 0), along)
-    axis_1 = Axis(near + normal * profile.surface_1 * sign, along)
-    climb = across.rotate(spin, profile.angle)
-    normal_1 = normal.rotate(spin, profile.angle)
-    # the first bend's far tangent line, where the run starts, and the second
-    # bend's near line at the end of the run
-    foot = axis_1.position + (near - axis_1.position).rotate(spin, profile.angle)
-    near_2 = foot + climb * profile.run
-    shift = across * (profile.reach - profile.consumed) + normal * profile.rise
-
-    def incline(shape: Face) -> Face:
-        """Slide a piece up to the first bend and swing it onto the run."""
-        return shape.translate(-across * start_2).rotate(axis_1, profile.angle)
-
-    faces = [
-        _orient_face(
-            _wrap_strip(
-                piece,
-                near,
-                across,
-                normal,
-                profile.angle,
-                profile.surface_1,
-                profile.allowance_1,
-            ),
-            normal.rotate(spin, profile.angle / 2),
-        )
-        for piece in strip_1
-    ]
-    faces += [incline(piece) for piece in run]
-    faces += [
-        _orient_face(
-            _wrap_strip(
-                incline(piece),
-                near_2,
-                climb,
-                normal_1,
-                -profile.angle,
-                profile.surface_2,
-                profile.allowance_2,
-            ),
-            normal_1.rotate(spin, -profile.angle / 2),
-        )
-        for piece in strip_2
-    ]
-    faces += [piece.translate(shift) for piece in onward]
-    return faces, shift
+    return bend_1 + run + bend_2 + onward, shift
 
 
 def _jog_fold(
     shell: Shell, face: Face, fold: Edge, profile: _JogProfile, setback: float
 ) -> Shell:
     """Jog a shell along a fold line of one of its planar faces."""
-    partner = _fold_partner(shell, face, fold)
-    moving = _fold_moving_faces(shell, face, partner)
-    normal = face.normal_at(face.center())
-    across = _fold_outward(face, fold)
-    near = Vector(fold.position_at(0)) - across * setback
-
-    starts_on_line = setback < _RELIEF_TOLERANCE
-    fixed = [face] if starts_on_line else _fold_pieces(face, near, across, False)
-    flat = ([] if starts_on_line else [face]) + [partner]
-    if not fixed:
-        raise ValueError(
-            f"the jog does not fit - it takes {setback:.4g} of sheet before its line"
-        )
-    folded, shift = _jog_faces(flat, near, across, normal, profile)
-    faces = fixed + folded
-    for other in shell.faces():
-        if other.is_same(face) or other.is_same(partner):
-            continue
-        faces.append(
-            other.translate(shift) if any(other.is_same(m) for m in moving) else other
-        )
-    return Shell.make_sheet(faces)
-
-
-def _miter_target(context: BuildSheet | None, vertices: list[Vertex]) -> Shell:
-    """Resolve the shell containing vertices in Builder or Algebra mode."""
-    return _owning_shell(context, vertices, "miter vertices")
+    site = _fold_site(shell, face, fold, setback, "jog")
+    folded, shift = _jog_faces(
+        site.beyond + [site.partner], site.near, site.across, site.normal, profile
+    )
+    return _reassemble(
+        shell, face, site, site.fixed + folded, lambda other: other.translate(shift)
+    )
 
 
 def _contains_vertex(edge: Edge, vertex: Vertex) -> bool:
@@ -980,10 +972,7 @@ def _miter_support(vertex: Vertex, target: Shell) -> tuple[Face, Edge, Edge, Edg
 
         bend_edges = []
         for edge in face.edges().filter_by(GeomType.LINE):
-            adjacent = [
-                Face(candidate)
-                for candidate in topo_explore_connected_faces(edge, target)
-            ]
+            adjacent = _neighbours(edge, target)
             if len(adjacent) == 2 and any(
                 candidate.geom_type == GeomType.CYLINDER and not candidate.is_same(face)
                 for candidate in adjacent
@@ -991,18 +980,13 @@ def _miter_support(vertex: Vertex, target: Shell) -> tuple[Face, Edge, Edge, Edg
                 bend_edges.append(edge)
 
         for bend_edge in bend_edges:
-            bend_direction = (
-                bend_edge.position_at(1) - bend_edge.position_at(0)
-            ).normalized()
+            bend_direction = _direction(bend_edge)
             for rim_edge in face.edges().filter_by(GeomType.LINE):
                 if not _contains_vertex(rim_edge, vertex):
                     continue
-                if len(topo_explore_connected_faces(rim_edge, target)) != 1:
+                if len(_neighbours(rim_edge, target)) != 1:
                     continue
-                rim_direction = (
-                    rim_edge.position_at(1) - rim_edge.position_at(0)
-                ).normalized()
-                if abs(abs(bend_direction.dot(rim_direction)) - 1) > 1e-6:
+                if abs(abs(bend_direction.dot(_direction(rim_edge))) - 1) > 1e-6:
                     continue
 
                 for side_edge in face.edges().filter_by(GeomType.LINE):
@@ -1078,7 +1062,7 @@ def miter(
         _resolve_sheet_parameters(context, sheet_parameters) if through_bend else None
     )
 
-    target = _miter_target(context, vertex_list)
+    target = _owning_shell(context, vertex_list, "miter vertices")
     selections = [(_miter_support(vertex, target), vertex) for vertex in vertex_list]
     face_selections: dict[Face, list[tuple[Edge, Edge, Edge, Vertex]]] = {}
     for (face, rim, fold, side), vertex in selections:
@@ -1141,11 +1125,7 @@ def miter(
             )
         )
 
-    result = Shell.make_sheet(new_faces)
-    if context is not None:
-        context._add_to_context(result, mode=Mode.REPLACE)
-        return context.sheet_local
-    return result
+    return _publish(context, Shell.make_sheet(new_faces))
 
 
 def _remodel_flange(face: Face, moved: dict[Vertex, Vector]) -> Face:
@@ -1194,11 +1174,7 @@ def _bend_beyond(
     scaled to the neutral axis, which is where a flat pattern is measured and
     so where a miter's angle has to hold.
     """
-    bends = [
-        Face(face)
-        for face in topo_explore_connected_faces(fold, shell)
-        if face is not None and Face(face).geom_type == GeomType.CYLINDER
-    ]
+    bends = _neighbours(fold, shell, GeomType.CYLINDER)
     if len(bends) != 1:
         raise ValueError(
             "miter through_bend needs the flange to meet a single bend along "
@@ -1595,8 +1571,7 @@ def hem(
         raise ValueError(f"Unknown hem type {hem_type}")
 
     parameters = _resolve_sheet_parameters(context, sheet_parameters)
-    if radius is None:
-        radius = parameters.resolved_bend_radius
+    radius = _bend_radius(parameters, radius)
 
     leg_length, bend_angle, bend_radius = _hem_parameters(
         hem_type,
@@ -1811,16 +1786,14 @@ def corner_relief(
         reach = values["depth"]
 
     # a fresh wrapper, so the record the reliefs chain up starts from this sheet
-    target = Shell(_miter_target(context, vertex_list).wrapped)
+    target = Shell(
+        _owning_shell(context, vertex_list, "corner_relief vertices").wrapped
+    )
     for vertex in vertex_list:
         target = _cut_corner_relief(
             target, vertex, relief_type, profile, reach, parameters
         )
-
-    if context is not None:
-        context._add_to_context(target, mode=Mode.REPLACE)
-        return context.sheet_local
-    return target
+    return _publish(context, target)
 
 
 def _cut_corner_relief(
@@ -1842,14 +1815,14 @@ def _cut_corner_relief(
     if not touching:
         raise ValueError("corner_relief vertices must be a corner of a planar face")
     base = max(touching, key=lambda face: face.area)
+    at = _corner_at(shell, base, corner, parameters)
 
     if relief_type is ReliefType.CONSTANT_WIDTH:
-        cutter = _constant_width_cutter(shell, base, corner, depth, parameters)
+        cutter = _constant_width_cutter(shell, at, depth)
         cut = shell.cut(cutter)
         result = cut if isinstance(cut, Shell) else Shell(cut.faces())
     elif profile is not None:
-        frames, _ = _corner_frames(shell, base, corner, parameters)
-        result = _replace_relief_faces(shell, _trim_faces(frames, profile))
+        result = _replace_relief_faces(shell, _trim_faces(at.frames, profile))
     else:
         raise ValueError(f"no profile built for {relief_type}")
 
@@ -1989,11 +1962,7 @@ def bend_relief(
     target = Shell(target.wrapped)
     for point, away, values in plans:
         target = _cut_bend_relief(target, point, away, relief_type, values, parameters)
-
-    if context is not None:
-        context._add_to_context(target, mode=Mode.REPLACE)
-        return context.sheet_local
-    return target
+    return _publish(context, target)
 
 
 # ---------------------------------------------------------------------------
@@ -2278,16 +2247,15 @@ def _corner_frames(
     # still where the two fold lines meet.
     touching = []
     for edge in base.edges():
-        others = [
-            Face(f)
-            for f in topo_explore_connected_faces(edge, shell)
-            if f is not None and not Face(f).is_same(base)
+        bends = [
+            f
+            for f in _neighbours(edge, shell, GeomType.CYLINDER)
+            if not f.is_same(base)
         ]
-        bends = [f for f in others if f.geom_type.name == "CYLINDER"]
         if not bends:
             continue
         start = Vector(edge.position_at(0))
-        along = (Vector(edge.position_at(1)) - start).normalized()
+        along = _direction(edge)
         offset = corner - start
         if (offset - along * offset.dot(along)).length > _RELIEF_TOLERANCE:
             continue  # the corner is not on this fold line
@@ -2479,7 +2447,7 @@ def _clip_profile(
     Every segment is broken where it crosses the boundary, and each piece is
     inside or outside as a whole. Consecutive inside pieces make a run.
     """
-    classifier = BRepTopAdaptor_FClass2d(face, _CLIP_TOLERANCE)
+    classifier = IntTools_FClass2d(face, _CLIP_TOLERANCE)
     boundary = [
         (
             (wire_index, bound_index),
@@ -2777,77 +2745,101 @@ def _replace_relief_faces(shell: Shell, replacements: dict[Face, Face]) -> Shell
     return result._made_by(record)
 
 
+@dataclass(frozen=True)
+class _Corner:
+    """A corner of a planar face where two bends meet, laid out flat once.
+
+    The frames map flat-pattern coordinates with their origin on the corner
+    into the base and each bend; everything a relief needs at the corner is
+    read from them rather than found again from the shell.
+    """
+
+    base: Face
+    point: Vector
+    frames: list[_FlatFrame]  # the base's frame, then the two bends'
+    wrapped: bool  # the sheet wraps around the corner rather than stopping
+
+    @property
+    def mirror_normal(self) -> Vector:
+        """The normal of the plane bisecting the corner.
+
+        The two unroll directions are the frames' flat axes; their difference
+        bisects the corner, so the two flanges sit symmetrically either side.
+        """
+        first = _flat_to_3d(self.frames[0], 1.0, 0.0) - self.point
+        second = _flat_to_3d(self.frames[0], 0.0, 1.0) - self.point
+        return (first.normalized() - second.normalized()).normalized()
+
+
+def _corner_at(
+    shell: Shell, base: Face, corner: Vector, parameters: SheetMetalParameters
+) -> _Corner:
+    """Lay a corner out flat, once, for whatever relief is cut there."""
+    frames, wrapped = _corner_frames(shell, base, corner, parameters)
+    return _Corner(base, corner, frames, wrapped)
+
+
 def _corner_mirror_plane(
     shell: Shell, base: Face, corner: Vector, parameters: SheetMetalParameters
 ):
-    """The plane that bisects a corner, as (origin, unit normal).
-
-    Its normal is the bisector of the two tangent directions, so the two
-    flanges sit symmetrically either side of it.
-    """
-    frames, _ = _corner_frames(shell, base, corner, parameters)
-    # the two unroll directions are the frames' flat axes; their difference
-    # bisects the corner
-    first = _flat_to_3d(frames[0], 1.0, 0.0) - corner
-    second = _flat_to_3d(frames[0], 0.0, 1.0) - corner
-    normal = (first.normalized() - second.normalized()).normalized()
-    return corner, normal
+    """The plane that bisects a corner, as (origin, unit normal)."""
+    return corner, _corner_at(shell, base, corner, parameters).mirror_normal
 
 
-def _corner_faces(
-    shell: Shell, base: Face, corner: Vector, parameters: SheetMetalParameters
-) -> list:
+def _corner_faces(shell: Shell, at: _Corner) -> list:
     """The bends meeting at a corner and the walls they carry."""
-    frames, wrapped = _corner_frames(shell, base, corner, parameters)
-    if wrapped:
+    if at.wrapped:
         raise ValueError(
             "the sheet wraps around this corner, so its flanges have no single "
             "gap to carry through - a constant width relief is not defined here"
         )
-    faces = [frame.face for frame in frames[1:]]
+    base = at.base
+    faces = [frame.face for frame in at.frames[1:]]
     for cylinder in list(faces):
         neighbours = {
-            Face(f)
+            f
             for edge in cylinder.edges()
-            for f in topo_explore_connected_faces(edge, shell)
-            if f is not None
+            for f in _neighbours(edge, shell, GeomType.PLANE)
         }
-        faces.extend(
-            f for f in neighbours if f.geom_type.name == "PLANE" and not f.is_same(base)
-        )
+        faces.extend(f for f in neighbours if not f.is_same(base))
     return faces
 
 
 def _flange_separation(
     shell: Shell, base: Face, corner: Vector, parameters: SheetMetalParameters
 ) -> float:
+    """The gap the two flanges leave at a corner, measured from the sheet."""
+    return _flange_gap(shell, _corner_at(shell, base, corner, parameters))
+
+
+def _flange_gap(shell: Shell, at: _Corner, faces: list | None = None) -> float:
     """The gap the two flanges leave at a corner, measured from the sheet.
 
     A constant width relief has to continue this gap, so its width is a
     property of the part rather than something a user should have to work out.
     Only meaningful when the two flange edges are parallel; anything else has
-    no single separation to continue and is rejected.
+    no single separation to continue and is rejected. ``faces`` are the
+    corner's faces if the caller already has them.
     """
+    corner = at.point
     # each bend carries a wall; that wall's free edge nearest the corner is
     # what bounds the gap
     walls = [
         f
-        for f in _corner_faces(shell, base, corner, parameters)
-        if f.geom_type.name == "PLANE"
+        for f in (_corner_faces(shell, at) if faces is None else faces)
+        if f.geom_type == GeomType.PLANE
     ]
     if len(walls) != 2:
         raise ValueError(f"corner carries {len(walls)} wall(s), expected 2")
 
     edges = []
     for wall in walls:
-        free = [
-            e for e in wall.edges() if len(topo_explore_connected_faces(e, shell)) == 1
-        ]
+        free = [e for e in wall.edges() if len(_neighbours(e, shell)) == 1]
         if not free:
             raise ValueError("flange wall has no free edge")
         edges.append(min(free, key=lambda e: e.distance_to(corner)))
 
-    directions = [(Vector(e @ 1) - Vector(e @ 0)).normalized() for e in edges]
+    directions = [_direction(e) for e in edges]
     if directions[0].cross(directions[1]).length > 1e-6:
         raise ValueError(
             "flange edges at this corner are not parallel, so the gap between "
@@ -2871,13 +2863,7 @@ def _obround_relief_profile(length: float, width: float) -> list:
     return _rotate_profile(_obround_profile(0.0, 0.0, length, width), pi / 4)
 
 
-def _constant_width_cutter(  # pylint: disable=too-many-locals
-    shell: Shell,
-    base: Face,
-    corner: Vector,
-    depth: float,
-    parameters: SheetMetalParameters,
-) -> Solid:
+def _constant_width_cutter(shell: Shell, at: _Corner, depth: float) -> Solid:
     """A solid that cuts a constant width relief at a corner.
 
     Unlike the other relief shapes this one is not a flat-pattern feature. It
@@ -2891,8 +2877,10 @@ def _constant_width_cutter(  # pylint: disable=too-many-locals
     straight in the developed pattern is not at a constant distance from the
     mirror plane once formed, so the gap pinches through the bends.
     """
-    width = _flange_separation(shell, base, corner, parameters)
-    _, normal = _corner_mirror_plane(shell, base, corner, parameters)
+    base, corner = at.base, at.point
+    faces = _corner_faces(shell, at)
+    width = _flange_gap(shell, at, faces)
+    normal = at.mirror_normal
     up = base.normal_at(base.center())
 
     # in the base plane, along the mirror plane, pointing away from the base
@@ -2905,7 +2893,7 @@ def _constant_width_cutter(  # pylint: disable=too-many-locals
     # wedge of each bend behind, which shows up as a step along the relief.
     reach = max(
         (Vector(vertex) - corner).dot(along)
-        for face in _corner_faces(shell, base, corner, parameters)
+        for face in faces
         for vertex in face.vertices()
     )
     overshoot = reach + width / 2 + _RELIEF_TOLERANCE
@@ -2986,10 +2974,8 @@ def _fold_outward(face: Face, fold: Edge) -> Vector:
     useful about a fold line bounding a hole, where it sits inside the hole and
     the material is on the far side of the line from it.
     """
-    start = Vector(fold.position_at(0))
-    along = (Vector(fold.position_at(1)) - start).normalized()
     middle = fold.position_at(0.5)
-    outward = along.cross(face.normal_at(middle)).normalized()
+    outward = _direction(fold).cross(face.normal_at(middle)).normalized()
     probe = middle + outward * max(fold.length * 1e-5, 1e-5)
     return -outward if face.is_inside(probe) else outward
 
@@ -3012,11 +2998,7 @@ def _bend_folds(cylinder: Face, shell: Shell) -> list:
     for edge in cylinder.edges():
         if edge.geom_type != GeomType.LINE:
             continue
-        planes = [
-            Face(face)
-            for face in topo_explore_connected_faces(edge, shell)
-            if face is not None and Face(face).geom_type == GeomType.PLANE
-        ]
+        planes = _neighbours(edge, shell, GeomType.PLANE)
         if len(planes) == 1:
             folds.append((edge, planes[0]))
     if not folds:
@@ -3038,7 +3020,7 @@ def _bend_ends(cylinder: Face, shell: Shell) -> list:
         raise ValueError("bend_relief takes only cylindrical bend faces")
     folds = _bend_folds(cylinder, shell)
     first = folds[0][0]
-    along = (Vector(first.position_at(1)) - Vector(first.position_at(0))).normalized()
+    along = _direction(first)
     step = _RELIEF_PROBE * min(first.length, radius)
     middle = cylinder.center()
 
@@ -3071,6 +3053,12 @@ def _bend_end_frames(
     Both share one flat coordinate system with its origin on that end: ``x``
     runs along the line away from the bend and ``y`` past the line into the
     bend. Returns ``([base frame, bend frame], probe, step)``.
+
+    The fold is found afresh on the shell as it is now, by the point the end
+    sits at, rather than taken from the bend end that asked for the relief.
+    Each relief rebuilds the faces it trims, so after the first cut on a base
+    the fold's faces are new ones, and the frames have to be built on those
+    for the trim to find them.
     """
     fold = None
     for edge in shell.edges():
@@ -3079,16 +3067,10 @@ def _bend_end_frames(
         corners = [Vector(edge.position_at(end)) for end in (0.0, 1.0)]
         if min((corner - point).length for corner in corners) > _RELIEF_TOLERANCE:
             continue
-        heading = (corners[1] - corners[0]).normalized()
-        if abs(heading.dot(away)) < 1 - _RELIEF_TOLERANCE:
+        if abs(_direction(edge).dot(away)) < 1 - _RELIEF_TOLERANCE:
             continue  # a fold line crossing this one, not the one ending here
-        neighbours = [
-            Face(face)
-            for face in topo_explore_connected_faces(edge, shell)
-            if face is not None
-        ]
-        planes = [f for f in neighbours if f.geom_type == GeomType.PLANE]
-        bends = [f for f in neighbours if f.geom_type == GeomType.CYLINDER]
+        planes = _neighbours(edge, shell, GeomType.PLANE)
+        bends = _neighbours(edge, shell, GeomType.CYLINDER)
         if len(planes) == 1 and len(bends) == 1:
             fold = (edge, planes[0], bends[0])
             break
@@ -3209,6 +3191,19 @@ def _selected_face(bend_line: Edge) -> Face:
     )
 
 
+def _fold_face(target: Shell, line: Edge, what: str) -> Face:
+    """The planar face of a sheet that a fold line was selected through."""
+    selected = _selected_face(line)
+    face = next((f for f in target.faces() if f.is_same(selected)), None)
+    if face is None:
+        raise ValueError(
+            f"the face {what} was selected from is not part of the sheet being folded"
+        )
+    if face.geom_type != GeomType.PLANE:
+        raise ValueError(f"{what} must be selected through a planar face")
+    return face
+
+
 def _reachable_faces(shell: Shell, seeds: list, blocked: Face) -> list:
     """Faces reached from ``seeds`` without passing through ``blocked``."""
     found = list(seeds)
@@ -3216,10 +3211,7 @@ def _reachable_faces(shell: Shell, seeds: list, blocked: Face) -> list:
     while frontier:
         current = frontier.pop()
         for edge in current.edges():
-            for raw in topo_explore_connected_faces(edge, shell):
-                if raw is None:
-                    continue
-                neighbour = Face(raw)
+            for neighbour in _neighbours(edge, shell):
                 if neighbour.is_same(blocked):
                     continue
                 if any(neighbour.is_same(seen) for seen in found):
@@ -3231,12 +3223,9 @@ def _reachable_faces(shell: Shell, seeds: list, blocked: Face) -> list:
 
 def _fold_partner(shell: Shell, face: Face, bend_line: Edge) -> Face:
     """The coplanar face on the other side of a bend line."""
-    beside = [
-        Face(raw)
-        for raw in topo_explore_connected_faces(bend_line, shell)
-        if raw is not None
+    beyond = [
+        other for other in _neighbours(bend_line, shell) if not other.is_same(face)
     ]
-    beyond = [other for other in beside if not other.is_same(face)]
     if len(beyond) != 1:
         raise ValueError(
             "bend_line must be shared with exactly one other face, and "
@@ -3261,6 +3250,58 @@ def _fold_moving_faces(shell: Shell, face: Face, partner: Face) -> list:
             "would tear it rather than carry it"
         )
     return moving
+
+
+@dataclass(frozen=True)
+class _FoldSite:
+    """A fold line on a sheet, with the frame the fold is made in.
+
+    The fixed face is split at the bend's near tangent line: what lies before
+    it stays put, and what lies beyond it is the start of the strip that rolls
+    into the bend.
+    """
+
+    partner: Face  # the coplanar face across the line, which swings
+    moving: list[Face]  # everything that swings with it
+    normal: Vector  # the fixed face's normal, the side a positive angle folds to
+    across: Vector  # across the line, away from the fixed face
+    near: Vector  # a point on the bend's near tangent line
+    fixed: list[Face]  # the fixed face before the near line
+    beyond: list[Face]  # the fixed face past it, taken by a set-back bend
+
+
+def _fold_site(
+    shell: Shell, face: Face, line: Edge, setback: float, what: str
+) -> _FoldSite:
+    """Where a fold along a line of a planar face happens, and what it moves."""
+    partner = _fold_partner(shell, face, line)
+    moving = _fold_moving_faces(shell, face, partner)
+    normal = face.normal_at(face.center())
+    across = _fold_outward(face, line)
+    near = Vector(line.position_at(0)) - across * setback
+    if setback < _RELIEF_TOLERANCE:
+        fixed, beyond = [face], []
+    else:
+        fixed = _fold_pieces(face, near, across, False)
+        beyond = _fold_pieces(face, near, across, True)
+    if not fixed:
+        raise ValueError(
+            f"the {what} does not fit - it takes {setback:.4g} of sheet before its line"
+        )
+    return _FoldSite(partner, moving, normal, across, near, fixed, beyond)
+
+
+def _reassemble(
+    shell: Shell, face: Face, site: _FoldSite, faces: list[Face], carried
+) -> Shell:
+    """The folded shell: the faces a fold made, and the rest, moved if they swung."""
+    rebuilt = list(faces)
+    for other in shell.faces():
+        if other.is_same(face) or other.is_same(site.partner):
+            continue
+        swings = any(other.is_same(moved) for moved in site.moving)
+        rebuilt.append(carried(other) if swings else other)
+    return Shell.make_sheet(rebuilt)
 
 
 def _fold_pieces(
@@ -3443,63 +3484,26 @@ def _fold(
     parameters: SheetMetalParameters,
 ) -> Shell:
     """Fold a shell along an edge of one of its planar faces."""
-    partner = _fold_partner(shell, face, bend_line)
-    moving = _fold_moving_faces(shell, face, partner)
-
-    normal = face.normal_at(face.center())
-    origin = Vector(bend_line.position_at(0))
-    across = _fold_outward(face, bend_line)
-
     # The bend face is drawn at the reference surface's radius, but the flat it
     # consumes is the bend allowance, the arc of the neutral fibre
     surface_radius = reference_radius(radius, parameters, angle)
     allowance = bend_allowance(radius, angle, parameters)
     setback = _fold_setback(position, angle, radius, parameters.thickness, allowance)
-    near = origin - across * setback
-    far = near + across * allowance
+    site = _fold_site(shell, face, bend_line, setback, "bend")
+    near, across, normal = site.near, site.across, site.normal
 
-    complaint = (
-        f"the bend does not fit - it takes {allowance:.4g} of sheet past the bend "
-        f"line and {setback:.4g} before it"
+    # The strip from the near line to the far one rolls into the bend, with
+    # whatever the blank's outline does there - holes, notches, tapers - and
+    # what lies beyond the far line swings round after it
+    flat = site.beyond + [site.partner]
+    bend_faces, folded = _roll(
+        flat, near, across, normal, angle, surface_radius, allowance
     )
-    # The legs are what lies before the near line and beyond the far one; the
-    # strip between them is what rolls into the bend, with whatever the blank's
-    # outline does there - holes, notches, tapers - rolling with it
-    starts_on_line = setback < _RELIEF_TOLERANCE
-    fixed_legs = [face] if starts_on_line else _fold_pieces(face, near, across, False)
-    strip_pieces = (
-        [] if starts_on_line else _fold_pieces(face, near, across, True)
-    ) + _fold_pieces(partner, far, across, False)
-    moving_legs = _fold_pieces(partner, far, across, True)
-    if not fixed_legs or not moving_legs or not strip_pieces:
-        raise ValueError(complaint)
-    strips = _planar_pieces(
-        strip_pieces[0].fuse(*strip_pieces[1:])
-        if len(strip_pieces) > 1
-        else strip_pieces[0]
-    )
-
-    bend_axis = Axis(
-        near + normal * surface_radius * (1 if angle > 0 else -1),
-        across.cross(normal),
-    )
-    spin = Axis((0, 0, 0), bend_axis.direction)
-    inside = normal.rotate(spin, angle / 2)
-    bend_faces = [
-        _orient_face(
-            _wrap_strip(piece, near, across, normal, angle, surface_radius, allowance),
-            inside,
+    moving_legs = _band(flat, near, across, allowance, None)
+    if not bend_faces or not moving_legs:
+        raise ValueError(
+            f"the bend does not fit - it takes {allowance:.4g} of sheet past the "
+            f"bend line and {setback:.4g} before it"
         )
-        for piece in strips
-    ]
-
-    def folded(shape):
-        """Slide a moving face up to the bend and swing it round."""
-        return shape.translate(-across * allowance).rotate(bend_axis, angle)
-
-    faces = fixed_legs + bend_faces + [folded(leg) for leg in moving_legs]
-    for other in shell.faces():
-        if other.is_same(face) or other.is_same(partner):
-            continue
-        faces.append(folded(other) if any(other.is_same(m) for m in moving) else other)
-    return Shell.make_sheet(faces)
+    faces = site.fixed + bend_faces + [folded(leg) for leg in moving_legs]
+    return _reassemble(shell, face, site, faces, folded)
