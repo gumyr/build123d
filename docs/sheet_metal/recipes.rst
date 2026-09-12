@@ -33,7 +33,7 @@ footprint, here the reference radius of 1.
 A cut across a bend from a view
 *******************************
 
-A drawn cutout is a solid, and a part object in ``Mode.SUBTRACT`` cuts every
+A normal cut is a solid, and a part object in ``Mode.SUBTRACT`` cuts every
 face it passes through. A box tall enough to reach the sheet on both sides of
 the drawing plane, centred on the bend, cuts a slot through the base, the bend
 and the wall in one go:

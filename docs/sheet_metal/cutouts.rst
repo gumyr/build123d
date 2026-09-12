@@ -56,8 +56,10 @@ Cutouts through a bend
 **********************
 
 A **solid** in ``Mode.SUBTRACT`` cuts every face it passes through. This is
-the *drawn cutout* of sheet metal packages: a profile drawn on a view plane
-and cut straight through the folded part, so it may cross a bend. Part objects
+the *normal cut* of sheet metal packages, also called a cut across a bend: a
+profile drawn on a view plane and cut straight through the folded part, so it
+may cross a bend. It is not the *drawn cutout* of those packages, which is a
+formed feature, a dimple without a bottom. Part objects
 are cutters too, so holes can be placed with the usual location contexts, and
 a cutter built before the context comes in with
 :func:`~operations_generic.insert`:
@@ -80,7 +82,7 @@ a cutter built before the context comes in with
         flange(tray.rims().sort_by(Axis.X)[-1], length=20)
         insert(punch, mode=Mode.SUBTRACT)
 
-A drawn cutout *trims*: it changes the outline of each face it crosses without
+A normal cut *trims*: it changes the outline of each face it crosses without
 changing the face's supporting surface, so the sheet keeps its planar and
 cylindrical geometry and still unfolds. Three things follow:
 
