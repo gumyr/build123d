@@ -104,7 +104,7 @@ class BuildPart(Builder[Part]):
         return Wire.combine(self.pending_edges)[0]
 
     @property
-    def location(self) -> Location | None:
+    def location(self) -> Location:
         """Builder's location"""
         return self.part.location if self.part is not None else Location()
 

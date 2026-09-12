@@ -58,17 +58,29 @@ import itertools
 from typing import ClassVar, overload, TYPE_CHECKING
 
 from collections.abc import Iterable
-from typing_extensions import Self
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
+from OCP.BRepAdaptor import BRepAdaptor_Curve2d
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
-from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS, TopoDS_Shape, TopoDS_Vertex, TopoDS_Edge
-from OCP.gp import gp_Pnt
-from build123d.geometry import Matrix, Vector, VectorLike, Location, Axis, Plane
-from build123d.build_enums import Keep, Unit
-from .shape_core import Shape, ShapeList, TrimmingTool, downcast, shapetype
+from OCP.BRepTools import BRepTools
+from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+from OCP.TopExp import TopExp, TopExp_Explorer
+from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
+from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Vertex, TopoDS_Edge
+from OCP.gp import gp_Pnt, gp_Pnt2d, gp_Vec2d
+from build123d.geometry import (
+    TOLERANCE,
+    Matrix,
+    Vector,
+    VectorLike,
+    Location,
+    Axis,
+    Plane,
+)
+from build123d.build_enums import Convexity, Keep, Select, Unit
+from .kernel import list_shapes
+from .shape_core import Shape, ShapeList, TrimmingTool, downcast, find_same_topods
 
 if TYPE_CHECKING:  # pragma: no cover
     from .one_d import Edge, Wire  # pylint: disable=R0801
@@ -149,6 +161,132 @@ class Vertex(Shape[TopoDS_Vertex]):
         return 0.0
 
     @property
+    def convexity(self) -> Convexity:
+        """How the shape this vertex was selected from sits around it.
+
+        Selected through a face, as ``face.vertices()`` or
+        ``face.edges()[0].vertices()`` does, the vertex is a corner of that
+        face: ``CONVEX`` at the corner of a plate, ``CONCAVE`` at the corner of
+        a slot or the step in an L, ``SMOOTH`` where two edges meet in line.
+        The corner is read in the face's own parameters, so a corner on a
+        curved face classifies the same way as one on a flat face.
+
+        Selected straight off a solid or shell, the vertex is classified by the
+        edges meeting there: ``CONVEX`` where every crease is convex, as at the
+        corner of a box, ``CONCAVE`` where every crease is concave, as at the
+        bottom corner of a pocket, and ``SADDLE`` where both kinds meet, as at
+        the inner corner of a step. Smooth edges do not count. See
+        :class:`~build_enums.Convexity`.
+
+        Raises:
+            ValueError: the vertex has no ``topo_parent``, or its face or edges
+                cannot be classified - a seam vertex has no single corner in
+                its face's parameters, for instance
+        """
+        face = self._owning_face()
+        if face is not None:
+            return self._corner_convexity(face)
+        return self._crease_convexity()
+
+    def _owning_face(self) -> TopoDS_Face | None:
+        """The innermost face this vertex was selected through, if any."""
+        for step in reversed(self.topo_path):
+            if step.wrapped is not None and step.wrapped.ShapeType() == ta.TopAbs_FACE:
+                return TopoDS.Face(step.wrapped)
+        return None
+
+    def _face_tangents(self, face: TopoDS_Face) -> list[tuple[float, float]]:
+        """Unit directions leading away from this vertex in the face's uv.
+
+        The boundary is followed in parameter space rather than in three
+        dimensions so that a corner on a curved face reads the same as one on
+        a flat face.
+        """
+        here = BRep_Tool.Parameters_s(self.wrapped, face)
+        seen: list[TopoDS_Edge] = []
+        directions: list[tuple[float, float]] = []
+        explorer = TopExp_Explorer(face, ta.TopAbs_EDGE)
+        while explorer.More():
+            edge = TopoDS.Edge(explorer.Current())
+            explorer.Next()
+            if any(edge.IsSame(other) for other in seen):
+                continue  # a seam edge is met once per side
+            seen.append(edge)
+            curve = BRepAdaptor_Curve2d(edge, face)
+            for param, sign in (
+                (curve.FirstParameter(), 1.0),
+                (curve.LastParameter(), -1.0),
+            ):
+                end = curve.Value(param)
+                if (end.X() - here.X()) ** 2 + (end.Y() - here.Y()) ** 2 > TOLERANCE:
+                    continue
+                point, tangent = gp_Pnt2d(), gp_Vec2d()
+                curve.D1(param, point, tangent)
+                length = (tangent.X() ** 2 + tangent.Y() ** 2) ** 0.5
+                if length > 0:
+                    directions.append(
+                        (sign * tangent.X() / length, sign * tangent.Y() / length)
+                    )
+        return directions
+
+    def _corner_convexity(self, face: TopoDS_Face) -> Convexity:
+        """Which way the face's boundary turns at this corner.
+
+        The two edges leaving the vertex bound a wedge of less than half a
+        turn, and their bisector points into it. Material there and the corner
+        is convex; material on the other side and it is concave.
+        """
+        directions = self._face_tangents(face)
+        if len(directions) != 2:
+            raise ValueError(
+                f"{len(directions)} edge end(s) meet this vertex on the face, "
+                "expected 2 - a corner is where exactly two of them do"
+            )
+        (first_u, first_v), (second_u, second_v) = directions
+        bisector = (first_u + second_u, first_v + second_v)
+        span = (bisector[0] ** 2 + bisector[1] ** 2) ** 0.5
+        if span < TOLERANCE:
+            return Convexity.SMOOTH  # the boundary runs straight through
+
+        u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(face)
+        step = 1e-4 * ((u_max - u_min) ** 2 + (v_max - v_min) ** 2) ** 0.5 / span
+        here = BRep_Tool.Parameters_s(self.wrapped, face)
+        probe = gp_Pnt2d(here.X() + bisector[0] * step, here.Y() + bisector[1] * step)
+        inside = BRepTopAdaptor_FClass2d(face, TOLERANCE).Perform(probe) == ta.TopAbs_IN
+        return Convexity.CONVEX if inside else Convexity.CONCAVE
+
+    def _crease_convexity(self) -> Convexity:
+        """Classify by the creases meeting at this vertex of a solid or shell."""
+        parent = self.topo_parent
+        if parent is None or parent.wrapped is None:
+            raise ValueError(
+                "this vertex was not selected from a shape, so there is nothing "
+                "to classify it against - take it from a face or solid"
+            )
+        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        TopExp.MapShapesAndAncestors_s(
+            parent.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
+        )
+        own = find_same_topods(
+            self.wrapped,
+            (vertex_edge_map.FindKey(i + 1) for i in range(vertex_edge_map.Extent())),
+        )
+        if own is None:
+            raise ValueError("this vertex is not part of its topo_parent")
+
+        kinds: set[Convexity] = set()
+        for topods_edge in list_shapes(vertex_edge_map.FindFromKey(own)):
+            edge = Shape.cast(topods_edge)
+            edge.topo_path = self.topo_path
+            kinds.add(edge.convexity)
+        turning = kinds - {Convexity.SMOOTH}
+        if not turning:
+            return Convexity.SMOOTH
+        if len(turning) == 1:
+            return turning.pop()
+        return Convexity.SADDLE
+
+    @property
     def X(self) -> float:
         """The X coordinate of this Vertex, including its current Location."""
         return BRep_Tool.Pnt_s(self.wrapped).X()
@@ -164,19 +302,6 @@ class Vertex(Shape[TopoDS_Vertex]):
         return BRep_Tool.Pnt_s(self.wrapped).Z()
 
     # ---- Class Methods ----
-
-    @classmethod
-    def cast(cls, obj: TopoDS_Shape) -> Self:
-        "Returns the right type of wrapper, given a OCCT object"
-
-        # define the shape lookup table for casting
-        constructor_lut = {
-            ta.TopAbs_VERTEX: Vertex,
-        }
-
-        shape_type = shapetype(obj)
-        # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](TopoDS.Vertex(obj))
 
     @classmethod
     def extrude(cls, obj: Shape, direction: VectorLike) -> Vertex:
@@ -332,9 +457,9 @@ class Vertex(Shape[TopoDS_Vertex]):
         """Return the Vertex"""
         return self
 
-    def vertices(self) -> ShapeList[Vertex]:
+    def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
-        return ShapeList((self,))  # Vertex is an iterable
+        return self._select(ShapeList((self,)), select)  # Vertex is an iterable
 
 
 def topo_explore_common_vertex(
@@ -343,9 +468,6 @@ def topo_explore_common_vertex(
     """Given two edges, find the common vertex"""
     topods_edge1 = edge1 if isinstance(edge1, TopoDS_Edge) else edge1.wrapped
     topods_edge2 = edge2 if isinstance(edge2, TopoDS_Edge) else edge2.wrapped
-
-    if topods_edge1 is None or topods_edge2 is None:
-        raise ValueError("edge is empty")
 
     # Explore vertices of the first edge
     vert_exp = TopExp_Explorer(topods_edge1, ta.TopAbs_VERTEX)
@@ -365,3 +487,10 @@ def topo_explore_common_vertex(
         vert_exp.Next()
 
     return None  # No common vertex found
+
+
+Shape.register_shape_constructor(ta.TopAbs_VERTEX, Vertex)
+Shape.register_geometry_constructor(Vector, Vertex)
+Shape.register_geometry_constructor(
+    Location, lambda location: Vertex(location.position)
+)

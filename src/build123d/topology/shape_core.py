@@ -47,6 +47,7 @@ license:
 from __future__ import annotations
 
 import copy
+from enum import Enum
 import itertools
 import warnings
 from abc import ABC, abstractmethod
@@ -140,7 +141,16 @@ from typing_extensions import Self
 from bd_materials import FinishedMaterial, resolve as resolve_material
 
 from build123d.build_constants import UNITS_PER_KILOGRAM, UNITS_PER_METER
-from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition, Unit
+from build123d.build_enums import (
+    CenterOf,
+    Convexity,
+    GeomType,
+    Keep,
+    Select,
+    SortBy,
+    Transition,
+    Unit,
+)
 from build123d.geometry import (
     DEG2RAD,
     TOLERANCE,
@@ -150,15 +160,17 @@ from build123d.geometry import (
     ColorLike,
     Location,
     Matrix,
-    NotAllLocationLikeError,
     OrientedBoundBox,
     Plane,
     Vector,
     VectorLike,
-    all_location_like,
+    apply_location_like,
     logger,
 )
 from build123d.pack_utils import _pack2d
+
+from .history import ShapeHistory
+from .kernel import list_shapes
 
 if TYPE_CHECKING:  # pragma: no cover
     from build123d.build_part import BuildPart  # pylint: disable=R0801
@@ -174,6 +186,8 @@ TrimmingTool = Union[Plane, "Shell", "Face"]
 TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape)
 CalcFn = Callable[[TopoDS_Shape, GProp_GProps], None]
 CompositeFactory = Callable[[Iterable["Shape"]], "Shape"]
+ShapeConstructor = Callable[[Any], "Shape"]
+GeometryConstructor = Callable[[Any], "Shape"]
 
 
 class Shape(NodeMixin, Generic[TOPODS]):
@@ -193,12 +207,17 @@ class Shape(NodeMixin, Generic[TOPODS]):
         color (Color): object color
         joints (dict[str:Joint]): dictionary of joints bound to this object (Solid only)
         children (Shape): list of assembly children of this object (Compound only)
-        topo_parent (Shape): assembly parent of this object
+        topo_path (tuple[Shape, ...]): the shapes this one was extracted through,
+            outermost first
+        topo_parent (Shape): the outermost of those, where it came from
+        topo_owner (Shape): the innermost of those, what it was taken out of
 
     """
 
     build123d_type: ClassVar[str] = "Shape"
     composite_factories: ClassVar[dict[int | None, CompositeFactory]] = {}
+    shape_constructors: ClassVar[dict[TopAbs_ShapeEnum, ShapeConstructor]] = {}
+    geometry_constructors: ClassVar[dict[type, GeometryConstructor]] = {}
 
     shape_LUT = {
         ta.TopAbs_VERTEX: "Vertex",
@@ -314,12 +333,42 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # parent must be set following children as post install accesses children
         self.parent = parent
 
-        # Extracted objects like Vertices and Edges may need to know where they came from
-        self.topo_parent: Shape | None = None
+        # Extracted objects like Vertices and Edges may need to know where they
+        # came from, and through what
+        self.topo_path: tuple[Shape, ...] = ()
+        # What the operation that made this shape did to its inputs' sub-shapes,
+        # when the kernel reported it (booleans, clean, fillets and chamfers)
+        self._history: ShapeHistory | None = None
 
     # ---- Properties ----
 
-    # pylint: disable=too-many-instance-attributes, too-many-public-methods
+    @property
+    def topo_parent(self) -> Shape | None:
+        """The shape this one was ultimately taken out of.
+
+        The outermost step of ``topo_path``: selecting an edge from a face of a
+        shell reports the shell, not the face. Use ``topo_owner`` for the face.
+        """
+        return self.topo_path[0] if self.topo_path else None
+
+    @topo_parent.setter
+    def topo_parent(self, value: Shape | None) -> None:
+        """Record a single step of provenance, discarding any longer path."""
+        self.topo_path = () if value is None else (value,)
+
+    @property
+    def topo_owner(self) -> Shape | None:
+        """The shape this one was taken directly out of.
+
+        The innermost step of ``topo_path``. An edge picked off a face knows
+        that face, which is what says which side of the edge the face is on -
+        something the edge alone cannot tell.
+        """
+        return self.topo_path[-1] if self.topo_path else None
+
+    def _extracted_from(self, source: Shape) -> None:
+        """Note that this shape was taken out of another, and how."""
+        self.topo_path = source.topo_path + (source,)
 
     @property
     def wrapped(self):
@@ -411,6 +460,28 @@ class Shape(NodeMixin, Generic[TOPODS]):
             color = self._material.pbr.interpolate_color()
             if color:
                 self.color = color
+
+    def _made_by(self, history: ShapeHistory | None) -> Self:
+        """Note the record of how this shape was made, for ``Select.LAST``/``NEW``."""
+        self._history = history
+        return self
+
+    @property
+    def convexity(self) -> Convexity:
+        """How the shape this was selected from sits around it.
+
+        Defined for a ``Vertex``, ``Edge`` or ``Face`` relative to the shape
+        it was taken out of - see :class:`~build_enums.Convexity`. Other
+        shapes are the region itself rather than an element of one, so the
+        question does not apply to them.
+
+        Raises:
+            ValueError: the shape has no convexity
+        """
+        raise ValueError(
+            f"a {type(self).__name__} has no convexity - only a Vertex, Edge or "
+            "Face selected from a larger shape does"
+        )
 
     @property
     def geom_type(self) -> GeomType:
@@ -593,7 +664,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
     @property
     def orientation(self) -> Vector:
         """Get the orientation component of this Shape's Location"""
-        if self.location is None:
+        if self._wrapped is None:
             raise ValueError("Can't find the orientation of an empty shape")
         return self.location.orientation
 
@@ -687,9 +758,56 @@ class Shape(NodeMixin, Generic[TOPODS]):
     # ---- Class Methods ----
 
     @classmethod
-    @abstractmethod
-    def cast(cls: type[Self], obj: TopoDS_Shape) -> Self:
+    def register_shape_constructor(
+        cls, shape_type: TopAbs_ShapeEnum, constructor: ShapeConstructor
+    ) -> None:
+        """Register a wrapper class for a TopAbs type without importing it here.
+
+        Each topology module registers the classes it defines as it is imported,
+        so that :meth:`cast` can build any shape without shape_core needing to
+        import classes that in turn import it.
+        """
+        cls.shape_constructors[shape_type] = constructor
+
+    @classmethod
+    def register_geometry_constructor(
+        cls, geometry_type: type, constructor: GeometryConstructor
+    ) -> None:
+        """Register how a geometry class becomes a Shape, without importing it.
+
+        Registered by whichever topology module defines the target class, since
+        the lower modules cannot import the higher ones.
+        """
+        cls.geometry_constructors[geometry_type] = constructor
+
+    @classmethod
+    def as_shape(cls, obj: Shape | Vector | Location | Axis | Plane) -> Shape:
+        """Return the Shape equivalent of a geometry object.
+
+        Vector and Location become a Vertex, Axis an Edge and Plane a Face.
+        A Shape is returned unchanged. Subclasses are honoured, so Pos and
+        Rotation convert like the Location they derive from.
+
+        The return type is what makes this usable in place of an isinstance
+        chain: the chain narrowed the operand to a Shape for type checkers, and
+        this has to do the same.
+        """
+        for geometry_type in type(obj).__mro__:
+            constructor = cls.geometry_constructors.get(geometry_type)
+            if constructor is not None:
+                return constructor(obj)
+        return tcast("Shape", obj)
+
+    @classmethod
+    def cast(cls, obj: TopoDS_Shape) -> Shape:
         """Returns the right type of wrapper, given a OCCT object"""
+
+        try:
+            constructor = cls.shape_constructors[shapetype(obj)]
+        except KeyError as exc:
+            raise ValueError(f"Unable to cast {obj.ShapeType()}") from exc
+        # NB downcast is needed to handle TopoDS_Shape types
+        return constructor(downcast(obj))
 
     @classmethod
     @abstractmethod
@@ -890,7 +1008,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             [shape.__class__.cast(i) for i in shape.entities(entity_type)]
         )
         for item in shape_list:
-            item.topo_parent = shape if shape.topo_parent is None else shape.topo_parent
+            item._extracted_from(shape)  # pylint: disable=protected-access
         return shape_list
 
     @overload
@@ -968,7 +1086,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
         )
         if factory is None:
             raise RuntimeError("Composite factory is not registered")
-        return factory(shape_list)
+        composite = factory(shape_list)
+        # pieces of one operation share its record; wrapping them keeps it
+        records = {id(s._history): s._history for s in shape_list if s._history}
+        if len(records) == 1:
+            composite._made_by(next(iter(records.values())))
+        return composite
 
     @overload
     def __add__(self, other: None) -> Self: ...
@@ -1057,8 +1180,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self.wrapped is not None:
             memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
         for key, value in self.__dict__.items():
-            if key == "topo_parent":
-                result.topo_parent = value
+            if key in ("topo_path", "_history"):
+                # provenance points at shapes outside the copy, so it is
+                # carried by reference rather than duplicated with it
+                setattr(result, key, value)
             else:
                 setattr(result, key, copy.deepcopy(value, memo))
             if key == "joints":
@@ -1095,17 +1220,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def __rmul__(self, other: Iterable[Plane | Location]) -> list[Self]: ...
     def __rmul__(self, other: Plane | Location | Iterable[Plane | Location]):
         """right multiply for positioning operator *"""
-        if isinstance(other, Location | Plane):
-            return self.moved(other)
-        try:
-            return [self.moved(loc) for loc in all_location_like(other)]
-        except NotAllLocationLikeError as e:
-            raise TypeError(f"{type(self).__name__} cannot be multiplied by {e}") from e
-        except TypeError:  # not iterable
-            pass
-        raise TypeError(
-            f"{type(self).__name__} cannot be multiplied by {type(other).__name__}"
-        )
+        return apply_location_like(self, other)
 
     @overload
     def __sub__(self, other: None) -> Self: ...
@@ -1241,10 +1356,18 @@ class Shape(NodeMixin, Generic[TOPODS]):
         upgrader = ShapeUpgrade_UnifySameDomain(self.wrapped, True, True, True)
         upgrader.AllowInternalEdges(False)
         # upgrader.SetAngularTolerance(1e-5)
+        # OCP binds each OCCT failure straight to Exception, so
+        # Standard_ConstructionError is not a Standard_Failure and there is no
+        # base class to name here. Cleaning is best effort anyway: on failure
+        # the uncleaned shape is still usable.
         try:
             upgrader.Build()
             self.wrapped = tcast(TOPODS, downcast(upgrader.Shape()))
-        except Exception:
+            unified = ShapeHistory.from_unify(upgrader)
+            self._history = (
+                unified if self._history is None else self._history.merge(unified)
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unable to clean {self}", stacklevel=2)
         return self
 
@@ -1278,6 +1401,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         attrs1 = set(self.__dict__.keys())
         attrs2 = set(target.__dict__.keys())
         common_attrs = attrs1 & attrs2
+        common_attrs.discard("_history")  # says how self was made, not target
         if exceptions is not None:
             common_attrs -= set(exceptions)
 
@@ -1375,12 +1499,41 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Edge"""
         return Shape.get_single_shape(self, "Edge")
 
-    def edges(self) -> ShapeList[Edge]:
-        """edges - all the edges in this Shape - subclasses may override"""
+    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
+        """edges - all the edges in this Shape - subclasses may override
+
+        Args:
+            select (Select, optional): all edges, or those the operation that
+                made this shape brought in or created (``LAST``) or created
+                outright (``NEW``). Defaults to Select.ALL.
+        """
         edge_list = Shape.get_shape_list(self, "Edge")
-        return edge_list.filter_by(
-            lambda e: BRep_Tool.Degenerated_s(e.wrapped), reverse=True
+        return self._select(
+            edge_list.filter_by(
+                lambda e: BRep_Tool.Degenerated_s(e.wrapped), reverse=True
+            ),
+            select,
         )
+
+    def _select(self, shapes: ShapeList[T], select: Select) -> ShapeList[T]:
+        """Narrow a list of this shape's sub-shapes by what the last operation did."""
+        if select == Select.ALL:
+            return shapes
+        if self._history is None:
+            raise ValueError(
+                f"Select.{select.name} needs a record of how this shape was made, "
+                "and this one has none - it is the result of no recorded operation"
+            )
+        record = self._history
+        if select == Select.LAST:
+            return ShapeList(
+                s for s in shapes if record.is_last(tcast(TopoDS_Shape, s.wrapped))
+            )
+        if select == Select.NEW:
+            return ShapeList(
+                s for s in shapes if record.is_new(tcast(TopoDS_Shape, s.wrapped))
+            )
+        raise ValueError(f"Invalid input, must be one of {[s.name for s in Select]}")
 
     def entities(self, topo_type: Shapes) -> list[TopoDS_Shape]:
         """Return all of the TopoDS sub entities of the given type"""
@@ -1392,9 +1545,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Face"""
         return Shape.get_single_shape(self, "Face")
 
-    def faces(self) -> ShapeList[Face]:
-        """faces - all the faces in this Shape"""
-        return Shape.get_shape_list(self, "Face")
+    def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
+        """faces - all the faces in this Shape, or those selected by ``select``"""
+        return self._select(Shape.get_shape_list(self, "Face"), select)
 
     def faces_intersected_by_axis(
         self,
@@ -1786,7 +1939,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
             The projected faces
 
         """
-        # pylint: disable=too-many-locals
         path_length = path.length
         # The derived classes of Shape implement center
         shape_center = self.center()  # pylint: disable=no-member
@@ -1920,7 +2072,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             transformation = gp_Trsf()
             transformation.SetScale(about_point.to_pnt(), float(factor))
             return self._apply_transform(transformation)
-        elif (
+        if (
             isinstance(factor, tuple)
             and len(factor) == 3
             and all(isinstance(scale, (int, float)) for scale in factor)
@@ -1950,16 +2102,15 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 ]
             )
             return self.transform_geometry(scale_matrix)
-        else:
-            raise ValueError("factor must be a float or a three tuple of float")
+        raise ValueError("factor must be a float or a three tuple of float")
 
     def shell(self) -> Shell:
         """Return the Shell"""
         return Shape.get_single_shape(self, "Shell")
 
-    def shells(self) -> ShapeList[Shell]:
-        """shells - all the shells in this Shape"""
-        return Shape.get_shape_list(self, "Shell")
+    def shells(self, select: Select = Select.ALL) -> ShapeList[Shell]:
+        """shells - all the shells in this Shape, or those selected by ``select``"""
+        return self._select(Shape.get_shape_list(self, "Shell"), select)
 
     def show_topology(
         self,
@@ -2015,9 +2166,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Solid"""
         return Shape.get_single_shape(self, "Solid")
 
-    def solids(self) -> ShapeList[Solid]:
-        """solids - all the solids in this Shape"""
-        return Shape.get_shape_list(self, "Solid")
+    def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
+        """solids - all the solids in this Shape, or those selected by ``select``"""
+        return self._select(Shape.get_shape_list(self, "Solid"), select)
 
     @overload
     def split(
@@ -2164,6 +2315,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return top
         if keep == Keep.BOTTOM:
             return bottom
+        # Keep.ALL returned earlier and INSIDE/OUTSIDE were rejected above, so
+        # this is unreachable until a Keep value is added
+        raise ValueError(f"Unsupported Keep value {keep}")  # pragma: no cover
 
     def tessellate(
         self, tolerance: float, angular_tolerance: float = 0.1
@@ -2576,9 +2730,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Wire"""
         return Shape.get_single_shape(self, "Wire")
 
-    def wires(self) -> ShapeList[Wire]:
-        """wires - all the wires in this Shape"""
-        return Shape.get_shape_list(self, "Wire")
+    def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
+        """wires - all the wires in this Shape, or those selected by ``select``"""
+        return self._select(Shape.get_shape_list(self, "Wire"), select)
 
     def _apply_transform(self, transformation: gp_Trsf) -> Self:
         """Private Apply Transform
@@ -2666,6 +2820,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
             if tool.IsEmpty() or arg.IsEmpty():
                 return self.__class__()
 
+        # The arguments were there before and the tools are brought in. An
+        # empty record means every input sub-shape came through untouched,
+        # which is what the shortcuts above produce
+        before = [o._wrapped for o in args if o._wrapped is not None]
+        brought = [o._wrapped for o in tools if o._wrapped is not None]
+        history = ShapeHistory(before=before, brought=brought)
         if topo_result is None:
             operation.SetArguments(arg)
             operation.SetTools(tool)
@@ -2674,15 +2834,18 @@ class Shape(NodeMixin, Generic[TOPODS]):
             operation.Build()
 
             topo_result = downcast(operation.Shape())
+            history = ShapeHistory.from_boolean(operation, before, brought)
 
         # Clean
         if SkipClean.clean:
             upgrader = ShapeUpgrade_UnifySameDomain(topo_result, True, True, True)
             upgrader.AllowInternalEdges(False)
+            # see Shape.clean: OCP gives OCCT failures no common base class
             try:
                 upgrader.Build()
                 topo_result = downcast(upgrader.Shape())
-            except Exception:
+                history.merge(ShapeHistory.from_unify(upgrader))
+            except Exception:  # pylint: disable=broad-exception-caught
                 warnings.warn("Boolean operation unable to clean", stacklevel=2)
 
         # Remove unnecessary TopoDS_Compound around single shape
@@ -2696,14 +2859,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
             )
             for result in results:
                 base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+                result._made_by(history)
             result = Shape.make_composite(results, highest_order[1])
             base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
-            return result
+            return result._made_by(history)
 
         result = highest_order[0].cast(topo_result)
         base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
-
-        return result
+        return result._made_by(history)
 
     def _bool_op_list(
         self,
@@ -2729,7 +2892,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if result.is_null:
             return ShapeList()
         if isinstance(result.wrapped, TopoDS_Compound):
-            return result.get_top_level_shapes()
+            pieces = result.get_top_level_shapes()
+            for piece in pieces:
+                piece._made_by(result._history)  # the same operation made them all
+            return pieces
         return ShapeList([result])
 
     def _ocp_section(
@@ -2784,6 +2950,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def _repr_html_(self):
         """Jupyter 3D representation support"""
 
+        # deferred so that importing build123d does not pull in jupyter_tools;
+        # this goes away when jupyter_tools is removed
+        # pylint: disable=import-outside-toplevel
         from build123d.jupyter_tools import shape_to_html, has_vtk
 
         if has_vtk:
@@ -2794,9 +2963,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Return the Vertex"""
         return Shape.get_single_shape(self, "Vertex")
 
-    def vertices(self) -> ShapeList[Vertex]:
-        """vertices - all the vertices in this Shape"""
-        return Shape.get_shape_list(self, "Vertex")
+    def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
+        """vertices - all the vertices in this Shape, or those selected by ``select``"""
+        return self._select(Shape.get_shape_list(self, "Vertex"), select)
 
 
 class Comparable(ABC):
@@ -2840,8 +3009,13 @@ class GroupBy(Generic[T, K]):
         self.groups: list[ShapeList[T]] = []
         self.key_f = key_f
 
+        def order(shape: T):
+            # enums are not orderable; group them in definition order
+            key = key_f(shape)
+            return key.value if isinstance(key, Enum) else key
+
         for i, (key, shapegroup) in enumerate(
-            itertools.groupby(sorted(shapelist, key=key_f, reverse=reverse), key=key_f)
+            itertools.groupby(sorted(shapelist, key=order, reverse=reverse), key=key_f)
         ):
             self.groups.append(ShapeList(shapegroup))
             self.key_to_group_index.append((key, i))
@@ -2895,6 +3069,47 @@ class GroupBy(Generic[T, K]):
                         printer.text(",")
                         printer.breakable()
                     printer.pretty(item)
+
+
+def find_same_topods(
+    query: TopoDS_Shape, candidates: Iterable[TopoDS_Shape]
+) -> TopoDS_Shape | None:
+    """Find the candidate that is ``query``, allowing for a relocation.
+
+    Moving a shape leaves its TShape alone and changes only its Location, so a
+    sub-shape taken out of a container and then moved no longer answers
+    ``IsSame`` (same TShape *and* Location) against the container's own
+    sub-shapes even though the geometry is shared. An exact ``IsSame`` match is
+    preferred; failing that, the first ``IsPartner`` match (same TShape at
+    another Location) is returned. The exact pass has to come first because a
+    container can hold one TShape at several locations.
+
+    Args:
+        query (TopoDS_Shape): the shape to look for
+        candidates (Iterable[TopoDS_Shape]): the container's sub-shapes
+
+    Returns:
+        TopoDS_Shape | None: the matching candidate, or None if there isn't one
+    """
+    candidates = list(candidates)
+    for candidate in candidates:
+        if candidate.IsSame(query):
+            return candidate
+    for candidate in candidates:
+        if candidate.IsPartner(query):
+            return candidate
+    return None
+
+
+def relocation_between(source: TopoDS_Shape, target: TopoDS_Shape) -> TopLoc_Location:
+    """The Location that carries ``source``'s frame onto ``target``'s.
+
+    For two shapes sharing a TShape at different Locations (see
+    :func:`find_same_topods`) this is the move that took one to the other, and
+    ``Moved`` with it brings anything found beside ``source`` into ``target``'s
+    frame.
+    """
+    return target.Location().Multiplied(source.Location().Inverted())
 
 
 def topo_distance_to(
@@ -2975,6 +3190,18 @@ def topo_distance_to(
     peer_lookup = {
         shape_hasher(peer.wrapped): peer for peer in peers if peer.wrapped is not None
     }
+    peer_topods = [peer.wrapped for peer in peers if peer.wrapped is not None]
+
+    def peer_of(shape: Shape) -> Shape | None:
+        """The peer that ``shape`` is, allowing for the shape having been moved."""
+        if shape.wrapped is None:
+            return None
+        peer = peer_lookup.get(shape_hasher(shape.wrapped))
+        if peer is None:
+            match = find_same_topods(shape.wrapped, peer_topods)
+            if match is not None:
+                peer = peer_lookup[shape_hasher(match)]
+        return peer
 
     if peer_type == "Vertex":
         vertex_neighbors: dict[Shape, set[Shape]] = {peer: set() for peer in peers}
@@ -2994,7 +3221,9 @@ def topo_distance_to(
             if vertex_peer is None:
                 continue
 
-            for edge_wrapped in vertex_edge_map.FindFromKey(vertex_wrapped):
+            for edge_wrapped in list_shapes(
+                vertex_edge_map.FindFromKey(vertex_wrapped)
+            ):
                 edge = TopoDS.Edge(edge_wrapped)
                 vertex0 = TopoDS_Vertex()
                 vertex1 = TopoDS_Vertex()
@@ -3019,7 +3248,7 @@ def topo_distance_to(
         for index in range(connector_peer_map.Extent()):
             connector = connector_peer_map.FindKey(index + 1)
             connected_peers = []
-            for peer_wrapped in connector_peer_map.FindFromKey(connector):
+            for peer_wrapped in list_shapes(connector_peer_map.FindFromKey(connector)):
                 peer = peer_lookup.get(shape_hasher(peer_wrapped))
                 if peer is None:
                     continue
@@ -3030,9 +3259,10 @@ def topo_distance_to(
     distances: dict[Shape, int] = {}
     frontier: deque[Shape] = deque()
     for source in sources:
-        if source in peers and source not in distances:
-            distances[source] = 0
-            frontier.append(source)
+        source_peer = peer_of(source)
+        if source_peer is not None and source_peer not in distances:
+            distances[source_peer] = 0
+            frontier.append(source_peer)
 
     while frontier:
         current = frontier.popleft()
@@ -3062,8 +3292,8 @@ def topo_distance_to(
         if not parent.is_same(obj.topo_parent):
             raise ValueError("Topological distance requires a shared topo_parent")
 
-        graph_distance = distances.get(obj, inf)
-        return graph_distance
+        peer = peer_of(obj)
+        return inf if peer is None else distances.get(peer, inf)
 
     return key_f
 
@@ -3074,8 +3304,6 @@ class ShapeList(list[T]):
     build123d_type: ClassVar[str] = "ShapeList"
 
     # ---- Properties ----
-
-    # pylint: disable=too-many-public-methods
 
     @property
     def first(self) -> T:
@@ -3236,7 +3464,7 @@ class ShapeList(list[T]):
 
     def filter_by(
         self,
-        filter_by: Callable[[T], bool] | Axis | Plane | GeomType | property,
+        filter_by: Callable[[T], bool] | Axis | Plane | GeomType | Convexity | property,
         reverse: bool = False,
         tolerance: float = 1e-5,
     ) -> ShapeList[T]:
@@ -3249,9 +3477,11 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            filter_by (Callable[[T], bool] | Axis | Plane | GeomType): function, axis,
-                plane, or geom type to filter and possibly sort by. Filtering by a plane
-                returns faces/edges parallel to that plane.
+            filter_by (Callable[[T], bool] | Axis | Plane | GeomType | Convexity):
+                function, axis, plane, geom type or convexity to filter and possibly
+                sort by. Filtering by a plane returns faces/edges parallel to that
+                plane. Filtering by a convexity classifies each object relative to
+                the shape it was selected from.
             reverse (bool, optional): invert the geom type filter. Defaults to False.
             tolerance (float, optional): maximum deviation from axis. Defaults to 1e-5.
 
@@ -3358,6 +3588,11 @@ class ShapeList(list[T]):
             def predicate(obj):
                 return obj.geom_type == filter_by
 
+        elif isinstance(filter_by, Convexity):
+
+            def predicate(obj):
+                return obj.convexity == filter_by
+
         else:
             raise ValueError(f"Unsupported filter_by predicate: {filter_by}")
 
@@ -3432,11 +3667,14 @@ class ShapeList(list[T]):
         """group by
 
         Group objects by provided criteria and then sort the groups according to the criteria.
-        Note that not all group_by criteria apply to all objects.
+        Note that not all group_by criteria apply to all objects. Grouping by
+        ``Convexity`` classifies each object relative to the shape it was selected
+        from, with the groups in the enum's definition order.
 
         Args:
             group_by (Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
-                optional): group and sort criteria. Defaults to Axis.Z.
+                optional): group and sort criteria, or the ``Convexity`` enum itself.
+                Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
             tol_digits (int, optional): Tolerance for building the group keys by
                 round(key, tol_digits)
@@ -3445,7 +3683,15 @@ class ShapeList(list[T]):
             GroupBy[T, K]: sorted groups of ShapeLists
         """
 
-        if isinstance(group_by, Axis):
+        if isinstance(group_by, type):
+            # the enum itself, checked first because a class is also callable
+            if group_by is not Convexity:
+                raise ValueError(f"Unsupported group_by function: {group_by}")
+
+            def key_f(obj):
+                return obj.convexity
+
+        elif isinstance(group_by, Axis):
             if group_by.wrapped is None:
                 raise ValueError("Cannot group by an empty axis")
             assert group_by.location is not None
@@ -3714,8 +3960,6 @@ class Joint(ABC):
 
     def _reparent(self, parent: Solid | Compound) -> None:
         """Bind this joint to a new parent without changing its location."""
-        if self.parent.location is None:
-            raise ValueError("Joint parent location is not set")
         relative_to_new_parent = parent.location.inverse() * self.parent.location
         if hasattr(self, "relative_location"):
             self.relative_location = relative_to_new_parent * self.relative_location

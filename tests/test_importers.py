@@ -1,12 +1,16 @@
-from io import StringIO
+from io import BytesIO, StringIO
 import os
 from os import fsencode, fsdecode
 import unittest
 import urllib.request
 import tempfile
+import zipfile
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
+from OCP.TopoDS import TopoDS_Edge
 
 from build123d import (
     BuildLine,
@@ -212,6 +216,24 @@ class ImportSTEP(unittest.TestCase):
         # If the parts where placed correctly they all touch and can be fused
         self.assertEqual(len(fused.solids()), 1)
 
+    def test_unnamed_component(self):
+        file_name = "nist_ctc_02_asme1_ap242-e2.stp"
+        temp_dir = tempfile.gettempdir()
+        file_path = os.path.join(temp_dir, "NIST-PMI-STEP-Files", file_name)
+        if not os.path.exists(file_path):
+            request = urllib.request.Request(
+                "https://www.nist.gov/system/files/documents/noindex/2024/06/19/NIST-PMI-STEP-Files.zip",
+                headers={"User-Agent": "build123d test suite"},
+            )
+            with urllib.request.urlopen(request) as response:
+                with zipfile.ZipFile(BytesIO(response.read())) as archive:
+                    archive.extract(f"NIST-PMI-STEP-Files/{file_name}", temp_dir)
+
+        imported = import_step(file_path)
+
+        self.assertIsInstance(imported, Compound)
+        self.assertIn("", [child.label for child in imported.children])
+
     def test_roundtrip_nested_labels_colors(self):
         a = Solid.make_sphere(1)
         a.label = "sphere"
@@ -369,6 +391,24 @@ def test_stl_import_rescale_units_invalid(unit="invalid"):
     stl_file = Path(__file__).parent / "cyl_w_rect_hole.stl"
     with pytest.raises(ValueError):
         importer = import_stl(stl_file, unit)
+
+
+class ImportSVGValidation(unittest.TestCase):
+    def test_unexpected_shape_type(self):
+        """The SVG document only ever yields wires and faces; the guard is a
+        defensive check on that contract."""
+
+        class _FakeDocument:
+            viewbox = SimpleNamespace(x=0, y=0, width=10, height=10)
+
+            def __iter__(self):
+                yield (TopoDS_Edge(), MagicMock())
+
+        with patch(
+            "build123d.importers.import_svg_document", return_value=_FakeDocument()
+        ):
+            with self.assertRaisesRegex(ValueError, "unexpected shape type"):
+                import_svg("unused.svg")
 
 
 if __name__ == "__main__":

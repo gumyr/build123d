@@ -201,6 +201,10 @@ class TestSolid(unittest.TestCase):
                 ]
             )
 
+        # two vertices, but not one at each end of the list
+        with self.assertRaisesRegex(ValueError, "beginning and end of the list"):
+            Solid.make_loft([Vertex(0, 0, 1), Vertex(0, 0, 2), Wire.make_rect(1, 1)])
+
     def test_extrude_until(self):
         square = Face.make_rect(1, 1)
         box = Solid.make_box(4, 4, 1, Plane((-2, -2, 3)))
@@ -264,6 +268,18 @@ class TestSolid(unittest.TestCase):
         self.assertAlmostEqual(rbb.volume, (10**3) * (3**0.5) / 9, 0)
         self.assertTrue(rbb.volume > obb.volume)
         self.assertAlmostEqual(obb2.volume, 40, 4)
+
+
+class TestSolidThicken(unittest.TestCase):
+    def test_offset_failure(self):
+        offset_builder = MagicMock()
+        offset_builder.Shape.side_effect = StdFail_NotDone("not done")
+        with patch(
+            "build123d.topology.three_d.BRepOffset_MakeOffset",
+            return_value=offset_builder,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Error applying thicken"):
+                Solid.thicken(Face.make_rect(1, 1), 1)
 
 
 class TestSolidDraft(unittest.TestCase):

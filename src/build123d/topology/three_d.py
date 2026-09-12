@@ -140,6 +140,8 @@ from .shape_core import (
     unwrap_topods_compound,
     _make_topods_compound_from_shapes,
 )
+from .history import ShapeHistory
+from .kernel import list_shapes
 from .two_d import Face, Mixin2D, Shell, sort_wires_by_build_order
 from .utils import (
     _extrude_topods_shape,
@@ -165,24 +167,6 @@ class Mixin3D(Shape[TOPODS]):
         return 3
 
     # ---- Class Methods ----
-
-    @classmethod
-    def cast(cls, obj: TopoDS_Shape) -> Self:
-        "Returns the right type of wrapper, given a OCCT object"
-
-        # define the shape lookup table for casting
-        constructor_lut = {
-            ta.TopAbs_VERTEX: Vertex,
-            ta.TopAbs_EDGE: Edge,
-            ta.TopAbs_WIRE: Wire,
-            ta.TopAbs_FACE: Face,
-            ta.TopAbs_SHELL: Shell,
-            ta.TopAbs_SOLID: Solid,
-        }
-
-        shape_type = shapetype(obj)
-        # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](downcast(obj))
 
     @classmethod
     def extrude(
@@ -301,7 +285,11 @@ class Mixin3D(Shape[TOPODS]):
                 "Failed creating a chamfer, try a smaller length value(s)"
             ) from err
 
-        return new_shape
+        return new_shape._made_by(
+            ShapeHistory.from_algorithm(
+                chamfer_builder, [self.wrapped], new_shape.wrapped
+            )
+        )
 
     def dprism(
         self,
@@ -386,7 +374,11 @@ class Mixin3D(Shape[TOPODS]):
                 f" or use max_fillet() to find the largest valid fillet radius"
             ) from err
 
-        return new_shape
+        return new_shape._made_by(
+            ShapeHistory.from_algorithm(
+                fillet_builder, [self.wrapped], new_shape.wrapped
+            )
+        )
 
     def hollow(
         self,
@@ -475,14 +467,7 @@ class Mixin3D(Shape[TOPODS]):
                 (shapes touching the solid's surface without penetrating)
         """
         # Convert geometry objects to shapes
-        if isinstance(other, Vector):
-            other = Vertex(other)
-        elif isinstance(other, Location):
-            other = Vertex(other.position)
-        elif isinstance(other, Axis):
-            other = Edge(other)
-        elif isinstance(other, Plane):
-            other = Face(other)
+        other = Shape.as_shape(other)
 
         def filter_redundant_touches(items: ShapeList) -> ShapeList:
             """Remove vertices/edges that lie on higher-dimensional results."""
@@ -1166,7 +1151,6 @@ class Solid(Mixin3D[TopoDS_Solid]):
         Returns:
             Solid: extruded cross section
         """
-        # pylint: disable=too-many-locals
         direction = Vector(direction)
 
         if (
@@ -1282,11 +1266,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
         face_explorer = TopExp_Explorer(target.wrapped, ta.TopAbs_FACE)
         while face_explorer.More():
             target_face = TopoDS.Face(face_explorer.Current())
-            modified_los: List_TopoDS_Shape = history.Modified(target_face)
-            while not modified_los.IsEmpty():
-                modified_face = TopoDS.Face(modified_los.First())
-                modified_los.RemoveFirst()
-                modified_target_faces.append(modified_face)
+            for modified in list_shapes(history.Modified(target_face)):
+                modified_target_faces.append(TopoDS.Face(modified))
             face_explorer.Next()
 
         # 3: Sew the resulting faces into shells - one for each surface the extrusion
@@ -1859,7 +1840,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 face=None,
                 problematic_shape=draft_angle_builder.ProblematicShape(),
             ) from err
-        return result
+        return result._made_by(
+            ShapeHistory.from_algorithm(
+                draft_angle_builder, [self.wrapped], result.wrapped
+            )
+        )
 
 
 class DraftAngleError(RuntimeError):
@@ -1869,3 +1854,6 @@ class DraftAngleError(RuntimeError):
         super().__init__(message)
         self.face = face
         self.problematic_shape = problematic_shape
+
+
+Shape.register_shape_constructor(ta.TopAbs_SOLID, Solid)

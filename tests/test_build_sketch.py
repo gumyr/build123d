@@ -125,7 +125,9 @@ class TestBuildSketch(unittest.TestCase):
             Rectangle(10, 10)
             self.assertEqual(len(test.edges()), 4)
             Rectangle(5, 20, align=(Align.CENTER, Align.MIN))
-            self.assertEqual(len(test.edges(Select.LAST)), 5)
+            # the three edges of the new rectangle that survive the fuse; the
+            # pieces of the old rectangle's split edge were only rebuilt
+            self.assertEqual(len(test.edges(Select.LAST)), 3)
 
     def test_select_faces(self):
         """Test faces()"""
@@ -444,13 +446,10 @@ class TestBuildSketchObjects(unittest.TestCase):
                 # The case where order == 1 is a rhombus so the area should be
                 # exact.
                 if order == 1:
-                    self.assertAlmostEqual(
-                        test.sketch.area,
-                        width * height / 2
-                    )
+                    self.assertAlmostEqual(test.sketch.area, width * height / 2)
                 else:
-                # For cases that are approximated with splines, only check the
-                # area to 5 decimal places.
+                    # For cases that are approximated with splines, only check the
+                    # area to 5 decimal places.
                     area = (
                         width
                         * height

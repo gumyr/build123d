@@ -35,6 +35,7 @@ from build123d.build_enums import GeomType, Mode, Until, Kind, Side
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector, VectorLike
 from build123d.topology import (
+    ShapeHistory,
     Compound,
     Curve,
     DraftAngleError,
@@ -106,7 +107,7 @@ def draft(
     if context is not None:
         context._add_to_context(new_solid, clean=False, mode=Mode.REPLACE)
 
-    return Part(Compound([new_solid]).wrapped)
+    return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
 
 
 def extrude(
@@ -142,7 +143,6 @@ def extrude(
     Returns:
         Part: extruded object
     """
-    # pylint: disable=too-many-locals, too-many-branches
     context: BuildPart | None = BuildPart._get_context("extrude")
     validate_inputs(context, "extrude", to_extrude)
 
@@ -365,7 +365,7 @@ def loft(
     elif clean:
         new_solid = new_solid.clean()
 
-    return Part(Compound([new_solid]).wrapped)
+    return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
 
 
 def make_brake_formed(
@@ -406,7 +406,6 @@ def make_brake_formed(
     Returns:
         Part: sheet metal part
     """
-    # pylint: disable=too-many-locals, too-many-branches
     context: BuildPart | None = BuildPart._get_context("make_brake_formed")
     validate_inputs(context, "make_brake_formed")
 
@@ -476,7 +475,7 @@ def make_brake_formed(
     elif clean:
         new_solid = new_solid.clean()
 
-    return Part(Compound([new_solid]).wrapped)
+    return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
 
 
 def project_workplane(
@@ -638,19 +637,12 @@ def section(
         )
         for plane in section_planes
     ]
-    if obj is None:
-        if context is not None and context._obj is not None:
-            obj = context.part
-        else:
-            raise ValueError("obj must be provided")
 
     new_objects: list[Face | Shell] = []
     for plane in planes:
         intersection = to_section.intersect(plane)
-        if isinstance(intersection, ShapeList):
+        if intersection is not None:
             new_objects.extend(intersection)
-        elif intersection is not None:
-            new_objects.append(intersection)
 
     if context is not None:
         context._add_to_context(

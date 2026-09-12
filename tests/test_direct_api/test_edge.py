@@ -31,21 +31,25 @@ import numpy as np
 import unittest
 
 from itertools import product
-from unittest.mock import patch, PropertyMock
+from unittest.mock import MagicMock, patch, PropertyMock
 
 from build123d.build_enums import (
     Align,
     AngularDirection,
+    Convexity,
     GeomType,
     PositionMode,
     Transition,
 )
-from build123d.geometry import Axis, Plane, Location, Vector
+from build123d.geometry import Axis, Plane, Location, Pos, Vector
 from build123d.objects_curve import CenterArc, EllipticalCenterArc, Line, Spline
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
-from build123d.objects_part import Box
+from build123d.objects_part import Box, Cylinder
 from build123d.operations_generic import sweep
-from build123d.topology import Curve, Edge, Face, Wire, Vertex
+from build123d.operations_generic import fillet
+from build123d.operations_part import extrude
+from build123d.topology import Curve, Edge, Face, Shell, Wire, Vertex
+from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
 from OCP.GeomProjLib import GeomProjLib
 
 
@@ -112,6 +116,15 @@ class TestEdge(unittest.TestCase):
             [(0, 0), (1, 1), (2, 1), (3, 0)], smoothing=(1.0, 5.0, 10.0)
         )
         self.assertAlmostEqual(spline.end_point(), (3, 0, 0), 5)
+
+        # smoothing needs degree 5 for C2; a lower max_deg is raised to suit
+        # rather than failing the approximation
+        spline = Edge.make_spline_approx(
+            [(i, (i % 3) * 1.5) for i in range(8)],
+            smoothing=(1.0, 1.0, 1.0),
+            max_deg=3,
+        )
+        self.assertAlmostEqual(spline.end_point(), (7, 1.5, 0), 5)
 
     def test_make_bspline(self):
         control_points = [(0, 0), (1, 1), (2, 0)]
@@ -232,6 +245,31 @@ class TestEdge(unittest.TestCase):
         line.wrapped = None
         with self.assertRaises(ValueError):
             line.trim(0.1, 0.9)
+
+    def test_trim_invalid_parameter(self):
+        line = Edge.make_line((-2, 0), (2, 0))
+        with self.assertRaisesRegex(TypeError, "start must be a float or VectorLike"):
+            line.trim("nowhere", 0.9)
+        with self.assertRaisesRegex(TypeError, "end must be a float or VectorLike"):
+            line.trim(0.1, object())
+
+    def test_make_spline_failure(self):
+        builder = MagicMock()
+        builder.IsDone.return_value = False
+        with patch(
+            "build123d.topology.one_d.GeomAPI_Interpolate", return_value=builder
+        ):
+            with self.assertRaisesRegex(ValueError, "B-spline interpolation failed"):
+                Edge.make_spline([(0, 0), (1, 1), (2, 0)])
+
+    def test_make_spline_approx_failure(self):
+        builder = MagicMock()
+        builder.IsDone.return_value = False
+        with patch(
+            "build123d.topology.one_d.GeomAPI_PointsToBSpline", return_value=builder
+        ):
+            with self.assertRaisesRegex(ValueError, "B-spline approximation failed"):
+                Edge.make_spline_approx([(0, 0), (1, 1), (2, 0)])
 
     def test_trim_to_length(self):
 
@@ -423,6 +461,74 @@ class TestEdge(unittest.TestCase):
         self.assertEqual(len(inside_edges), 5)
         self.assertTrue(all(e.geom_type == GeomType.ELLIPSE for e in inside_edges))
 
+    def test_convexity_of_creases(self):
+        box = Box(10, 10, 10)
+        self.assertTrue(all(e.convexity == Convexity.CONVEX for e in box.edges()))
+
+        cross = extrude((Rectangle(8, 2) + Rectangle(2, 8)).face(), 2)
+        concave = cross.edges().filter_by(Convexity.CONCAVE)
+        self.assertEqual(len(concave), 4)
+        self.assertTrue(all(e.is_interior for e in concave))
+        self.assertEqual(len(cross.edges().filter_by(Convexity.CONVEX)), 32)
+        # the re-entrant edges are the vertical ones nearest the axis
+        self.assertTrue(
+            all(abs(e.center().X) == 1 and abs(e.center().Y) == 1 for e in concave)
+        )
+
+    def test_convexity_moved(self):
+        # A moved copy of an extracted solid still names the unmoved container as
+        # its topo_parent; the faces have to be found by TShape, not Location
+        cross = (Rectangle(8, 2) + Rectangle(2, 8)).face()
+        moved = Pos(X=10) * extrude(cross, 2).solid()
+        inside_edges = moved.edges().filter_by(Edge.is_interior)
+        self.assertEqual(len(inside_edges), 4)
+        self.assertTrue(all(e.center().X > 5 for e in inside_edges))
+
+    def test_convexity_smooth(self):
+        # a fillet meets the faces it blends into without a crease
+        rounded = fillet(Box(10, 10, 10).edges(), 2)
+        self.assertTrue(all(e.convexity == Convexity.SMOOTH for e in rounded.edges()))
+        self.assertFalse(any(e.is_interior for e in rounded.edges()))
+        # a seam has the same face on both sides
+        seam = Cylinder(3, 5).edges().filter_by(GeomType.LINE)[0]
+        self.assertEqual(seam.convexity, Convexity.SMOOTH)
+        self.assertEqual(len(Cylinder(3, 5).edges().filter_by(Convexity.CONVEX)), 2)
+
+    def test_convexity_saddle(self):
+        # a wall twisting about its shared edge, from going down at one end to
+        # going up at the other, is convex there and concave here
+        plate = Face.make_rect(20, 5, Plane(origin=(0, -2.5, 0)))
+        along = Edge.make_line((-10, 0, 0), (10, 0, 0))
+        rim = Edge.make_spline(
+            [
+                (
+                    x,
+                    5 * math.cos(math.pi / 2 * x / 10),
+                    5 * math.sin(math.pi / 2 * x / 10),
+                )
+                for x in range(-10, 11, 2)
+            ]
+        )
+        wall = Face.make_surface_from_curves(along, rim)
+        sewing = BRepBuilderAPI_Sewing(1e-6)
+        sewing.Add(plate.wrapped)
+        sewing.Add(wall.wrapped)
+        sewing.Perform()
+        shell = Shell(sewing.SewedShape())
+        shared = [
+            e
+            for e in shell.edges()
+            if e.geom_type == GeomType.LINE and abs(e.center().Y) < 1e-6
+        ]
+        self.assertEqual(len(shared), 1)
+        self.assertEqual(shared[0].convexity, Convexity.SADDLE)
+
+    def test_convexity_errors(self):
+        with self.assertRaisesRegex(ValueError, "no valid parent"):
+            Edge.make_line((0, 0), (1, 0)).convexity
+        with self.assertRaisesRegex(ValueError, "one face only"):
+            Face.make_rect(1, 1).edges()[0].is_interior
+
     def test_position_at(self):
         line = Edge.make_line((1, 1), (2, 2))
         self.assertEqual(line @ 0, Vector(1, 1, 0))
@@ -508,6 +614,35 @@ class TestEdge(unittest.TestCase):
 
 class TestEdgeParamAt(unittest.TestCase):
     """Edge.param_at regression tests (Issue #1095)."""
+
+    def test_param_at_point_search_fallback(self):
+        """When the OCCT projection returns a bad parameter the minimization
+        search takes over and still finds the point."""
+        projector = MagicMock()
+        projector.LowerDistanceParameter.return_value = 0.0
+        edge = Edge.make_line((0, 0), (10, 0))
+        with patch(
+            "build123d.topology.one_d.GeomAPI_ProjectPointOnCurve",
+            return_value=projector,
+        ):
+            self.assertAlmostEqual(edge.param_at_point((7, 0, 0)), 0.7, 6)
+
+    def test_param_at_point_not_found(self):
+        """Neither projection nor search converge."""
+        projector = MagicMock()
+        projector.LowerDistanceParameter.return_value = 0.0
+        result = MagicMock()
+        result.fun, result.x = 1e6, 0.0
+        edge = Edge.make_line((0, 0), (10, 0))
+        with (
+            patch(
+                "build123d.topology.one_d.GeomAPI_ProjectPointOnCurve",
+                return_value=projector,
+            ),
+            patch("build123d.topology.one_d.minimize_scalar", return_value=result),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Edge is too complex"):
+                edge.param_at_point((7, 0, 0))
 
     def test_param_at_line_midpoint(self):
         """

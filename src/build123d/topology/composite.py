@@ -85,10 +85,9 @@ from OCP.TopoDS import (
     TopoDS_Builder,
     TopoDS_Compound,
     TopoDS_Iterator,
-    TopoDS_Shape,
 )
 from anytree import PreOrderIter
-from build123d.build_enums import Align, CenterOf, FontStyle, TextAlign, Unit
+from build123d.build_enums import Align, CenterOf, FontStyle, Select, TextAlign, Unit
 from build123d.geometry import (
     TOLERANCE,
     Axis,
@@ -102,12 +101,12 @@ from build123d.geometry import (
 from build123d.text import FONT_ASPECT, FontManager
 
 from .one_d import Edge, Wire, Mixin1D
+from .history import ShapeHistory
 from .shape_core import (
     Shape,
     ShapeList,
     Joint,
     downcast,
-    shapetype,
     topods_dim,
     _make_topods_compound_from_shapes,
 )
@@ -189,37 +188,26 @@ class Compound(Mixin3D[TopoDS_Compound]):
         return sum(i.volume for i in [*self.get_type(Solid), *self.get_type(Shell)])
 
     def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
-        """mass - the mass of this Compound"""
+        """mass - the mass of this Compound
+
+        An assembly is summed over its children so each one contributes its own
+        material; Shape.material walks up the tree for children that don't
+        declare one. A Compound with no children is summed over its topology
+        instead, where the sub-shapes are not build123d objects and can only
+        take this Compound's material.
+        """
+        if self.children:
+            return sum(child.mass(mass_unit, length_unit) for child in self.children)
+
         masses = []
         for s in [*self.get_type(Solid), *self.get_type(Shell)]:
-            if s._material is None:
-                s._material = self.material
+            # get_type builds fresh wrappers from the topology, so these never
+            # carry a material of their own.
+            s._material = self.material
             masses.append(s.mass(mass_unit, length_unit))
         return sum(masses)
 
     # ---- Class Methods ----
-
-    @classmethod
-    def cast(
-        cls, obj: TopoDS_Shape
-    ) -> Vertex | Edge | Wire | Face | Shell | Solid | Compound:
-        "Returns the right type of wrapper, given a OCCT object"
-
-        # define the shape lookup table for casting
-        constructor_lut = {
-            ta.TopAbs_VERTEX: Vertex,
-            ta.TopAbs_EDGE: Edge,
-            ta.TopAbs_WIRE: Wire,
-            ta.TopAbs_FACE: Face,
-            ta.TopAbs_SHELL: Shell,
-            ta.TopAbs_SOLID: Solid,
-            ta.TopAbs_COMPOUND: Compound,
-            ta.TopAbs_COMPSOLID: Compound,
-        }
-
-        shape_type = shapetype(obj)
-        # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](downcast(obj))
 
     @classmethod
     def extrude(cls, obj: Shell, direction: VectorLike) -> Compound:
@@ -325,7 +313,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
             )
 
         """
-        # pylint: disable=too-many-locals
+        # text placement genuinely has this many independent knobs, and users
+        # keep asking for more rather than fewer
+        # pylint: disable=too-many-arguments, too-many-positional-arguments
 
         def position_glyph(glyph: Shape, path: Edge | Wire, position: float) -> Shape:
             """Reposition a glyph shape on provided path
@@ -507,7 +497,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             curve = Curve() if self._wrapped is None else Curve(self.wrapped)
             sum1d = curve + other
             if isinstance(sum1d, Edge):
-                result1d = Curve([sum1d])
+                result1d = Curve([sum1d])._made_by(ShapeHistory.of(sum1d))
             else:
                 result1d = sum1d
             self.copy_attributes_to(result1d, ["wrapped", "_NodeMixin__children"])
@@ -527,6 +517,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         if not summands:
             return self
 
+        brought = summands
         summands = ShapeList(
             s for s in self.get_top_level_shapes() + summands if s is not None
         )
@@ -538,6 +529,13 @@ class Compound(Mixin3D[TopoDS_Compound]):
             fuse_op.SetFuzzyValue(TOLERANCE)
             self.copy_attributes_to(summands[0], ["wrapped", "_NodeMixin__children"])
             result = self._bool_op(summands[:1], summands[1:], fuse_op)
+            # the fuse ran self's first piece against all the rest; for the
+            # record, everything of self was there before and `other` was brought in
+            if result._history is not None:
+                result._history.with_inputs(
+                    (s.wrapped for s in self.get_top_level_shapes()),
+                    (s.wrapped for s in brought),
+                )
             if not isinstance(result, Compound):
                 result = Shape.make_composite([result], self._dim)
 
@@ -545,12 +543,12 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
     def __and__(self, other: Shape | Iterable[Shape]) -> Compound:
         """Intersect other to self `&` operator"""
+        # Shape.__and__ resolves any ShapeList to a single shape before
+        # returning, so this only ever sees a Shape or None.
         intersection = Shape.__and__(self, other)
         if intersection is None:
             return Compound()
-        if isinstance(intersection, list):
-            intersection = Shape.make_composite(intersection)
-        elif not isinstance(intersection, Compound):
+        if not isinstance(intersection, Compound):
             intersection = Shape.make_composite([intersection])
         self.copy_attributes_to(intersection, ["wrapped", "_NodeMixin__children"])
         return intersection
@@ -768,14 +766,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 (only relevant when Solids are involved)
         """
         # Convert geometry objects
-        if isinstance(other, Vector):
-            other = Vertex(other)
-        elif isinstance(other, Location):
-            other = Vertex(other.position)
-        elif isinstance(other, Axis):
-            other = Edge(other)
-        elif isinstance(other, Plane):
-            other = Face(other)
+        other = Shape.as_shape(other)
 
         # Get self elements: assembly children or OCCT direct children
         if self.children:
@@ -897,16 +888,19 @@ class Compound(Mixin3D[TopoDS_Compound]):
     def _post_attach(self, parent: Compound):
         """Method call after attaching to `parent`."""
         logger.debug("Updated parent of %s to %s", self.label, parent.label)
-        parent.wrapped = _make_topods_compound_from_shapes(
+        parent._wrapped = _make_topods_compound_from_shapes(
             [c.wrapped for c in parent.children]
         )
 
     def _post_attach_children(self, children: Iterable[Shape]):
         """Method call after attaching `children`."""
+        # _wrapped is initialized by Shape.__init__; pylint doesn't track it
+        # through this hierarchy, though it does for a direct Shape subclass
+        # pylint: disable=attribute-defined-outside-init
         if children:
             kids = ",".join([child.label for child in children])
             logger.debug("Adding children %s to %s", kids, self.label)
-            self.wrapped = _make_topods_compound_from_shapes(
+            self._wrapped = _make_topods_compound_from_shapes(
                 [c.wrapped for c in self.children]
             )
         # else:
@@ -916,7 +910,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """Method call after detaching from `parent`."""
         logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         if parent.children:
-            parent.wrapped = _make_topods_compound_from_shapes(
+            parent._wrapped = _make_topods_compound_from_shapes(
                 [c.wrapped for c in parent.children]
             )
         # else:
@@ -924,10 +918,13 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
     def _post_detach_children(self, children):
         """Method call before detaching `children`."""
+        # _wrapped is initialized by Shape.__init__; pylint doesn't track it
+        # through this hierarchy, though it does for a direct Shape subclass
+        # pylint: disable=attribute-defined-outside-init
         if children:
             kids = ",".join([child.label for child in children])
             logger.debug("Removing children %s from %s", kids, self.label)
-            self.wrapped = _make_topods_compound_from_shapes(
+            self._wrapped = _make_topods_compound_from_shapes(
                 [c.wrapped for c in self.children]
             )
         # else:
@@ -980,9 +977,9 @@ class Curve(Compound):
         """Location on wire operator ^ - only works if continuous"""
         return Wire(self.edges()).location_at(position)
 
-    def wires(self) -> ShapeList[Wire]:  # type: ignore
+    def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:  # type: ignore
         """A list of wires created from the edges"""
-        return Wire.combine(self.edges())
+        return Wire.combine(self.edges(select))
 
 
 class Sketch(Compound):
@@ -1019,3 +1016,7 @@ Shape.register_composite_factory(None, Compound)
 Shape.register_composite_factory(1, Curve)
 Shape.register_composite_factory(2, Sketch)
 Shape.register_composite_factory(3, Part)
+
+
+Shape.register_shape_constructor(ta.TopAbs_COMPOUND, Compound)
+Shape.register_shape_constructor(ta.TopAbs_COMPSOLID, Compound)

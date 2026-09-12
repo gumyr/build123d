@@ -190,5 +190,22 @@ class TestMatrix(unittest.TestCase):
         matrix_almost_equal(m3, rot_x_matrix)
 
 
+class TestMatrixValidation(unittest.TestCase):
+    """Rejection paths of the Matrix constructor"""
+
+    def test_unexpected_positional_type(self):
+        with self.assertRaisesRegex(TypeError, "unexpected type"):
+            Matrix(42)
+
+    def test_unexpected_keyword(self):
+        with self.assertRaisesRegex(ValueError, "Unexpected argument"):
+            Matrix(nonsense=1)
+
+    def test_elements_must_be_numbers(self):
+        rows = [[1, 0, 0, 0], [0, 1, 0, "x"], [0, 0, 1, 0]]
+        with self.assertRaisesRegex(TypeError, "Only float or int"):
+            Matrix(rows)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -148,7 +148,9 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
         """Extract name and format"""
         name = ""
         std_name = TDataStd_Name()
-        if label.FindAttribute(TDataStd_Name.GetID_s(), std_name):
+        if label.IsAttribute(TDataStd_Name.GetID_s()) and label.FindAttribute(
+            TDataStd_Name.GetID_s(), std_name
+        ):
             name = TCollection_AsciiString(std_name.Get()).ToCString()
         # Remove characters that cause ocp_vscode to fail
         clean_name = "".join(ch for ch in name if unicodedata.category(ch)[0] != "C")
