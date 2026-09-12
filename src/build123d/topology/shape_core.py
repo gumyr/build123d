@@ -3666,8 +3666,8 @@ class ShapeList(list[T]):
         from, with the groups in the enum's definition order.
 
         Args:
-            group_by (Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
-                optional): group and sort criteria, or the ``Convexity`` enum itself.
+            group_by (Callable | Axis | Edge | Wire | SortBy | property, optional):
+                group and sort criteria, or the ``Convexity`` enum itself.
                 Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
             tol_digits (int, optional): Tolerance for building the group keys by
@@ -3793,8 +3793,8 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            sort_by (Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
-                optional): sort criteria. Defaults to Axis.Z.
+            sort_by (Callable | Axis | Edge | Wire | SortBy | property, optional):
+                sort criteria. Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
 
         Raises:

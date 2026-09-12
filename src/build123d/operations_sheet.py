@@ -501,7 +501,7 @@ def flange(
             in Algebra mode and supplied by ``BuildSheet`` in Builder mode.
 
     Returns:
-        The updated reference Shell.
+        Shell: The updated reference Shell.
     """
     context: BuildSheet | None = BuildSheet._get_context("flange")
     edge_list = list(flatten_sequence(edges))
@@ -625,7 +625,7 @@ def bend(
             in Algebra mode and supplied by ``BuildSheet`` in Builder mode.
 
     Returns:
-        The updated reference Shell.
+        Shell: The updated reference Shell.
     """
     context: BuildSheet | None = BuildSheet._get_context("bend")
     validate_inputs(context, "bend", [bend_line] if bend_line is not None else [])
@@ -706,7 +706,7 @@ def jog(
             in Algebra mode and supplied by ``BuildSheet`` in Builder mode.
 
     Returns:
-        The updated reference Shell.
+        Shell: The updated reference Shell.
     """
     context: BuildSheet | None = BuildSheet._get_context("jog")
     edge_list = list(flatten_sequence(edges))
@@ -1062,7 +1062,7 @@ def miter(
             Builder mode.
 
     Returns:
-        The updated reference Shell.
+        Shell: The updated reference Shell.
     """
     context: BuildSheet | None = BuildSheet._get_context("miter")
     vertex_list = list(flatten_sequence(vertices))
@@ -1540,9 +1540,26 @@ def hem(
     * ``TEARDROP`` requires ``width`` and accepts ``radius`` and ``opening``.
     * ``ROLLED`` accepts ``radius`` and ``roll_angle``.
 
-    An omitted ``radius`` uses the default bend radius in ``sheet_parameters``.
-    ``sheet_parameters`` is required in Algebra mode and obtained from the
-    active ``BuildSheet`` in Builder mode.
+    Args:
+        edges (Edge | list[Edge]): Linear free boundary edge or edges to hem.
+        hem_type (HemType, optional): Profile of the hem. Defaults to ``FLAT``.
+        width (float): Length of the folded-back leg, for ``FLAT``, ``OPEN``
+            and ``TEARDROP``.
+        opening (float, optional): Gap between the leg and the sheet. Required
+            and positive for ``OPEN``; accepted by ``TEARDROP``, where it
+            defaults to 0.
+        radius (float, optional): Inside radius of the curl, for ``TEARDROP``
+            and ``ROLLED``. Defaults to the bend radius in
+            ``sheet_parameters``.
+        roll_angle (float, optional): How far the ``ROLLED`` curl turns, in
+            degrees. Defaults to the furthest it can turn before meeting the
+            sheet.
+        sheet_parameters (SheetMetalParameters, optional): Material and
+            reference-surface parameters. Required in Algebra mode and supplied
+            by ``BuildSheet`` in Builder mode.
+
+    Returns:
+        Shell: The updated reference Shell.
     """
     context: BuildSheet | None = BuildSheet._get_context("hem")
     edge_list = list(flatten_sequence(edges))
@@ -1724,21 +1741,22 @@ def corner_relief(
     developed blank. ``CONSTANT_WIDTH`` is defined by the formed part instead.
 
     Args:
-        vertices: Corner vertex or vertices to relieve.
-        relief_type: Shape of the relief. Defaults to ``ROUND``.
-        radius: Circle radius for ``ROUND``.
-        size: Side length for ``SQUARE``.
-        length: Overall length along the diagonal for ``OBROUND``.
-        width: Slot width for ``OBROUND``.
-        depth: Distance the relief reaches into the sheet for
+        vertices (Vertex | list[Vertex]): Corner vertex or vertices to relieve.
+        relief_type (ReliefType, optional): Shape of the relief. Defaults to
+            ``ROUND``.
+        radius (float): Circle radius for ``ROUND``.
+        size (float): Side length for ``SQUARE``.
+        length (float): Overall length along the diagonal for ``OBROUND``.
+        width (float): Slot width for ``OBROUND``.
+        depth (float): Distance the relief reaches into the sheet for
             ``CONSTANT_WIDTH``.
-        sheet_parameters: Material and reference-surface parameters. Required
-            in Algebra mode and supplied by ``BuildSheet`` in Builder mode -
-            a relief is laid out on the blank, so its shape depends on where
-            the neutral axis lies.
+        sheet_parameters (SheetMetalParameters, optional): Material and
+            reference-surface parameters. Required in Algebra mode and supplied
+            by ``BuildSheet`` in Builder mode - a relief is laid out on the
+            blank, so its shape depends on where the neutral axis lies.
 
     Returns:
-        The updated reference Shell.
+        Shell: The updated reference Shell.
     """
     context: BuildSheet | None = BuildSheet._get_context("corner_relief")
     # flatten_sequence(None) yields [None], so drop those before counting
@@ -1897,17 +1915,22 @@ def bend_relief(
     defined where two of them meet - see ``corner_relief``.
 
     Args:
-        bends: Cylindrical bend face or faces to relieve.
-        relief_type: Shape of the relief. Defaults to ``ROUND``.
-        radius: Hole radius for ``ROUND``.
-        depth: How far past the fold line the relief reaches, for ``SQUARE``
-            and ``OBROUND``.
-        width: Width along the fold line, for ``SQUARE`` and ``OBROUND``.
-        sheet_parameters: Material and reference-surface parameters. Required
-            in Algebra mode and supplied by ``BuildSheet`` in Builder mode.
+        bends (Face | list[Face]): Cylindrical bend face or faces to relieve.
+        relief_type (ReliefType, optional): Shape of the relief. Defaults to
+            ``ROUND``.
+        radius (float, optional): Hole radius for ``ROUND``. Defaults to one
+            thickness.
+        depth (float, optional): How far past the fold line the relief reaches,
+            for ``SQUARE`` and ``OBROUND``. Defaults to the bend radius plus
+            one thickness.
+        width (float, optional): Width along the fold line, for ``SQUARE`` and
+            ``OBROUND``. Defaults to one thickness.
+        sheet_parameters (SheetMetalParameters, optional): Material and
+            reference-surface parameters. Required in Algebra mode and supplied
+            by ``BuildSheet`` in Builder mode.
 
     Returns:
-        The updated reference Shell.
+        Shell: The updated reference Shell.
     """
     context: BuildSheet | None = BuildSheet._get_context("bend_relief")
     # flatten_sequence(None) yields [None], so drop those before counting

@@ -44,6 +44,8 @@ Object arithmetic
 * A mathematically formal definition of the algebra can be found in :ref:`algebra_definition`.
 
 
+.. _algebra_sewing:
+
 Sewing sheet surfaces
 =====================
 
