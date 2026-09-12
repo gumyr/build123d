@@ -14,7 +14,7 @@ authors = [
 ]
 description = "A python CAD programming library"
 readme = "README.md"
-requires-python = ">= 3.10, < 3.15"
+requires-python = ">= 3.11, < 3.15"
 keywords = [
     "3d models",
     "3d printing",
@@ -118,7 +118,7 @@ exclude = ["build123d._dev"]
 write_to = "src/build123d/_version.py"
 
 [tool.black]
-target-version = ["py310", "py311", "py312", "py313", "py314"]
+target-version = ["py311", "py312", "py313", "py314"]
 line-length = 88
 
 [tool.coverage.run]
