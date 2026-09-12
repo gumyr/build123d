@@ -14,7 +14,7 @@ authors = [
 ]
 description = "A python CAD programming library"
 readme = "README.md"
-requires-python = ">= 3.10, < 3.15"
+requires-python = ">= 3.11, < 3.15"
 keywords = [
     "3d models",
     "3d printing",
@@ -33,7 +33,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "cadquery-ocp-novtk >= 7.9, < 8.0",
+    "cadquery-ocp-novtk >= 8.0, < 8.1",
     "typing_extensions >= 4.16.0, < 5",
     "numpy >= 2, < 3",
     "svgpathtools >= 1.5.1, < 2",
@@ -41,8 +41,8 @@ dependencies = [
     "ezdxf >= 1.1.0, < 2",
     "fonttools >= 4.39.0, < 5",
     "ipython >= 8.0.0, < 10",
-    "ocpsvg >= 0.6, < 0.7",
-    "ocp_gordon >= 0.2, < 0.3",
+    "ocpsvg >= 0.7, < 0.8",
+    "ocp_gordon >= 0.3.1, < 0.4",
     "trianglesolver",
     "sympy",
     "scipy",
@@ -87,7 +87,7 @@ development = [
 
 # typing stubs for the OCP CAD kernel
 stubs = [
-    "cadquery-ocp-stubs >= 7.9, < 8.0",
+    "cadquery-ocp-stubs >= 8.0, < 8.1",
 ]
 
 # dependencies to build the docs
@@ -118,7 +118,7 @@ exclude = ["build123d._dev"]
 write_to = "src/build123d/_version.py"
 
 [tool.black]
-target-version = ["py310", "py311", "py312", "py313", "py314"]
+target-version = ["py311", "py312", "py313", "py314"]
 line-length = 88
 
 [tool.coverage.run]

@@ -115,20 +115,19 @@ from OCP.Standard import (
     Standard_TypeMismatch,
 )
 from OCP.StdFail import StdFail_NotDone
-from OCP.TColgp import TColgp_Array1OfPnt, TColgp_HArray2OfPnt
-from OCP.TColStd import (
-    TColStd_Array1OfInteger,
-    TColStd_Array1OfReal,
-    TColStd_HArray2OfReal,
+from OCP.collections import (
+    Array1_double,
+    Array1_gp_Pnt,
+    Array1_int,
+    HArray2_double,
+    HArray2_gp_Pnt,
+    IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
+    List_TopoDS_Shape,
+    Sequence_TopoDS_Shape,
 )
 from OCP.TopAbs import TopAbs_Orientation
 from OCP.TopExp import TopExp
 from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape, TopoDS_Shell, TopoDS_Solid
-from OCP.TopTools import (
-    TopTools_IndexedDataMapOfShapeListOfShape,
-    TopTools_ListOfShape,
-    TopTools_SequenceOfShape,
-)
 from ocp_gordon import interpolate_curve_network
 from typing_extensions import Self
 
@@ -267,8 +266,8 @@ class Mixin2D(ABC, Shape[TOPODS]):
 
         """
 
-        def get(los: TopTools_ListOfShape) -> list:
-            """Return objects from TopTools_ListOfShape as list"""
+        def get(los: List_TopoDS_Shape) -> list:
+            """Return objects from List_TopoDS_Shape as list"""
             shapes = []
             for _ in range(los.Size()):
                 first = los.First()
@@ -320,7 +319,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
         # Process the perimeter
         if not perimeter.is_closed:
             raise ValueError("perimeter must be a closed Wire or Edge")
-        perimeter_edges = TopTools_SequenceOfShape()
+        perimeter_edges = Sequence_TopoDS_Shape()
         seams = [seam for face in self.faces() for seam in face.seams]
         for perimeter_edge in perimeter.edges():
             if not perimeter_edge:
@@ -1379,13 +1378,13 @@ class Face(Mixin2D[TopoDS_Face]):
         ):
             raise ValueError("A weight must be provided for each control point")
 
-        points_ = TColgp_HArray2OfPnt(1, len(points), 1, len(points[0]))
+        points_ = HArray2_gp_Pnt(1, len(points), 1, len(points[0]))
         for i, row_points in enumerate(points):
             for j, point in enumerate(row_points):
                 points_.SetValue(i + 1, j + 1, Vector(point).to_pnt())
 
         if weights:
-            weights_ = TColStd_HArray2OfReal(1, len(weights), 1, len(weights[0]))
+            weights_ = HArray2_double(1, len(weights), 1, len(weights[0]))
             for i, row_weights in enumerate(weights):
                 for j, weight in enumerate(row_weights):
                     weights_.SetValue(i + 1, j + 1, float(weight))
@@ -1429,15 +1428,15 @@ class Face(Mixin2D[TopoDS_Face]):
         def create_zero_length_bspline_curve(
             point: gp_Pnt, degree: int = 1
         ) -> Geom_BSplineCurve:
-            control_points = TColgp_Array1OfPnt(1, 2)
+            control_points = Array1_gp_Pnt(1, 2)
             control_points.SetValue(1, point)
             control_points.SetValue(2, point)
 
-            knots = TColStd_Array1OfReal(1, 2)
+            knots = Array1_double(1, 2)
             knots.SetValue(1, 0.0)
             knots.SetValue(2, 1.0)
 
-            multiplicities = TColStd_Array1OfInteger(1, 2)
+            multiplicities = Array1_int(1, 2)
             multiplicities.SetValue(1, degree + 1)
             multiplicities.SetValue(2, degree + 1)
 
@@ -1671,7 +1670,7 @@ class Face(Mixin2D[TopoDS_Face]):
             min_deg (int, optional): minimum spline degree. Enforced only when
                 smoothing is None. Defaults to 1.
             max_deg (int, optional): maximum spline degree. Defaults to 3. Raised
-                to 5 when smoothing is used, the lowest degree that can meet the
+                to 6 when smoothing is used, the lowest degree that can meet the
                 C2 continuity the smoothing algorithm requires.
 
         Raises:
@@ -1680,17 +1679,18 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Face: a potentially non-planar face defined by points
         """
-        points_ = TColgp_HArray2OfPnt(1, len(points), 1, len(points[0]))
+        points_ = HArray2_gp_Pnt(1, len(points), 1, len(points[0]))
 
         for i, point_row in enumerate(points):
             for j, point in enumerate(point_row):
                 points_.SetValue(i + 1, j + 1, Vector(point).to_pnt())
 
         if smoothing:
-            # The smoothing overload asks OCCT for C2 continuity, which its
-            # variational solver cannot reach below degree 5.
+            # The smoothing overload asks OCCT for C2 continuity; its Jacobi
+            # basis needs a work degree of at least 2 * (2 + 1) = 6 for that
+            # (PLib_JacobiPolynomial rejects anything smaller since OCCT 8)
             spline_builder = GeomAPI_PointsToBSplineSurface(
-                points_, *smoothing, DegMax=max(max_deg, 5), Tol3D=tol
+                points_, *smoothing, DegMax=max(max_deg, 6), Tol3D=tol
             )
         else:
             spline_builder = GeomAPI_PointsToBSplineSurface(
@@ -2010,7 +2010,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
         chamfer_builder = BRepFilletAPI_MakeFillet2d(self.wrapped)
 
-        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        vertex_edge_map = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
         TopExp.MapShapesAndAncestors_s(
             self.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
         )
@@ -2818,7 +2818,7 @@ class Face(Mixin2D[TopoDS_Face]):
             trimmed_first.position_at(0) - trimmed_last.position_at(1)
         ).length
         wire_builder = BRepBuilderAPI_MakeWire()
-        combined_edges = TopTools_ListOfShape()
+        combined_edges = List_TopoDS_Shape()
         for edge in wrapped_edges:
             combined_edges.Append(edge.wrapped)
         wire_builder.Add(combined_edges)
