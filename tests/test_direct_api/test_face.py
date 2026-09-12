@@ -1599,7 +1599,7 @@ class TestSurfaceFromArrayOfPoints(unittest.TestCase):
         ]
 
     def test_variational_smoothing(self):
-        """Smoothing needs degree 5 for the C2 continuity OCCT asks of it; the
+        """Smoothing needs degree 6 for the C2 continuity OCCT asks of it; the
         default max_deg of 3 is raised to suit rather than failing."""
         grid = self._grid()
         plain = Face.make_surface_from_array_of_points(grid)
