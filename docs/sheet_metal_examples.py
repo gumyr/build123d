@@ -153,8 +153,36 @@ def write_layout(panels: list[Panel], name: str, gap_fraction: float = 0.15) -> 
     svg.add_layer("Text", fill_color="black", line_color=None)
     for layer, shapes in layers.items():
         if shapes:
-            svg.add_shape(shapes, layer)
+            svg.add_shape(drawing_order(shapes), layer)
     svg.write(OUTPUT / f"{name}.svg")
+
+
+def drawing_order(shapes: list[Shape]) -> list[Shape]:
+    """Shapes sorted by where they lie, so the SVG comes out the same every run.
+
+    A boolean hands its edges back, and a Text its glyph faces, in an order
+    that depends on memory addresses, which would otherwise churn the
+    committed images without changing a pixel. Text is taken apart into its
+    faces so they can be ordered too.
+    """
+
+    def key(shape: Shape) -> tuple:
+        if isinstance(shape, Edge):
+            ends = sorted(
+                (round(shape.position_at(t).X, 4), round(shape.position_at(t).Y, 4))
+                for t in (0.0, 1.0)
+            )
+            middle = shape.position_at(0.5)
+            return (*ends, round(middle.X, 4), round(middle.Y, 4))
+        centre = shape.center()
+        return (round(centre.X, 4), round(centre.Y, 4), round(shape.area, 6))
+
+    pieces = [
+        piece
+        for shape in shapes
+        for piece in (shape.faces() if isinstance(shape, Compound) else [shape])
+    ]
+    return sorted(pieces, key=key)
 
 
 def render(shape: Shape, name: str, view: VectorLike = ISO_VIEW) -> None:
@@ -396,9 +424,7 @@ def relieved_blank(relief_type: ReliefType, **sizes) -> Shell:
             Rectangle(60, 40)
         flange(tray.rims(), length=15, gaps=3.1)
         base = tray.flats().sort_by(Axis.Z)[0]
-        corner_relief(
-            base.vertices().filter_by(Convexity.CONVEX), relief_type, **sizes
-        )
+        corner_relief(base.vertices().filter_by(Convexity.CONVEX), relief_type, **sizes)
         return unfold(align=Align.MIN)
 
 
