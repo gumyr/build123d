@@ -52,9 +52,13 @@ following principles apply:
    the Builder type.
    - For example:
    
-     - **BuildLine**: Use ``.line`` to retrieve the final wireframe geometry.
-     - **BuildSketch**: Use ``.sketch`` to extract the completed 2D profile.
-     - **BuildPart**: Use ``.part`` to obtain the 3D solid.
+     - **BuildLine**: Use ``.line`` to retrieve a ``Curve`` containing the edges.
+     - **BuildSketch**: Use ``.sketch`` to retrieve a ``Sketch`` containing the faces.
+     - **BuildPart**: Use ``.part`` to retrieve a ``Part`` containing the solids.
+
+   These results are geometry containers, each of which may contain more than one
+   shape. See :ref:`part_sketch_curve` for their relationship to ``Edge``, ``Face``
+   and ``Solid``, and examples of using Builder results in algebra mode.
 
 Example Workflow
 -----------------
