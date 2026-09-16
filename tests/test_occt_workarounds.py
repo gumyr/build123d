@@ -36,7 +36,7 @@ import math
 import warnings
 
 import pytest
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
 from OCP.Geom import Geom_Circle, Geom_Line, Geom_OffsetCurve
 from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
@@ -55,6 +55,7 @@ from build123d import (
     CenterArc,
     Circle,
     Compound,
+    Cone,
     Cylinder,
     Edge,
     Face,
@@ -71,9 +72,11 @@ from build123d import (
     Rectangle,
     RectangleRounded,
     Rot,
+    Shape,
     Side,
     Solid,
     Sphere,
+    Torus,
     Vector,
     Wire,
     chamfer,
@@ -94,6 +97,7 @@ from build123d import (
 from build123d.exporters3d import _exact_offset_curve
 from build123d.topology.shape_core import (
     _has_mirrored_same_domain_faces,
+    _is_suspicious_common,
     _periodic_surfaces,
     unify_same_domain,
 )
@@ -522,3 +526,52 @@ class TestOffsetNoOp:
             assert "not hollowed" in str(err)
         else:  # or OpenCascade got it right
             assert hollow.is_valid and hollow.volume < lofted.volume / 2
+
+
+class TestUnifySameDomainKeepsInput:
+    """A failing unification corrupts the geometry it shares with its input"""
+
+    def test_torus_cut_stays_valid(self):
+        result = Torus(0.6, 0.2) - Pos(-0.74, 0.13, 0.03) * Cone(0.5, 0, 1)
+        assert result.is_valid
+        assert result.volume == pytest.approx(0.4317, abs=1e-3)
+
+    def test_input_is_not_modified(self):
+        raw = raw_boolean(
+            BRepAlgoAPI_Cut(), Torus(0.6, 0.2), Pos(0.18, 0.18, 0.4) * Cylinder(0.5, 1)
+        )
+        volume = Compound(raw).volume
+        unified = unify_same_domain(raw)
+        assert BRepCheck_Analyzer(raw).IsValid()
+        assert BRepCheck_Analyzer(unified).IsValid()
+        assert Compound(unified).volume == pytest.approx(volume)
+
+
+class TestSuspiciousCommon:
+    def test_oversized_intersection_warns(self):
+        torus = Torus(0.6, 0.2)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = torus & Pos(-1.17, -0.56, 0.195) * Torus(0.6, 0.2)
+        if result.volume == pytest.approx(torus.volume):  # the OCCT defect is present
+            assert any("intersection" in str(w.message) for w in caught)
+
+    def test_contained_operand_does_not_warn(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = Sphere(1) & Box(3, 3, 3)
+        assert result.volume == pytest.approx(Sphere(1).volume)
+
+    def test_legitimate_intersection_does_not_warn(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = Box(1, 1, 1) & Box(2, 2, 2)
+        assert result.volume == pytest.approx(1)
+
+    def test_check_tolerates_bad_shapes(self, monkeypatch):
+        def failing_volume(_self):
+            raise RuntimeError("simulated OCCT failure")
+
+        monkeypatch.setattr(Solid, "volume", property(failing_volume))
+        common = raw_boolean(BRepAlgoAPI_Common(), Box(1, 1, 1), Box(2, 2, 2))
+        assert not _is_suspicious_common(common, [Box(1, 1, 1)], [Box(2, 2, 2)])

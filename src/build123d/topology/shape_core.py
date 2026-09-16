@@ -53,7 +53,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator
 from functools import reduce
-from math import inf
+from math import inf, isclose
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -2679,6 +2679,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
                     "small to enclose the argument, the operation probably failed",
                     stacklevel=3,
                 )
+            elif isinstance(operation, BRepAlgoAPI_Common) and _is_suspicious_common(
+                topo_result, args, tools
+            ):
+                warnings.warn(
+                    "Boolean intersection returned a shape that does not fit inside "
+                    "its operands, the operation probably failed",
+                    stacklevel=3,
+                )
 
         # Clean
         if SkipClean.clean:
@@ -3925,12 +3933,19 @@ def unify_same_domain(shape: TopoDS_Shape) -> TopoDS_Shape:
     periodic = _periodic_surfaces(shape)
     unify_faces = not _has_mirrored_same_domain_faces(periodic)
 
-    unified = _unify_same_domain(shape, True, unify_faces)
-    if not periodic or BRepCheck_Analyzer(unified).IsValid():
+    if not periodic:
+        return _unify_same_domain(shape, True, unify_faces)
+
+    # A failing unification can corrupt the geometry shared with its input, so
+    # work on a copy to keep the original intact for the retries
+    unified = _unify_same_domain(BRepBuilderAPI_Copy(shape).Shape(), True, unify_faces)
+    if BRepCheck_Analyzer(unified).IsValid():
         return unified
 
     try:
-        unified = _unify_same_domain(shape, False, unify_faces)
+        unified = _unify_same_domain(
+            BRepBuilderAPI_Copy(shape).Shape(), False, unify_faces
+        )
         if BRepCheck_Analyzer(unified).IsValid():
             return unified
         if unify_faces:
@@ -3955,6 +3970,34 @@ def _is_suspicious_empty_cut(
     except Exception:  # pylint: disable=broad-exception-caught
         return False
     return arg_volume > TOLERANCE and tool_volume < arg_volume * (1 - 1e-6)
+
+
+def _is_suspicious_common(
+    result: TopoDS_Shape, args: list[Shape], tools: list[Shape]
+) -> bool:
+    """Is result larger than an operand, or equal to one that the others can't
+    enclose? An intersection lies within every operand."""
+    try:
+        properties = GProp_GProps()
+        BRepGProp.VolumeProperties_s(result, properties)
+        result_volume = properties.Mass()
+        operands = [s for s in args + tools if s._wrapped is not None]
+        for operand in operands:
+            volume = operand.volume
+            if result_volume > volume * (1 + 1e-6) + TOLERANCE:
+                return True
+            if isclose(result_volume, volume, rel_tol=1e-6, abs_tol=TOLERANCE):
+                box = operand.bounding_box()
+                slack = 1e-3 * box.diagonal
+                if not all(
+                    box.covered_by(other.bounding_box(), slack)
+                    for other in operands
+                    if other is not operand
+                ):
+                    return True
+    except Exception:  # pylint: disable=broad-exception-caught
+        return False
+    return False
 
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
