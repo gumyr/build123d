@@ -454,7 +454,7 @@ class TestExactOffsetCurves:
 
 
 class TestUnifySameDomainFallbacks:
-    def test_all_variants_invalid_keeps_input(self, monkeypatch):
+    def test_all_variants_invalid_keeps_a_copy_of_the_input(self, monkeypatch):
         import build123d.topology.shape_core as shape_core
 
         raw_cut = raw_boolean(BRepAlgoAPI_Cut(), Sphere(5), Box(8, 8, 8))
@@ -463,7 +463,9 @@ class TestUnifySameDomainFallbacks:
         invalid = upgrader.Shape()
         monkeypatch.setattr(shape_core, "_unify_same_domain", lambda *_: invalid)
         with pytest.warns(UserWarning, match="Unable to simplify"):
-            assert unify_same_domain(raw_cut).IsSame(raw_cut)
+            kept = unify_same_domain(raw_cut)
+        assert BRepCheck_Analyzer(kept).IsValid()
+        assert Compound(kept).volume == pytest.approx(Compound(raw_cut).volume)
 
     def test_exception_in_fallback_keeps_input(self, monkeypatch):
         import build123d.topology.shape_core as shape_core
@@ -478,7 +480,9 @@ class TestUnifySameDomainFallbacks:
 
         monkeypatch.setattr(shape_core, "_unify_same_domain", failing_fallback)
         with pytest.warns(UserWarning, match="Unable to simplify"):
-            assert unify_same_domain(raw_cut).IsSame(raw_cut)
+            kept = unify_same_domain(raw_cut)
+        assert BRepCheck_Analyzer(kept).IsValid()
+        assert Compound(kept).volume == pytest.approx(Compound(raw_cut).volume)
 
     def test_boolean_warns_when_clean_raises(self, monkeypatch):
         import build123d.topology.shape_core as shape_core
@@ -536,15 +540,20 @@ class TestUnifySameDomainKeepsInput:
         assert result.is_valid
         assert result.volume == pytest.approx(0.4317, abs=1e-3)
 
-    def test_input_is_not_modified(self):
+    def test_retry_starts_from_a_pristine_copy(self):
         raw = raw_boolean(
             BRepAlgoAPI_Cut(), Torus(0.6, 0.2), Pos(0.18, 0.18, 0.4) * Cylinder(0.5, 1)
         )
         volume = Compound(raw).volume
         unified = unify_same_domain(raw)
-        assert BRepCheck_Analyzer(raw).IsValid()
         assert BRepCheck_Analyzer(unified).IsValid()
         assert Compound(unified).volume == pytest.approx(volume)
+
+    def test_unchanged_sub_shapes_keep_their_identity(self):
+        box = Box(4, 4, 4)
+        result = box - Cylinder(1, 6)
+        assert len(box.edges() - result.edges()) == 0
+        assert len(result.edges() - box.edges()) == 3  # two circles and a seam
 
 
 class TestSuspiciousCommon:

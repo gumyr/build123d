@@ -3937,25 +3937,28 @@ def unify_same_domain(shape: TopoDS_Shape) -> TopoDS_Shape:
         return _unify_same_domain(shape, True, unify_faces)
 
     # A failing unification can corrupt the geometry shared with its input, so
-    # work on a copy to keep the original intact for the retries
-    unified = _unify_same_domain(BRepBuilderAPI_Copy(shape).Shape(), True, unify_faces)
+    # keep a copy for the retries
+    backup = BRepBuilderAPI_Copy(shape).Shape()
+    unified = _unify_same_domain(shape, True, unify_faces)
     if BRepCheck_Analyzer(unified).IsValid():
         return unified
 
     try:
         unified = _unify_same_domain(
-            BRepBuilderAPI_Copy(shape).Shape(), False, unify_faces
+            BRepBuilderAPI_Copy(backup).Shape(), False, unify_faces
         )
         if BRepCheck_Analyzer(unified).IsValid():
             return unified
         if unify_faces:
-            unified = _unify_same_domain(shape, False, False)
+            unified = _unify_same_domain(
+                BRepBuilderAPI_Copy(backup).Shape(), False, False
+            )
             if BRepCheck_Analyzer(unified).IsValid():
                 return unified
     except Exception:  # pylint: disable=broad-exception-caught
         pass
     warnings.warn("Unable to simplify shape, keeping it as is", stacklevel=2)
-    return shape
+    return backup
 
 
 def _is_suspicious_empty_cut(
