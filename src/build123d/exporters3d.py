@@ -124,6 +124,11 @@ def _create_xde(
     # Create a label map to find the appropriate label for all shapes
     label_map: dict[Shape, TDF_Label] = {}
 
+    # Effective display name of each node: an unlabeled node inherits the name
+    # of its nearest labeled ancestor so user defined names replace the
+    # auto-generated ones (e.g. "SOLID") at every level of the assembly
+    name_map: dict[Shape | None, str] = {}
+
     def resolve_component_parent_label(label: TDF_Label) -> TDF_Label:
         """Return a label suitable for assembly operations.
 
@@ -142,12 +147,13 @@ def _create_xde(
                 return referred
         return label
 
-    def set_name_and_color(node: Shape, node_label: TDF_Label) -> None:
+    def set_name_and_color(node: Shape, node_label: TDF_Label, name: str) -> None:
         """Assign label/color metadata for one XDE node label.
 
         Behavior:
-        - Sets `TDataStd_Name` on the instance label and, when applicable,
-          also on the referred shape label so STEP PRODUCT names persist.
+        - Sets `TDataStd_Name` to `name` on the instance label and, when
+          applicable, also on the referred shape label so STEP PRODUCT names
+          persist.
         - Sets generic color on the instance label and referred label.
         - For leaf `Compound` wrappers (`Part`, `Sketch`, `Curve`), propagates
           color to relevant sub-shapes (solid/face/edge) using appropriate
@@ -156,17 +162,15 @@ def _create_xde(
         if node_label.IsNull():
             return
 
-        if node.label:
-            TDataStd_Name.Set_s(node_label, TCollection_ExtendedString(node.label))
+        if name:
+            TDataStd_Name.Set_s(node_label, TCollection_ExtendedString(name))
             if XCAFDoc_ShapeTool.IsReference_s(node_label):
                 referred = TDF_Label()
                 if (
                     XCAFDoc_ShapeTool.GetReferredShape_s(node_label, referred)
                     and not referred.IsNull()
                 ):
-                    TDataStd_Name.Set_s(
-                        referred, TCollection_ExtendedString(node.label)
-                    )
+                    TDataStd_Name.Set_s(referred, TCollection_ExtendedString(name))
 
         if node.color is not None:
             node_color_type = XCAFDoc_ColorType.XCAFDoc_ColorGen
@@ -225,8 +229,12 @@ def _create_xde(
             continue
 
         label_map[node] = node_label
-        if node.label or node.color is not None:
-            set_name_and_color(node, node_label)
+        node_name = node.label
+        if auto_naming and not node_name:
+            node_name = name_map.get(parent, "")
+        name_map[node] = node_name
+        if node_name or node.color is not None:
+            set_name_and_color(node, node_label, node_name)
 
     shape_tool.UpdateAssemblies()
 
@@ -374,7 +382,8 @@ def export_step(
 
     Export a build123d Shape or assembly with color and label attributes.
     Note that if the color of a node in an assembly isn't set, it will be
-    assigned the color of its nearest ancestor.
+    assigned the color of its nearest ancestor. Likewise, a node without a
+    label is exported under the name of its nearest labeled ancestor.
 
     Args:
         to_export (Shape): object or assembly
