@@ -3098,6 +3098,38 @@ class TestBendRelief(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "sheet_parameters is required"):
             bend_relief(bends, ReliefType.SQUARE)
 
+    def test_relief_at_every_bend_position(self):
+        """A flange pulled back from the blank's edge leaves a strip of base
+        beside each bend end; the notch takes that strip as well as its depth."""
+        expected_setback = {
+            BendPosition.BEND_OUTSIDE: 0.0,
+            BendPosition.MATERIAL_INSIDE: 2 * tan(radians(45)),
+            BendPosition.MATERIAL_OUTSIDE: (2 + 1) * tan(radians(45)),
+            BendPosition.CENTER: (2 + 0.5) * pi / 2 / 2,
+        }
+        for position, setback in expected_setback.items():
+            with self.subTest(position=position):
+                with BuildSheet(thickness=1, bend_radius=2) as sheet:
+                    with BuildSketch():
+                        Rectangle(60, 40)
+                    flange(
+                        sheet.rims().sort_by(Axis.Y)[-1],
+                        length=15,
+                        position=position,
+                        gaps=10,
+                    )
+                    before = unfold().area
+                    bend_relief(
+                        sheet.bends()[0],
+                        relief_type=ReliefType.SQUARE,
+                        depth=3,
+                        width=2,
+                    )
+                    after = unfold().area
+                self.assertTrue(sheet.sheet.is_valid)
+                # two notches, each width wide and depth plus the setback deep
+                self.assertAlmostEqual(before - after, 2 * 2 * (3 + setback), 3)
+
 
 class TestBend(unittest.TestCase):
     """Folding a sheet along an edge it already carries."""

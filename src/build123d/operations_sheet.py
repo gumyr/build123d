@@ -1211,7 +1211,7 @@ def _bend_miter_cut(
     tangents = [edge for edge in cylinder.edges() if edge.geom_type == GeomType.LINE]
     fold = max(tangents, key=lambda edge: edge.distance_to(corner))
     ends = [Vector(fold.position_at(end)) for end in (0.0, 1.0)]
-    frames, _, _ = _bend_end_frames(
+    frames, _, _, _ = _bend_end_frames(
         shell, min(ends, key=lambda point: (point - corner).length), -inward, parameters
     )
     # the frame is in developed units, so the far tangent sits one bend
@@ -3145,7 +3145,12 @@ def _bend_end_frames(
 
     Both share one flat coordinate system with its origin on that end: ``x``
     runs along the line away from the bend and ``y`` past the line into the
-    bend. Returns ``([base frame, bend frame], probe, step)``.
+    bend. Returns ``([base frame, bend frame], probe, step, reach)``, where
+    ``reach`` is how far the base carries on past the fold line beside the
+    bend end: nothing when the fold line is the blank's edge, and the bend's
+    setback when a ``BendPosition`` pulled the line back from it. An end with
+    material on both sides of the line never gets here; ``_bend_ends``
+    refuses it.
 
     The fold is found afresh on the shell as it is now, by the point the end
     sits at, rather than taken from the bend end that asked for the relief.
@@ -3182,26 +3187,53 @@ def _bend_end_frames(
         _cylinder_frame(cylinder, point, 1, away, rolling),
     ]
     step = _RELIEF_PROBE * min(edge.length, radius)
-    return frames, _bend_end_probe(point, away, outward, step), step
+    # the notch's open ends stop where the base does, a probe's step past it so
+    # the clip finds the crossing; on the blank's own edge, or a hole's, there
+    # is nothing past the line to take
+    setback = _base_reach(base, point + away * step, outward, step)
+    reach = setback + step if setback > _RELIEF_TOLERANCE else 0.0
+    return frames, _bend_end_probe(point, away, outward, step), step, reach
 
 
-def _bend_square_profile(depth: float, width: float) -> list:
-    """A square-cornered notch, open along the fold line."""
+def _base_reach(base: Face, start: Vector, outward: Vector, step: float) -> float:
+    """How far a face's material carries on from ``start`` along ``outward``.
+
+    Nothing unless the face is there just past ``start``; otherwise the
+    distance to the first of the face's edges, of any wire, along the ray.
+    """
+    if not base.is_inside(start + outward * step):
+        return 0.0
+    ray = Axis(start, outward)
+    distances = [
+        (Vector(hit) - start).dot(outward)
+        for edge in base.edges()
+        for hit in (edge.intersect(ray) or [])
+    ]
+    ahead = [d for d in distances if d > step]
+    return min(ahead) if ahead else 0.0
+
+
+def _bend_square_profile(depth: float, width: float, reach: float = 0.0) -> list:
+    """A square-cornered notch, open across the fold line.
+
+    The open ends stop ``reach`` past the line, where the base's free edge is,
+    so the notch also takes the strip a bend's setback leaves beside its end.
+    """
     return [
-        _FlatLine((0.0, 0.0), (0.0, -depth)),
+        _FlatLine((0.0, reach), (0.0, -depth)),
         _FlatLine((0.0, -depth), (width, -depth)),
-        _FlatLine((width, -depth), (width, 0.0)),
+        _FlatLine((width, -depth), (width, reach)),
     ]
 
 
-def _bend_obround_profile(depth: float, width: float) -> list:
-    """A round-ended notch, open along the fold line."""
+def _bend_obround_profile(depth: float, width: float, reach: float = 0.0) -> list:
+    """A round-ended notch, open across the fold line; see the square one."""
     radius = width / 2
     flank = depth - radius
     return [
-        _FlatLine((0.0, 0.0), (0.0, -flank)),
+        _FlatLine((0.0, reach), (0.0, -flank)),
         _FlatArc((radius, -flank), radius, pi, 2 * pi),
-        _FlatLine((width, -flank), (width, 0.0)),
+        _FlatLine((width, -flank), (width, reach)),
     ]
 
 
@@ -3214,7 +3246,7 @@ def _cut_bend_relief(
     parameters: SheetMetalParameters,
 ) -> Shell:
     """Notch one end of a fold line, by whichever route the shape needs."""
-    frames, probe, step = _bend_end_frames(shell, point, away, parameters)
+    frames, probe, step, reach = _bend_end_frames(shell, point, away, parameters)
 
     if relief_type is ReliefType.ROUND:
         profile = _circle_profile(0.0, 0.0, values["radius"])
@@ -3224,7 +3256,7 @@ def _cut_bend_relief(
             if relief_type is ReliefType.SQUARE
             else _bend_obround_profile
         )
-        profile = shape(values["depth"], values["width"])
+        profile = shape(values["depth"], values["width"], reach)
 
     # a notch is open along the fold line, so it lands on the base alone; a
     # round relief is a hole centred on the end of the line and reaches into
