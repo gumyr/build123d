@@ -55,7 +55,7 @@ from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
 from build123d.exporters3d import export_stl
-from build123d.geometry import Axis, Location, Plane, Pos, Vector
+from build123d.geometry import Axis, Location, Plane, Pos, Rotation, Vector
 from build123d.importers import import_stl
 from build123d.objects_curve import JernArc, Line, Polyline, Spline, ThreePointArc
 from build123d.objects_part import Box, Cone, Cylinder, Sphere, Torus
@@ -303,6 +303,40 @@ class TestFace(unittest.TestCase):
         self.assertAlmostEqual(test_face.length, 8, 5)
         self.assertAlmostEqual(test_face.width, 10, 5)
 
+    def test_length_width_of_a_cylinder(self):
+        """Along the axis and around it - the two extents measured on the
+        surface, so their product is the area just as it is for a plane."""
+        face = Solid.make_cylinder(1, 4).faces().filter_by(GeomType.CYLINDER)[0]
+        self.assertAlmostEqual(face.length, 4, 6)
+        self.assertAlmostEqual(face.width, 2 * math.pi, 6)
+        self.assertAlmostEqual(face.length * face.width, face.area, 6)
+
+    def test_length_width_do_not_depend_on_orientation(self):
+        """Measured in the face's own parameters rather than by a bounding box
+        in space, which only agrees while the axis lies along a global one."""
+        upright = Solid.make_cylinder(1, 4).faces().filter_by(GeomType.CYLINDER)[0]
+        tilted = (
+            (Rotation(0, 22, 30) * Solid.make_cylinder(1, 4))
+            .faces()
+            .filter_by(GeomType.CYLINDER)[0]
+        )
+        self.assertAlmostEqual(tilted.length, upright.length, 6)
+        self.assertAlmostEqual(tilted.width, upright.width, 6)
+
+    def test_length_follows_a_curved_trim(self):
+        """The parametric domain's own bounds are padded where the boundary
+        curves, so the extent comes from the boundary itself."""
+        cut = Solid.make_cylinder(1, 4).split(
+            Plane((0, 0, 2), z_dir=(0.3, 0, 1)), keep=Keep.BOTTOM
+        )
+        face = cut.faces().filter_by(GeomType.CYLINDER)[0]
+        self.assertAlmostEqual(face.length, 2.3, 5)
+
+    def test_length_is_none_for_other_surfaces(self):
+        sphere = Solid.make_sphere(5).faces()[0]
+        self.assertIsNone(sphere.length)
+        self.assertIsNone(sphere.width)
+
     def test_geometry(self):
         box = Solid.make_box(1, 1, 2)
         self.assertEqual(box.faces().sort_by(Axis.Z).last.geometry, "SQUARE")
@@ -334,6 +368,15 @@ class TestFace(unittest.TestCase):
         self.assertEqual(len(uv_face.inner_wires()[0].edges()), 1)
         self.assertEqual(len(uv_face.edges().filter_by(GeomType.BSPLINE)), 3)
         self.assertGreater(uv_face.area, 0)
+
+        mapped_uv_face, edge_map = spherical_face.uv_face_with_map
+        self.assertTrue(mapped_uv_face.is_valid)
+        self.assertEqual(len(edge_map), len(spherical_face.edges()))
+        for source_key, (source_edge, mapped_edge) in edge_map.items():
+            self.assertEqual(source_key, hash(source_edge.wrapped))
+            self.assertTrue(
+                any(mapped_edge.is_same(edge) for edge in mapped_uv_face.edges())
+            )
 
     def test_is_planar(self):
         self.assertTrue(Face.make_rect(1, 1).is_planar)
@@ -1488,6 +1531,65 @@ class TestAxesOfSysmmetrySplitNone(unittest.TestCase):
 
         # Restore the original split method (cleanup).
         Face.split = original_split
+
+
+class TestSurfaceOffset(unittest.TestCase):
+    """Mixin2D.offset moves each point along its own normal"""
+
+    @staticmethod
+    def quarter_cylinder(radius=5.0):
+        return Face.extrude(Edge.make_circle(radius, Plane.XY, 0, 90), (0, 0, 10))
+
+    def test_planar_face_translates(self):
+        """For a plane, offsetting is a translation, as it always was"""
+        face = Face.make_rect(10, 10)
+        for amount in (2.0, -2.0):
+            with self.subTest(amount=amount):
+                moved = face.offset(amount)
+                self.assertIsInstance(moved, Face)
+                self.assertAlmostEqual(moved.center().Z, amount, 6)
+                self.assertAlmostEqual(moved.area, face.area, 6)
+
+    def test_cylindrical_face_changes_radius(self):
+        """A translation would leave the radius alone"""
+        face = self.quarter_cylinder()
+        outward = face.offset(-1)
+        inward = face.offset(1)
+        self.assertAlmostEqual(outward.radius, 6.0, 6)
+        self.assertAlmostEqual(inward.radius, 4.0, 6)
+        self.assertAlmostEqual(outward.area, face.area * 6 / 5, 6)
+        self.assertAlmostEqual(inward.area, face.area * 4 / 5, 6)
+
+    def test_positive_follows_the_normal(self):
+        """A sphere's normal points outward, so a positive offset grows it"""
+        sphere = Solid.make_sphere(5).faces()[0]
+        self.assertAlmostEqual(sphere.offset(1).area, 4 * math.pi * 36, 4)
+        self.assertAlmostEqual(sphere.offset(-1).area, 4 * math.pi * 16, 4)
+
+    def test_shell_stays_a_shell(self):
+        box_shell = Solid.make_box(10, 10, 10).shells()[0]
+        bigger = box_shell.offset(0.5)
+        self.assertIsInstance(bigger, Shell)
+        self.assertEqual(len(bigger.faces()), 6)
+        self.assertAlmostEqual(bigger.area, 6 * 11 * 11, 6)
+
+    def test_zero_offset_returns_a_copy(self):
+        face = Face.make_rect(10, 10)
+        same = face.offset(0)
+        self.assertIsInstance(same, Face)
+        self.assertAlmostEqual(same.area, face.area, 6)
+        self.assertIsNot(same, face)
+
+    def test_collapse_is_rejected(self):
+        """Offsetting a cylinder by its own radius leaves nothing"""
+        with self.assertRaisesRegex(ValueError, "collapsed"):
+            self.quarter_cylinder().offset(5.0)
+
+    def test_attributes_are_carried_over(self):
+        face = Face.make_rect(10, 10)
+        face.label = "plate"
+        moved = face.offset(1)
+        self.assertEqual(moved.label, "plate")
 
 
 class TestFaceValidation(unittest.TestCase):

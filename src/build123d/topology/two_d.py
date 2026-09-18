@@ -73,6 +73,7 @@ from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakeWire,
+    BRepBuilderAPI_Sewing,
 )
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
@@ -82,9 +83,10 @@ from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet2d
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepLProp import BRepLProp_SLProps
 from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
+from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeFilling, BRepOffsetAPI_MakePipeShell
 from OCP.BRepPrimAPI import BRepPrimAPI_MakeRevol
-from OCP.BRepTools import BRepTools, BRepTools_ReShape, BRepTools_WireExplorer
+from OCP.BRepTools import BRepTools, BRepTools_ReShape
 from OCP.gce import gce_MakeLin
 from OCP.Geom import (
     Geom_BezierSurface,
@@ -94,7 +96,13 @@ from OCP.Geom import (
     Geom_Surface,
     Geom_TrimmedCurve,
 )
-from OCP.GeomAbs import GeomAbs_C0, GeomAbs_CurveType, GeomAbs_G1, GeomAbs_G2
+from OCP.GeomAbs import (
+    GeomAbs_C0,
+    GeomAbs_CurveType,
+    GeomAbs_G1,
+    GeomAbs_G2,
+    GeomAbs_Intersection,
+)
 from OCP.GeomAdaptor import GeomAdaptor_Surface
 from OCP.GeomAPI import (
     GeomAPI_ExtremaCurveCurve,
@@ -123,7 +131,14 @@ from OCP.TColStd import (
 )
 from OCP.TopAbs import TopAbs_Orientation
 from OCP.TopExp import TopExp
-from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape, TopoDS_Shell, TopoDS_Solid
+from OCP.TopoDS import (
+    TopoDS,
+    TopoDS_Edge,
+    TopoDS_Face,
+    TopoDS_Shape,
+    TopoDS_Shell,
+    TopoDS_Solid,
+)
 from OCP.TopTools import (
     TopTools_IndexedDataMapOfShapeListOfShape,
     TopTools_ListOfShape,
@@ -153,9 +168,21 @@ from build123d.geometry import (
     Vector,
     VectorLike,
 )
+from build123d.sheet_utils import (
+    SheetMetalParameters,
+    _unfold_shell,
+    _uv_topods_edge,
+    _uv_topods_face_with_map,
+)
 
-from .one_d import Edge, Mixin1D, Wire, _split_edge_at_vertex
 from .history import ShapeHistory
+from .one_d import (
+    Edge,
+    Mixin1D,
+    Wire,
+    _split_edge_at_vertex,
+    topo_explore_connected_faces,
+)
 from .shape_core import (
     TOPODS,
     Shape,
@@ -204,6 +231,69 @@ class Mixin2D(ABC, Shape[TOPODS]):
         return NotImplemented
 
     # ---- Instance Methods ----
+
+    @overload
+    def __add__(self, other: None) -> Self: ...
+    @overload
+    def __add__(self, other: Shape | Iterable[Shape]) -> Self | Shell | Compound: ...
+    def __add__(self, other: None | Shape | Iterable[Shape]) -> Self | Shell | Compound:
+        """fuse shape to face/shell operator +
+
+        When a Shell is involved the faces are sewn into a single Shell, which
+        is what joining sheet surfaces along shared edges requires; a boolean
+        fuse would leave the faces unmerged in a Compound. Sewing is used for
+        ``Shell + Face``, ``Face + Shell`` and ``Shell + Shell``, and any 2D
+        operand contributes its faces, so sketch objects work too::
+
+            shell += Pos(X=10) * Rectangle(20, 10)
+
+        Faces that cannot sew into one connected shell - disjoint pieces, or
+        three faces meeting on an edge - raise ValueError rather than falling
+        back to a fuse. A fuse would return a Compound, so the result type
+        would depend on the geometry and every later operation would have to
+        cope with either; ``Shell(faces)`` rejects the same input.
+
+        Adding faces without a Shell involved is unchanged: coplanar faces fuse
+        into a Face or Sketch as they always have.
+
+        Raises:
+            ValueError: operands are not all 2D
+            ValueError: faces don't sew into one connected shell
+        """
+        summands = Shape._operands(other)
+        # If there is nothing to add return the original object
+        if not summands:
+            return self
+
+        # Only sew when a Shell is being built up, otherwise fuse as before
+        if not isinstance(self, Shell) and not any(
+            isinstance(summand, Shell) for summand in summands
+        ):
+            return super().__add__(other)
+
+        if not all(summand._dim == 2 for summand in summands):
+            raise ValueError("Only shapes with the same dimension can be added")
+
+        faces = list(self.faces()) + [f for s in summands for f in s.faces()]
+        try:
+            sum_shape: Shape = Shell(faces)
+        except (
+            TypeError,
+            ValueError,
+            RuntimeError,
+            Standard_ConstructionError,
+        ) as exc:
+            raise ValueError(
+                "Unable to sew faces into a single connected Shell - faces must "
+                "meet along shared edges, with at most two faces on an edge"
+            ) from exc
+
+        if SkipClean.clean:
+            sum_shape = sum_shape.clean()
+
+        self.copy_attributes_to(sum_shape, ["wrapped", "_NodeMixin__children"])
+
+        return sum_shape
 
     def __neg__(self) -> Self:
         """Reverse normal operator -"""
@@ -628,8 +718,59 @@ class Mixin2D(ABC, Shape[TOPODS]):
         """A location from a face or shell"""
 
     def offset(self, amount: float) -> Self:
-        """Return a copy of self moved along the normal by amount"""
-        return copy.deepcopy(self).moved(Location(self.normal_at() * amount))
+        """Offset a Face or Shell along its own surface normals
+
+        Every point of the surface moves ``amount`` along the normal there, so a
+        cylinder changes radius and the faces of a Shell stay joined. Positive
+        values follow the face normal: on a sphere or a closed box shell that
+        grows the shape, while on a surface whose normal points at its own
+        centre of curvature it shrinks.
+
+        A curved surface offset by exactly its radius of curvature collapses to
+        zero area and is rejected. Offsetting further turns the surface inside
+        out, which OpenCascade reports as success and this method does not
+        detect: offsetting a radius 5 cylinder by 6 yields a radius 1 cylinder.
+
+        Args:
+            amount (float): distance to offset, positive along the normal
+
+        Raises:
+            ValueError: the offset collapsed or inverted the surface
+
+        Returns:
+            Self: offset Face or Shell
+        """
+        if amount == 0:
+            return copy.deepcopy(self)
+
+        offset_builder = BRepOffset_MakeOffset()
+        offset_builder.Initialize(
+            self.wrapped,
+            Offset=amount,
+            Tol=TOLERANCE,
+            Mode=BRepOffset_Skin,
+            Intersection=True,
+            SelfInter=False,
+            Join=GeomAbs_Intersection,
+            Thickening=False,
+            RemoveIntEdges=True,
+        )
+        offset_builder.MakeOffsetShape()
+        offset_shape = offset_builder.Shape()
+        if offset_shape is None or offset_shape.IsNull():
+            raise ValueError(f"Unable to offset {type(self).__name__} by {amount}")
+
+        result = Mixin2D.cast(offset_shape)
+        # The builder always returns a Shell; a Face offsets to a single face
+        if isinstance(self, Face) and len(result.faces()) == 1:
+            result = result.faces()[0]
+        if result.area <= TOLERANCE:
+            raise ValueError(
+                f"Offsetting by {amount} collapsed the "
+                f"{type(self).__name__} onto itself"
+            )
+        self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return tcast(Self, result)
 
     def project_to_viewport(
         self,
@@ -1217,14 +1358,23 @@ class Face(Mixin2D[TopoDS_Face]):
 
     @property
     def length(self) -> None | float:
-        """length of planar face"""
-        result = None
+        """length of a planar or cylindrical face
+
+        Measured on the surface itself: across a planar face, and along the
+        axis of a cylindrical one, which is the length of a sheet metal bend.
+        Taken from the face's own parameters rather than from a bounding box,
+        so it does not depend on how the face is oriented in space.
+        """
         if self.is_planar:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
             face_vertices = flat_face.vertices().sort_by(Axis.X)
-            result = face_vertices[-1].X - face_vertices[0].X
-        return result
+            return face_vertices[-1].X - face_vertices[0].X
+        if self.geom_type == GeomType.CYLINDER:
+            # the parametric domain's own bounds are padded where the trim is
+            # curved, so the boundary is measured rather than the surface
+            return self.uv_face.bounding_box().size.Y
+        return None
 
     @property
     def radii(self) -> None | tuple[float, float]:
@@ -1261,6 +1411,48 @@ class Face(Mixin2D[TopoDS_Face]):
             return degrees(self.geom_adaptor().SemiAngle())  # type: ignore[attr-defined]
         return None
 
+    def _uv_edge(self, native_edge: TopoDS_Edge) -> Edge:
+        """Create a planar edge from a non-planar native edge"""
+        return Edge(_uv_topods_edge(self.wrapped, native_edge))
+
+    @property
+    def uv_face_with_map(self) -> tuple[Face, dict[int, tuple[Edge, Edge]]]:
+        """Create a UV face and retain its source-edge correspondence.
+
+        A face constructed from UV boundary edges does not necessarily contain
+        the same topological edges passed to its wire and face builders. Those
+        builders may replace edges while connecting and fixing the resulting
+        topology. Consumers such as surface-development algorithms therefore
+        cannot reliably associate the completed UV face with ``self`` by
+        retaining only the initially generated UV edges.
+
+        The returned mapping records that provenance after construction. Its
+        keys are hashes of the source ``TopoDS_Edge`` objects. Each value is a
+        ``(source_edge, uv_edge)`` tuple, where ``source_edge`` is the oriented
+        occurrence in this face and ``uv_edge`` is the corresponding oriented
+        edge actually contained in the returned UV face. Outer and inner wire
+        edges are both included.
+
+        The UV face is a representation of the surface parameter domain, not
+        necessarily an isometric development. For example, a cylinder's U
+        coordinate is angular and must be scaled by the appropriate radius to
+        produce physical arc length.
+
+        Returns:
+            A tuple containing the planar UV ``Face`` and its source-to-UV edge
+            mapping.
+
+        Raises:
+            ValueError: If an initially generated UV edge cannot be associated
+                uniquely with an edge in the completed UV face.
+        """
+
+        uv_face, edge_map = _uv_topods_face_with_map(self.wrapped)
+        return Face(uv_face), {
+            source_key: (Edge(source_edge), Edge(uv_edge))
+            for source_key, (source_edge, uv_edge) in edge_map.items()
+        }
+
     @property
     def uv_face(self) -> Face:
         """Create a planar face from a face's parametric-space boundary.
@@ -1276,32 +1468,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             A planar ``Face`` in UV parameter space.
         """
-        xy_face = BRepBuilderAPI_MakeFace(Plane.XY.wrapped).Face()
-        xy_surface = BRep_Tool.Surface_s(xy_face)
-
-        def uv_edge(native_edge) -> Edge:
-            first, last = BRep_Tool.Range_s(native_edge, self.wrapped)
-            pcurve = BRep_Tool.CurveOnSurface_s(native_edge, self.wrapped, first, last)
-            edge_builder = BRepBuilderAPI_MakeEdge(pcurve, xy_surface, first, last)
-            if not edge_builder.IsDone():  # pragma: no cover
-                raise ValueError("Unable to convert pcurve to a planar edge")
-
-            topods_edge = edge_builder.Edge()
-            if native_edge.Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
-                topods_edge = TopoDS.Edge(topods_edge.Reversed())
-            return Edge(topods_edge)
-
-        def uv_wire(source_wire: Wire) -> Wire:
-            wire_explorer = BRepTools_WireExplorer(source_wire.wrapped)
-            uv_edges = []
-            while wire_explorer.More():
-                uv_edges.append(uv_edge(TopoDS.Edge(wire_explorer.Current())))
-                wire_explorer.Next()
-            return Wire(uv_edges)
-
-        outer_wire = uv_wire(self.outer_wire())
-        inner_wires = [uv_wire(wire) for wire in self.inner_wires()]
-        return Face(outer_wire, inner_wires)
+        return self.uv_face_with_map[0]
 
     @property
     def volume(self) -> float:
@@ -1315,14 +1482,21 @@ class Face(Mixin2D[TopoDS_Face]):
 
     @property
     def width(self) -> None | float:
-        """width of planar face"""
-        result = None
+        """width of a planar or cylindrical face
+
+        The companion of :meth:`length`, measured the same way: across a
+        planar face, and around a cylindrical one, where it is the arc the
+        face wraps through - the width of the strip it would flatten into.
+        Length times width is the area for both.
+        """
         if self.is_planar:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
             face_vertices = flat_face.vertices().sort_by(Axis.Y)
-            result = face_vertices[-1].Y - face_vertices[0].Y
-        return result
+            return face_vertices[-1].Y - face_vertices[0].Y
+        if self.geom_type == GeomType.CYLINDER and self.radius is not None:
+            return self.uv_face.bounding_box().size.X * self.radius
+        return None
 
     # ---- Class Methods ----
 
@@ -2087,6 +2261,55 @@ class Face(Mixin2D[TopoDS_Face]):
     def geom_adaptor(self) -> Geom_Surface:
         """Return the Geom Surface for this Face"""
         return BRep_Tool.Surface_s(self.wrapped)
+
+    def fold_lines(self) -> ShapeList[Edge]:
+        """The straight edges this flat shares with a coplanar flat of its sheet.
+
+        A fold line is where a sheet can be folded: an edge between two flats
+        that still lie in one plane. Selected through this face, the lines carry
+        it on their route, so ``bend(flat.fold_lines()[0], 90)`` folds the far
+        side and leaves this flat where it is. The face has to have been taken
+        from its sheet, as ``sheet.flats()`` does, so the neighbours are known.
+
+        Raises:
+            ValueError: the face was not selected from a shell
+
+        Returns:
+            ShapeList[Edge]: the fold lines of this flat
+        """
+        sheet = self._sheet_selected_from()
+        return ShapeList(
+            edge for edge in self.edges() if _fold_partner_of(edge, self, sheet)
+        )
+
+    def rims(self) -> ShapeList[Edge]:
+        """The free edges of this flat: what ``flange`` and ``hem`` consume.
+
+        The face has to have been taken from its sheet, as ``sheet.flats()``
+        does, so that free means free of the whole sheet and not of the face.
+
+        Raises:
+            ValueError: the face was not selected from a shell
+
+        Returns:
+            ShapeList[Edge]: the rims of this flat
+        """
+        sheet = self._sheet_selected_from()
+        return ShapeList(
+            edge
+            for edge in self.edges()
+            if len(topo_explore_connected_faces(edge, sheet)) == 1
+        )
+
+    def _sheet_selected_from(self) -> Shape:
+        """The shell this face was taken from, for questions about its neighbours."""
+        parent = self.topo_parent
+        if parent is None or parent.wrapped is None or len(parent.faces()) < 2:
+            raise ValueError(
+                "this face was not selected from a sheet, so its neighbours are "
+                "unknown - take it from the sheet, as in sheet.flats()[0]"
+            )
+        return parent
 
     def inner_wires(self) -> ShapeList[Wire]:
         """Extract the inner or hole wires from this Face"""
@@ -2912,6 +3135,218 @@ class Shell(Mixin2D[TopoDS_Shell]):
         """mass - the mass of this Shell if manifold in g, otherwise zero"""
         return self.compute_mass(mass_unit, length_unit)
 
+    # ---- Instance Methods ----
+
+    def bends(self) -> ShapeList[Face]:
+        """The cylindrical faces of this Shell.
+
+        Named for the sheet metal shell it is most useful on, where every
+        cylindrical face is a bend, whether it came from a flange, a hem or a
+        fold. On any other shell it is simply the cylindrical faces.
+
+        Returns:
+            ShapeList[Face]: the cylindrical faces
+        """
+        return self.faces().filter_by(GeomType.CYLINDER)
+
+    def fold_lines(self) -> ShapeList[Edge]:
+        """The lines this sheet can be folded on.
+
+        A fold line is a straight edge shared by two flats that still lie in
+        one plane - a ``split`` leaves one, and so does a blank imported with
+        its fold lines drawn. Every edge here belongs to two flats, so to fold
+        take the line through the flat that stays put: ``flat.fold_lines()``.
+
+        Returns:
+            ShapeList[Edge]: the fold lines
+        """
+        return ShapeList(
+            edge
+            for edge in self.edges()
+            if edge.geom_type == GeomType.LINE
+            and _coplanar_pair(edge, self) is not None
+        )
+
+    def rims(self) -> ShapeList[Edge]:
+        """The free edges of this sheet's flats: what ``flange`` and ``hem`` consume.
+
+        The free edges of bends are not rims; a flange folds off a flat.
+
+        Returns:
+            ShapeList[Edge]: the rims
+        """
+        rims: ShapeList[Edge] = ShapeList()
+        for edge in self.edges():
+            beside = topo_explore_connected_faces(edge, self)
+            if len(beside) == 1 and Face(beside[0]).geom_type == GeomType.PLANE:
+                rims.append(edge)
+        return rims
+
+    @classmethod
+    def make_sheet(
+        cls, faces: Iterable[Face], merge_coplanar: bool | Iterable[Face] = False
+    ) -> Shell:
+        """Sew faces into a sheet metal reference shell.
+
+        A sheet is a shell of flats and bends - planar and cylindrical faces -
+        sewn into one connected, manifold, valid shell. That is the invariant
+        every sheet operation keeps, and this is where it is enforced, in
+        Builder and Algebra mode alike.
+
+        With ``merge_coplanar`` touching coplanar faces are joined first, for
+        material that arrives in pieces and is meant to read as one face - two
+        sketch regions that happen to touch, or a mirror taken across an edge.
+        ``True`` joins every such pair; a collection of faces joins only pairs
+        one of them is in, so what has just arrived merges into what it touches
+        while the seams already in the sheet stay where they are. By default a
+        seam between coplanar faces is kept, because on a sheet it may be a
+        fold line rather than an accident.
+
+        The shell carries the record of what became of each face - the sewing,
+        and whatever boolean made a face from a previous one, read from the
+        record the face carries - so ``Select.LAST`` and ``Select.NEW`` can
+        follow a face through an operation.
+
+        Args:
+            faces (Iterable[Face]): the faces of the sheet
+            merge_coplanar (bool | Iterable[Face], optional): join touching
+                coplanar faces - all of them, or only pairs including one of the
+                given faces. Defaults to False.
+
+        Raises:
+            ValueError: a face is neither planar nor cylindrical, a cylindrical
+                face has no positive radius, or the faces do not sew into one
+                valid manifold shell
+
+        Returns:
+            Shell: the sheet
+        """
+        face_list = list(faces)
+        if merge_coplanar is True:
+            face_list, _ = _merge_coplanar_faces(face_list)
+        elif merge_coplanar:
+            face_list, _ = _merge_coplanar_faces(face_list, merge_coplanar)
+        # a fused face carries the record of its fuse, a trimmed one of its cut
+        records = [
+            record
+            for face in face_list
+            if (record := ShapeHistory.of(face)) is not None
+        ]
+        return cls._sewn_sheet(face_list, records)
+
+    def cut_sheet(self, *cutters: Shape) -> Shell:
+        """Trim this sheet with cutters, keeping its flats and bends.
+
+        A ``Solid`` is a normal cut, the cut across a bend of sheet metal
+        packages: it cuts every face it passes through, planar and cylindrical
+        alike, so the cutout may cross a bend. Trimming changes a face's boundary without
+        changing its surface, so the sheet stays a sheet. The cutter
+        has to reach the reference surface, which for ``SheetSurface.INSIDE``
+        or ``OUTSIDE`` is one side of the material rather than the middle. A
+        ``Face`` removes area only where it is coplanar with a planar sheet
+        face, and one that matches no face is rejected rather than ignored.
+
+        Args:
+            cutters (Shape): solids, or faces coplanar with sheet faces
+
+        Raises:
+            ValueError: a face cutter is coplanar with no planar sheet face
+
+        Returns:
+            Shell: the trimmed sheet
+        """
+        remaining = list(self.faces())
+        records: list[ShapeHistory] = []
+        solids = [cutter for cutter in cutters if cutter._dim == 3]
+        planes = [cutter for cutter in cutters if isinstance(cutter, Face)]
+        if solids:
+            trimmed: list[Face] = []
+            for face in remaining:
+                result = face.cut(*solids)
+                trimmed.extend(_faces_of(result))
+                if (record := ShapeHistory.of(result)) is not None:
+                    records.append(record)
+            remaining = trimmed
+        if planes:
+            trimmed = []
+            used: set[int] = set()
+            for face in remaining:
+                matching = [
+                    cutter
+                    for cutter in planes
+                    if face.geom_type == GeomType.PLANE
+                    and cutter.geom_type == GeomType.PLANE
+                    and face.is_coplanar(Plane(cutter))
+                ]
+                used.update(id(cutter) for cutter in matching)
+                if not matching:
+                    trimmed.append(face)
+                    continue
+                result = face.cut(*matching)
+                trimmed.extend(_faces_of(result))
+                if (record := ShapeHistory.of(result)) is not None:
+                    records.append(record)
+            if len(used) != len({id(cutter) for cutter in planes}):
+                raise ValueError(
+                    "A Face cutter must be coplanar with a planar sheet face - use "
+                    "a Solid to cut across bends or curved faces"
+                )
+            remaining = trimmed
+        return Shell._sewn_sheet(remaining, records)
+
+    @classmethod
+    def _sewn_sheet(cls, faces: list[Face], records: list[ShapeHistory]) -> Shell:
+        """Sew faces into a sheet, check the invariant, and record the sewing.
+
+        ``records`` are the histories of whatever booleans made ``faces`` from
+        the sheet's previous faces; the sewing's own record is chained after
+        them.
+        """
+        if not faces:
+            return cls()
+        for face in faces:
+            if face.geom_type not in (GeomType.PLANE, GeomType.CYLINDER):
+                raise ValueError("a sheet has only planar and cylindrical faces")
+            if face.geom_type == GeomType.CYLINDER and (
+                face.radius is None or face.radius <= 0
+            ):
+                raise ValueError("a sheet's cylindrical faces need a positive radius")
+
+        sewing = BRepBuilderAPI_Sewing()
+        for face in faces:
+            sewing.Add(face.wrapped)
+        sewing.Perform()
+        sewn = downcast(sewing.SewedShape())
+        if isinstance(sewn, TopoDS_Face):
+            shell = cls(Face(sewn))  # one face is a sheet of one face
+        elif isinstance(sewn, TopoDS_Shell):
+            shell = cls(sewn)
+        else:
+            raise ValueError("Sheet faces must sew into one connected shell")
+        if not shell.is_valid:
+            raise ValueError("Sheet faces produced an invalid shell")
+        if any(
+            len(topo_explore_connected_faces(edge, shell)) > 2 for edge in shell.edges()
+        ):
+            raise ValueError("Sheet faces produced non-manifold topology")
+
+        record = ShapeHistory()
+        for earlier in records:
+            record.merge(earlier)
+        record.merge(ShapeHistory.from_sewing(sewing, [f.wrapped for f in faces]))
+        return shell._made_by(record)
+
+    def flats(self) -> ShapeList[Face]:
+        """The planar faces of this Shell.
+
+        The counterpart of :meth:`bends`: on a sheet metal shell these are the
+        base, the walls, and whatever else the bends join up.
+
+        Returns:
+            ShapeList[Face]: the planar faces
+        """
+        return self.faces().filter_by(GeomType.PLANE)
+
     # ---- Class Methods ----
 
     @classmethod
@@ -3012,6 +3447,49 @@ class Shell(Mixin2D[TopoDS_Shell]):
 
     # ---- Instance Methods ----
 
+    @overload
+    def __add__(self, other: None) -> Self: ...
+    @overload
+    def __add__(self, other: Shape | Iterable[Shape]) -> Shell: ...
+    def __add__(self, other):
+        """sew shape into this shell operator +
+
+        Adding to a Shell always sews (see :meth:`Mixin2D.__add__`), so the
+        result is always a Shell; operands that can't sew raise ValueError.
+        Declared here so callers get Shell rather than the wider union
+        Mixin2D needs for Face.
+        """
+        return tcast(Shell, super().__add__(other))
+
+    def unfold(self, sheet_parameters: SheetMetalParameters | None = None) -> Shell:
+        """Develop this planar/cylindrical shell onto ``Plane.XY``.
+
+        Adjacent faces are placed by matching the developed representations of
+        their shared edges. Planar faces retain their metric UV dimensions;
+        cylindrical faces have their angular UV direction scaled by the
+        appropriate development radius.
+
+        When ``sheet_parameters`` is omitted, the geometric radius of every
+        cylindrical face is used. Supplying sheet parameters compensates each
+        bend to its neutral radius using the face orientation to distinguish
+        positive and negative bends.
+
+        Args:
+            sheet_parameters: Optional material and reference-surface parameters
+                used to produce a neutral-axis flat pattern.
+
+        Raises:
+            ValueError: If the shell is empty, disconnected, non-manifold,
+                contains unsupported surface types, or cannot be developed
+                consistently without a cut.
+
+        Returns:
+            The developed shell on ``Plane.XY``.
+        """
+        if not self:
+            raise ValueError("unfold requires a non-empty Shell")
+        return Shell(_unfold_shell(self.wrapped, sheet_parameters))
+
     def center(self) -> Vector:
         """Center of mass of the shell"""
         properties = GProp_GProps()
@@ -3083,6 +3561,80 @@ def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
         )
 
     return return_value
+
+
+def _coplanar_pair(edge: Edge, sheet: Shape) -> tuple[Face, Face] | None:
+    """The two coplanar flats an edge lies between, if that is what it does."""
+    beside = [Face(raw) for raw in topo_explore_connected_faces(edge, sheet)]
+    if len(beside) != 2 or any(f.geom_type != GeomType.PLANE for f in beside):
+        return None
+    normals = [f.normal_at(f.center()) for f in beside]
+    if normals[0].cross(normals[1]).length > TOLERANCE:
+        return None
+    return beside[0], beside[1]
+
+
+def _fold_partner_of(edge: Edge, face: Face, sheet: Shape) -> Face | None:
+    """The coplanar flat across a straight edge of ``face``, if there is one."""
+    if edge.geom_type != GeomType.LINE:
+        return None
+    pair = _coplanar_pair(edge, sheet)
+    if pair is None:
+        return None
+    return next((other for other in pair if not other.is_same(face)), None)
+
+
+def _faces_of(result: Shape | None) -> list[Face]:
+    """The faces a surface boolean left, if any."""
+    if result is None or not result:
+        return []
+    return list(result.faces())
+
+
+def _merge_coplanar_faces(
+    faces: list[Face], fresh: Iterable[Face] | None = None
+) -> tuple[list[Face], list[ShapeHistory]]:
+    """Union touching coplanar faces, and the records of the fuses that did it.
+
+    With ``fresh`` given, only pairs with one of those faces in them are joined:
+    material that has just arrived merges into what it touches, while a seam
+    already in the sheet - a fold line - is left alone.
+    """
+    merged = list(faces)
+    fresh_list = None if fresh is None else list(fresh)
+    movable = [
+        fresh_list is None or any(face.is_same(other) for other in fresh_list)
+        for face in merged
+    ]
+    records: list[ShapeHistory] = []
+    changed = True
+    while changed:
+        changed = False
+        for i, first in enumerate(merged):
+            if first.geom_type != GeomType.PLANE:
+                continue
+            for j in range(i + 1, len(merged)):
+                second = merged[j]
+                if (
+                    second.geom_type != GeomType.PLANE
+                    or not (movable[i] or movable[j])
+                    or not first.is_coplanar(Plane(second))
+                    or first.distance_to(second) > TOLERANCE
+                ):
+                    continue
+                fused = first.fuse(second)
+                if isinstance(fused, Face):
+                    merged[i] = fused
+                    movable[i] = True
+                    merged.pop(j)
+                    movable.pop(j)
+                    if fused._history is not None:
+                        records.append(fused._history)
+                    changed = True
+                    break
+            if changed:
+                break
+    return merged, records
 
 
 Shape.register_shape_constructor(ta.TopAbs_FACE, Face)

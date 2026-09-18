@@ -867,9 +867,10 @@ class Mixin1D(Shape[TOPODS]):
 
         A curvature comb is a set of short line segments (“teeth”) erected
         perpendicular to the curve that visualize the signed curvature κ(u).
-        Tooth length is proportional to |κ| and the direction encodes the sign
-        (left normal for κ>0, right normal for κ<0). This is useful for inspecting
-        fairness and continuity (C0/C1/C2) of edges and wires.
+        Tooth length is proportional to the magnitude of κ and the direction
+        encodes the sign (left normal for κ>0, right normal for κ<0). This is
+        useful for inspecting fairness and continuity (C0/C1/C2) of edges and
+        wires.
 
         Args:
             count (int, optional): Number of uniformly spaced samples over the normalized

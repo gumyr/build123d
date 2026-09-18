@@ -35,6 +35,7 @@ from scipy.spatial import ConvexHull
 from build123d.build_common import BaseObject
 from build123d.build_enums import Align, Mode
 from build123d.build_part import BuildPart
+from build123d.build_sheet import BuildSheet
 from build123d.geometry import (
     Location,
     Plane,
@@ -68,7 +69,7 @@ class BasePartObject(Part, BaseObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -124,7 +125,7 @@ class Box(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -167,7 +168,7 @@ class Cone(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -215,7 +216,7 @@ class ConvexPolyhedron(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -248,12 +249,18 @@ class _BaseHole(BasePartObject):
     """Shared functionality for hole-style part operations."""
 
     def _through_hole_depth(self) -> float:
-        """Calculate a conservative depth from the part and hole origins."""
+        """Calculate a conservative depth from the target and hole origins.
+
+        Uses the Builder's current object so a hole passes through a BuildSheet
+        reference shell as well as a BuildPart part.
+        """
         context = self._get_builder_context()
-        if context is None or context.part_local is None:
+        # An empty Builder object is falsy but not None, so test the object
+        # itself: a BuildSheet starts with an empty Shell
+        if context is None or not context._obj:
             raise ValueError("No depth provided")
 
-        part_origin = context.part_local.bounding_box().center()
+        part_origin = context._obj.bounding_box().center()
         origin_distance = max(
             (part_origin - location.position).length
             for location in self._get_object_locations()
@@ -274,7 +281,7 @@ class CounterBoreHole(_BaseHole):
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -323,7 +330,7 @@ class CounterSinkHole(_BaseHole):
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -377,7 +384,7 @@ class Cylinder(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -419,7 +426,7 @@ class Hole(_BaseHole):
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -466,7 +473,7 @@ class Sphere(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -517,7 +524,7 @@ class Torus(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -574,7 +581,7 @@ class Wedge(BasePartObject):
         mode (Mode, optional): combine mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildPart._tag]
+    _applies_to = [BuildPart._tag, BuildSheet._tag]
 
     # pylint: disable=too-many-arguments
     # pylint: disable=too-many-positional-arguments

@@ -37,6 +37,7 @@ import trianglesolver
 
 from build123d.build_common import BaseObject, flatten_sequence
 from build123d.build_enums import Align, FontStyle, Mode, TextAlign
+from build123d.build_sheet import BuildSheet
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import (
     TOLERANCE,
@@ -74,7 +75,7 @@ class BaseSketchObject(Sketch, BaseObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -111,7 +112,7 @@ class Circle(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -147,7 +148,7 @@ class Ellipse(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -184,7 +185,7 @@ class Polygon(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -217,7 +218,7 @@ class Rectangle(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -251,7 +252,7 @@ class RectangleRounded(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -292,7 +293,7 @@ class RegularPolygon(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -356,7 +357,7 @@ class SlotArc(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -388,7 +389,7 @@ class SlotCenterPoint(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -435,7 +436,7 @@ class SlotCenterToCenter(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -481,7 +482,7 @@ class SlotOverall(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -518,7 +519,7 @@ class Superellipse(BaseSketchObject):
     """Sketch Object: Superellipse
 
     Create an superellipse ("squircle") defined by width, height, and order.
-    
+
     Args:
         width (float): superellipse width
         height (float): superellipse height
@@ -532,7 +533,7 @@ class Superellipse(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -623,7 +624,7 @@ class Text(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     # Text is exceptionally flexible as per user requests
     # pylint: disable=too-many-arguments
@@ -705,7 +706,7 @@ class Trapezoid(BaseSketchObject):
         ValueError: Give angles result in an invalid trapezoid
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     def __init__(
         self,
@@ -788,7 +789,7 @@ class Triangle(BaseSketchObject):
         ValueError: One length and two other values were not provided
     """
 
-    _applies_to = [BuildSketch._tag]
+    _applies_to = [BuildSketch._tag, BuildSheet._tag]
 
     # Using standard mathematical terms for the interior angles
     # pylint: disable=invalid-name
