@@ -220,6 +220,10 @@ Enum and are shown in the following diagram:
 ExportDXF
 ---------
 
+``ExportDXF`` accepts the standard :class:`~geometry.ColorLike` interface for
+document and layer colors. The older ``ColorIndex`` values remain supported
+during the transition but emit a ``DeprecationWarning``.
+
 .. autoclass:: exporters.ExportDXF
     :noindex:
 
