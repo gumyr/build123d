@@ -65,6 +65,18 @@ with no ``opening`` brings the tip of the leg down to touch the sheet, and an
 turns, in degrees; left out, the curl turns as far as it can before it would
 meet the sheet, a little past 270 degrees.
 
+A flat hem has no opening, so its fold would have an inside radius of zero
+and the two legs would lie on one another, which no surface or solid can
+represent. The fold is therefore given a very small inside radius, 0.001 in
+the model's units, and an ``OPEN`` hem whose opening is smaller than twice
+that uses the same. The reference shell carries this as a half-cylinder face
+0.001 in radius along the fold, and the thickened part has a matching strip
+0.002 wide on the inside of the fold. Both are valid geometry and survive
+export and re-import; they are worth knowing about when a script walks the
+faces of a hemmed part and expects every face to be sheet-sized. The flat
+pattern is not affected: a fold this tight adds only its neutral-axis length
+to the blank, which is what a closed hem does in practice.
+
 ************
 Algebra mode
 ************

@@ -68,6 +68,10 @@ from build123d.geometry import TOLERANCE, Location, Matrix, Plane, Vector
 
 __all__ = ["SheetMetalParameters"]
 
+# The smallest inside radius a bend is modelled with. A fold with no gap, such
+# as a flat hem, would otherwise have an inside radius of zero and legs lying
+# on one another, which neither a surface nor a solid can represent. See the
+# hem documentation for what this looks like on the finished part.
 MIN_BEND_RADIUS = 1e-3
 
 

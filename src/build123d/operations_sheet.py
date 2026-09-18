@@ -1516,6 +1516,13 @@ def hem(
     * ``TEARDROP`` requires ``width`` and accepts ``radius`` and ``opening``.
     * ``ROLLED`` accepts ``radius`` and ``roll_angle``.
 
+    A flat hem, and an open hem whose ``opening`` is smaller than
+    ``2 * MIN_BEND_RADIUS``, folds about an inside radius of ``MIN_BEND_RADIUS``
+    (0.001) rather than zero, since two legs lying on one another cannot be
+    represented. The fold is a half-cylinder face of that radius on the
+    reference shell and a strip twice that wide on the inside of the
+    thickened part.
+
     Args:
         edges (Edge | list[Edge]): Linear free boundary edge or edges to hem.
         hem_type (HemType, optional): Profile of the hem. Defaults to ``FLAT``.
