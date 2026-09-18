@@ -271,6 +271,7 @@ __all__ = [
     "section",
     "split",
     "sweep",
+    "sheet_shells",
     "thicken",
     "unfold",
     "trace",

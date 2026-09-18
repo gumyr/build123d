@@ -29,6 +29,7 @@ license:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import combinations
 from math import asin, atan, atan2, cos, degrees, pi, radians, sin, sqrt, tan
 from typing import Callable, Literal, overload
 
@@ -92,6 +93,7 @@ from build123d.sheet_utils import (
     reference_radius,
 )
 from build123d.topology import (
+    Compound,
     Edge,
     Face,
     Shape,
@@ -100,6 +102,7 @@ from build123d.topology import (
     Solid,
     Vertex,
     Wire,
+    topo_explore_common_vertex,
     topo_explore_connected_faces,
 )
 from build123d.topology.shape_core import find_same_topods
@@ -1649,6 +1652,89 @@ def unfold(
 
     flat = sheet.unfold(_resolve_sheet_parameters(context, sheet_parameters))
     return flat.moved(Location(flat.bounding_box().to_align_offset(align)))
+
+
+def sheet_shells(
+    solid: Solid | Compound, tolerance: float = 1e-4
+) -> tuple[Shell, Shell, float]:
+    """Sheet Operation: sheet_shells
+
+    Take a constant-thickness solid apart into its two sheet surfaces and its
+    thickness: the way back into the sheet-metal model for a part that arrived
+    as a solid, imported or built some other way. Either surface can serve as
+    a reference ``Shell``, with ``SheetMetalParameters(thickness=thickness)``
+    and the matching ``SheetSurface``, for :func:`unfold` or further sheet
+    operations.
+
+    The thickness faces are found by measurement rather than by geometry type.
+    Every face votes with the distances between its non-adjacent boundary
+    edges; the distance shared by the most faces is the thickness, since every
+    edge face, hole wall, relief and hem end has two boundary edges exactly
+    that far apart, and every face with a pair of edges at that distance is a
+    thickness face. What remains sews into the two sheet surfaces.
+
+    Args:
+        solid (Solid | Compound): the sheet-metal solid, or a ``Part`` holding
+            exactly one solid.
+        tolerance (float, optional): how far a measured distance may be from
+            the thickness, as a fraction of it, and still count. Offset
+            surfaces are approximations, so the corner faces of a relief can
+            measure a few millionths off. Defaults to 1e-4.
+
+    Raises:
+        ValueError: the shape holds no single solid, or tolerance is not
+            positive
+        ValueError: no distance is shared by enough faces to be a thickness
+        ValueError: the remaining faces do not form exactly two surfaces
+
+    Returns:
+        tuple[Shell, Shell, float]: the two sheet surfaces, larger area first,
+        and the thickness
+    """
+    if tolerance <= 0:
+        raise ValueError("tolerance must be positive")
+    solids = solid.solids()
+    if len(solids) != 1:
+        raise ValueError(f"sheet_shells takes one solid, given {len(solids)}")
+    faces = solids[0].faces()
+
+    # every face votes with the distances between its non-adjacent outer edges
+    votes: list[tuple[Face, float]] = []
+    for face in faces:
+        edges = face.outer_wire().edges()
+        for first, second in combinations(edges, 2):
+            # two edges of a single wire always share both vertices
+            if len(edges) != 2 and topo_explore_common_vertex(first, second):
+                continue
+            votes.append((face, first.distance_to(second)))
+    if not votes:
+        raise ValueError("no face has a pair of separated edges to measure")
+
+    # the thickness is the distance the most faces agree on; a tie, such as a
+    # plain plate whose every dimension is shared by four faces, goes to the
+    # smallest, since a sheet is thinner than it is wide
+    ballots: dict[float, set[Face]] = {}
+    for face, distance in votes:
+        ballots.setdefault(round(distance, 3), set()).add(face)
+    thickness, voters = max(ballots.items(), key=lambda item: (len(item[1]), -item[0]))
+    if len(voters) < 2:
+        raise ValueError("no distance is shared by enough faces to be a thickness")
+
+    # every face with a pair of edges that far apart, to within the tolerance
+    thickness_faces = {
+        face
+        for face, distance in votes
+        if abs(distance - thickness) <= tolerance * thickness
+    }
+    sheet_faces = [face for face in faces if face not in thickness_faces]
+    groups = Face.sew_faces(sheet_faces) if sheet_faces else []
+    if len(groups) != 2:
+        raise ValueError(
+            f"the faces that are not {thickness:g} thick form {len(groups)} "
+            "surfaces, not the two sides of a sheet"
+        )
+    shells = sorted((Shell(group) for group in groups), key=lambda s: -s.area)
+    return shells[0], shells[1], thickness
 
 
 @overload

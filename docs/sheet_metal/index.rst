@@ -122,6 +122,13 @@ and what it refuses.
 
         Turn the reference surface into a solid part.
 
+    .. grid-item-card:: Sheet shells
+        :link: sheet_metal_sheet_shells
+        :link-type: ref
+
+        Take a solid sheet-metal part apart into its two surfaces and its
+        thickness.
+
 *********************
 Recipes and reference
 *********************
@@ -158,5 +165,6 @@ Recipes and reference
     cutouts
     unfold
     thicken
+    sheet_shells
     recipes
     reference

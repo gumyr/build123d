@@ -61,6 +61,7 @@ Operations
 .. autofunction:: operations_sheet.corner_relief
 .. autofunction:: operations_sheet.bend_relief
 .. autofunction:: operations_sheet.unfold
+.. autofunction:: operations_sheet.sheet_shells
 
 .. autofunction:: operations_part.thicken
     :noindex:

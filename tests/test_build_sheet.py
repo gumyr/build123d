@@ -3326,5 +3326,104 @@ class TestBend(unittest.TestCase):
             bend(tangent, sheet_parameters=self.PARAMETERS)
 
 
+class TestSheetShells(unittest.TestCase):
+    """sheet_shells takes a sheet-metal solid apart into its two surfaces."""
+
+    @staticmethod
+    def bracket() -> Part:
+        """A one-way bent part with a relief, a hole and a hem."""
+        with BuildPart() as part:
+            with BuildSheet(thickness=1.5, bend_radius=2) as sheet:
+                with BuildSketch():
+                    Rectangle(60, 40)
+                    with Locations((-15, 0)):
+                        Circle(4, mode=Mode.SUBTRACT)
+                # the hole's edge is a rim too, and cannot be flanged
+                flange(sheet.rims().filter_by(GeomType.LINE), length=20, gaps=3.1)
+                base = sheet.flats().sort_by(Axis.Z)[0]
+                corner_relief(
+                    base.vertices().filter_by(Convexity.CONVEX),
+                    ReliefType.ROUND,
+                    radius=3,
+                )
+                rims = sheet.rims().filter_by(GeomType.LINE).group_by(Axis.Z)[-1]
+                hem(rims.sort_by(Axis.X)[-1], width=6)
+            thicken()
+        return part.part
+
+    @staticmethod
+    def free_edges(shell: Shell) -> ShapeList[Edge]:
+        """The boundary edges of an open shell."""
+        return ShapeList(
+            edge
+            for edge in shell.edges()
+            if len(topo_explore_connected_faces(edge, shell)) == 1
+        )
+
+    def test_plate(self):
+        larger, smaller, thickness = sheet_shells(Box(40, 30, 2))
+        self.assertAlmostEqual(thickness, 2, 6)
+        self.assertAlmostEqual(larger.area, 1200, 6)
+        self.assertAlmostEqual(smaller.area, 1200, 6)
+        self.assertEqual(len(larger.faces()), 1)
+        self.assertEqual(len(smaller.faces()), 1)
+
+    def test_bracket(self):
+        part = self.bracket()
+        larger, smaller, thickness = sheet_shells(part)
+        self.assertAlmostEqual(thickness, 1.5, 4)
+        self.assertTrue(larger.is_valid and smaller.is_valid)
+        self.assertGreater(larger.area, smaller.area)
+        # the two surfaces mirror each other, and the rest is thickness
+        self.assertEqual(len(larger.faces()), len(smaller.faces()))
+        thickness_faces = [
+            f
+            for f in part.faces()
+            if all(not f.is_same(g) for g in larger.faces() + smaller.faces())
+        ]
+        self.assertEqual(
+            len(part.faces()), 2 * len(larger.faces()) + len(thickness_faces)
+        )
+        self.assertGreater(len(thickness_faces), 0)
+        # the surfaces are open only where a thickness face joins them
+        thick_edges = {hash(e) for f in thickness_faces for e in f.edges()}
+        for shell in (larger, smaller):
+            free = self.free_edges(shell)
+            self.assertTrue(free)
+            self.assertTrue(all(hash(e) in thick_edges for e in free))
+        # a part bent one way: the larger surface is outside the smaller one
+        outer, inner = larger.bounding_box(), smaller.bounding_box()
+        self.assertGreater(outer.size.X, inner.size.X)
+        self.assertGreater(outer.size.Z, inner.size.Z)
+
+    def test_solid_and_part_agree(self):
+        part = self.bracket()
+        from_part = sheet_shells(part)
+        from_solid = sheet_shells(part.solid())
+        self.assertAlmostEqual(from_part[2], from_solid[2], 6)
+        self.assertAlmostEqual(from_part[0].area, from_solid[0].area, 6)
+
+    def test_reference_shell_unfolds(self):
+        """A recovered surface is a usable reference shell."""
+        part = self.bracket()
+        larger, smaller, thickness = sheet_shells(part)
+        parameters = SheetMetalParameters(
+            thickness=thickness, sheet_surface=SheetSurface.INSIDE
+        )
+        flat = unfold(smaller, sheet_parameters=parameters)
+        self.assertTrue(flat.is_valid)
+        self.assertTrue(all(f.is_planar for f in flat.faces()))
+
+    def test_refusals(self):
+        with self.assertRaisesRegex(ValueError, "one solid"):
+            sheet_shells(Box(1, 1, 1) + Pos(5, 0, 0) * Box(1, 1, 1))
+        with self.assertRaisesRegex(ValueError, "not the two sides"):
+            sheet_shells(Box(10, 10, 10))
+        with self.assertRaisesRegex(ValueError, "thickness"):
+            sheet_shells(Sphere(5))
+        with self.assertRaisesRegex(ValueError, "tolerance"):
+            sheet_shells(Box(40, 30, 2), tolerance=0)
+
+
 if __name__ == "__main__":
     unittest.main()

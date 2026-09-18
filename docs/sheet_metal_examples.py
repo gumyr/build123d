@@ -565,6 +565,23 @@ with BuildPart() as bracket_part:
 render(bracket_part.part, "thicken_basic")
 
 # ---------------------------------------------------------------------------
+# sheet shells
+# ---------------------------------------------------------------------------
+
+# [sheet_shells_basic]
+with BuildPart() as tray_part:
+    with BuildSheet(thickness=1, bend_radius=2) as tray:
+        with BuildSketch():
+            Rectangle(60, 40)
+        flange(tray.rims(), length=15, gaps=3.1)
+    thicken()
+
+# the solid, as an imported part would arrive, taken apart again
+larger, smaller, thickness = sheet_shells(tray_part.part)
+# [sheet_shells_basic]
+render(smaller, "sheet_shells_basic")
+
+# ---------------------------------------------------------------------------
 # tutorial: an open enclosure base
 # ---------------------------------------------------------------------------
 

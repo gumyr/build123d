@@ -110,7 +110,8 @@ its local-coordinate counterpart; ``tray.sheet_parameters`` are the
 parameters it was built with. There is no ``part``: a sheet is a surface
 until :ref:`thicken <sheet_metal_thicken>` gives it material, and
 :ref:`unfold <sheet_metal_unfold>` develops the same surface into the flat
-pattern.
+pattern. A part that arrives as a solid is taken apart again by
+:ref:`sheet_shells <sheet_metal_sheet_shells>`.
 
 *********
 Reference
