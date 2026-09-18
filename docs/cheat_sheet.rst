@@ -118,8 +118,10 @@ Cheat Sheet
             | :func:`~operations_generic.fillet`
             | :func:`~operations_part.loft`
             | :func:`~operations_part.make_brake_formed`
+            | :func:`~operations_part.make_solid`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
+            | :func:`~operations_generic.patch_surface`
             | :func:`~operations_generic.project`
             | :func:`~operations_part.project_workplane`
             | :func:`~operations_part.revolve`
