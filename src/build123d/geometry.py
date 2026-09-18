@@ -3276,12 +3276,14 @@ class Plane(metaclass=PlaneMeta):
     def shift_origin(self, locator: Axis | VectorLike | Vertex) -> Plane:
         """shift plane origin
 
-        Creates a new plane with the origin moved within the plane to the point of intersection
-        of the axis or at the given Vertex. The plane's x_dir and z_dir are unchanged.
+        Creates a new plane with the origin moved within the plane to the given point
+        or the intersection with an axis. The plane's x_dir and z_dir are unchanged.
 
         Args:
-            locator (Axis | VectorLike | Vertex): Either Axis that intersects the new
-                plane origin or Vertex within Plane.
+            locator (Axis | VectorLike | Vertex): A two-tuple specifies local x and y
+                coordinates relative to this plane's origin. A three-tuple, Vector, or
+                Vertex specifies a global point within the plane. An Axis specifies its
+                intersection with the plane.
 
         Raises:
             ValueError: Vertex isn't within plane
@@ -3297,6 +3299,8 @@ class Plane(metaclass=PlaneMeta):
             new_origin = Vector(geom_point.X(), geom_point.Y(), geom_point.Z())
             if not self.contains(new_origin):
                 raise ValueError(f"{locator} is not located within plane")
+        elif isinstance(locator, tuple) and len(locator) == 2:
+            new_origin = self.from_local_coords(locator)
         elif isinstance(locator, (tuple, Vector)):
             new_origin = Vector(locator)
             if not self.contains(locator):
