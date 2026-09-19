@@ -472,13 +472,15 @@ class TestTessellateWithUVs(DirectApiTestCase):
             def __getattr__(self, name):
                 return getattr(self.wrapped, name)
 
+        box = Box(1, 1, 1)
+        box.mesh(0.1)
         with patch(
             "build123d.topology.shape_core.BRep_Tool.Triangulation_s",
             side_effect=lambda face, location: NoUVTriangulation(
                 triangulation(face, location)
             ),
         ):
-            _, _, _, uvs = Box(1, 1, 1).tessellate_with_uvs(0.1, atlas_packing=False)
+            _, _, _, uvs = box.tessellate_with_uvs(0.1, atlas_packing=False)
 
         self.assertTrue(uvs)
         self.assertTrue(all(uv == (0.0, 0.0) for uv in uvs))
