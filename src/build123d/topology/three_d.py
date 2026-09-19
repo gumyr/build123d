@@ -61,6 +61,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal, cast
 from bd_materials import FinishedMaterial
 
 import OCP.TopAbs as ta
+from OCP.BRep import BRep_Builder
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
@@ -95,6 +96,7 @@ from OCP.TopoDS import (
     TopoDS,
     TopoDS_Compound,
     TopoDS_Face,
+    TopoDS_Iterator,
     TopoDS_Shape,
     TopoDS_Shell,
     TopoDS_Solid,
@@ -677,6 +679,8 @@ class Mixin3D(Shape[TOPODS]):
                 "offset Error, an alternative kind may resolve this error"
             ) from err
 
+        if offset_occt_solid.ShapeType() == ta.TopAbs_SOLID:
+            offset_occt_solid = _forward_solid(TopoDS.Solid(offset_occt_solid))
         offset_solid = self.__class__.cast(offset_occt_solid)
         assert offset_solid.wrapped is not None
 
@@ -712,6 +716,41 @@ class Mixin3D(Shape[TOPODS]):
         return Mixin1D.project_to_viewport(
             self, viewport_origin, viewport_up, look_at, focus
         )
+
+
+def _forward_solid(solid: TopoDS_Solid) -> TopoDS_Solid:
+    """The same solid with FORWARD flags on itself and its shells.
+
+    ``BRepOffsetAPI_MakeThickSolid`` can return a solid whose faces point
+    inward under a REVERSED flag on the solid. Everything that composes
+    orientations along the topology accepts it: the volume is positive and
+    ``BRepCheck`` is satisfied. ``BRepFilletAPI_MakeFillet`` does not compose
+    the solid's flag, sees an inside-out solid, and builds an inside-out
+    result. Rebuilding the solid FORWARD, with every face carrying the
+    orientation it had in effect, keeps the geometry and removes the flag.
+    """
+    shells = TopoDS_Iterator(solid, True, True)
+    flags = [solid.Orientation()]
+    while shells.More():
+        flags.append(shells.Value().Orientation())
+        shells.Next()
+    if all(flag == ta.TopAbs_FORWARD for flag in flags):
+        return solid
+
+    builder = BRep_Builder()
+    forward = TopoDS_Solid()
+    builder.MakeSolid(forward)
+    shells = TopoDS_Iterator(solid, True, True)  # orientations composed
+    while shells.More():
+        shell = TopoDS_Shell()
+        builder.MakeShell(shell)
+        faces = TopoDS_Iterator(shells.Value(), True, True)
+        while faces.More():
+            builder.Add(shell, faces.Value())
+            faces.Next()
+        builder.Add(forward, shell)
+        shells.Next()
+    return forward
 
 
 class Solid(Mixin3D[TopoDS_Solid]):
