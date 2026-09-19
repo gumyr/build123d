@@ -249,6 +249,67 @@ class TestMatrixValidation(unittest.TestCase):
         # a similarity converts to a gp_Trsf, so it can place a shape
         rotation_scale_mirror.wrapped.Trsf()
 
+    def test_svd_of_rotation_scale_and_mirror(self):
+        c, s = math.cos(math.radians(30)), math.sin(math.radians(30))
+
+        def reconstruct(matrix):
+            left, scales, right = matrix.svd()
+            diagonal = Matrix(
+                [[scales.X, 0, 0, 0], [0, scales.Y, 0, 0], [0, 0, scales.Z, 0]]
+            )
+            product = left.multiply(diagonal).multiply(right)
+            for r in range(3):
+                for col in range(3):
+                    self.assertAlmostEqual(product[r, col], matrix[r, col], 9)
+            # both factors are proper rotations
+            for factor in (left, right):
+                self.assertAlmostEqual(
+                    factor.multiply(Vector(1, 0, 0))
+                    .cross(factor.multiply(Vector(0, 1, 0)))
+                    .dot(factor.multiply(Vector(0, 0, 1))),
+                    1.0,
+                    9,
+                )
+            return scales
+
+        rotation = Matrix([[c, -s, 0, 0], [s, c, 0, 0], [0, 0, 1, 0]])
+        self.assertAlmostEqual(reconstruct(rotation), (1, 1, 1), 9)
+
+        uniform = Matrix([[2, 0, 0, 5], [0, 2, 0, 0], [0, 0, 2, 0]])
+        self.assertAlmostEqual(reconstruct(uniform), (2, 2, 2), 9)
+
+        stretch = Matrix([[3, 0, 0, 0], [0, 1, 0, 0], [0, 0, 2, 0]])
+        self.assertAlmostEqual(reconstruct(stretch), (3, 2, 1), 9)
+
+        mirror = Matrix([[-1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
+        self.assertAlmostEqual(reconstruct(mirror), (1, 1, -1), 9)
+
+    def test_copies_are_independent_for_any_matrix(self):
+        for label, rows in (
+            ("rotation", [[0, -1, 0, 1], [1, 0, 0, 2], [0, 0, 1, 3]]),
+            ("shear", [[1, 0.5, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]),
+            ("stretch", [[2, 0, 0, 1], [0, 1, 0, 0], [0, 0, 1, 0]]),
+        ):
+            with self.subTest(matrix=label):
+                original = Matrix(rows)
+                for copied in (copy.copy(original), copy.deepcopy(original)):
+                    self.assertIsNot(copied.wrapped, original.wrapped)
+                    for r in range(3):
+                        for col in range(4):
+                            self.assertAlmostEqual(copied[r, col], original[r, col], 9)
+                    copied.rotate(Axis.Z, 90)
+                    self.assertAlmostEqual(original[0, 0], rows[0][0], 9)
+
+    def test_svd_of_a_planar_transform(self):
+        """A map acting only in a plane sorts its zero scale last."""
+        planar = Matrix([[0.2, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 0]])
+        left, scales, right = planar.svd()
+        self.assertAlmostEqual(scales, (1, 0.2, 0), 9)
+        # the in-plane axes have no component across the plane
+        self.assertAlmostEqual(left[2, 0], 0, 9)
+        self.assertAlmostEqual(left[2, 1], 0, 9)
+        self.assertAlmostEqual(abs(left[2, 2]), 1, 9)
+
     def test_list_general_affine_multiplies_vector(self):
         non_uniform = Matrix([[2, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
         self.assertEqual(non_uniform.wrapped.Form(), gp_TrsfForm.gp_Other)

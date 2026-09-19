@@ -178,6 +178,7 @@ from .utils import (
 from .zero_d import Vertex
 
 if TYPE_CHECKING:  # pragma: no cover
+    from .uv_write import UVFrame
     from .composite import Compound, Curve  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
 
@@ -2489,6 +2490,34 @@ class Face(Mixin2D[TopoDS_Face]):
                 stacklevel=2,
             )
         return self.outer_wire()
+
+    def uv_frame(self, location: Location, tolerance: float = 1e-4) -> UVFrame:
+        """uv_frame
+
+        A flat coordinate system laid onto this face, for writing planar
+        shapes drawn on ``Plane.XY`` into its parameter space so that they lie
+        on the surface exactly. The flat origin lands on ``location`` and the
+        flat x axis runs along its x direction; ``location_at`` is the usual
+        way to make one.
+
+        The map behind the frame is chosen from the face's geometry: exact for
+        planes and cylinders, the exact unrolling for cones, an azimuthal
+        equidistant projection for spheres, and for any other surface the
+        exponential map, which places a flat point along the geodesic leaving
+        the origin in its direction. See :class:`~topology.UVFrame`.
+
+        Args:
+            location (Location): where the flat origin lands and which way
+                flat x runs
+            tolerance (float, optional): largest 3D error allowed when a
+                curve's image has to be interpolated. Defaults to 1e-4.
+
+        Returns:
+            UVFrame: the frame
+        """
+        from .uv_write import UVFrame  # pylint: disable=import-outside-toplevel
+
+        return UVFrame.at(self, location, tolerance)
 
     @overload
     def wrap(

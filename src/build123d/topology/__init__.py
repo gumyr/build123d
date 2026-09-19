@@ -62,6 +62,7 @@ from .one_d import (
     topo_explore_connected_faces,
 )
 from .two_d import Face, Shell, Mixin2D, sort_wires_by_build_order
+from .uv_write import UVFrame
 from .three_d import Solid, Mixin3D, DraftAngleError
 from .composite import Compound, Curve, Sketch, Part
 
@@ -95,6 +96,7 @@ __all__ = [
     "topo_explore_connected_faces",
     "Face",
     "Shell",
+    "UVFrame",
     "sort_wires_by_build_order",
     "Solid",
     "Compound",
