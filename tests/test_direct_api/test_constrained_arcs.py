@@ -26,6 +26,8 @@ license:
 
 """
 
+import platform
+
 import pytest
 from OCP.BRep import BRep_Tool
 from OCP.gp import gp_Ax2d, gp_Circ2d, gp_Dir2d, gp_Pnt2d
@@ -504,6 +506,11 @@ def test_tan3_4():
     assert len(tan3) == 0
 
 
+@pytest.mark.xfail(
+    platform.system() == "Linux" and platform.machine() == "aarch64",
+    reason="the RadiusArc case leaves two half circles, so there is no shorter "
+    "or longer sagitta to choose and the kernel's pick differs on Linux arm64",
+)
 def test_make_constrained_arcs_3tan():
     """test correct trimming in _make_3tan_arcs"""
     c1 = CenterArc((0, 20), 20, -90, 90)
