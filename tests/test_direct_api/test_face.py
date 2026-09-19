@@ -36,7 +36,6 @@ from unittest.mock import MagicMock, PropertyMock, patch
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.gp import gp_Ax3, gp_Dir, gp_Pnt
 from OCP.Geom import Geom_RectangularTrimmedSurface
-from OCP.GeomAPI import GeomAPI_ExtremaCurveCurve
 from OCP.Geom import Geom_CylindricalSurface, Geom_OffsetSurface
 from OCP.StdFail import StdFail_NotDone
 
@@ -1369,10 +1368,19 @@ class TestFace(unittest.TestCase):
         s = Sphere(1).face()
         self.assertIsNone(s.radii)
 
+    @staticmethod
+    def surface_gap(shape, surface: Face, samples: int = 20) -> float:
+        """Largest distance from sampled points of the shape's edges to the surface"""
+        return max(
+            surface.distance_to(edge.position_at(i / samples))
+            for edge in shape.edges()
+            for i in range(samples + 1)
+        )
+
     def test_wrap(self):
         surfaces = [
             part.faces().filter_by(GeomType.PLANE, reverse=True)[0]
-            for part in (Cylinder(5, 10), Sphere(5), Cone(5, 2, 10))
+            for part in (Cylinder(5, 10), Sphere(5), Cone(5, 2, 10), Torus(10, 3))
         ]
         inner = PolarLocations(1, 5, -18).local_locations
         outer = PolarLocations(3, 5, -18 + 36).local_locations
@@ -1381,49 +1389,69 @@ class TestFace(unittest.TestCase):
         planar_edge = Edge.make_line((0, 0), (3, 3))
         planar_wire = Wire([planar_edge, Edge.make_line(planar_edge @ 1, (3, 0))])
         for surface in surfaces:
-            with self.subTest(surface=surface):
-                target = surface.location_at(0.5, 0.5, x_dir=(1, 0, 0))
+            with self.subTest(surface=surface.geom_type.name):
+                target = surface.location_at(0.5, 0.5, x_dir=(0, 0, 1))
 
-                wrapped_face: Face = surface.wrap(star, target)
-                self.assertTrue(isinstance(wrapped_face, Face))
+                wrapped_face = surface.wrap(star, target)
+                self.assertIsInstance(wrapped_face, Face)
+                self.assertTrue(wrapped_face.is_valid)
                 self.assertFalse(wrapped_face.is_planar)
-                self.assertTrue(wrapped_face.inner_wires())
+                self.assertEqual(len(wrapped_face.inner_wires()), 1)
+                self.assertLess(self.surface_gap(wrapped_face, surface), 1e-4)
+                # the wrapped face has the surface's normal
+                centre = wrapped_face.center()
+                self.assertGreater(
+                    wrapped_face.normal_at(centre).dot(surface.normal_at(centre)), 0
+                )
 
+                # a straight line from the origin keeps its length on any surface
                 wrapped_edge = surface.wrap(planar_edge, target)
-                self.assertTrue(wrapped_edge.geom_type == GeomType.BSPLINE)
-                self.assertAlmostEqual(planar_edge.length, wrapped_edge.length, 2)
+                self.assertAlmostEqual(planar_edge.length, wrapped_edge.length, 3)
                 self.assertAlmostEqual(wrapped_edge @ 0, target.position, 5)
 
                 wrapped_wire = surface.wrap(planar_wire, target)
-                self.assertAlmostEqual(planar_wire.length, wrapped_wire.length, 2)
+                self.assertEqual(len(wrapped_wire.edges()), 2)
                 self.assertAlmostEqual(wrapped_wire @ 0, target.position, 5)
+                self.assertLess(self.surface_gap(wrapped_wire, surface), 1e-4)
+
+        # a cylinder and a cone unroll without distortion, so every length
+        # and area is kept; a sphere or torus cannot be flattened, and is not
+        for surface in (surfaces[0], surfaces[2]):
+            with self.subTest(surface=surface.geom_type.name):
+                target = surface.location_at(0.5, 0.5, x_dir=(0, 0, 1))
+                self.assertAlmostEqual(
+                    surface.wrap(planar_wire, target).length, planar_wire.length, 4
+                )
+                self.assertAlmostEqual(surface.wrap(star, target).area, star.area, 4)
 
         with self.assertRaises(TypeError):
-            surface.wrap(Solid.make_box(1, 1, 1), target)
+            surfaces[0].wrap(Solid.make_box(1, 1, 1), target)
+        with self.assertRaisesRegex(ValueError, "empty face"):
+            Face().wrap(planar_edge, target)
 
-    @patch.object(GeomAPI_ExtremaCurveCurve, "NbExtrema", return_value=0)
-    def test_wrap_intersect_error(self, mock_is_valid):
-        surface = Cone(5, 2, 10).faces().filter_by(GeomType.PLANE, reverse=True)[0]
-        target = surface.location_at(0.5, 0.5, x_dir=(1, 0, 0))
-        inner = PolarLocations(1, 5, -18).local_locations
-        outer = PolarLocations(3, 5, -18 + 36).local_locations
-        points = [p.position for pair in zip(inner, outer) for p in pair]
-        star = (Polygon(*points, align=Align.NONE) - Circle(0.5)).face()
-
-        with self.assertRaises(RuntimeError):
-            surface.wrap(star.outer_wire(), target)
-
-    @patch.object(Wire, "is_valid", new_callable=PropertyMock, return_value=False)
-    def test_wrap_invalid_wire(self, mock_is_valid):
-        surface = Cone(5, 2, 10).faces().filter_by(GeomType.PLANE, reverse=True)[0]
-        target = surface.location_at(0.5, 0.5, x_dir=(1, 0, 0))
-        inner = PolarLocations(1, 5, -18).local_locations
-        outer = PolarLocations(3, 5, -18 + 36).local_locations
-        points = [p.position for pair in zip(inner, outer) for p in pair]
-        star = (Polygon(*points, align=Align.NONE) - Circle(0.5)).face()
-
-        with self.assertRaises(RuntimeError):
-            surface.wrap(star, target)
+    def test_wrap_across_the_seam(self):
+        """A face over the seam comes back as a shell of one face per period,
+        and the shell thickens and fuses as one solid"""
+        cylinder = Cylinder(5, 10)
+        surface = cylinder.faces().filter_by(GeomType.CYLINDER)[0]
+        target = surface.location_at(0.0, 0.5, x_dir=(0, 1, 0))
+        planar = (Rectangle(6, 3) - Circle(0.8)).face()
+        wrapped = surface.wrap(planar, target)
+        self.assertIsInstance(wrapped, Shell)
+        self.assertEqual(len(wrapped.faces()), 2)
+        self.assertAlmostEqual(wrapped.area, planar.area, 4)
+        raised = Solid.thicken(wrapped, 0.5)
+        self.assertTrue(raised.is_valid)
+        embossed = cylinder.fuse(raised)
+        self.assertTrue(embossed.is_valid)
+        self.assertGreater(embossed.volume, cylinder.volume)
+        # a wire gets a vertex where it crosses the seam
+        outline = surface.wrap(planar.outer_wire(), target)
+        self.assertTrue(outline.is_closed)
+        self.assertEqual(len(outline.edges()), 6)
+        # but not a whole turn
+        with self.assertRaisesRegex(ValueError, "whole turn"):
+            surface.wrap(Rectangle(40, 2).face(), target)
 
     def test_wrap_faces(self):
         sphere = Solid.make_sphere(50, angle1=-90).face()
@@ -1437,9 +1465,15 @@ class TestFace(unittest.TestCase):
             .reversed()
         )
         text = Text(txt="ei", font_size=15, align=(Align.MIN, Align.CENTER))
+        before = [f.center() for f in text.faces()]
         wrapped_faces = surface.wrap_faces(text.faces(), path, 0.2)
         self.assertEqual(len(wrapped_faces), 3)
         self.assertTrue(all(not f.is_planar for f in wrapped_faces))
+        self.assertTrue(all(f.is_valid for f in wrapped_faces))
+        self.assertLess(max(self.surface_gap(f, surface) for f in wrapped_faces), 1e-4)
+        # the planar faces are left where they were
+        self.assertEqual([f.center() for f in text.faces()], before)
+        self.assertEqual(surface.wrap_faces([], path), [])
 
     def test_revolve(self):
         l1 = Edge.make_line((3, 0), (3, 2))
@@ -1621,50 +1655,6 @@ class TestFillet2DNoVertices(unittest.TestCase):
     def test_returns_self(self):
         face = Rectangle(10, 10).face()
         self.assertIs(face.fillet_2d(1, []), face)
-
-
-class TestWrapValidation(unittest.TestCase):
-    """Rejection paths of Mixin2D.wrap / _wrap_edge"""
-
-    def setUp(self):
-        self.surface = (
-            Cylinder(5, 10).faces().filter_by(GeomType.PLANE, reverse=True)[0]
-        )
-        self.target = self.surface.location_at(0.5, 0.5, x_dir=(1, 0, 0))
-        self.edge = Edge.make_line((0, 0), (3, 3))
-
-    def test_empty_surface(self):
-        with self.assertRaisesRegex(ValueError, "Can't wrap around an empty face"):
-            Face().wrap(self.edge, self.target)
-
-    def test_wrapping_runs_off_the_surface(self):
-        """An edge longer than the surface finds no face to intersect."""
-        too_long = Edge.make_line((0, 0), (0, 40))
-        with self.assertRaisesRegex(RuntimeError, "over surface boundary"):
-            self.surface.wrap(too_long, self.target)
-
-    def test_wrapping_over_the_surface_boundary(self):
-        """A face is found but the axis misses it."""
-        with patch.object(Face, "find_intersection_points", return_value=[]):
-            with self.assertRaisesRegex(RuntimeError, "over surface boundary"):
-                self.surface.wrap(self.edge, self.target)
-
-    def test_length_error_exceeds_tolerance(self):
-        with self.assertRaisesRegex(RuntimeError, "exceeds tolerance"):
-            self.surface.wrap(self.edge, self.target, tolerance=1e-12)
-
-    def test_invalid_wrapped_edge(self):
-        with patch.object(
-            Edge, "is_valid", new_callable=PropertyMock, return_value=False
-        ):
-            with self.assertRaisesRegex(RuntimeError, "Wrapped edge is invalid"):
-                self.surface.wrap(self.edge, self.target)
-
-    def test_projection_failure(self):
-        with patch("build123d.topology.two_d.GeomProjLib") as geom_proj_lib:
-            geom_proj_lib.Project_s.return_value = None
-            with self.assertRaisesRegex(RuntimeError, "Projection failed"):
-                self.surface.wrap(self.edge, self.target)
 
 
 class TestSurfaceHoles(unittest.TestCase):
