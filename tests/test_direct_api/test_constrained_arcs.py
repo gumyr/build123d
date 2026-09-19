@@ -506,27 +506,18 @@ def test_tan3_4():
     assert len(tan3) == 0
 
 
-@pytest.mark.xfail(
-    platform.system() == "Linux" and platform.machine() == "aarch64",
-    reason="the RadiusArc case leaves two half circles, so there is no shorter "
-    "or longer sagitta to choose and the kernel's pick differs on Linux arm64",
-)
 def test_make_constrained_arcs_3tan():
     """test correct trimming in _make_3tan_arcs"""
     c1 = CenterArc((0, 20), 20, -90, 90)
-    c2 = CenterArc((0, 20), 10, -90, 90)
+    c2 = CenterArc((5, 25), 10, -90, 90)
     ln1 = Line(c1 @ 1, c2 @ 1)
     c3 = RadiusArc(c1 @ 1, c2 @ 1, 10)
-    for i, el in enumerate([ln1, c3]):
-        if i == 0:
-            sagitta = Sagitta.LONG
-        else:
-            sagitta = Sagitta.SHORT
+    for el in [ln1, c3]:
         tan3 = Edge.make_constrained_arcs(
             (c1, Tangency.UNQUALIFIED),
             (c2, Tangency.UNQUALIFIED),
             (el, Tangency.UNQUALIFIED),
-            sagitta=sagitta,
+            sagitta=Sagitta.SHORT,
         )
         assert el.intersect(tan3[0]) is not None
 
