@@ -3400,6 +3400,69 @@ class TestSheetShells(unittest.TestCase):
         self.assertEqual(len(larger.faces()), 1)
         self.assertEqual(len(smaller.faces()), 1)
 
+    def test_extruded_profile(self):
+        """Along an extruded profile every sheet face measures the length of
+        the part, so more faces share that than the thickness; taking them
+        away leaves the two ends, which are not the sheet's surfaces"""
+        profile = Rectangle(40, 20) - Pos(0, 2) * Rectangle(36, 20)
+        channel = extrude(profile.face(), 300)
+        larger, smaller, thickness = sheet_shells(channel)
+        self.assertAlmostEqual(thickness, 2, 6)
+        self.assertEqual(len(larger.faces()), 3)
+        self.assertEqual(len(smaller.faces()), 3)
+        self.assertAlmostEqual(larger.area, (40 + 2 * 20) * 300, 4)
+        self.assertAlmostEqual(smaller.area, (36 + 2 * 18) * 300, 4)
+
+    def test_narrower_than_thick(self):
+        """A width smaller than the thickness that several faces share is
+        passed over, since its faces do not separate two surfaces"""
+        slots = [Pos(19, y, 0) * Box(4, 0.5, 2) for y in (-8, 0, 8)]
+        larger, smaller, thickness = sheet_shells(Box(40, 30, 2) - slots)
+        self.assertAlmostEqual(thickness, 2, 6)
+        self.assertAlmostEqual(larger.area, 1200 - 3 * 1.5, 4)
+        self.assertAlmostEqual(smaller.area, larger.area, 4)
+
+    def test_given_thickness(self):
+        """A known thickness is used as given, with nothing searched for"""
+        part = self.bracket()
+        found = sheet_shells(part)
+        given = sheet_shells(part, thickness=1.5)
+        self.assertEqual(given[2], 1.5)
+        self.assertAlmostEqual(given[0].area, found[0].area, 6)
+        self.assertAlmostEqual(given[1].area, found[1].area, 6)
+        # a plate is a sheet three ways; only being told picks the others
+        larger, smaller, thickness = sheet_shells(Box(40, 30, 2), thickness=30)
+        self.assertEqual(thickness, 30)
+        self.assertAlmostEqual(larger.area, 80, 6)
+        self.assertAlmostEqual(smaller.area, 80, 6)
+        # the wrong thickness is refused rather than replaced by a found one
+        with self.assertRaisesRegex(ValueError, "measure 1.2 does not leave"):
+            sheet_shells(part, thickness=1.2)
+        with self.assertRaisesRegex(ValueError, "thickness must be positive"):
+            sheet_shells(part, thickness=0)
+
+    def test_unsewable_leftovers_are_passed_over(self):
+        """The faces a wrong distance leaves are arbitrary; the kernel failing
+        on them rules that distance out and the search goes on"""
+        sew_faces = Face.sew_faces
+        calls = []
+
+        def fail_first(faces):
+            calls.append(len(calls))
+            if len(calls) == 1:
+                raise RuntimeError("could not sew")
+            return sew_faces(faces)
+
+        with patch.object(Face, "sew_faces", side_effect=fail_first):
+            _, _, thickness = sheet_shells(self.bracket())
+        self.assertAlmostEqual(thickness, 1.5, 4)
+        self.assertGreater(len(calls), 1)
+
+    def test_thickness_is_as_measured(self):
+        """A sixteenth of an inch, which does not round to three places"""
+        _, _, thickness = sheet_shells(Box(40, 30, 1.5875))
+        self.assertAlmostEqual(thickness, 1.5875, 6)
+
     def test_bracket(self):
         part = self.bracket()
         larger, smaller, thickness = sheet_shells(part)
@@ -3449,10 +3512,10 @@ class TestSheetShells(unittest.TestCase):
     def test_refusals(self):
         with self.assertRaisesRegex(ValueError, "one solid"):
             sheet_shells(Box(1, 1, 1) + Pos(5, 0, 0) * Box(1, 1, 1))
-        with self.assertRaisesRegex(ValueError, "not the two sides"):
-            sheet_shells(Box(10, 10, 10))
-        with self.assertRaisesRegex(ValueError, "thickness"):
-            sheet_shells(Sphere(5))
+        # every face of a cube measures the same; a sphere's measures nothing
+        for solid in (Box(10, 10, 10), Sphere(5)):
+            with self.assertRaisesRegex(ValueError, "never leaves the two sides"):
+                sheet_shells(solid)
         with self.assertRaisesRegex(ValueError, "tolerance"):
             sheet_shells(Box(40, 30, 2), tolerance=0)
 

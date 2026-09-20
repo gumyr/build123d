@@ -31,6 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 from math import asin, atan, atan2, cos, degrees, pi, radians, sin, sqrt, tan
+from statistics import median
 from typing import Callable, Literal, overload
 
 import numpy as np
@@ -1655,7 +1656,7 @@ def unfold(
 
 
 def sheet_shells(
-    solid: Solid | Compound, tolerance: float = 1e-4
+    solid: Solid | Compound, thickness: float | None = None, tolerance: float = 1e-4
 ) -> tuple[Shell, Shell, float]:
     """Sheet Operation: sheet_shells
 
@@ -1667,25 +1668,33 @@ def sheet_shells(
     operations.
 
     The thickness faces are found by measurement rather than by geometry type.
-    Every face votes with the distances between its non-adjacent boundary
-    edges; the distance shared by the most faces is the thickness, since every
-    edge face, hole wall, relief and hem end has two boundary edges exactly
-    that far apart, and every face with a pair of edges at that distance is a
-    thickness face. What remains sews into the two sheet surfaces.
+    Every face is measured between its non-adjacent boundary edges. Every edge
+    face, hole wall, relief and hem end has two boundary edges exactly the
+    thickness apart, so taking away the faces that measure the thickness
+    leaves the two sheet surfaces, and the thickness is the smallest distance
+    shared by two or more faces that does so. A larger one can do the same by
+    accident: the faces as long as an extruded profile are all of its sheet
+    faces, and taking those away leaves its two ends.
+
+    A known ``thickness`` is taken as given and none is searched for, which
+    settles a part whose own measurements are ambiguous.
 
     Args:
         solid (Solid | Compound): the sheet-metal solid, or a ``Part`` holding
             exactly one solid.
+        thickness (float, optional): the sheet's thickness, when known.
+            Defaults to None, which finds it by measurement.
         tolerance (float, optional): how far a measured distance may be from
             the thickness, as a fraction of it, and still count. Offset
             surfaces are approximations, so the corner faces of a relief can
             measure a few millionths off. Defaults to 1e-4.
 
     Raises:
-        ValueError: the shape holds no single solid, or tolerance is not
-            positive
-        ValueError: no distance is shared by enough faces to be a thickness
-        ValueError: the remaining faces do not form exactly two surfaces
+        ValueError: the shape holds no single solid, or thickness or
+            tolerance is not positive
+        ValueError: no face has a pair of separated edges to measure
+        ValueError: no distance is a thickness, leaving exactly two surfaces,
+            or the given thickness does not
 
     Returns:
         tuple[Shell, Shell, float]: the two sheet surfaces, larger area first,
@@ -1693,6 +1702,8 @@ def sheet_shells(
     """
     if tolerance <= 0:
         raise ValueError("tolerance must be positive")
+    if thickness is not None and thickness <= 0:
+        raise ValueError("thickness must be positive")
     solids = solid.solids()
     if len(solids) != 1:
         raise ValueError(f"sheet_shells takes one solid, given {len(solids)}")
@@ -1710,31 +1721,57 @@ def sheet_shells(
     if not votes:
         raise ValueError("no face has a pair of separated edges to measure")
 
-    # the thickness is the distance the most faces agree on; a tie, such as a
-    # plain plate whose every dimension is shared by four faces, goes to the
-    # smallest, since a sheet is thinner than it is wide
-    ballots: dict[float, set[Face]] = {}
-    for face, distance in votes:
-        ballots.setdefault(round(distance, 3), set()).add(face)
-    thickness, voters = max(ballots.items(), key=lambda item: (len(item[1]), -item[0]))
-    if len(voters) < 2:
-        raise ValueError("no distance is shared by enough faces to be a thickness")
+    def surfaces(distance: float) -> list[Shell]:
+        """The two surfaces left without the faces that measure a distance,
+        or nothing when that is not what is left
 
-    # every face with a pair of edges that far apart, to within the tolerance
-    thickness_faces = {
-        face
-        for face, distance in votes
-        if abs(distance - thickness) <= tolerance * thickness
-    }
-    sheet_faces = [face for face in faces if face not in thickness_faces]
-    groups = Face.sew_faces(sheet_faces) if sheet_faces else []
-    if len(groups) != 2:
-        raise ValueError(
-            f"the faces that are not {thickness:g} thick form {len(groups)} "
-            "surfaces, not the two sides of a sheet"
+        A distance that is not the thickness leaves an arbitrary set of
+        faces, and the kernel refusing to sew them only says so again.
+        """
+        thickness_faces = {
+            face
+            for face, measured in votes
+            if abs(measured - distance) <= tolerance * distance
+        }
+        sheet_faces = [face for face in faces if face not in thickness_faces]
+        try:
+            groups = Face.sew_faces(sheet_faces) if sheet_faces else []
+            return [Shell(group) for group in groups] if len(groups) == 2 else []
+        # the kernel's failures share no base class
+        except Exception:  # pylint: disable=broad-exception-caught
+            return []
+
+    if thickness is not None:
+        candidates = [thickness]
+    else:
+        # distances that agree to three places are one candidate, measured by
+        # their median; one that a single face measures is a width, not a
+        # thickness
+        ballots: dict[float, list[tuple[Face, float]]] = {}
+        for face, distance in votes:
+            ballots.setdefault(round(distance, 3), []).append((face, distance))
+        candidates = sorted(
+            median(distance for _, distance in ballot)
+            for ballot in ballots.values()
+            if len({face for face, _ in ballot}) >= 2
         )
-    shells = sorted((Shell(group) for group in groups), key=lambda s: -s.area)
-    return shells[0], shells[1], thickness
+
+    # the thickness is the smallest of them whose faces, taken away, leave two
+    # surfaces. How many faces share a distance says nothing: every sheet face
+    # of an extruded profile measures the length of the part
+    for candidate in candidates:
+        shells = sorted(surfaces(candidate), key=lambda shell: -shell.area)
+        if shells:
+            return shells[0], shells[1], candidate
+    if thickness is not None:
+        raise ValueError(
+            f"taking away the faces that measure {thickness:g} does not leave "
+            "the two sides of a sheet"
+        )
+    raise ValueError(
+        "no distance between a face's edges is a thickness: taking away the "
+        "faces that measure it never leaves the two sides of a sheet"
+    )
 
 
 @overload
