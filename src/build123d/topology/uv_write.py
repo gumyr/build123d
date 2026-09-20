@@ -72,7 +72,9 @@ license:
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import cache
 from math import asin, atan2, ceil, cos, floor, hypot, pi, sin
+from typing import TypeVar
 
 from scipy.integrate import solve_ivp
 
@@ -80,8 +82,8 @@ from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
 from OCP.BRepLib import BRepLib
-from OCP.BRepTools import BRepTools
-from OCP.Geom import Geom_Curve, Geom_Surface
+from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+from OCP.Geom import Geom_Surface
 from OCP.Geom2d import (
     Geom2d_BSplineCurve,
     Geom2d_Circle,
@@ -93,9 +95,8 @@ from OCP.Geom2d import (
 from OCP.Geom2dConvert import Geom2dConvert
 from OCP.GeomAbs import GeomAbs_Shape
 from OCP.GeomAPI import GeomAPI
-from OCP.gp import gp_Ax22d, gp_Dir2d, gp_Pln, gp_Pnt, gp_Pnt2d, gp_Vec
-from OCP.ShapeAnalysis import ShapeAnalysis_Surface
-from OCP.TopAbs import TopAbs_Orientation
+from OCP.gp import gp_Ax22d, gp_Dir2d, gp_Pln, gp_Pnt2d
+from OCP.TopAbs import TopAbs_Orientation, TopAbs_State
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS
 
@@ -109,9 +110,15 @@ from .two_d import Face
 PointMap = Callable[[float, float], tuple[float, float]]
 """A map from flat (x, y) to the (u, v) parameters of a surface"""
 
+_ORDERS = ((1, 0), (0, 1), (2, 0), (0, 2), (1, 1))
+"""The (u, v) orders of a surface's derivatives S_u, S_v, S_uu, S_vv, S_uv"""
+
 Period = tuple[Vector, float, float]
 """A periodic direction of a surface on the uv plane: its unit vector there,
 where the surface's own range starts along it, and the period"""
+
+Piece = TypeVar("Piece", Edge, Face)
+"""An edge or a face of a mapped shape on the uv plane"""
 
 
 class UVFrame:
@@ -153,6 +160,7 @@ class UVFrame:
         self._location = TopLoc_Location()
         self._surface: Geom_Surface = BRep_Tool.Surface_s(face.wrapped, self._location)
         self._placement = Location(self._location)
+        self._periods = _surface_periods(self._surface)
 
     # ---- construction ----
 
@@ -181,10 +189,10 @@ class UVFrame:
         if kind in (GeomType.PLANE, GeomType.CYLINDER):
             return cls(face, _affine_map(face, location), tolerance)
         if kind == GeomType.CONE:
-            return cls(face, _ConeMap(face, location), tolerance)
+            return cls(face, _cone_map(face, location), tolerance)
         if kind == GeomType.SPHERE:
             return cls(face, _sphere_map(face, location), tolerance)
-        return cls(face, _GeodesicMap(face, location, tolerance), tolerance)
+        return cls(face, _geodesic_map(face, location, tolerance), tolerance)
 
     # ---- points ----
 
@@ -263,7 +271,7 @@ class UVFrame:
             for piece in self._pieces(self._lift_face(planar))
         )
 
-    def punch(self, planar: Face) -> list[Face]:
+    def punch(self, planar: Face) -> ShapeList[Face]:
         """The frame's face with a planar face's outline cut out of it
 
         Returns the punched face first. The planar face's own holes are
@@ -280,19 +288,22 @@ class UVFrame:
             ValueError: the outline crosses the surface's seam
 
         Returns:
-            list[Face]: the punched face, then any islands
+            ShapeList[Face]: the punched face, then any islands
         """
         lifted = self._lift_face(planar)
         if len(self._pieces(lifted)) > 1:
             raise ValueError("an outline crossing the face's seam cannot be punched")
+        lifted = self._in_range(lifted)
         # the face in its own frame, where the written wires are
         local = TopoDS.Face(self.face.wrapped.Located(TopLoc_Location()))
         maker = BRepBuilderAPI_MakeFace(local)
         # the outline becomes a hole: clockwise about the face normal
         maker.Add(self._oriented(lifted.outer_wire(), clockwise=True).wrapped)
+        if not maker.IsDone():
+            raise RuntimeError("could not build the punched face")
         punched = TopoDS.Face(maker.Face().Oriented(self.face.wrapped.Orientation()))
         islands = [self._write_face(Face(island)) for island in lifted.inner_wires()]
-        return [Face(punched).moved(self._placement), *islands]
+        return ShapeList([Face(punched).moved(self._placement), *islands])
 
     # ---- the uv plane ----
 
@@ -306,8 +317,11 @@ class UVFrame:
         Raises:
             ValueError: the map jumps along the edge, as it does along the
                 outline of a shape surrounding a pole of the face
+            ValueError: the interpolated image cannot be brought within the
+                tolerance
         """
-        curve, first, last = _edge_curve(edge)
+        first, last = BRep_Tool.Range_s(edge.wrapped)
+        curve = BRep_Tool.Curve_s(edge.wrapped, first, last)
         if isinstance(self.mapping, Matrix):
             image, first, last = _affine_image(
                 GeomAPI.To2d_s(curve, gp_Pln()), first, last, self.mapping
@@ -319,7 +333,6 @@ class UVFrame:
             point = curve.Value(t)
             return self.to_uv(point.X(), point.Y())
 
-        periods = self._periods()
         segments = 8
         for _ in range(8):
             params = [
@@ -329,12 +342,12 @@ class UVFrame:
             jumps = any(
                 abs((b - a).dot(axis)) > period / 2
                 for a, b in zip(uvs, uvs[1:])
-                for axis, _, period in periods
+                for axis, _, period in self._periods
             )
             lifted = Edge.make_spline(
                 list[VectorLike](uvs), parameters=params, tol=1e-9
             )
-            spline = _edge_curve(lifted)[0]
+            spline = BRep_Tool.Curve_s(lifted.wrapped, float(), float())
             # check midway between samples, in 3D
             error = max(
                 (
@@ -350,7 +363,10 @@ class UVFrame:
                 "the map jumps along an edge of the shape: it surrounds a pole "
                 "of the face, or reaches the far side of the surface"
             )
-        return lifted
+        raise ValueError(
+            f"the image of an edge is still {error:.3g} from the mapped curve, "
+            f"over the tolerance of {self.tolerance}"
+        )
 
     def _lift_wire(self, wire: Wire) -> Wire:
         """The planar wire's image on the uv plane, traversed the same way"""
@@ -373,16 +389,6 @@ class UVFrame:
         """The point of the surface at a uv-plane point"""
         return Vector(self._surface.Value(uv.X, uv.Y))
 
-    def _periods(self) -> list[Period]:
-        """The periodic directions of the surface on the uv plane"""
-        u_start, _, v_start, _ = self._surface.Bounds()
-        periods = []
-        if self._surface.IsUPeriodic():
-            periods.append((Vector(1, 0, 0), u_start, self._surface.UPeriod()))
-        if self._surface.IsVPeriodic():
-            periods.append((Vector(0, 1, 0), v_start, self._surface.VPeriod()))
-        return periods
-
     def _seam_cutters(self, lifted: Shape) -> list[Plane]:
         """Planes across the uv plane along the seam lines a mapped shape
         crosses: the parameter lines a whole number of periods from the start
@@ -391,12 +397,13 @@ class UVFrame:
         Raises:
             ValueError: the shape spans a whole turn of the surface or more
         """
+        box = lifted.bounding_box()
         cutters = []
-        for axis, start, period in self._periods():
-            reached = [point.dot(axis) - start for point in _outline_samples(lifted)]
+        for axis, start, period in self._periods:
+            low, high = box.min.dot(axis) - start, box.max.dot(axis) - start
             cutters += [
                 Plane(axis * (start + k * period), z_dir=axis)
-                for k in _periods_crossed(min(reached), max(reached), period)
+                for k in _periods_crossed(low, high, period)
             ]
         return cutters
 
@@ -407,7 +414,7 @@ class UVFrame:
             pieces = [part for piece in pieces for part in _split_all(piece, cutter)]
         return pieces
 
-    def _in_range(self, piece):
+    def _in_range(self, piece: Piece) -> Piece:
         """A mapped piece moved by whole periods into the surface's own
         parameter range
 
@@ -419,7 +426,7 @@ class UVFrame:
         """
         centre = piece.center()
         shift = Vector()
-        for axis, start, period in self._periods():
+        for axis, start, period in self._periods:
             shift += axis * (floor((centre.dot(axis) - start) / period) * period)
         return piece.moved(Location(-shift)) if shift.length else piece
 
@@ -430,7 +437,8 @@ class UVFrame:
 
     def _write_edge(self, lifted: Edge) -> Edge:
         """A uv-plane edge written onto the surface, its curve the pcurve"""
-        curve, first, last = _edge_curve(lifted)
+        first, last = BRep_Tool.Range_s(lifted.wrapped)
+        curve = BRep_Tool.Curve_s(lifted.wrapped, first, last)
         pcurve = GeomAPI.To2d_s(curve, gp_Pln())
         edge = BRepBuilderAPI_MakeEdge(pcurve, self._surface, first, last).Edge()
         if not BRepLib.BuildCurves3d_s(
@@ -463,7 +471,7 @@ class UVFrame:
         """The wire written and turned to run the required way about the
         FORWARD face normal, whichever way the planar wire and the map run"""
         written = self._write_wire(lifted)
-        if (_signed_area(lifted) < 0) != clockwise:
+        if _is_clockwise(lifted) != clockwise:
             written = Wire(TopoDS.Wire(written.wrapped.Reversed()))
         return written
 
@@ -486,23 +494,27 @@ class UVFrame:
 # ---------------------------------------------------------------------------
 
 
-def _edge_curve(edge: Edge) -> tuple[Geom_Curve, float, float]:
-    """An edge's curve, in place, and its parameter range"""
-    first, last = BRep_Tool.Range_s(edge.wrapped)
-    return BRep_Tool.Curve_s(edge.wrapped, first, last), first, last
+def _is_clockwise(wire: Wire) -> bool:
+    """Whether a closed wire on Plane.XY runs clockwise about z
+
+    The wire bounds a face on the plane, whose normal is +z: run clockwise
+    it is the boundary of a hole, and the face is everything outside of it,
+    the point at infinity included.
+    """
+    face = BRepBuilderAPI_MakeFace(gp_Pln(), wire.wrapped, False).Face()
+    classifier = BRepTopAdaptor_FClass2d(face, TOLERANCE)
+    return classifier.PerformInfinitePoint() == TopAbs_State.TopAbs_IN
 
 
-def _signed_area(wire: Wire, samples: int = 16) -> float:
-    """The area a closed planar wire encloses, positive when it runs
-    counter-clockwise about z, by Green's theorem over sampled points"""
-    points = [
-        edge.position_at(i / samples)
-        for edge in wire.order_edges()
-        for i in range(samples + 1)
-    ]
-    return 0.5 * sum(
-        a.X * b.Y - b.X * a.Y for a, b in zip(points, points[1:] + points[:1])
-    )
+def _surface_periods(surface: Geom_Surface) -> list[Period]:
+    """The periodic directions of a surface on the uv plane"""
+    u_start, _, v_start, _ = surface.Bounds()
+    periods = []
+    if surface.IsUPeriodic():
+        periods.append((Vector(1, 0, 0), u_start, surface.UPeriod()))
+    if surface.IsVPeriodic():
+        periods.append((Vector(0, 1, 0), v_start, surface.VPeriod()))
+    return periods
 
 
 def _periods_crossed(low: float, high: float, period: float) -> list[int]:
@@ -524,15 +536,7 @@ def _periods_crossed(low: float, high: float, period: float) -> list[int]:
     ]
 
 
-def _outline_samples(shape: Shape) -> list[Vector]:
-    """Points along a planar shape's edges, enough to bound its reach"""
-    samples = [Vector(vertex.X, vertex.Y, 0) for vertex in shape.vertices()]
-    for edge in shape.edges():
-        samples += [edge.position_at(i / 8) for i in range(1, 8)]
-    return samples
-
-
-def _split_all(shape, cutter) -> list:
+def _split_all(shape: Piece, cutter: Plane) -> list[Piece]:
     """Every piece of a shape either side of a cutter, the shape itself when
     the cutter misses it"""
     pieces = shape.split(cutter, keep=Keep.ALL)
@@ -652,7 +656,7 @@ def _conic_image(
 # ---------------------------------------------------------------------------
 
 
-def _frame_axes(face: Face, location: Location) -> tuple[Vector, Vector, Vector]:
+def _frame_directions(face: Face, location: Location) -> tuple[Vector, Vector, Vector]:
     """Origin, flat x direction and flat y direction in 3D, on the face"""
     origin = location.position
     normal = face.normal_at(origin)
@@ -660,27 +664,6 @@ def _frame_axes(face: Face, location: Location) -> tuple[Vector, Vector, Vector]
     x_dir = (x_dir - normal * x_dir.dot(normal)).normalized()
     y_dir = normal.cross(x_dir)
     return origin, x_dir, y_dir
-
-
-def _derivatives(face: Face, u: float, v: float) -> tuple[Vector, Vector]:
-    """The surface's partial derivatives at (u, v)"""
-    point, d_u, d_v = gp_Pnt(), gp_Vec(), gp_Vec()
-    BRepAdaptor_Surface(face.wrapped).D1(u, v, point, d_u, d_v)
-    return Vector(d_u), Vector(d_v)
-
-
-def _project(face: Face, point: Vector) -> tuple[float, float]:
-    """Parameters of a point on the face, within the face's own uv range"""
-    location = TopLoc_Location()
-    surface = BRep_Tool.Surface_s(face.wrapped, location)
-    local = point.to_pnt().Transformed(location.Transformation().Inverted())
-    uv = ShapeAnalysis_Surface(surface).ValueOfUV(local, TOLERANCE)
-    u, v = uv.X(), uv.Y()
-    if surface.IsUPeriodic():
-        u_min, u_max, _, _ = BRepTools.UVBounds_s(face.wrapped)
-        period = surface.UPeriod()
-        u += period * round(((u_min + u_max) / 2 - u) / period)
-    return u, v
 
 
 def _affine_map(face: Face, location: Location) -> Matrix:
@@ -693,9 +676,11 @@ def _affine_map(face: Face, location: Location) -> Matrix:
     1/radius per unit of arc. Both are constant over the surface, so the map
     is the exact unrolling everywhere, not only at the origin.
     """
-    origin, x_dir, y_dir = _frame_axes(face, location)
-    u0, v0 = _project(face, origin)
-    d_u, d_v = _derivatives(face, u0, v0)
+    origin, x_dir, y_dir = _frame_directions(face, location)
+    u0, v0 = face.param_at_point(origin, normalize=False)
+    d_u, d_v = (
+        face.derivative_at(u0, v0, *order, normalize=False) for order in _ORDERS[:2]
+    )
     d_u, d_v = d_u / d_u.dot(d_u), d_v / d_v.dot(d_v)
     return Matrix(
         [
@@ -706,7 +691,7 @@ def _affine_map(face: Face, location: Location) -> Matrix:
     )
 
 
-class _ConeMap:
+def _cone_map(face: Face, location: Location) -> PointMap:
     """The exact unrolling of a cone: a sector about the apex
 
     In OCCT's cone, u is the angle about the axis and v the distance along
@@ -717,34 +702,36 @@ class _ConeMap:
     when the cone narrows with increasing v, and then the apex lies at
     larger v.
     """
+    cone = BRepAdaptor_Surface(face.wrapped).Cone()
+    s = sin(cone.SemiAngle())
+    sign = 1.0 if s > 0 else -1.0
+    v_apex = -cone.RefRadius() / s
+    scale = abs(s)  # sector angle per radian of u
 
-    def __init__(self, face: Face, location: Location):
-        cone = BRepAdaptor_Surface(face.wrapped).Cone()
-        s = sin(cone.SemiAngle())
-        self.sign = 1.0 if s > 0 else -1.0
-        self.v_apex = -cone.RefRadius() / s
-        self.scale = abs(s)  # sector angle per radian of u
+    origin, x_dir, y_dir = _frame_directions(face, location)
+    u0, v0 = face.param_at_point(origin, normalize=False)
+    rho0 = (v0 - v_apex) * sign  # distance from the apex
+    phi0 = u0 * scale
+    # flat axes in the sector plane, from the 3D directions' components
+    # along the circumferential (u) and generatrix (v) directions
+    d_u, d_v = (
+        face.derivative_at(u0, v0, *order, normalize=False) for order in _ORDERS[:2]
+    )
+    e_u, e_v = d_u.normalized(), d_v.normalized()
+    around = Vector(-sin(phi0), cos(phi0), 0)  # increasing u
+    radial = Vector(cos(phi0), sin(phi0), 0) * sign  # increasing v
+    sector_x = around * x_dir.dot(e_u) + radial * x_dir.dot(e_v)
+    sector_y = around * y_dir.dot(e_u) + radial * y_dir.dot(e_v)
+    base = Vector(cos(phi0), sin(phi0), 0) * rho0
 
-        origin, x_dir, y_dir = _frame_axes(face, location)
-        u0, v0 = _project(face, origin)
-        rho0 = (v0 - self.v_apex) * self.sign  # distance from the apex
-        self.phi0 = u0 * self.scale
-        # flat axes in the sector plane, from the 3D directions' components
-        # along the circumferential (u) and generatrix (v) directions
-        d_u, d_v = _derivatives(face, u0, v0)
-        e_u, e_v = d_u.normalized(), d_v.normalized()
-        around = Vector(-sin(self.phi0), cos(self.phi0), 0)  # increasing u
-        radial = Vector(cos(self.phi0), sin(self.phi0), 0) * self.sign  # increasing v
-        self.sector_x = around * x_dir.dot(e_u) + radial * x_dir.dot(e_v)
-        self.sector_y = around * y_dir.dot(e_u) + radial * y_dir.dot(e_v)
-        self.base = Vector(cos(self.phi0), sin(self.phi0), 0) * rho0
-
-    def __call__(self, x: float, y: float) -> tuple[float, float]:
-        q = self.base + self.sector_x * x + self.sector_y * y
+    def to_uv(x: float, y: float) -> tuple[float, float]:
+        q = base + sector_x * x + sector_y * y
         # sector angle, continuous with the origin's
         phi = atan2(q.Y, q.X)
-        phi += 2 * pi * round((self.phi0 - phi) / (2 * pi))
-        return phi / self.scale, self.v_apex + self.sign * q.length
+        phi += 2 * pi * round((phi0 - phi) / (2 * pi))
+        return phi / scale, v_apex + sign * q.length
+
+    return to_uv
 
 
 def _sphere_map(face: Face, location: Location) -> PointMap:
@@ -758,9 +745,9 @@ def _sphere_map(face: Face, location: Location) -> PointMap:
     sphere = BRepAdaptor_Surface(face.wrapped).Sphere()
     radius = sphere.Radius()
     centre = Vector(sphere.Location())
-    origin, x_dir, y_dir = _frame_axes(face, location)
+    origin, x_dir, y_dir = _frame_directions(face, location)
     n0 = (origin - centre) / radius
-    u0, _ = _project(face, origin)
+    u0, _ = face.param_at_point(origin, normalize=False)
     position = sphere.Position()
     sphere_x = Vector(position.XDirection())
     sphere_y = Vector(position.YDirection())
@@ -781,7 +768,7 @@ def _sphere_map(face: Face, location: Location) -> PointMap:
     return to_uv
 
 
-class _GeodesicMap:
+def _geodesic_map(face: Face, location: Location, tolerance: float) -> PointMap:
     """The exponential map of a surface about the frame's origin
 
     A flat point at bearing b and distance d from the origin is placed d
@@ -802,55 +789,44 @@ class _GeodesicMap:
     Values are cached by flat point, since the sampled image of a curve
     revisits its points as it refines.
     """
+    origin, x_dir, y_dir = _frame_directions(face, location)
+    u0, v0 = face.param_at_point(origin, normalize=False)
+    s_u0, s_v0 = (
+        face.derivative_at(u0, v0, *order, normalize=False) for order in _ORDERS[:2]
+    )
+    # the tolerance is in 3D; the integrator's in parameters
+    parameter_tolerance = tolerance / 10 / max(s_u0.length, s_v0.length)
 
-    def __init__(self, face: Face, location: Location, tolerance: float):
-        self._surface = BRepAdaptor_Surface(face.wrapped)
-        origin, self._x_dir, self._y_dir = _frame_axes(face, location)
-        self._origin = _project(face, origin)
-        s_u, s_v = self._derivatives(*self._origin)[:2]
-        # the tolerance is in 3D; the integrator's in parameters
-        self._tolerance = tolerance / 10 / max(s_u.length, s_v.length)
-        self._cache: dict[tuple[float, float], tuple[float, float]] = {}
+    def geodesic(_: float, state) -> list[float]:
+        """The geodesic equation as a first order system in (u, v, u', v')"""
+        u, v, d_u, d_v = state
+        s_u, s_v, s_uu, s_vv, s_uv = (
+            face.derivative_at(u, v, *order, normalize=False) for order in _ORDERS
+        )
+        w = s_uu * (d_u * d_u) + s_uv * (2 * d_u * d_v) + s_vv * (d_v * d_v)
+        acceleration = _components(s_u, s_v, w)
+        return [d_u, d_v, -acceleration[0], -acceleration[1]]
 
-    def __call__(self, x: float, y: float) -> tuple[float, float]:
-        key = (x, y)
-        if key not in self._cache:
-            self._cache[key] = self._integrate(x, y)
-        return self._cache[key]
-
-    def _integrate(self, x: float, y: float) -> tuple[float, float]:
+    @cache
+    def to_uv(x: float, y: float) -> tuple[float, float]:
         length = hypot(x, y)
-        u, v = self._origin
         if length < 1e-15:
-            return u, v
-        heading = (self._x_dir * x + self._y_dir * y) / length
-        s_u, s_v = self._derivatives(u, v)[:2]
+            return u0, v0
+        heading = (x_dir * x + y_dir * y) / length
         solution = solve_ivp(
-            self._geodesic,
+            geodesic,
             (0.0, length),
-            [u, v, *_components(s_u, s_v, heading)],
+            [u0, v0, *_components(s_u0, s_v0, heading)],
             method="RK45",
             rtol=1e-9,
-            atol=self._tolerance,
+            atol=parameter_tolerance,
             max_step=length / 8,
         )
         if not solution.success:
             raise ValueError("a geodesic from the frame's origin runs into a pole")
         return solution.y[0, -1], solution.y[1, -1]
 
-    def _derivatives(self, u: float, v: float) -> list[Vector]:
-        """S_u, S_v, S_uu, S_vv, S_uv at (u, v)"""
-        vectors = [gp_Vec() for _ in range(5)]
-        self._surface.D2(u, v, gp_Pnt(), *vectors)
-        return [Vector(vector) for vector in vectors]
-
-    def _geodesic(self, _: float, state) -> list[float]:
-        """The geodesic equation as a first order system in (u, v, u', v')"""
-        u, v, d_u, d_v = state
-        s_u, s_v, s_uu, s_vv, s_uv = self._derivatives(u, v)
-        w = s_uu * (d_u * d_u) + s_uv * (2 * d_u * d_v) + s_vv * (d_v * d_v)
-        acceleration = _components(s_u, s_v, w)
-        return [d_u, d_v, -acceleration[0], -acceleration[1]]
+    return to_uv
 
 
 def _components(s_u: Vector, s_v: Vector, vector: Vector) -> tuple[float, float]:

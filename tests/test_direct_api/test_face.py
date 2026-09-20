@@ -36,7 +36,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.gp import gp_Ax3, gp_Dir, gp_Pnt
 from OCP.Geom import Geom_RectangularTrimmedSurface
-from OCP.Geom import Geom_CylindricalSurface, Geom_OffsetSurface
+from OCP.Geom import Geom_CylindricalSurface, Geom_OffsetSurface, Geom_ToroidalSurface
 from OCP.StdFail import StdFail_NotDone
 
 from build123d.build_common import GridLocations, Locations, PolarLocations
@@ -54,7 +54,7 @@ from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
 from build123d.exporters3d import export_stl
-from build123d.geometry import Axis, Location, Plane, Pos, Vector
+from build123d.geometry import Axis, Location, Plane, Pos, Rot, Vector
 from build123d.importers import import_stl
 from build123d.objects_curve import JernArc, Line, Polyline, Spline, ThreePointArc
 from build123d.objects_part import Box, Cone, Cylinder, Sphere, Torus
@@ -533,6 +533,85 @@ class TestFace(unittest.TestCase):
         square = Face.make_rect(2, 2, plane=Plane.XZ.offset(1))
         p = square.position_at(0.25, 0.75)
         self.assertAlmostEqual(p, (-0.5, -1.0, 0.5), 5)
+
+    def test_param_at_point(self):
+        # normalized parameters invert position_at, on a moved face too
+        cylinder = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        torus = Torus(10, 2).face()
+        patch = Pos(1, 2, 3) * Rot(30, 40, 50) * Face.make_rect(4, 2)
+        for face in (cylinder, torus, patch, Pos(1, 2, 3) * Rot(X=25) * torus):
+            for u, v in [(0.1, 0.2), (0.5, 0.5), (0.9, 0.7)]:
+                with self.subTest(face=face.geom_type.name, u=u, v=v):
+                    uv = face.param_at_point(face.position_at(u, v))
+                    self.assertAlmostEqual(uv[0], u, 6)
+                    self.assertAlmostEqual(uv[1], v, 6)
+
+        # the kernel's own parameters: angle about the axis, distance along it
+        u, v = cylinder.param_at_point(cylinder.position_at(0.25, 0.5), False)
+        self.assertAlmostEqual(u, math.pi / 2, 6)
+        self.assertAlmostEqual(v, 5, 6)
+
+        # a face across both seams of a torus: periodic parameters land in
+        # the face's own range, in u and in v
+        across = Face(
+            BRepBuilderAPI_MakeFace(
+                Geom_ToroidalSurface(gp_Ax3(), 10, 2),
+                -math.pi / 2,
+                math.pi / 2,
+                -math.pi / 3,
+                math.pi / 3,
+                1e-6,
+            ).Face()
+        )
+        for u, v in [(0.1, 0.1), (0.9, 0.9), (0.1, 0.9)]:
+            uv = across.param_at_point(across.position_at(u, v))
+            self.assertAlmostEqual(uv[0], u, 6)
+            self.assertAlmostEqual(uv[1], v, 6)
+
+        # on the surface but beyond the face's boundary
+        u, _ = patch.param_at_point(patch.position_at(1.5, 0.5))
+        self.assertAlmostEqual(u, 1.5, 6)
+
+        with self.assertRaisesRegex(ValueError, "from the face's surface"):
+            cylinder.param_at_point((0, 0, 5))
+        with self.assertRaisesRegex(ValueError, "empty face"):
+            Face().param_at_point((0, 0, 0))
+
+    def test_derivative_at(self):
+        # normalized derivatives are those of position_at, by central differences
+        cylinder = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        torus = Pos(1, 2, 3) * Rot(X=25) * Torus(10, 2).face()
+        h = 1e-4
+        for face in (cylinder, torus):
+            at = lambda du, dv: face.position_at(0.3 + du, 0.6 + dv)
+            expected = {
+                (1, 0): (at(h, 0) - at(-h, 0)) / (2 * h),
+                (0, 1): (at(0, h) - at(0, -h)) / (2 * h),
+                (2, 0): (at(h, 0) - at(0, 0) * 2 + at(-h, 0)) / h**2,
+                (0, 2): (at(0, h) - at(0, 0) * 2 + at(0, -h)) / h**2,
+                (1, 1): (at(h, h) - at(h, -h) - at(-h, h) + at(-h, -h)) / (4 * h**2),
+            }
+            for order, value in expected.items():
+                with self.subTest(face=face.geom_type.name, order=order):
+                    self.assertAlmostEqual(
+                        face.derivative_at(0.3, 0.6, *order), value, 3
+                    )
+
+        # the kernel's own: a radius per radian about the axis, 1 along it
+        u, v = cylinder.param_at_point(cylinder.position_at(0.25, 0.5), False)
+        self.assertAlmostEqual(
+            cylinder.derivative_at(u, v, 1, 0, normalize=False), (-5, 0, 0), 6
+        )
+        self.assertAlmostEqual(
+            cylinder.derivative_at(u, v, 0, 1, normalize=False), (0, 0, 1), 6
+        )
+
+        with self.assertRaisesRegex(ValueError, "orders"):
+            cylinder.derivative_at(0.5, 0.5, 0, 0)
+        with self.assertRaisesRegex(ValueError, "orders"):
+            cylinder.derivative_at(0.5, 0.5, -1, 2)
+        with self.assertRaisesRegex(ValueError, "empty face"):
+            Face().derivative_at(0.5, 0.5, 1, 0)
 
     def test_location_at(self):
         bottom = Box(1, 2, 3, align=Align.MIN).faces().filter_by(Axis.Z)[0]
@@ -1424,8 +1503,12 @@ class TestFace(unittest.TestCase):
                 )
                 self.assertAlmostEqual(surface.wrap(star, target).area, star.area, 4)
 
+        target = surfaces[0].location_at(0.5, 0.5, x_dir=(0, 0, 1))
         with self.assertRaises(TypeError):
             surfaces[0].wrap(Solid.make_box(1, 1, 1), target)
+        # a location that is not on the face is refused
+        with self.assertRaisesRegex(ValueError, "from the face's surface"):
+            surfaces[0].wrap(planar_edge, surfaces[2].location_at(0.5, 0.5))
         with self.assertRaisesRegex(ValueError, "empty face"):
             Face().wrap(planar_edge, target)
 

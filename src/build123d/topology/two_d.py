@@ -102,7 +102,7 @@ from OCP.GeomLib import GeomLib_IsPlanarSurface
 from OCP.gp import gp_Ax1, gp_Ax3, gp_Dir, gp_Pln, gp_Pnt, gp_Vec
 from OCP.GProp import GProp_GProps
 from OCP.Precision import Precision
-from OCP.ShapeAnalysis import ShapeAnalysis_Edge
+from OCP.ShapeAnalysis import ShapeAnalysis_Edge, ShapeAnalysis_Surface
 from OCP.ShapeFix import ShapeFix_Solid
 from OCP.Standard import (
     Standard_ConstructionError,
@@ -119,6 +119,7 @@ from OCP.TColStd import (
 )
 from OCP.TopAbs import TopAbs_Orientation
 from OCP.TopExp import TopExp
+from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Shape, TopoDS_Shell, TopoDS_Solid
 from OCP.TopTools import (
     TopTools_IndexedDataMapOfShapeListOfShape,
@@ -1894,6 +1895,57 @@ class Face(Mixin2D[TopoDS_Face]):
             ).add_modified(self.wrapped, result.wrapped)
         )
 
+    def derivative_at(
+        self, u: float, v: float, u_order: int, v_order: int, normalize: bool = True
+    ) -> Vector:
+        """derivative_at
+
+        A partial derivative of this face's surface: ``u_order`` times in u and
+        ``v_order`` times in v, so (1, 0) is S_u, (0, 1) is S_v and (1, 1) the
+        mixed second derivative S_uv.
+
+        ``normalize`` chooses the parameterization for both the position and
+        the result. Normalized, u and v are fractions of the face's parameter
+        range and the derivative is with respect to those fractions, so that
+        ``position_at(u + du, v)`` is ``position_at(u, v) + du * S_u`` to first
+        order. Otherwise both are in the kernel's own parameters, as returned
+        by ``param_at_point(point, normalize=False)``.
+
+        These are derivatives of the surface and ignore the face's
+        orientation: on a reversed face S_u x S_v is opposite to
+        :meth:`normal_at`.
+
+        Args:
+            u (float): the horizontal coordinate in the parameter space of the Face
+            v (float): the vertical coordinate in the parameter space of the Face
+            u_order (int): number of derivatives taken in u
+            v_order (int): number of derivatives taken in v
+            normalize (bool, optional): work in fractions of the face's
+                parameter range instead of the kernel's own parameters.
+                Defaults to True.
+
+        Raises:
+            ValueError: Can't find derivative on empty face
+            ValueError: orders must not be negative and must not both be zero
+
+        Returns:
+            Vector: the derivative
+        """
+        if self._wrapped is None:
+            raise ValueError("Can't find derivative on empty face")
+        if u_order < 0 or v_order < 0 or u_order + v_order == 0:
+            raise ValueError("orders must not be negative and must not both be zero")
+
+        scale = 1.0
+        if normalize:
+            u_min, u_max, v_min, v_max = self._uv_bounds()
+            u = u_min + u * (u_max - u_min)
+            v = v_min + v * (v_max - v_min)
+            scale = (u_max - u_min) ** u_order * (v_max - v_min) ** v_order
+        return (
+            Vector(BRepAdaptor_Surface(self.wrapped).DN(u, v, u_order, v_order)) * scale
+        )
+
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Face:
         """Apply 2D fillet to a face
 
@@ -2223,6 +2275,60 @@ class Face(Mixin2D[TopoDS_Face]):
         outer = Wire(BRepTools.OuterWire_s(self.wrapped))
         outer._extracted_from(self)  # pylint: disable=protected-access
         return outer
+
+    def param_at_point(
+        self, point: VectorLike, normalize: bool = True
+    ) -> tuple[float, float]:
+        """param_at_point
+
+        The surface parameters of a point on this face's surface - the inverse
+        of :meth:`position_at`.
+
+        The point must lie on the surface but need not be within the face's
+        boundary; outside of it a normalized parameter falls outside of 0.0 to
+        1.0. On a periodic surface the parameters are those nearest the middle
+        of the face's own range, so on a closed face a point on the seam is
+        ambiguous and either side may be chosen.
+
+        Args:
+            point (VectorLike): a point on the surface of this face
+            normalize (bool, optional): return u and v as fractions of the
+                face's parameter range, as used by :meth:`position_at`,
+                :meth:`location_at` and :meth:`normal_at`, instead of the
+                kernel's own parameters. Defaults to True.
+
+        Raises:
+            ValueError: Can't find param on empty face
+            ValueError: the point is not on the surface
+
+        Returns:
+            tuple[float, float]: u, v
+        """
+        if self._wrapped is None:
+            raise ValueError("Can't find param on empty face")
+
+        pnt = Vector(point)
+        location = TopLoc_Location()
+        surface = BRep_Tool.Surface_s(self.wrapped, location)
+        local = pnt.to_pnt().Transformed(location.Transformation().Inverted())
+        analysis = ShapeAnalysis_Surface(surface)
+        uv = analysis.ValueOfUV(local, TOLERANCE)
+        separation = analysis.Gap()
+        if separation > TOLERANCE:
+            raise ValueError(f"point ({pnt}) is {separation} from the face's surface")
+
+        u, v = uv.X(), uv.Y()
+        u_min, u_max, v_min, v_max = self._uv_bounds()
+        if surface.IsUPeriodic():
+            period = surface.UPeriod()
+            u += period * round(((u_min + u_max) / 2 - u) / period)
+        if surface.IsVPeriodic():
+            period = surface.VPeriod()
+            v += period * round(((v_min + v_max) / 2 - v) / period)
+        if normalize:
+            u = (u - u_min) / (u_max - u_min)
+            v = (v - v_min) / (v_max - v_min)
+        return u, v
 
     def position_at(self, u: float, v: float) -> Vector:
         """position_at

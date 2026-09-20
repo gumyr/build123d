@@ -30,11 +30,11 @@ import math
 import unittest
 
 from build123d.build_enums import Align, GeomType
-from build123d.geometry import Axis, Matrix, Pos, Vector
+from build123d.geometry import Axis, Matrix, Pos, Rot, Vector
 from build123d.objects_part import Box, Cone, Cylinder, Sphere, Torus
 from build123d.objects_sketch import Circle, Polygon, Rectangle, Text
 from build123d.topology import Edge, Face, Solid, UVFrame, Wire
-from build123d.topology.uv_write import _affine_map, _GeodesicMap, _sphere_map
+from build123d.topology.uv_write import _affine_map, _geodesic_map, _sphere_map
 
 from OCP.BRep import BRep_Tool
 from OCP.Geom2d import Geom2d_BSplineCurve, Geom2d_Ellipse, Geom2d_Line
@@ -204,6 +204,23 @@ class TestCylinderFrame(unittest.TestCase):
             numeric_length(written), numeric_length(outline), delta=1e-4
         )
 
+    def test_barely_crossing_the_seam_still_splits(self):
+        """A curved outline reaching just past the seam, with no vertex near
+        its extreme, is still cut there"""
+        u0 = self.frame.to_uv(0, 0).X
+        per_unit = self.frame.to_uv(1, 0).X - u0
+        for poke in (0.05, 0.005):
+            with self.subTest(poke=poke):
+                x = (2 * math.pi - u0) / per_unit - 3 + poke
+                planar = Pos(x, 0) * Rot(Z=11) * Circle(3).face()
+                pieces = self.frame.write_face(planar)
+                self.assertEqual(len(pieces), 2)
+                self.assertAlmostEqual(sum(p.area for p in pieces), planar.area, 5)
+                for piece in pieces:
+                    u_min, u_max, _, _ = piece._uv_bounds()
+                    self.assertGreaterEqual(u_min, -1e-9)
+                    self.assertLessEqual(u_max, 2 * math.pi + 1e-9)
+
     def test_a_full_turn_is_refused(self):
         with self.assertRaisesRegex(ValueError, "whole turn"):
             self.frame.write_face(Rectangle(35, 2).face())  # circumference is 31.4
@@ -245,6 +262,20 @@ class TestCylinderFrame(unittest.TestCase):
         self.assertTrue(punched.is_valid and island.is_valid)
         self.assertAlmostEqual(punched.area, self.surface.area - math.pi * 1.5**2, 4)
         self.assertAlmostEqual(island.area, math.pi * 0.5**2, 4)
+
+    def test_punch_beyond_the_seam(self):
+        """An outline wholly on the far side of the seam, without crossing
+        it, is punched inside the surface's own parameter range"""
+        frame = self.surface.uv_frame(
+            self.surface.location_at(0.03, 0.5, x_dir=(0, 0, 1))
+        )
+        for y in (4, -4):  # either side of the seam, around the cylinder
+            with self.subTest(y=y):
+                ring = Pos(0, y) * (Circle(1) - Circle(0.4)).face()
+                punched, island = frame.punch(ring)
+                self.assertTrue(punched.is_valid and island.is_valid)
+                self.assertAlmostEqual(punched.area, self.surface.area - math.pi, 4)
+                self.assertAlmostEqual(island.area, math.pi * 0.4**2, 4)
 
 
 class TestPlaneFrame(unittest.TestCase):
@@ -372,11 +403,11 @@ class TestGeodesicFrame(unittest.TestCase):
         cylinder the unrolling"""
         sphere = Sphere(5).face()
         location = sphere.location_at(0.3, 0.6, x_dir=(1, 0, 0))
-        geodesic = _GeodesicMap(sphere, location, 1e-4)
+        geodesic = _geodesic_map(sphere, location, 1e-4)
         closed_form = _sphere_map(sphere, location)
         cylinder = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
         location = cylinder.location_at(0.3, 0.6, x_dir=(0, 0, 1))
-        unrolled = _GeodesicMap(cylinder, location, 1e-4)
+        unrolled = _geodesic_map(cylinder, location, 1e-4)
         affine = _affine_map(cylinder, location)
         for x, y in [(1, 0), (0, 1), (-2, 1.5), (3, -3), (0.1, 4)]:
             with self.subTest(x=x, y=y):
@@ -425,13 +456,13 @@ class TestGeodesicFrame(unittest.TestCase):
 
     def test_poles_are_refused(self):
         sphere = Sphere(5).face()
-        at_pole = _GeodesicMap(
+        at_pole = _geodesic_map(
             sphere, sphere.location_at(0.5, 1.0, x_dir=(1, 0, 0)), 1e-4
         )
         with self.assertRaisesRegex(ValueError, "pole"):
             at_pole(1.0, 0.0)
         # a geodesic from the equator straight up runs into the pole
-        from_equator = _GeodesicMap(
+        from_equator = _geodesic_map(
             sphere, sphere.location_at(0.5, 0.5, x_dir=(1, 0, 0)), 1e-4
         )
         with self.assertRaisesRegex(ValueError, "pole"):
@@ -465,6 +496,11 @@ class TestFrameConstruction(unittest.TestCase):
         surface = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
         with self.assertRaisesRegex(ValueError, "tolerance"):
             UVFrame(surface, Matrix(), tolerance=0)
+        # an interpolated image that cannot be brought within the tolerance
+        sphere = Sphere(5).face()
+        frame = sphere.uv_frame(sphere.location_at(0.3, 0.6), tolerance=1e-15)
+        with self.assertRaisesRegex(ValueError, "over the tolerance"):
+            frame.write_edge(Edge.make_circle(2))
 
     def test_any_map_can_cross_the_seam(self):
         """Seams are split in parameter space, so a bare callable takes part"""
