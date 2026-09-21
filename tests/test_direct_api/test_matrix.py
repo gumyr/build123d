@@ -30,7 +30,7 @@ import copy
 import math
 import unittest
 
-from OCP.gp import gp_Ax1, gp_Dir, gp_Pnt, gp_Trsf
+from OCP.gp import gp_Ax1, gp_Dir, gp_Pnt, gp_Trsf, gp_TrsfForm
 from build123d.geometry import Axis, Matrix, Vector
 
 
@@ -149,6 +149,17 @@ class TestMatrix(unittest.TestCase):
         v = Vector(1, 0, 0)
         self.assertAlmostEqual(mz.multiply(v), (root_3_over_2, 1 / 2, 0), 7)
 
+        # The same rotation written as a list must multiply a vector too
+        mz_list = Matrix(m_rotate_z_30)
+        self.assertAlmostEqual(mz_list.multiply(v), (root_3_over_2, 1 / 2, 0), 7)
+
+        # A list-built matrix rotated afterwards keeps working
+        m_list_identity = Matrix([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
+        m_list_identity.rotate(Axis.Z, 30)
+        self.assertAlmostEqual(
+            m_list_identity.multiply(v), (root_3_over_2, 1 / 2, 0), 7
+        )
+
         # Test matrix multiply matrix
         m_rotate_xy_30 = [
             [root_3_over_2, 0, 1 / 2, 0],
@@ -205,6 +216,49 @@ class TestMatrixValidation(unittest.TestCase):
         rows = [[1, 0, 0, 0], [0, 1, 0, "x"], [0, 0, 1, 0]]
         with self.assertRaisesRegex(TypeError, "Only float or int"):
             Matrix(rows)
+
+    def test_list_translation_multiplies_vector(self):
+        translation = Matrix(
+            [
+                [1, 0, 0, 1],
+                [0, 1, 0, 2],
+                [0, 0, 1, 3],
+                [0, 0, 0, 1],
+            ]
+        )
+        self.assertNotEqual(translation.wrapped.Form(), gp_TrsfForm.gp_Other)
+        self.assertAlmostEqual(
+            translation.multiply(Vector(10, 20, 30)), (11, 22, 33), 7
+        )
+        self.assertEqual(translation[0, 0], 1.0)
+        self.assertEqual(translation[1, 3], 2.0)
+
+    def test_list_similarity_is_recognised(self):
+        c, s = math.cos(math.radians(30)), math.sin(math.radians(30))
+        rotation_scale_mirror = Matrix(
+            [
+                [-2 * c, 2 * s, 0, 5],
+                [2 * s, 2 * c, 0, 0],
+                [0, 0, 2, 0],
+            ]
+        )
+        self.assertNotEqual(rotation_scale_mirror.wrapped.Form(), gp_TrsfForm.gp_Other)
+        self.assertAlmostEqual(
+            rotation_scale_mirror.multiply(Vector(1, 0, 0)), (5 - 2 * c, 2 * s, 0), 7
+        )
+        # a similarity converts to a gp_Trsf, so it can place a shape
+        rotation_scale_mirror.wrapped.Trsf()
+
+    def test_list_general_affine_multiplies_vector(self):
+        non_uniform = Matrix([[2, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
+        self.assertEqual(non_uniform.wrapped.Form(), gp_TrsfForm.gp_Other)
+        self.assertAlmostEqual(non_uniform.multiply(Vector(1, 1, 1)), (2, 1, 1), 7)
+
+        shear = Matrix([[1, 0.5, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
+        self.assertAlmostEqual(shear.multiply(Vector(10, 20, 30)), (20, 20, 30), 7)
+
+        projection = Matrix([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 0]])
+        self.assertAlmostEqual(projection.multiply(Vector(10, 20, 30)), (10, 20, 0), 7)
 
 
 if __name__ == "__main__":

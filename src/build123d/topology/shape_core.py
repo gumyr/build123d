@@ -110,7 +110,7 @@ from OCP.BRepTools import BRepTools
 from OCP.gce import gce_MakeLin
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
 from OCP.GeomLib import GeomLib_IsPlanarSurface
-from OCP.gp import gp_Ax1, gp_Ax2, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec, gp_XYZ
+from OCP.gp import gp_Ax1, gp_Ax2, gp_Dir, gp_Pnt, gp_Trsf, gp_TrsfForm, gp_Vec, gp_XYZ
 from OCP.GProp import GProp_GProps
 from OCP.ShapeAnalysis import ShapeAnalysis_Curve
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
@@ -2644,10 +2644,20 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self._wrapped is None:
             return self
         new_shape = copy.deepcopy(self, None)
-        transformed = downcast(
-            BRepBuilderAPI_GTransform(self.wrapped, t_matrix.wrapped, True).Shape()
-        )
-        new_shape.wrapped = tcast(TOPODS, transformed)
+        if t_matrix.wrapped.Form() == gp_TrsfForm.gp_Other:
+            # a general affine transform (stretch, shear): only GTransform
+            # can apply it, at the cost of converting geometry to splines
+            builder: BRepBuilderAPI_GTransform | BRepBuilderAPI_Transform = (
+                BRepBuilderAPI_GTransform(self.wrapped, t_matrix.wrapped, True)
+            )
+        else:
+            # a similarity: Transform applies it exactly and keeps the geometry
+            # types; GTransform would drop its scale factor, which a gp_GTrsf
+            # of any recognised form keeps apart from its matrix
+            builder = BRepBuilderAPI_Transform(
+                self.wrapped, t_matrix.wrapped.Trsf(), True
+            )
+        new_shape.wrapped = tcast(TOPODS, downcast(builder.Shape()))
 
         return new_shape
 
