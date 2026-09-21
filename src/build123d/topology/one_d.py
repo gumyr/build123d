@@ -163,12 +163,18 @@ from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
 from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
 from OCP.ShapeFix import ShapeFix_Shape, ShapeFix_Wireframe
 from OCP.Standard import Standard_ConstructionError
-from OCP.TColgp import TColgp_Array1OfPnt, TColgp_Array1OfVec, TColgp_HArray1OfPnt
-from OCP.TColStd import (
-    TColStd_Array1OfInteger,
-    TColStd_Array1OfReal,
-    TColStd_HArray1OfBoolean,
-    TColStd_HArray1OfReal,
+from OCP.collections import (
+    Array1_double,
+    Array1_gp_Pnt,
+    Array1_gp_Vec,
+    Array1_int,
+    HArray1_bool,
+    HArray1_double,
+    HArray1_gp_Pnt,
+    HSequence_TopoDS_Shape,
+    IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
+    IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher,
+    List_TopoDS_Shape,
 )
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp, TopExp_Explorer
@@ -181,12 +187,6 @@ from OCP.TopoDS import (
     TopoDS_Shape,
     TopoDS_Vertex,
     TopoDS_Wire,
-)
-from OCP.TopTools import (
-    TopTools_HSequenceOfShape,
-    TopTools_IndexedDataMapOfShapeListOfShape,
-    TopTools_IndexedMapOfShape,
-    TopTools_ListOfShape,
 )
 from scipy.optimize import minimize_scalar
 from scipy.spatial import ConvexHull
@@ -1753,12 +1753,12 @@ class Edge(Mixin1D[TopoDS_Edge]):
         cntl_gp_pnts = [Vector(cntl_pnt).to_pnt() for cntl_pnt in cntl_pnts]
 
         # The poles are stored in an OCCT Array object
-        poles = TColgp_Array1OfPnt(1, len(cntl_gp_pnts))
+        poles = Array1_gp_Pnt(1, len(cntl_gp_pnts))
         for i, cntl_gp_pnt in enumerate(cntl_gp_pnts):
             poles.SetValue(i + 1, cntl_gp_pnt)
 
         if weights:
-            pole_weights = TColStd_Array1OfReal(1, len(weights))
+            pole_weights = Array1_double(1, len(weights))
             for i, weight in enumerate(weights):
                 pole_weights.SetValue(i + 1, float(weight))
             bezier_curve = Geom_BezierCurve(poles, pole_weights)
@@ -2509,7 +2509,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         point_vectors = [Vector(point) for point in points]
         if tangents:
             tangent_vectors = tuple(Vector(v) for v in tangents)
-        pnts = TColgp_HArray1OfPnt(1, len(point_vectors))
+        pnts = HArray1_gp_Pnt(1, len(point_vectors))
         for i, point in enumerate(point_vectors):
             pnts.SetValue(i + 1, point.to_pnt())
 
@@ -2522,7 +2522,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
                     "(plus one if periodic), or none specified. Parameter count: "
                     f"{len(parameters)}, point count: {len(point_vectors)}"
                 )
-            parameters_array = TColStd_HArray1OfReal(1, len(parameters))
+            parameters_array = HArray1_double(1, len(parameters))
             for p_index, p_value in enumerate(parameters):
                 parameters_array.SetValue(p_index + 1, p_value)
 
@@ -2543,10 +2543,8 @@ class Edge(Mixin1D[TopoDS_Edge]):
                     )
 
                 # Specify a tangent for each interpolation point:
-                tangents_array = TColgp_Array1OfVec(1, len(tangent_vectors))
-                tangent_enabled_array = TColStd_HArray1OfBoolean(
-                    1, len(tangent_vectors)
-                )
+                tangents_array = Array1_gp_Vec(1, len(tangent_vectors))
+                tangent_enabled_array = HArray1_bool(1, len(tangent_vectors))
                 for t_index, t_value in enumerate(tangent_vectors):
                     tangent_enabled_array.SetValue(t_index + 1, t_value is not None)
                     tangent_vec = t_value if t_value is not None else Vector()
@@ -2605,21 +2603,21 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 unique_knots.append(knot)
                 multiplicities.append(1)
 
-        poles_array = TColgp_Array1OfPnt(1, len(point_vectors))
+        poles_array = Array1_gp_Pnt(1, len(point_vectors))
         for index, point in enumerate(point_vectors, start=1):
             poles_array.SetValue(index, point.to_pnt())
 
-        knots_array = TColStd_Array1OfReal(1, len(unique_knots))
+        knots_array = Array1_double(1, len(unique_knots))
         for index, knot in enumerate(unique_knots, start=1):
             knots_array.SetValue(index, float(knot))
 
-        multiplicities_array = TColStd_Array1OfInteger(1, len(multiplicities))
+        multiplicities_array = Array1_int(1, len(multiplicities))
         for index, multiplicity in enumerate(multiplicities, start=1):
             multiplicities_array.SetValue(index, multiplicity)
 
         weights_list = list(weights) if weights is not None else []
         if weights_list:
-            weights_array = TColStd_Array1OfReal(1, len(weights_list))
+            weights_array = Array1_double(1, len(weights_list))
             for index, weight in enumerate(weights_list, start=1):
                 weights_array.SetValue(index, float(weight))
             spline_geom = Geom_BSplineCurve(
@@ -2662,7 +2660,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
             min_deg (int, optional): minimum spline degree. Enforced only when smoothing
                 is None. Defaults to 1.
             max_deg (int, optional): maximum spline degree. Defaults to 6. Raised
-                to 5 when smoothing is used, the lowest degree that can meet the
+                to 6 when smoothing is used, the lowest degree that can meet the
                 C2 continuity the smoothing algorithm requires.
 
         Raises:
@@ -2671,15 +2669,16 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Edge: spline
         """
-        pnts = TColgp_HArray1OfPnt(1, len(points))
+        pnts = HArray1_gp_Pnt(1, len(points))
         for i, point in enumerate(points):
             pnts.SetValue(i + 1, Vector(point).to_pnt())
 
         if smoothing:
-            # The smoothing overload asks OCCT for C2 continuity, which its
-            # variational solver cannot reach below degree 5.
+            # The smoothing overload asks OCCT for C2 continuity; its Jacobi
+            # basis needs a work degree of at least 2 * (2 + 1) = 6 for that
+            # (PLib_JacobiPolynomial rejects anything smaller since OCCT 8)
             spline_builder = GeomAPI_PointsToBSpline(
-                pnts, *smoothing, DegMax=max(max_deg, 5), Tol3D=tol
+                pnts, *smoothing, DegMax=max(max_deg, 6), Tol3D=tol
             )
         else:
             spline_builder = GeomAPI_PointsToBSpline(
@@ -3693,7 +3692,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
             edges = placed_edges
 
         wire_builder = BRepBuilderAPI_MakeWire()
-        combined_edges = TopTools_ListOfShape()
+        combined_edges = List_TopoDS_Shape()
         for edge in edges:
             if edge.wrapped is not None:
                 combined_edges.Append(edge.wrapped)
@@ -3729,8 +3728,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
             ShapeList[Wire]: Wires
         """
 
-        edges_in = TopTools_HSequenceOfShape()
-        wires_out = TopTools_HSequenceOfShape()
+        edges_in = HSequence_TopoDS_Shape()
+        wires_out = HSequence_TopoDS_Shape()
 
         for edge in [e for w in wires for e in w.edges()]:
             if edge.wrapped is not None:
@@ -4020,7 +4019,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
         unchamfered_face = _make_topods_face_from_wires(self.wrapped)
         chamfer_builder = BRepFilletAPI_MakeFillet2d(unchamfered_face)
 
-        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        vertex_edge_map = (
+            IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
         TopExp.MapShapesAndAncestors_s(
             unchamfered_face, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
         )
@@ -4312,7 +4313,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
             closest_topods_edge_param = extrema.ParOnEdgeS2(1)[0]
         elif supp_type == BRepExtrema_SupportType.BRepExtrema_IsVertex:
             v_hit = tcast(TopoDS_Vertex, downcast(extrema.SupportOnShape2(1)))
-            vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+            vertex_edge_map = (
+                IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+            )
             TopExp.MapShapesAndAncestors_s(
                 self.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
             )
@@ -4691,8 +4694,8 @@ def edges_to_wires(edges: Iterable[Edge], tol: float = 1e-6) -> ShapeList[Wire]:
 
     """
 
-    edges_in = TopTools_HSequenceOfShape()
-    wires_out = TopTools_HSequenceOfShape()
+    edges_in = HSequence_TopoDS_Shape()
+    wires_out = HSequence_TopoDS_Shape()
 
     for edge in edges:
         if edge.wrapped is not None:
@@ -4894,7 +4897,9 @@ def topo_explore_connected_faces(
         raise ValueError("edge has no valid parent")
 
     # make a edge --> faces mapping
-    edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
+    edge_face_map = (
+        IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+    )
     TopExp.MapShapesAndAncestors_s(
         parent.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, edge_face_map
     )
@@ -4910,7 +4915,7 @@ def topo_explore_connected_faces(
     relocation = relocation_between(parent_edge, edge.wrapped)
 
     # Query the map and select only unique faces
-    unique_face_map = TopTools_IndexedMapOfShape()
+    unique_face_map = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
     for face in list_shapes(edge_face_map.FindFromKey(parent_edge)):
         unique_face_map.Add(face)
     return [

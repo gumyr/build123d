@@ -64,9 +64,9 @@ from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve2d
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 from OCP.BRepTools import BRepTools
-from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+from OCP.IntTools import IntTools_FClass2d
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
+from OCP.collections import IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher
 from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Vertex, TopoDS_Edge
 from OCP.gp import gp_Pnt, gp_Pnt2d, gp_Vec2d
 from build123d.geometry import (
@@ -252,7 +252,7 @@ class Vertex(Shape[TopoDS_Vertex]):
         step = 1e-4 * ((u_max - u_min) ** 2 + (v_max - v_min) ** 2) ** 0.5 / span
         here = BRep_Tool.Parameters_s(self.wrapped, face)
         probe = gp_Pnt2d(here.X() + bisector[0] * step, here.Y() + bisector[1] * step)
-        inside = BRepTopAdaptor_FClass2d(face, TOLERANCE).Perform(probe) == ta.TopAbs_IN
+        inside = IntTools_FClass2d(face, TOLERANCE).Perform(probe) == ta.TopAbs_IN
         return Convexity.CONVEX if inside else Convexity.CONCAVE
 
     def _crease_convexity(self) -> Convexity:
@@ -263,7 +263,7 @@ class Vertex(Shape[TopoDS_Vertex]):
                 "this vertex was not selected from a shape, so there is nothing "
                 "to classify it against - take it from a face or solid"
             )
-        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        vertex_edge_map = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
         TopExp.MapShapesAndAncestors_s(
             parent.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
         )

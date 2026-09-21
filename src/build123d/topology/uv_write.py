@@ -82,7 +82,6 @@ from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
 from OCP.BRepLib import BRepLib
-from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
 from OCP.Geom import Geom_Surface
 from OCP.Geom2d import (
     Geom2d_BSplineCurve,
@@ -95,6 +94,7 @@ from OCP.Geom2d import (
 from OCP.Geom2dConvert import Geom2dConvert
 from OCP.GeomAbs import GeomAbs_Shape
 from OCP.GeomAPI import GeomAPI
+from OCP.IntTools import IntTools_FClass2d
 from OCP.gp import gp_Ax22d, gp_Dir2d, gp_Pln, gp_Pnt2d
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_State
 from OCP.TopLoc import TopLoc_Location
@@ -502,7 +502,7 @@ def _is_clockwise(wire: Wire) -> bool:
     the point at infinity included.
     """
     face = BRepBuilderAPI_MakeFace(gp_Pln(), wire.wrapped, False).Face()
-    classifier = BRepTopAdaptor_FClass2d(face, TOLERANCE)
+    classifier = IntTools_FClass2d(face, TOLERANCE)
     return classifier.PerformInfinitePoint() == TopAbs_State.TopAbs_IN
 
 
