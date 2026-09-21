@@ -50,6 +50,7 @@ from build123d.topology import (
 import build123d
 from OCP.BRepOffsetAPI import BRepOffsetAPI_DraftAngle
 from OCP.StdFail import StdFail_NotDone
+from OCP.TopAbs import TopAbs_Orientation
 
 
 class TestSolid(unittest.TestCase):
@@ -268,6 +269,44 @@ class TestSolid(unittest.TestCase):
         self.assertAlmostEqual(rbb.volume, (10**3) * (3**0.5) / 9, 0)
         self.assertTrue(rbb.volume > obb.volume)
         self.assertAlmostEqual(obb2.volume, 40, 4)
+
+
+class TestOffsetOrientation(unittest.TestCase):
+    """An outward offset with openings comes back as a forward solid.
+
+    OCCT returns it with inward faces under a REVERSED flag, which volume and
+    validity checks accept but the fillet builder does not.
+    """
+
+    def test_offset_cup_can_be_filleted(self):
+        cone = Solid.make_cone(22.5, 33.75, 40)
+        cup = cone.offset_3d(
+            cone.faces().sort_by(Axis.Z)[-1:], 3, kind=Kind.INTERSECTION
+        )
+        self.assertEqual(cup.wrapped.Orientation(), TopAbs_Orientation.TopAbs_FORWARD)
+        self.assertGreater(cup.volume, 0)
+        rim = cup.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[0]
+        rounded = cup.fillet(1, [rim])
+        self.assertTrue(rounded.is_valid)
+        self.assertAlmostEqual(rounded.volume, cup.volume, delta=cup.volume / 100)
+        self.assertLess(rounded.volume, cup.volume)
+
+    def test_offset_box_both_ways_and_kinds(self):
+        box = Solid.make_box(30, 20, 10)
+        top = box.faces().sort_by(Axis.Z)[-1:]
+        for amount in (2, -2):
+            for kind in (Kind.ARC, Kind.INTERSECTION):
+                with self.subTest(amount=amount, kind=kind):
+                    shelled = box.offset_3d(top, amount, kind=kind)
+                    self.assertEqual(
+                        shelled.wrapped.Orientation(), TopAbs_Orientation.TopAbs_FORWARD
+                    )
+                    self.assertGreater(shelled.volume, 0)
+                    # the sharp edges around the opening fillet on every variant
+                    rim = shelled.edges().filter_by(GeomType.LINE).group_by(Axis.Z)[-1]
+                    rounded = shelled.fillet(0.5, rim)
+                    self.assertTrue(rounded.is_valid)
+                    self.assertLess(rounded.volume, shelled.volume)
 
 
 class TestSolidThicken(unittest.TestCase):
