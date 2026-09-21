@@ -327,6 +327,42 @@ def _bend_zone(
     return _BendZone(gapped, gapped.translate(-outward * setback), outward, normal)
 
 
+def _oblique_reach(
+    edge: Edge, support: Face, zone: _BendZone, setback: float, gap: float, end: int
+) -> float:
+    """How far past one end of an edge the strip its bend takes has to run.
+
+    The strip is squared off at the ends of the edge. Where the edge ends at a
+    corner of the face and the side beyond it leans away, the square end cuts
+    across the face and leaves a sliver between itself and that side: past
+    the bend's tangent line, held on only along it, and unable to stay flat.
+    Running the strip on to where the side crosses the tangent line takes the
+    sliver into the bend, and the face's own outline ends it, as it does where
+    a side leans the other way and the strip overhangs the face.
+
+    A side leaning more than 45 degrees is the face carrying on beside the
+    bend rather than a corner of it, as is a gap, a side that is not straight
+    or one too short to reach the tangent line; what is left there is a strip
+    for a bend relief.
+    """
+    if gap > 0:
+        return 0.0
+    corner = Vector(edge.position_at(end))
+    along = _direction(edge) * (1 if end == 0 else -1)  # from the corner, into the edge
+    for side in support.edges():
+        if side.is_same(edge) or side.geom_type != GeomType.LINE:
+            continue
+        ends = [Vector(side.position_at(0)), Vector(side.position_at(1))]
+        if min((point - corner).length for point in ends) > TOLERANCE:
+            continue
+        away = max(ends, key=lambda point: (point - corner).length) - corner
+        back, lean = -away.dot(zone.outward), -away.dot(along)
+        if back < setback - _RELIEF_TOLERANCE or not 0 < lean <= back * (1 + 1e-9):
+            return 0.0
+        return setback * lean / back
+    return 0.0
+
+
 def _bend_zones(
     target: Shell, edges: list[Edge], gaps: tuple[float, float], setback: float
 ) -> tuple[list[tuple[_BendZone, list[Face]]], list[Face], list[Face]]:
@@ -355,12 +391,22 @@ def _bend_zones(
         if setback < _RELIEF_TOLERANCE:
             zoned += [(zone, []) for zone in zones]
             continue
-        takes = [
-            _orient_face(
-                _flat_rectangle(zone.near, zone.outward, 0, setback), zone.normal
+        takes = []
+        for edge, zone in zip(group, zones):
+            tangent = _direction(zone.near)
+            reach = [
+                _oblique_reach(edge, support, zone, setback, gaps[end], end)
+                for end in (0, 1)
+            ]
+            strip = Edge.make_line(
+                Vector(zone.near.position_at(0)) - tangent * reach[0],
+                Vector(zone.near.position_at(1)) + tangent * reach[1],
             )
-            for zone in zones
-        ]
+            takes.append(
+                _orient_face(
+                    _flat_rectangle(strip, zone.outward, 0, setback), zone.normal
+                )
+            )
         for index, take in enumerate(takes):
             if any(_planar_pieces(take.intersect(other)) for other in takes[:index]):
                 raise ValueError(
@@ -560,7 +606,9 @@ def flange(
     a drawing dimensions, and ``CENTER`` straddles it. The strip of the face the
     bend takes rolls into it, with whatever the outline does there - a hole, a
     notch, a taper - so ``unfold`` gives the blank back. Only the bend's own
-    span between the ``gaps`` is taken; the face beside it keeps its edge.
+    span between the ``gaps`` is taken; the face beside it keeps its edge. At
+    a corner of the face whose side is not square to the edge the strip ends
+    on that side, so an edge cut at a slant leaves no sliver beside its bend.
 
     ``length`` is the flat wall by default, measured from the bend's tangent
     line. A drawing more often gives the overall size, to the corner the part

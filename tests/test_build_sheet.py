@@ -1148,6 +1148,55 @@ class TestFlangePosition(unittest.TestCase):
         self.assertAlmostEqual(precise_area(flat), 60 * (110 + allowance - 6) - pi, 4)
         self.assertTrue(materialize(bs).is_valid)
 
+    def oblique(self, right=((100, 0),), **kwargs):
+        """A face whose top rim slopes from (0, 70) to (100, 40), flanged
+        along it; ``right`` is the outline from the origin round to the rim"""
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Polygon((0, 0), *right, (100, 40), (0, 70), align=None)
+            rim = bs.edges().sort_by(Axis.Y)[-1]
+            flange(rim, length=10, position=BendPosition.MATERIAL_OUTSIDE, **kwargs)
+        return bs
+
+    def test_a_rim_oblique_to_the_sides_leaves_no_sliver(self):
+        """Squared off at the rim's ends, the strip a set back bend takes
+        overhangs one side and stops short of the other, where a sliver of
+        face would stand beside the bend; it runs to the face's outline at
+        both ends instead"""
+        bs = self.oblique()
+        rim_length, setback = sqrt(100**2 + 30**2), 3
+        base = bs.sheet.flats().sort_by(Axis.Z)[0]
+        self.assertEqual(len(base.vertices()), 4)
+        self.assertAlmostEqual(base.area, 100 * 55 - rim_length * setback, 6)
+        self.assertEqual(len(bs.sheet.faces()), 3)
+        self.assertTrue(materialize(bs).is_valid)
+        # the blank is the face and the new material past its rim
+        allowance = (2 + 0.5) * pi / 2
+        flat = unfold(bs.sheet, bs.sheet_parameters)
+        self.assertAlmostEqual(
+            precise_area(flat), 100 * 55 + rim_length * (allowance - setback + 10), 4
+        )
+
+    def test_a_face_carrying_on_beside_the_bend_keeps_its_strip(self):
+        """A gap, or a side leaning more than 45 degrees, is the face going
+        on past the bend's end: what is beside the bend stays, for a relief"""
+        rim_length, setback, gap = sqrt(100**2 + 30**2), 3, 5
+        base = self.oblique(gaps=gap).sheet.flats().sort_by(Axis.Z)[0]
+        self.assertAlmostEqual(
+            base.area, 100 * 55 - (rim_length - 2 * gap) * setback, 6
+        )
+        # a side leaning 60 degrees from square to the rim keeps the corner
+        along = Vector(100, -30).normalized()
+        back = Vector(-30, -100).normalized()
+        foot = (
+            Vector(100, 40) + (back * cos(radians(60)) + along * sin(radians(60))) * 40
+        )
+        bs = self.oblique(right=((foot.X, 0), (foot.X, foot.Y)))
+        base = bs.sheet.flats().sort_by(Axis.Z)[0]
+        self.assertTrue(
+            any((Vector(v) - Vector(100, 40)).length < 1e-6 for v in base.vertices())
+        )
+
     def test_flanges_on_every_edge_share_the_face(self):
         with BuildSheet(thickness=1, bend_radius=2) as bs:
             with BuildSketch():

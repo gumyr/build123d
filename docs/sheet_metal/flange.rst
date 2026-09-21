@@ -102,6 +102,10 @@ Position               What lands on the edge
 
 Only the bend's own span between the gaps is taken from the face; beside it,
 the face keeps its edge as tabs that still reach the corner it was drawn to.
+An edge that ends at a corner of the face has no face beside it there, and
+the strip runs to the face's own side even when that side is not square to the
+edge, as along the top of a wall cut at a slant; a side leaning more than 45
+degrees counts as the face carrying on.
 Where two flanged edges meet, each bend's strip would take material the other
 needs, so the gaps there have to be wider than the setback. The two corner
 positions are undefined at 180 degrees, where the faces never meet.
