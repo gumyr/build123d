@@ -9,12 +9,28 @@ from OCP.BRep import BRep_Builder
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Shell
 
-from build123d import Box, Edge, Face, GeomType, Pos, Shell, Solid, Vector
+from build123d import (
+    Axis,
+    Box,
+    BuildSheet,
+    BuildSketch,
+    Edge,
+    Face,
+    GeomType,
+    Keep,
+    Plane,
+    Pos,
+    Rectangle,
+    Shell,
+    Solid,
+    Vector,
+    Wire,
+    flange,
+)
+from build123d.topology.utils import _make_topods_shell, _topods_material_side
 from build123d.sheet_utils import (
     SheetMetalParameters,
     _DevelopedFace,
-    _edge_position,
-    _make_shell,
     _move_developed_face,
     _ordered_developed_edge_points,
     _place_adjacent_developed_face,
@@ -91,18 +107,9 @@ class TestSheetUtils(unittest.TestCase):
             face.wrapped, TopoDS.Edge(source.wrapped.Reversed())
         )
 
-        self.assertLess(
-            (
-                _edge_position(developed, 0) - _edge_position(reversed_developed, 1)
-            ).length,
-            1e-6,
-        )
-        self.assertLess(
-            (
-                _edge_position(developed, 1) - _edge_position(reversed_developed, 0)
-            ).length,
-            1e-6,
-        )
+        forward, backward = Edge(developed), Edge(reversed_developed)
+        self.assertLess((forward @ 0 - backward @ 1).length, 1e-6)
+        self.assertLess((forward @ 1 - backward @ 0).length, 1e-6)
 
     def test_raw_uv_face_edge_provenance(self):
         face = Solid.make_cylinder(2, 3).faces().filter_by(GeomType.CYLINDER)[0]
@@ -162,13 +169,15 @@ class TestSheetUtils(unittest.TestCase):
 
     def test_single_and_disconnected_shell_construction(self):
         face = Face.make_rect(2, 1)
-        shell = _make_shell([face.wrapped])
+        shell = _make_topods_shell([face.wrapped])
         self.assertTrue(Shell(shell).is_valid)
         self.assertEqual(len(Shell(shell).faces()), 1)
 
         separated = Pos(5, 0) * face
-        with self.assertRaisesRegex(ValueError, "one connected Shell"):
-            _make_shell([face.wrapped, separated.wrapped])
+        with self.assertRaisesRegex(ValueError, "one connected shell"):
+            _make_topods_shell([face.wrapped, separated.wrapped])
+        with self.assertRaisesRegex(ValueError, "at least one face"):
+            _make_topods_shell([])
 
     def test_raw_unfold_validation(self):
         with self.assertRaisesRegex(ValueError, "non-empty Shell"):
@@ -186,6 +195,56 @@ class TestSheetUtils(unittest.TestCase):
         builder.Add(disconnected, (Pos(5, 0) * Face.make_rect(1, 1)).wrapped)
         with self.assertRaisesRegex(ValueError, "disconnected face groups"):
             _unfold_shell(disconnected, None)
+
+    def test_material_side_reads_the_face_not_the_edge_given(self):
+        """The side the material is on is fixed by how the face walks its
+        edge, so a reversed or moved copy of the edge gives the same answer,
+        and an edge of some other shape is refused"""
+        face = Face.make_rect(20, 10)
+        right = face.edges().sort_by(Axis.X)[-1]
+        inward = Vector(-1, 0, 0)
+        for candidate in (
+            right,
+            right.reversed(),
+            face.moved(Pos(7, 0)).edges().sort_by(Axis.X)[-1],
+        ):
+            self.assertAlmostEqual(
+                _topods_material_side(face.wrapped, candidate.wrapped), inward, 6
+            )
+        # a hole's edges run the other way, and the material is outside them
+        holed = Face.make_rect(20, 10).make_holes([Wire.make_circle(2)])
+        hole_edge = holed.inner_wires()[0].edges()[0]
+        side = _topods_material_side(holed.wrapped, hole_edge.wrapped)
+        self.assertGreater(side.dot(hole_edge.position_at(0.5)), 0)
+        with self.assertRaisesRegex(ValueError, "not an edge of the face"):
+            _topods_material_side(face.wrapped, Edge.make_line((0, 0), (1, 0)).wrapped)
+
+    def test_faces_sharing_a_curved_edge_are_placed(self):
+        """Which side of a shared edge a face lies on is read from the face's
+        own traversal of it, so the edge need not be straight: a flat split
+        along an arc unfolds in one piece with its bend"""
+        with BuildSheet(thickness=1, bend_radius=2) as builder:
+            with BuildSketch():
+                Rectangle(40, 30)
+            flange(builder.rims().sort_by(Axis.X)[-1], length=10)
+        sheet = builder.sheet
+        base = sheet.flats().sort_by(Axis.Z)[0]
+        arc = (
+            Solid.make_cylinder(8, 5, Plane.XY.offset(-2))
+            .faces()
+            .filter_by(GeomType.CYLINDER)[0]
+        )
+        pieces = [f for f in base.split(arc, keep=Keep.BOTH) if isinstance(f, Face)]
+        self.assertEqual(len(pieces), 2)
+        others = [f for f in sheet.faces() if not f.is_same(base)]
+        split = Shell(Face.sew_faces(pieces + others)[0])
+        self.assertEqual(len(split.faces()), 4)
+
+        flat = Shell(_unfold_shell(split.wrapped, builder.sheet_parameters))
+        self.assertTrue(flat.is_valid)
+        self.assertEqual(len(flat.faces()), 4)
+        whole = Shell(_unfold_shell(sheet.wrapped, builder.sheet_parameters))
+        self.assertAlmostEqual(flat.area, whole.area, 6)
 
     def test_closed_shell_requires_a_cut(self):
         with self.assertRaisesRegex(ValueError, "requires a cut"):

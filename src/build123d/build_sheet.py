@@ -2,7 +2,7 @@
 BuildSheet
 
 name: build_sheet.py
-by:   Gumyr & Gabriel Jesus
+by:   Gumyr
 date: July 21st 2026
 
 desc:
@@ -10,7 +10,7 @@ desc:
 
 license:
 
-    Copyright 2026 Gumyr & Gabriel Jesus
+    Copyright 2026 Gumyr
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -87,7 +87,6 @@ class BuildSheet(Builder[Shell]):
             sheet_surface=sheet_surface,
         )
         self._sheet = Shell()
-        self.pending_edges: ShapeList[Edge] = ShapeList()
         super().__init__(*placements, mode=mode)
 
     @property
@@ -152,11 +151,6 @@ class BuildSheet(Builder[Shell]):
     @_obj.setter
     def _obj(self, value: Shell) -> None:
         self._sheet = value
-
-    @property
-    def pending_edges_as_wire(self) -> Wire | None:
-        """Return pending edges as a wire, if present."""
-        return Wire.combine(self.pending_edges)[0] if self.pending_edges else None
 
     def bends(self, select: Select = Select.ALL) -> ShapeList[Face]:
         """Return the bends of the sheet.
@@ -231,8 +225,8 @@ class BuildSheet(Builder[Shell]):
         return self._sheet
 
     def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
-        """Store edges supplied by line builders."""
-        self.pending_edges.extend(obj for obj in objects if isinstance(obj, Edge))
+        """Nothing in a sheet is built from pending edges or faces."""
+        raise NotImplementedError("_add_to_pending doesn't apply to BuildSheet")
 
     def _accept_publication(
         self, build_product: Shape, source: Builder | None, mode: Mode
@@ -271,7 +265,6 @@ class BuildSheet(Builder[Shell]):
             return
 
         incoming_faces: list[Face] = []
-        incoming_edges: list[Edge] = []
         incoming_solids: list[Solid] = []
         incoming_shells: list[Shell] = []
         for obj in objects:
@@ -283,15 +276,23 @@ class BuildSheet(Builder[Shell]):
                 incoming_shells.append(obj)
                 incoming_faces.extend(obj.faces())
             elif isinstance(obj, (Edge, Wire)):
-                incoming_edges.extend(obj.edges())
+                # a line builder's product: nothing in a sheet is made from one
+                raise ValueError(
+                    "BuildSheet takes no edges or wires - draw sheet material "
+                    "in a nested BuildSketch"
+                )
             elif isinstance(obj, Solid):
                 incoming_solids.append(obj)
             elif isinstance(obj, Compound):
                 if obj.solids():
                     incoming_solids.extend(obj.solids())
-                else:
+                elif obj.faces():
                     incoming_faces.extend(obj.faces())
-                    incoming_edges.extend(obj.edges() if not obj.faces() else [])
+                elif obj.edges():
+                    raise ValueError(
+                        "BuildSheet takes no edges or wires - draw sheet material "
+                        "in a nested BuildSketch"
+                    )
             else:
                 raise ValueError(
                     "BuildSheet only accepts Face, Sketch, Shell, or Solid inputs"
@@ -302,8 +303,6 @@ class BuildSheet(Builder[Shell]):
                 "BuildSheet accepts Solids only as cutters with Mode.SUBTRACT"
             )
 
-        if incoming_edges:
-            self._add_to_pending(*incoming_edges)
         if not incoming_faces and not incoming_solids:
             return
 

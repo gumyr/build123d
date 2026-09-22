@@ -133,7 +133,9 @@ from OCP.TopoDS import (
     TopoDS_Vertex,
     TopoDS_Wire,
 )
-from OCP.collections import IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher
+from OCP.collections import (
+    IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
+)
 from OCP.collections import List_TopoDS_Shape
 from OCP.TopTools import TopTools_ShapeMapHasher
 from typing_extensions import Self
@@ -393,10 +395,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """area -the surface area of all faces in this Shape"""
         if self._wrapped is None:
             return 0.0
-        properties = GProp_GProps()
-        BRepGProp.SurfaceProperties_s(self.wrapped, properties)
-
-        return properties.Mass()
+        return _topods_area(self.wrapped)
 
     @property
     def color(self) -> None | Color:
@@ -3240,7 +3239,9 @@ def topo_distance_to(
                     if neighbor is not None and neighbor != vertex_peer:
                         vertex_neighbors[vertex_peer].add(neighbor)
     else:
-        connector_peer_map = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        connector_peer_map = (
+            IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
         TopExp.MapShapesAndAncestors_s(
             parent.wrapped,
             connector_enum_lut[peer_type],
@@ -4020,6 +4021,31 @@ class SkipClean:
 
     def __exit__(self, exception_type, exception_value, traceback):
         SkipClean.clean = True
+
+
+def _faces_of(result: Shape | Iterable[Shape] | None) -> ShapeList[Face]:
+    """The faces in what an operation returned, whatever form it took: one
+    shape, several, a compound of them, or nothing
+
+    A face is returned as it is, record and all, rather than re-wrapped from
+    the kernel.
+    """
+    if result is None:
+        return ShapeList()
+    faces: ShapeList[Face] = ShapeList()
+    for shape in [result] if isinstance(result, Shape) else result:
+        if shape.wrapped is not None and shapetype(shape.wrapped) == ta.TopAbs_FACE:
+            faces.append(tcast("Face", shape))
+        else:
+            faces.extend(shape.faces())
+    return faces
+
+
+def _topods_area(shape: TopoDS_Shape) -> float:
+    """The surface area of a shape's faces"""
+    properties = GProp_GProps()
+    BRepGProp.SurfaceProperties_s(shape, properties)
+    return properties.Mass()
 
 
 def _sew_topods_faces(faces: Iterable[TopoDS_Face]) -> TopoDS_Shape:

@@ -38,35 +38,36 @@ import OCP.TopAbs as ta
 from OCP.collections import (
     IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
 )
-from OCP.BRep import BRep_Builder, BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+from OCP.BRep import BRep_Tool
+from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_GTransform,
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
-    BRepBuilderAPI_MakeVertex,
-    BRepBuilderAPI_Sewing,
 )
 from OCP.BRepCheck import BRepCheck_Analyzer
-from OCP.BRepExtrema import BRepExtrema_DistShapeShape
-from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
-from OCP.GProp import GProp_GProps
-from OCP.gp import gp_Pnt, gp_Vec
 from OCP.ShapeExtend import ShapeExtend_WireData
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Wire
-from OCP.TopExp import TopExp, TopExp_Explorer
+from OCP.TopExp import TopExp
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Edge,
     TopoDS_Face,
-    TopoDS_Shape,
     TopoDS_Shell,
     TopoDS_Wire,
 )
 
 from build123d.build_enums import SheetSurface
 from build123d.geometry import TOLERANCE, Location, Matrix, Plane, Vector
+from build123d.topology.one_d import Edge
+from build123d.topology.shape_core import _topods_area, _topods_entities
+from build123d.topology.utils import (
+    _make_topods_shell,
+    _topods_face_normal,
+    _topods_face_position,
+    _topods_material_side,
+)
 
 __all__ = ["SheetMetalParameters"]
 
@@ -212,60 +213,6 @@ class _DevelopedFace:
     edges: dict[int, tuple[TopoDS_Edge, TopoDS_Edge]]
 
 
-def _topods_entities(
-    shape: TopoDS_Shape, shape_type: ta.TopAbs_ShapeEnum
-) -> list[TopoDS_Shape]:
-    """Return unique subshapes of the requested type."""
-    entities: dict[int, TopoDS_Shape] = {}
-    explorer = TopExp_Explorer(shape, shape_type)
-    while explorer.More():
-        entity = explorer.Current()
-        entities[hash(entity)] = entity
-        explorer.Next()
-    return list(entities.values())
-
-
-def _edge_position(edge: TopoDS_Edge, position: float) -> Vector:
-    """Return a point at a normalized position along an edge."""
-    adaptor = BRepAdaptor_Curve(edge)
-    if edge.Orientation() == ta.TopAbs_REVERSED:
-        position = 1.0 - position
-    parameter = adaptor.FirstParameter() + position * (
-        adaptor.LastParameter() - adaptor.FirstParameter()
-    )
-    return Vector(adaptor.Value(parameter))
-
-
-def _face_position(face: TopoDS_Face, u: float, v: float) -> Vector:
-    """Return a point at normalized UV coordinates on a face."""
-    u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(face)
-    surface = BRep_Tool.Surface_s(face)
-    return Vector(
-        surface.Value(u_min + u * (u_max - u_min), v_min + v * (v_max - v_min))
-    )
-
-
-def _face_normal(face: TopoDS_Face, u: float = 0.5, v: float = 0.5) -> Vector:
-    """Return the oriented normal at normalized UV coordinates."""
-    u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(face)
-    point = gp_Pnt()
-    normal = gp_Vec()
-    BRepGProp_Face(face).Normal(
-        u_min + u * (u_max - u_min),
-        v_min + v * (v_max - v_min),
-        point,
-        normal,
-    )
-    return Vector(normal).normalized()
-
-
-def _face_center(face: TopoDS_Face) -> Vector:
-    """Return the face center of mass."""
-    properties = GProp_GProps()
-    BRepGProp.SurfaceProperties_s(face, properties)
-    return Vector(properties.CentreOfMass())
-
-
 def _uv_topods_edge(
     source_face: TopoDS_Face,
     source_edge: TopoDS_Edge,
@@ -328,8 +275,8 @@ def _edges_match(
     """Compare edge geometry by sampling, optionally in reverse order."""
     return all(
         (
-            _edge_position(first, position)
-            - _edge_position(second, 1.0 - position if reverse else position)
+            Edge(first).position_at(position)
+            - Edge(second).position_at(1.0 - position if reverse else position)
         ).length
         <= TOLERANCE
         for position in (0.0, 0.25, 0.5, 0.75, 1.0)
@@ -347,7 +294,7 @@ def _uv_topods_face_with_map(
     outer_wire, preliminary_map = _make_uv_wire(source_face, source_outer, xy_surface)
     source_wires = [
         TopoDS.Wire(wire)
-        for wire in _topods_entities(source_face, ta.TopAbs_WIRE)
+        for wire in _topods_entities(source_face, "Wire")
         if not wire.IsSame(source_outer)
     ]
     inner_wires: list[TopoDS_Wire] = []
@@ -372,9 +319,7 @@ def _uv_topods_face_with_map(
     uv_face = TopoDS.Face(face_fixer.Result())
 
     actual_map: dict[int, tuple[TopoDS_Edge, TopoDS_Edge]] = {}
-    available_edges = [
-        TopoDS.Edge(edge) for edge in _topods_entities(uv_face, ta.TopAbs_EDGE)
-    ]
+    available_edges = [TopoDS.Edge(edge) for edge in _topods_entities(uv_face, "Edge")]
     for source_key, (source_edge, preliminary_edge) in preliminary_map.items():
         matches: list[tuple[TopoDS_Edge, bool]] = []
         for candidate in available_edges:
@@ -418,9 +363,9 @@ def _scale_developed_face(developed: _DevelopedFace, radius: float) -> _Develope
                 f"found {modified.Size()}"
             )
         scaled_edge = TopoDS.Edge(modified.First())
-        uv_start = _edge_position(uv_edge, 0)
+        uv_start = Edge(uv_edge).position_at(0)
         expected_start = Vector(radius * uv_start.X, uv_start.Y, uv_start.Z)
-        if (_edge_position(scaled_edge, 0) - expected_start).length > TOLERANCE:
+        if (Edge(scaled_edge).position_at(0) - expected_start).length > TOLERANCE:
             scaled_edge = TopoDS.Edge(scaled_edge.Reversed())
         scaled_edges[source_key] = (source_edge, scaled_edge)
     return _DevelopedFace(scaled_face, scaled_edges)
@@ -430,13 +375,13 @@ def is_positive_bend(face: TopoDS_Face) -> bool:
     """Return whether a cylindrical face bends toward its oriented normal."""
     cylinder = BRepAdaptor_Surface(face).Cylinder()
     axis = cylinder.Axis()
-    surface_point = _face_position(face, 0.5, 0.5)
+    surface_point = _topods_face_position(face, 0.5, 0.5)
     axis_position = Vector(axis.Location())
     axis_direction = Vector(axis.Direction())
     axis_point = axis_position + axis_direction * (
         (surface_point - axis_position).dot(axis_direction)
     )
-    return _face_normal(face).dot(surface_point - axis_point) < 0
+    return _topods_face_normal(face).dot(surface_point - axis_point) < 0
 
 
 def _develop_face(
@@ -463,13 +408,13 @@ def _ordered_developed_edge_points(
 ) -> tuple[Vector, Vector]:
     """Return developed endpoints ordered like a source edge occurrence."""
     source_edge, developed_edge = edge_record
-    reference_start = _edge_position(reference_edge, 0)
-    source_start = _edge_position(source_edge, 0)
-    source_end = _edge_position(source_edge, 1)
+    reference_start = Edge(reference_edge).position_at(0)
+    source_start = Edge(source_edge).position_at(0)
+    source_end = Edge(source_edge).position_at(1)
     if (source_start - reference_start).length <= TOLERANCE:
-        return _edge_position(developed_edge, 0), _edge_position(developed_edge, 1)
+        return Edge(developed_edge).position_at(0), Edge(developed_edge).position_at(1)
     if (source_end - reference_start).length <= TOLERANCE:
-        return _edge_position(developed_edge, 1), _edge_position(developed_edge, 0)
+        return Edge(developed_edge).position_at(1), Edge(developed_edge).position_at(0)
     raise ValueError("Unable to associate shared-edge endpoints")
 
 
@@ -487,30 +432,6 @@ def _move_developed_face(
             for source_key, (source_edge, developed_edge) in developed.edges.items()
         },
     )
-
-
-def _side_of_edge(face: TopoDS_Face, start: Vector, end: Vector) -> float:
-    """Which side of an edge a developed face lies on, next to the edge.
-
-    Read beside the edge rather than from the face's centre of mass, which
-    says nothing reliable about a face that wraps around a hole: there the
-    centre sits inside the hole, on the far side of the edges bounding it.
-    """
-    tangent = (end - start).normalized()
-    midpoint = (start + end) * 0.5
-    across = Vector(-tangent.Y, tangent.X, 0)  # developed faces lie in XY
-    step = max((end - start).length * 1e-4, 1e-6)
-    for side in (1.0, -1.0):
-        if _point_on_face(face, midpoint + across * (side * step)):
-            return side
-    # nothing beside the edge: fall back on where the bulk of the face is
-    return tangent.cross(_face_center(face) - midpoint).Z
-
-
-def _point_on_face(face: TopoDS_Face, point: Vector, tolerance: float = 1e-9) -> bool:
-    """Is a point within a face's trimmed boundary?"""
-    vertex = BRepBuilderAPI_MakeVertex(gp_Pnt(point.X, point.Y, point.Z)).Vertex()
-    return BRepExtrema_DistShapeShape(vertex, face).Value() <= tolerance
 
 
 def _place_adjacent_developed_face(
@@ -537,7 +458,7 @@ def _place_adjacent_developed_face(
     child_frame = Plane(
         origin=child_start,
         x_dir=child_end - child_start,
-        z_dir=_face_normal(child.face),
+        z_dir=_topods_face_normal(child.face),
     )
 
     def candidate(parent_normal: Vector) -> _DevelopedFace:
@@ -549,14 +470,15 @@ def _place_adjacent_developed_face(
         placement = parent_frame.location * child_frame.location.inverse()
         return _move_developed_face(child, placement)
 
-    placed = candidate(_face_normal(parent.face))
+    placed = candidate(_topods_face_normal(parent.face))
     placed_start, placed_end = _ordered_developed_edge_points(
         placed.edges[edge_key], shared_edge
     )
-    parent_side = _side_of_edge(parent.face, parent_start, parent_end)
-    child_side = _side_of_edge(placed.face, placed_start, placed_end)
-    if parent_side * child_side >= 0:
-        placed = candidate(-_face_normal(parent.face))
+    # the child belongs on the far side of the shared edge from the parent
+    parent_side = _topods_material_side(parent.face, parent_edge_record[1])
+    child_side = _topods_material_side(placed.face, placed.edges[edge_key][1])
+    if parent_side.dot(child_side) >= 0:
+        placed = candidate(-_topods_face_normal(parent.face))
         placed_start, placed_end = _ordered_developed_edge_points(
             placed.edges[edge_key], shared_edge
         )
@@ -566,25 +488,6 @@ def _place_adjacent_developed_face(
     ).length > TOLERANCE:
         raise ValueError("Unable to align adjacent developed faces")
     return placed
-
-
-def _make_shell(faces: list[TopoDS_Face]) -> TopoDS_Shell:
-    """Sew developed faces into one shell."""
-    if len(faces) == 1:
-        shell = TopoDS_Shell()
-        builder = BRep_Builder()
-        builder.MakeShell(shell)
-        builder.Add(shell, faces[0])
-        return shell
-
-    sewing = BRepBuilderAPI_Sewing()
-    for face in faces:
-        sewing.Add(face)
-    sewing.Perform()
-    sewed = sewing.SewedShape()
-    if sewed.ShapeType() != ta.TopAbs_SHELL:
-        raise ValueError("Unfolding didn't produce one connected Shell")
-    return TopoDS.Shell(sewed)
 
 
 def _unfold_shell(
@@ -597,9 +500,7 @@ def _unfold_shell(
     ):
         raise TypeError("sheet_parameters must be a SheetMetalParameters")
 
-    source_faces = [
-        TopoDS.Face(face) for face in _topods_entities(shell, ta.TopAbs_FACE)
-    ]
+    source_faces = [TopoDS.Face(face) for face in _topods_entities(shell, "Face")]
     if not source_faces:
         raise ValueError("unfold requires a non-empty Shell")
     supported_types = (ga.GeomAbs_Plane, ga.GeomAbs_Cylinder)
@@ -624,7 +525,7 @@ def _unfold_shell(
         IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
     )
     TopExp.MapShapesAndAncestors_s(shell, ta.TopAbs_EDGE, ta.TopAbs_FACE, edge_face_map)
-    for raw_edge in _topods_entities(shell, ta.TopAbs_EDGE):
+    for raw_edge in _topods_entities(shell, "Edge"):
         edge = TopoDS.Edge(raw_edge)
         connected_by_key: dict[int, TopoDS_Face] = {}
         if edge_face_map.Contains(edge):
@@ -643,12 +544,7 @@ def _unfold_shell(
         key: _develop_face(face, sheet_parameters) for key, face in faces_by_key.items()
     }
 
-    def face_area(face: TopoDS_Face) -> float:
-        properties = GProp_GProps()
-        BRepGProp.SurfaceProperties_s(face, properties)
-        return properties.Mass()
-
-    root_key = hash(max(planar_faces, key=face_area))
+    root_key = hash(max(planar_faces, key=_topods_area))
     placed = {root_key: developments[root_key]}
     queue = deque([root_key])
     while queue:
@@ -679,7 +575,7 @@ def _unfold_shell(
     if len(placed) != len(source_faces):
         raise ValueError("The Shell contains disconnected face groups")
 
-    result = _make_shell([developed.face for developed in placed.values()])
+    result = _make_topods_shell(developed.face for developed in placed.values())
     if not BRepCheck_Analyzer(result).IsValid():
         raise ValueError("Unfolding produced an invalid flat Shell")
     return result
