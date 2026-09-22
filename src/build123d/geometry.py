@@ -77,6 +77,7 @@ from OCP.gp import (
     gp_Pnt,
     gp_Quaternion,
     gp_Trsf,
+    gp_TrsfForm,
     gp_Vec,
     gp_XYZ,
 )
@@ -2774,13 +2775,60 @@ class Matrix:
 
         return [data[j][i] for i in range(4) for j in range(4)]
 
+    def svd(self) -> tuple[Matrix, Vector, Matrix]:
+        """Singular value decomposition of the linear part
+
+        Factors the 3x3 linear part of the transform as
+        ``left @ diag(scales) @ right``: read from the right, ``right`` turns
+        space, the scales stretch it along the three axes, and ``left`` turns
+        it again. Any affine matrix can be read this way, which is what makes
+        the decomposition useful: the scales say how much a transform stretches
+        and whether it mirrors, ``left`` gives the directions it stretches
+        along, and the image of a circle under the transform is an ellipse
+        with the scales as semi-axes and the columns of ``left`` as axes.
+
+        Both ``left`` and ``right`` are proper rotations. When the transform
+        mirrors, the last scale is negative. Scales come in descending order
+        of magnitude, so a transform that acts only in a plane, with a zero
+        scale across it, has its two in-plane axes as the first two columns
+        of ``left`` and the first two rows of ``right``.
+
+        Returns:
+            tuple[Matrix, Vector, Matrix]: ``left``, the scales, ``right``
+        """
+        linear = np.array([[self[row, col] for col in range(3)] for row in range(3)])
+        left, scales, right = np.linalg.svd(linear)
+        if np.linalg.det(left) < 0:
+            left[:, 2] *= -1
+            scales[2] *= -1
+        if np.linalg.det(right) < 0:
+            right[2, :] *= -1
+            scales[2] *= -1
+
+        def as_matrix(rows: np.ndarray) -> Matrix:
+            return Matrix([[*rows[row], 0.0] for row in range(3)])
+
+        return as_matrix(left), Vector(*scales), as_matrix(right)
+
     def __copy__(self) -> Matrix:
         """Return copy of self"""
-        return Matrix(self.wrapped.Trsf())
+        return Matrix(self._copied_trsf())
 
     def __deepcopy__(self, _memo) -> Matrix:
         """Return deepcopy of self"""
-        return Matrix(self.wrapped.Trsf())
+        return Matrix(self._copied_trsf())
+
+    def _copied_trsf(self) -> gp_GTrsf:
+        """An independent copy of the OCP transform
+
+        ``gp_GTrsf`` has no copy constructor in OCP. A similarity is copied
+        through its ``gp_Trsf``, which keeps OCCT's record of its form and
+        scale; a general affine transform, which ``Trsf()`` refuses, is copied
+        from its matrix and translation, which hold everything it has.
+        """
+        if self.wrapped.Form() != gp_TrsfForm.gp_Other:
+            return gp_GTrsf(self.wrapped.Trsf())
+        return gp_GTrsf(self.wrapped.VectorialPart(), self.wrapped.TranslationPart())
 
     def __getitem__(self, row_col: tuple[int, int]) -> float:
         """Provide Matrix[r, c] syntax for accessing individual values. The row

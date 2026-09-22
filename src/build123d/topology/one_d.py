@@ -142,7 +142,6 @@ from OCP.GeomFill import (
     GeomFill_Frenet,
     GeomFill_TrihedronLaw,
 )
-from OCP.GeomProjLib import GeomProjLib
 from OCP.gp import (
     gp_Ax1,
     gp_Ax2,
@@ -2545,9 +2544,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
                 # Specify a tangent for each interpolation point:
                 tangents_array = Array1_gp_Vec(1, len(tangent_vectors))
-                tangent_enabled_array = HArray1_bool(
-                    1, len(tangent_vectors)
-                )
+                tangent_enabled_array = HArray1_bool(1, len(tangent_vectors))
                 for t_index, t_value in enumerate(tangent_vectors):
                     tangent_enabled_array.SetValue(t_index + 1, t_value is not None)
                     tangent_vec = t_value if t_value is not None else Vector()
@@ -2786,52 +2783,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 loc.orientation = Vector(0, 0, 0)
 
         return locations
-
-    def _extend_spline(
-        self,
-        at_start: bool,
-        geom_surface: Geom_Surface,
-        extension_factor: float = 0.1,
-    ):
-        """Helper method to slightly extend an edge that is bound to a surface"""
-        if self._wrapped is None:
-            raise ValueError("Can't extend empty spline")
-        if self.geom_type != GeomType.BSPLINE:
-            raise TypeError("_extend_spline only works with splines")
-
-        u_start: float = self.param_at(0)
-        u_end: float = self.param_at(1)
-
-        curve_original = tcast(
-            Geom_BSplineCurve, BRep_Tool.Curve_s(self.wrapped, u_start, u_end)
-        )
-        n_poles = curve_original.NbPoles()
-        poles = [curve_original.Pole(i + 1) for i in range(n_poles)]
-        # Find position and tangent past end of spline to extend it
-        ends = (-extension_factor, 1) if at_start else (0, 1 + extension_factor)
-        if at_start:
-            new_pole = self.position_at(-extension_factor).to_pnt()
-            poles = [new_pole] + poles
-        else:
-            new_pole = self.position_at(1 + extension_factor).to_pnt()
-            poles = poles + [new_pole]
-        tangents: list[VectorLike] = [self.tangent_at(p) for p in ends]
-
-        pnts: list[VectorLike] = [Vector(p) for p in poles]
-        extended_edge = Edge.make_spline(pnts, tangents=tangents)
-        assert extended_edge.wrapped is not None
-
-        geom_curve = BRep_Tool.Curve_s(
-            extended_edge.wrapped, extended_edge.param_at(0), extended_edge.param_at(1)
-        )
-        snapped_geom_curve = GeomProjLib.Project_s(geom_curve, geom_surface)
-        if snapped_geom_curve is None:
-            raise RuntimeError("Failed to snap extended edge to surface")
-
-        # Build a new projected edge
-        snapped_edge = Edge(BRepBuilderAPI_MakeEdge(snapped_geom_curve).Edge())
-
-        return snapped_edge, snapped_geom_curve
 
     def find_intersection_points(
         self, other: Axis | Edge | None = None, tolerance: float = TOLERANCE
@@ -4068,7 +4019,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
         unchamfered_face = _make_topods_face_from_wires(self.wrapped)
         chamfer_builder = BRepFilletAPI_MakeFillet2d(unchamfered_face)
 
-        vertex_edge_map = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        vertex_edge_map = (
+            IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
         TopExp.MapShapesAndAncestors_s(
             unchamfered_face, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
         )
@@ -4360,7 +4313,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
             closest_topods_edge_param = extrema.ParOnEdgeS2(1)[0]
         elif supp_type == BRepExtrema_SupportType.BRepExtrema_IsVertex:
             v_hit = tcast(TopoDS_Vertex, downcast(extrema.SupportOnShape2(1)))
-            vertex_edge_map = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+            vertex_edge_map = (
+                IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+            )
             TopExp.MapShapesAndAncestors_s(
                 self.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
             )
@@ -4942,7 +4897,9 @@ def topo_explore_connected_faces(
         raise ValueError("edge has no valid parent")
 
     # make a edge --> faces mapping
-    edge_face_map = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+    edge_face_map = (
+        IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+    )
     TopExp.MapShapesAndAncestors_s(
         parent.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, edge_face_map
     )
