@@ -2759,11 +2759,27 @@ class Matrix:
         ...
 
     def multiply(self, other):
-        """Matrix multiplication"""
+        """Matrix multiplication
+
+        With a ``Vector``, the vector transformed; with a ``Matrix``, the
+        product that applies ``other`` first and then this matrix.
+        """
         if isinstance(other, Vector):
             return other.transform(self)
 
-        return Matrix(self.wrapped.Multiplied(other.wrapped))
+        # OCCT's gp_GTrsf product mixes the bare rotation of a similarity with
+        # its scale factor kept aside, so a mirror or a uniform scale times a
+        # general affine matrix loses that factor; multiply the values instead
+        return Matrix(
+            [
+                [
+                    sum(self[row, k] * other[k, col] for k in range(3))
+                    + (self[row, 3] if col == 3 else 0.0)
+                    for col in range(4)
+                ]
+                for row in range(3)
+            ]
+        )
 
     def transposed_list(self) -> Sequence[float]:
         """Needed by the cqparts gltf exporter"""
