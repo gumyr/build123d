@@ -110,7 +110,7 @@ from OCP.BRepTools import BRepTools
 from OCP.gce import gce_MakeLin
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
 from OCP.GeomLib import GeomLib_IsPlanarSurface
-from OCP.gp import gp_Ax1, gp_Ax2, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec, gp_XYZ
+from OCP.gp import gp_Ax1, gp_Ax2, gp_Dir, gp_Pnt, gp_Trsf, gp_TrsfForm, gp_Vec, gp_XYZ
 from OCP.GProp import GProp_GProps
 from OCP.ShapeAnalysis import ShapeAnalysis_Curve
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
@@ -133,11 +133,9 @@ from OCP.TopoDS import (
     TopoDS_Vertex,
     TopoDS_Wire,
 )
-from OCP.TopTools import (
-    TopTools_IndexedDataMapOfShapeListOfShape,
-    TopTools_ListOfShape,
-    TopTools_ShapeMapHasher,
-)
+from OCP.collections import IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher
+from OCP.collections import List_TopoDS_Shape
+from OCP.TopTools import TopTools_ShapeMapHasher
 from typing_extensions import Self
 
 from bd_materials import FinishedMaterial, resolve as resolve_material
@@ -530,7 +528,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
             shape = shape_stack.pop(0)
 
             # Create an empty indexed data map to store the edges and their corresponding faces.
-            shape_map = TopTools_IndexedDataMapOfShapeListOfShape()
+            shape_map = (
+                IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+            )
 
             # Fill the map with edges and their associated faces in the given shape. Each edge in
             # the map is associated with a list of faces that share that edge.
@@ -1635,7 +1635,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
     #     if self._wrapped is None:
     #         return {}
 
-    #     res = TopTools_IndexedDataMapOfShapeListOfShape()
+    #     res = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
 
     #     TopExp.MapShapesAndAncestors_s(
     #         self.wrapped,
@@ -2221,7 +2221,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if keep in [Keep.INSIDE, Keep.OUTSIDE]:
             raise ValueError(f"{keep} is invalid")
 
-        shape_list = TopTools_ListOfShape()
+        shape_list = List_TopoDS_Shape()
         shape_list.Append(self.wrapped)
 
         # Define the splitting tool
@@ -2230,7 +2230,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             if isinstance(tool, Plane)
             else tool.wrapped
         )
-        tool_list = TopTools_ListOfShape()
+        tool_list = List_TopoDS_Shape()
         tool_list.Append(trim_tool)
 
         # Create the splitter algorithm
@@ -2640,10 +2640,20 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self._wrapped is None:
             return self
         new_shape = copy.deepcopy(self, None)
-        transformed = downcast(
-            BRepBuilderAPI_GTransform(self.wrapped, t_matrix.wrapped, True).Shape()
-        )
-        new_shape.wrapped = tcast(TOPODS, transformed)
+        if t_matrix.wrapped.Form() == gp_TrsfForm.gp_Other:
+            # a general affine transform (stretch, shear): only GTransform
+            # can apply it, at the cost of converting geometry to splines
+            builder: BRepBuilderAPI_GTransform | BRepBuilderAPI_Transform = (
+                BRepBuilderAPI_GTransform(self.wrapped, t_matrix.wrapped, True)
+            )
+        else:
+            # a similarity: Transform applies it exactly and keeps the geometry
+            # types; GTransform would drop its scale factor, which a gp_GTrsf
+            # of any recognised form keeps apart from its matrix
+            builder = BRepBuilderAPI_Transform(
+                self.wrapped, t_matrix.wrapped.Trsf(), True
+            )
+        new_shape.wrapped = tcast(TOPODS, downcast(builder.Shape()))
 
         return new_shape
 
@@ -2783,12 +2793,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # The base of the operation
         base = args[0] if isinstance(args, (list, tuple)) else args
 
-        arg = TopTools_ListOfShape()
+        arg = List_TopoDS_Shape()
         for obj in args:
             if obj._wrapped is not None:
                 arg.Append(obj._wrapped)
 
-        tool = TopTools_ListOfShape()
+        tool = List_TopoDS_Shape()
         for obj in tools:
             if obj._wrapped is not None:
                 tool.Append(obj._wrapped)
@@ -3201,7 +3211,9 @@ def topo_distance_to(
 
     if peer_type == "Vertex":
         vertex_neighbors: dict[Shape, set[Shape]] = {peer: set() for peer in peers}
-        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        vertex_edge_map = (
+            IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
         TopExp.MapShapesAndAncestors_s(
             parent.wrapped,
             ta.TopAbs_VERTEX,
@@ -3228,7 +3240,7 @@ def topo_distance_to(
                     if neighbor is not None and neighbor != vertex_peer:
                         vertex_neighbors[vertex_peer].add(neighbor)
     else:
-        connector_peer_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        connector_peer_map = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
         TopExp.MapShapesAndAncestors_s(
             parent.wrapped,
             connector_enum_lut[peer_type],
@@ -4036,11 +4048,11 @@ def _topods_bool_op(
     """
     args = list(args)
     tools = list(tools)
-    arg = TopTools_ListOfShape()
+    arg = List_TopoDS_Shape()
     for obj in args:
         arg.Append(obj)
 
-    tool = TopTools_ListOfShape()
+    tool = List_TopoDS_Shape()
     for obj in tools:
         tool.Append(obj)
 

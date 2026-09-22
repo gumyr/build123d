@@ -35,6 +35,9 @@ from math import radians
 
 import OCP.GeomAbs as ga
 import OCP.TopAbs as ta
+from OCP.collections import (
+    IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
+)
 from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import (
@@ -61,7 +64,6 @@ from OCP.TopoDS import (
     TopoDS_Shell,
     TopoDS_Wire,
 )
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
 
 from build123d.build_enums import SheetSurface
 from build123d.geometry import TOLERANCE, Location, Matrix, Plane, Vector
@@ -618,7 +620,9 @@ def _unfold_shell(
     adjacency: dict[int, list[tuple[int, TopoDS_Edge]]] = {
         key: [] for key in faces_by_key
     }
-    edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
+    edge_face_map = (
+        IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+    )
     TopExp.MapShapesAndAncestors_s(shell, ta.TopAbs_EDGE, ta.TopAbs_FACE, edge_face_map)
     for raw_edge in _topods_entities(shell, ta.TopAbs_EDGE):
         edge = TopoDS.Edge(raw_edge)

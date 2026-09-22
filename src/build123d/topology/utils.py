@@ -66,7 +66,7 @@ from OCP.BRepPrimAPI import BRepPrimAPI_MakePrism
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopTools import TopTools_ListOfShape
+from OCP.collections import List_TopoDS_Shape
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Compound,
@@ -311,13 +311,13 @@ def new_edges(*objects: Shape, combined: Shape) -> ShapeList[Edge]:
         ShapeList[Edge]: new edges
     """
     # Create a list of combined object edges
-    combined_topo_edges = TopTools_ListOfShape()
+    combined_topo_edges = List_TopoDS_Shape()
     for edge in combined.edges():
         if edge.wrapped is not None:
             combined_topo_edges.Append(edge.wrapped)
 
     # Create a list of original object edges
-    original_topo_edges = TopTools_ListOfShape()
+    original_topo_edges = List_TopoDS_Shape()
     for edge in [e for obj in objects for e in obj.edges()]:
         if edge.wrapped is not None:
             original_topo_edges.Append(edge.wrapped)

@@ -191,6 +191,7 @@ __all__ = [
     "Edge",
     "Wire",
     "Face",
+    "UVFrame",
     "Matrix",
     "Solid",
     "Shell",
