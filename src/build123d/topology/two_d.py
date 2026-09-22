@@ -65,11 +65,10 @@ from typing import cast as tcast
 from typing import overload
 
 import OCP.TopAbs as ta
-from OCP.BRep import BRep_Builder, BRep_Tool
+from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Section
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing
-from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepFill import BRepFill
@@ -112,7 +111,6 @@ from OCP.Standard import (
     Standard_ConstructionError,
     Standard_Failure,
     Standard_NoSuchObject,
-    Standard_TypeMismatch,
 )
 from OCP.StdFail import StdFail_NotDone
 from OCP.collections import (
@@ -192,6 +190,10 @@ from .utils import (
     _extrude_topods_shape,
     _make_loft,
     _make_topods_face_from_wires,
+    _make_topods_shell,
+    _topods_face_center,
+    _topods_face_position,
+    _topods_point_on_face,
     find_max_dimension,
 )
 from .zero_d import Vertex
@@ -1237,11 +1239,16 @@ class Face(Mixin2D[TopoDS_Face]):
 
     @property
     def radius(self) -> None | float:
-        """Return the radius of a cylinder or sphere, otherwise None"""
-        if self.geom_type in [GeomType.CYLINDER, GeomType.SPHERE] and not isinstance(
-            self.geom_adaptor(), Geom_RectangularTrimmedSurface
-        ):
-            return self.geom_adaptor().Radius()  # type: ignore[attr-defined]
+        """Return the radius of a cylinder or sphere, otherwise None
+
+        Read through the same adaptor as ``geom_type``, so a cylinder or
+        sphere that arrived as a trimmed surface has its radius all the same.
+        """
+        adaptor = BRepAdaptor_Surface(self.wrapped)
+        if self.geom_type == GeomType.CYLINDER:
+            return adaptor.Cylinder().Radius()
+        if self.geom_type == GeomType.SPHERE:
+            return adaptor.Sphere().Radius()
         return None
 
     @property
@@ -1252,11 +1259,13 @@ class Face(Mixin2D[TopoDS_Face]):
 
     @property
     def semi_angle(self) -> None | float:
-        """Return the semi angle of a cone, otherwise None"""
-        if self.geom_type == GeomType.CONE and not isinstance(
-            self.geom_adaptor(), Geom_RectangularTrimmedSurface
-        ):
-            return degrees(self.geom_adaptor().SemiAngle())  # type: ignore[attr-defined]
+        """Return the semi angle of a cone, otherwise None
+
+        Read through the same adaptor as ``geom_type``, so a cone that
+        arrived as a trimmed surface has its semi angle all the same.
+        """
+        if self.geom_type == GeomType.CONE:
+            return degrees(BRepAdaptor_Surface(self.wrapped).Cone().SemiAngle())
         return None
 
     def _uv_edge(self, native_edge: TopoDS_Edge) -> Edge:
@@ -1987,21 +1996,13 @@ class Face(Mixin2D[TopoDS_Face]):
         if (center_of == CenterOf.MASS) or (
             center_of == CenterOf.GEOMETRY and self.is_planar
         ):
-            properties = GProp_GProps()
-            BRepGProp.SurfaceProperties_s(self.wrapped, properties)
-            center_point = properties.CentreOfMass()
+            center_point = _topods_face_center(self.wrapped)
 
         elif center_of == CenterOf.BOUNDING_BOX:
             center_point = self.bounding_box().center()
 
         elif center_of == CenterOf.GEOMETRY:
-            u_val0, u_val1, v_val0, v_val1 = self._uv_bounds()
-            u_val = 0.5 * (u_val0 + u_val1)
-            v_val = 0.5 * (v_val0 + v_val1)
-
-            center_point = gp_Pnt()
-            normal = gp_Vec()
-            BRepGProp_Face(self.wrapped).Normal(u_val, v_val, center_point, normal)
+            center_point = _topods_face_position(self.wrapped, 0.5, 0.5)
 
         return Vector(center_point)
 
@@ -2249,9 +2250,7 @@ class Face(Mixin2D[TopoDS_Face]):
           bool: indicating whether or not point is within Face
 
         """
-        solid_classifier = BRepClass3d_SolidClassifier(self.wrapped)
-        solid_classifier.Perform(gp_Pnt(*Vector(point)), tolerance)
-        return solid_classifier.IsOnAFace()
+        return _topods_point_on_face(self.wrapped, point, tolerance)
 
         # surface = BRep_Tool.Surface_s(self.wrapped)
         # projector = GeomAPI_ProjectPointOnSurf(Vector(point).to_pnt(), surface)
@@ -2565,15 +2564,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Vector: point on Face
         """
-        u_val0, u_val1, v_val0, v_val1 = self._uv_bounds()
-        u_val = u_val0 + u * (u_val1 - u_val0)
-        v_val = v_val0 + v * (v_val1 - v_val0)
-
-        gp_pnt = gp_Pnt()
-        normal = gp_Vec()
-        BRepGProp_Face(self.wrapped).Normal(u_val, v_val, gp_pnt, normal)
-
-        return Vector(gp_pnt)
+        return _topods_face_position(self.wrapped, u, v)
 
     def project_to_shape(
         self, target_object: Shape, direction: VectorLike
@@ -2866,16 +2857,9 @@ class Shell(Mixin2D[TopoDS_Shell]):
         if isinstance(obj, Face):
             if not obj:
                 raise ValueError("Can't create a Shell from empty Face")
-            builder = BRep_Builder()
-            shell = TopoDS_Shell()
-            builder.MakeShell(shell)
-            builder.Add(shell, obj.wrapped)
-            obj = shell
+            obj = _make_topods_shell([obj.wrapped])
         elif isinstance(obj, Iterable):
-            try:
-                obj = TopoDS.Shell(_sew_topods_faces([f.wrapped for f in obj]))
-            except Standard_TypeMismatch as exc:
-                raise TypeError("Unable to create Shell, invalid input type") from exc
+            obj = _make_topods_shell([f.wrapped for f in obj])
 
         super().__init__(
             obj=obj,

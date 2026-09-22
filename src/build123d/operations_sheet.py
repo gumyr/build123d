@@ -2,7 +2,7 @@
 Sheet Metal Operations
 
 name: operations_sheet.py
-by:   Gumyr & Gabriel Jesus
+by:   Gumyr
 date: July 21st 2026
 
 desc:
@@ -10,7 +10,7 @@ desc:
 
 license:
 
-    Copyright 2026 Gumyr & Gabriel Jesus
+    Copyright 2026 Gumyr
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ from math import asin, atan, cos, degrees, radians, sin, sqrt, tan
 from statistics import median
 from typing import Callable, Literal, overload
 
+from scipy.optimize import brentq
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.Geom import Geom_CylindricalSurface
 from OCP.gp import gp_Ax3
@@ -59,18 +60,20 @@ from build123d.sheet_utils import (
     neutral_radius,
     reference_radius,
 )
+from build123d.topology.shape_core import _faces_of
+from build123d.topology.utils import _topods_material_side
 from build123d.topology import (
     Compound,
     Edge,
     Face,
     Shape,
+    ShapeList,
     Shell,
     Sketch,
     Solid,
     UVFrame,
     Vertex,
     Wire,
-    topo_explore_common_vertex,
     topo_explore_connected_faces,
 )
 from build123d.topology.shape_core import find_same_topods
@@ -94,11 +97,6 @@ def _neighbours(edge: Edge, shell: Shell, kind: GeomType | None = None) -> list[
         if raw is not None
     ]
     return faces if kind is None else [face for face in faces if face.geom_type == kind]
-
-
-def _direction(edge: Edge) -> Vector:
-    """The unit vector from a straight edge's start to its end."""
-    return (Vector(edge.position_at(1)) - Vector(edge.position_at(0))).normalized()
 
 
 def _bend_radius(parameters: SheetMetalParameters, radius: float | None) -> float:
@@ -144,14 +142,10 @@ def _support_face(edge: Edge, target: Shell) -> Face:
 
 
 def _outward_direction(edge: Edge, support: Face) -> tuple[Vector, Vector]:
-    """Return the outward in-plane direction and oriented support normal."""
-    tangent = _direction(edge)
-    normal = support.normal_at(edge.position_at(0.5)).normalized()
-    outward = tangent.cross(normal).normalized()
-    probe_distance = max(edge.length * 1e-5, 1e-5)
-    if support.is_inside(edge.position_at(0.5) + outward * probe_distance):
-        outward = -outward
-    return outward, normal
+    """The in-plane direction out of a face across one of its edges, and the
+    face's normal there."""
+    outward = -_topods_material_side(support.wrapped, edge.wrapped)
+    return outward, support.normal_at(edge.position_at(0.5)).normalized()
 
 
 def _current_sheet(context: BuildSheet, shapes: list, what: str) -> Shell:
@@ -256,8 +250,8 @@ def _flange_faces(
             continue
         # the flat the bend and its wall are made from: what came out of the
         # face behind the edge, and new material from the edge on
-        beyond = _flat_rectangle(
-            zone.edge, zone.outward, 0, allowance - setback + leg_length
+        beyond = Face.extrude(
+            zone.edge, zone.outward * (allowance - setback + leg_length)
         )
         flat = taken + [_orient_face(beyond, zone.normal)]
         additions += _bend_and_leg(zone, angle, radius, leg_length, (flat, allowance))
@@ -297,7 +291,7 @@ def _bend_zone(
     """Place a bend on a free edge of its supporting face."""
     outward, normal = _outward_direction(edge, support)
     p0, p1 = Vector(edge.position_at(0)), Vector(edge.position_at(1))
-    tangent = _direction(edge)
+    tangent = edge.tangent_at()
     if sum(gaps) >= edge.length:
         raise ValueError("gaps leave no bend width on the edge")
     gapped = Edge.make_line(p0 + tangent * gaps[0], p1 - tangent * gaps[1])
@@ -325,7 +319,9 @@ def _oblique_reach(
     if gap > 0:
         return 0.0
     corner = Vector(edge.position_at(end))
-    along = _direction(edge) * (1 if end == 0 else -1)  # from the corner, into the edge
+    along = edge.tangent_at() * (
+        1 if end == 0 else -1
+    )  # from the corner, into the edge
     for side in support.edges():
         if side.is_same(edge) or side.geom_type != GeomType.LINE:
             continue
@@ -370,7 +366,7 @@ def _bend_zones(
             continue
         takes = []
         for edge, zone in zip(group, zones):
-            tangent = _direction(zone.near)
+            tangent = zone.near.tangent_at()
             reach = [
                 _oblique_reach(edge, support, zone, setback, gaps[end], end)
                 for end in (0, 1)
@@ -380,9 +376,7 @@ def _bend_zones(
                 Vector(zone.near.position_at(1)) + tangent * reach[1],
             )
             takes.append(
-                _orient_face(
-                    _flat_rectangle(strip, zone.outward, 0, setback), zone.normal
-                )
+                _orient_face(Face.extrude(strip, zone.outward * setback), zone.normal)
             )
         for index, take in enumerate(takes):
             if any(_planar_pieces(take.intersect(other)) for other in takes[:index]):
@@ -502,30 +496,9 @@ def _band(
     return pieces
 
 
-def _flat_rectangle(line: Edge, across: Vector, start: float, end: float) -> Face:
-    """The rectangle spanning a line from ``start`` to ``end`` along ``across``."""
-    p0, p1 = Vector(line.position_at(0)), Vector(line.position_at(1))
-    return Face(
-        Wire.make_polygon(
-            [
-                p0 + across * start,
-                p1 + across * start,
-                p1 + across * end,
-                p0 + across * end,
-            ]
-        )
-    )
-
-
-def _planar_pieces(shape: Shape | list | None) -> list[Face]:
-    """The faces a boolean on planar faces left, in whatever form it left them."""
-    if shape is None:
-        return []
-    if isinstance(shape, Face):
-        return [shape]
-    if isinstance(shape, list):
-        return [piece for item in shape for piece in _planar_pieces(item)]
-    return [face for face in shape.faces() if face.area > _RELIEF_TOLERANCE]
+def _planar_pieces(result: Shape | list | None) -> list[Face]:
+    """The faces a boolean on planar faces left, slivers dropped."""
+    return [face for face in _faces_of(result) if face.area > _RELIEF_TOLERANCE]
 
 
 def _apply_faces(
@@ -828,8 +801,8 @@ def jog(
             raise ValueError("a jog off a free edge needs a positive length")
         zoned, additions, replaced = _bend_zones(target, edge_list, gap_pair, setback)
         for zone, taken in zoned:
-            beyond = _flat_rectangle(
-                zone.edge, zone.outward, 0, profile.consumed - setback + length
+            beyond = Face.extrude(
+                zone.edge, zone.outward * (profile.consumed - setback + length)
             )
             folded, _ = _jog_faces(
                 taken + [_orient_face(beyond, zone.normal)],
@@ -1009,13 +982,13 @@ def _miter_support(vertex: Vertex, target: Shell) -> tuple[Face, Edge, Edge, Edg
                 bend_edges.append(edge)
 
         for bend_edge in bend_edges:
-            bend_direction = _direction(bend_edge)
+            bend_direction = bend_edge.tangent_at()
             for rim_edge in face.edges().filter_by(GeomType.LINE):
                 if not _contains_vertex(rim_edge, vertex):
                     continue
                 if len(_neighbours(rim_edge, target)) != 1:
                     continue
-                if abs(abs(bend_direction.dot(_direction(rim_edge))) - 1) > 1e-6:
+                if abs(abs(bend_direction.dot(rim_edge.tangent_at())) - 1) > 1e-6:
                     continue
 
                 for side_edge in face.edges().filter_by(GeomType.LINE):
@@ -1292,7 +1265,7 @@ def _remodel_bend(
         Face(Wire.make_polygon(corners)), developed.normal_at(developed.center())
     )
     reshaped = developed.cut(triangle) if reach > 0 else developed.fuse(triangle)
-    pieces = [reshaped] if isinstance(reshaped, Face) else list(reshaped.faces())
+    pieces = list(_faces_of(reshaped))
     if len(pieces) != 1:
         raise ValueError("the miter cuts the bend into pieces")
     return _orient_face(
@@ -1351,7 +1324,7 @@ def _meet_crossing_miters(
             if first.travel + partner.travel <= first.rim.length + TOLERANCE:
                 continue
             meeting = _lines_meet(
-                face, first.anchor, first.direction, partner.anchor, partner.direction
+                first.anchor, first.direction, partner.anchor, partner.direction
             )
             replacements[first.vertex] = meeting
             replacements[partner.vertex] = meeting
@@ -1366,44 +1339,21 @@ def _meet_crossing_miters(
             )
             start = Vector(far_side.position_at(0))
             meeting = _lines_meet(
-                face,
-                first.anchor,
-                first.direction,
-                start,
-                (Vector(far_side.position_at(1)) - start).normalized(),
+                first.anchor, first.direction, start, far_side.tangent_at()
             )
             replacements[first.vertex] = meeting
             replacements[first.far_vertex] = meeting
 
 
 def _lines_meet(
-    face: Face, origin: Vector, heading: Vector, other: Vector, other_heading: Vector
+    origin: Vector, heading: Vector, other: Vector, other_heading: Vector
 ) -> Vector:
-    """Where two lines in a face's plane cross."""
-    normal = face.normal_at(face.center())
-    denominator = heading.cross(other_heading).dot(normal)
-    if abs(denominator) < TOLERANCE:  # pragma: no cover - miters always cross
+    """Where two lines in a flange's plane cross."""
+    meeting = Axis(origin, heading).intersect(Axis(other, other_heading))
+    # parallel lines meet nowhere, and lines along one another everywhere
+    if not isinstance(meeting, Vector):  # pragma: no cover - miters always cross
         raise ValueError("the miter cuts on this flange run parallel")
-    along = (other - origin).cross(other_heading).dot(normal)
-    return origin + heading * (along / denominator)
-
-
-def _bisection(func, lower: float, upper: float, eps: float = 1.0e-9) -> float:
-    """Return a root of ``func`` in the inclusive interval."""
-    f_lower, f_upper = func(lower), func(upper)
-    if f_lower * f_upper > 0:
-        raise ValueError("Teardrop hem has unexpected incorrect geometry")
-    mid = 0.5 * (lower + upper)
-    previous = mid + 2 * eps
-    while abs(mid - previous) >= eps:
-        previous = mid
-        f_mid = func(mid)
-        if f_lower * f_mid < 0:
-            upper = mid
-        else:
-            lower, f_lower = mid, f_mid
-        mid = 0.5 * (lower + upper)
-    return mid
+    return meeting
 
 
 def _hem_parameters(
@@ -1465,7 +1415,10 @@ def _hem_parameters(
         def equation(leg: float) -> float:
             return leg - width + bend_width + thickness * sin(2 * atan(radius / leg))
 
-        leg = _bisection(equation, width - bend_width - thickness, width - bend_width)
+        try:
+            leg = brentq(equation, width - bend_width - thickness, width - bend_width)
+        except ValueError as exc:  # no sign change: no leg satisfies the geometry
+            raise ValueError("Teardrop hem has unexpected incorrect geometry") from exc
         if opening == 0.0:
             theta = atan(radius / leg)
             return leg, 180.0 + 2 * degrees(theta), radius
@@ -1697,14 +1650,15 @@ def sheet_shells(
     and the matching ``SheetSurface``, for :func:`unfold` or further sheet
     operations.
 
-    The thickness faces are found by measurement rather than by geometry type.
-    Every face is measured between its non-adjacent boundary edges. Every edge
-    face, hole wall, relief and hem end has two boundary edges exactly the
-    thickness apart, so taking away the faces that measure the thickness
-    leaves the two sheet surfaces, and the thickness is the smallest distance
-    shared by two or more faces that does so. A larger one can do the same by
-    accident: the faces as long as an extruded profile are all of its sheet
-    faces, and taking those away leaves its two ends.
+    The two surfaces are found as pairs of faces with the sheet between them.
+    A bend is two coaxial cylinders side by side whose radii differ by the
+    thickness, which nothing else on a sheet-metal part is, so where the part
+    has bends they settle the thickness. A flat is two planar faces facing
+    away from each other, one behind the other, with the sheet between; the
+    faces of the sheet's edges pair the same way across its width, but a
+    sheet's faces are far larger than its edge faces, so the distance the
+    most face area agrees on is the thickness. The faces of pairs at that
+    distance are the surfaces, and sew into the two sides of the sheet.
 
     A known ``thickness`` is taken as given and none is searched for, which
     settles a part whose own measurements are ambiguous.
@@ -1722,9 +1676,9 @@ def sheet_shells(
     Raises:
         ValueError: the shape holds no single solid, or thickness or
             tolerance is not positive
-        ValueError: no face has a pair of separated edges to measure
-        ValueError: no distance is a thickness, leaving exactly two surfaces,
-            or the given thickness does not
+        ValueError: no pair of faces has the sheet between them
+        ValueError: the faces at the thickness do not form exactly two
+            surfaces
 
     Returns:
         tuple[Shell, Shell, float]: the two sheet surfaces, larger area first,
@@ -1739,69 +1693,109 @@ def sheet_shells(
         raise ValueError(f"sheet_shells takes one solid, given {len(solids)}")
     faces = solids[0].faces()
 
-    # every face votes with the distances between its non-adjacent outer edges
-    votes: list[tuple[Face, float]] = []
-    for face in faces:
-        edges = face.outer_wire().edges()
-        for first, second in combinations(edges, 2):
-            # two edges of a single wire always share both vertices
-            if len(edges) != 2 and topo_explore_common_vertex(first, second):
-                continue
-            votes.append((face, first.distance_to(second)))
-    if not votes:
-        raise ValueError("no face has a pair of separated edges to measure")
+    bends = _bend_pairs(faces)
+    flats = _flat_pairs(faces, solids[0].bounding_box().diagonal)
+    if not bends and not flats:
+        raise ValueError("no pair of faces has a sheet between them")
 
-    def surfaces(distance: float) -> list[Shell]:
-        """The two surfaces left without the faces that measure a distance,
-        or nothing when that is not what is left
+    def agreed(pairs: list[tuple[Face, Face, float]], weigh: bool) -> float:
+        """The distance the pairs agree on, by area or by count"""
+        clusters: list[list[tuple[float, float]]] = []
+        for _, _, distance in sorted(pairs, key=lambda pair: pair[2]):
+            if clusters and distance - clusters[-1][-1][0] <= tolerance * distance:
+                clusters[-1].append((distance, 1.0))
+            else:
+                clusters.append([(distance, 1.0)])
+        if weigh:
+            by_distance = {round(d, 12): 0.0 for _, _, d in pairs}
+            for first, _, distance in pairs:
+                by_distance[round(distance, 12)] += first.area_without_holes
+            clusters = [
+                [(d, by_distance[round(d, 12)]) for d, _ in cluster]
+                for cluster in clusters
+            ]
+        best = max(clusters, key=lambda cluster: sum(w for _, w in cluster))
+        return median(d for d, _ in best)
 
-        A distance that is not the thickness leaves an arbitrary set of
-        faces, and the kernel refusing to sew them only says so again.
-        """
-        thickness_faces = {
-            face
-            for face, measured in votes
-            if abs(measured - distance) <= tolerance * distance
-        }
-        sheet_faces = [face for face in faces if face not in thickness_faces]
-        try:
-            groups = Face.sew_faces(sheet_faces) if sheet_faces else []
-            return [Shell(group) for group in groups] if len(groups) == 2 else []
-        # the kernel's failures share no base class
-        except Exception:  # pylint: disable=broad-exception-caught
-            return []
+    # bends settle it where there are any: a rolled tube's only planar faces
+    # are its ends, whose flats measure its length
+    if thickness is None:
+        thickness = agreed(bends, weigh=False) if bends else agreed(flats, True)
 
-    if thickness is not None:
-        candidates = [thickness]
-    else:
-        # distances that agree to three places are one candidate, measured by
-        # their median; one that a single face measures is a width, not a
-        # thickness
-        ballots: dict[float, list[tuple[Face, float]]] = {}
-        for face, distance in votes:
-            ballots.setdefault(round(distance, 3), []).append((face, distance))
-        candidates = sorted(
-            median(distance for _, distance in ballot)
-            for ballot in ballots.values()
-            if len({face for face, _ in ballot}) >= 2
-        )
-
-    # the thickness is the smallest of them whose faces, taken away, leave two
-    # surfaces. How many faces share a distance says nothing: every sheet face
-    # of an extruded profile measures the length of the part
-    for candidate in candidates:
-        shells = sorted(surfaces(candidate), key=lambda shell: -shell.area)
-        if shells:
-            return shells[0], shells[1], candidate
-    if thickness is not None:
+    sheet_faces: list[Face] = []
+    for first, second, distance in bends + flats:
+        if abs(distance - thickness) <= tolerance * thickness:
+            sheet_faces += [
+                face
+                for face in (first, second)
+                if all(not face.is_same(known) for known in sheet_faces)
+            ]
+    groups = Face.sew_faces(sheet_faces) if sheet_faces else []
+    if len(groups) != 2:
         raise ValueError(
-            f"taking away the faces that measure {thickness:g} does not leave "
+            f"the faces {thickness:g} apart form {len(groups)} surfaces, not "
             "the two sides of a sheet"
         )
-    raise ValueError(
-        "no distance between a face's edges is a thickness: taking away the "
-        "faces that measure it never leaves the two sides of a sheet"
-    )
+    shells = sorted((Shell(group) for group in groups), key=lambda s: -s.area)
+    return shells[0], shells[1], thickness
+
+
+def _bend_pairs(faces: ShapeList[Face]) -> list[tuple[Face, Face, float]]:
+    """The two surfaces of each bend, and the distance between them.
+
+    Coaxial cylinders whose spans overlap along the axis: a bend's two
+    surfaces sit side by side, where a counterbore's cylinders sit end to end
+    and differ by the step rather than the thickness.
+    """
+    pairs = []
+    for first, second in combinations(faces.filter_by(GeomType.CYLINDER), 2):
+        # every cylinder has an axis and a radius; the None is for the others
+        axis, other = first.axis_of_rotation, second.axis_of_rotation
+        assert axis is not None and other is not None
+        if not axis.is_coaxial(other):
+            continue
+        spans = [
+            [(Vector(v) - axis.position).dot(axis.direction) for v in face.vertices()]
+            for face in (first, second)
+        ]
+        if min(max(spans[0]), max(spans[1])) - max(min(spans[0]), min(spans[1])) <= 0:
+            continue
+        assert first.radius is not None and second.radius is not None
+        # one cylinder in two faces is no bend either
+        if abs(first.radius - second.radius) > TOLERANCE:
+            pairs.append((first, second, abs(first.radius - second.radius)))
+    return pairs
+
+
+def _flat_pairs(faces: ShapeList[Face], reach: float) -> list[tuple[Face, Face, float]]:
+    """Each planar face with the face behind it, and the distance between.
+
+    The face behind is the nearest planar face facing the other way in the
+    face's own shadow, cast into the material as far as the part reaches:
+    the first thing the material behind the face meets. Being the face's own
+    shadow it takes the holes with it, and it finds the face however far off
+    it is, so a face lists once, with what is behind it, though what lies
+    further along the shadow past that face may face this way too.
+    """
+    pairs = []
+    planes = faces.filter_by(GeomType.PLANE)
+    for face in planes:
+        normal = face.normal_at()
+        shadow = Solid.extrude(face, -normal * reach)
+        behind = [
+            (face.distance_to(other), other)
+            for other in planes
+            if normal.dot(other.normal_at()) <= -1 + TOLERANCE
+        ]
+        nearest = None
+        for distance, other in sorted(behind, key=lambda item: item[0]):
+            hit = shadow.intersect(other)
+            if hit is not None and hit.faces():
+                nearest = (face, other, distance)
+                break
+        if nearest is not None:
+            pairs.append(nearest)
+    return pairs
 
 
 @overload
@@ -1980,7 +1974,7 @@ def _cut_corner_relief(
     if relief_type is ReliefType.CONSTANT_WIDTH:
         cutter = _constant_width_cutter(shell, at, depth)
         cut = shell.cut(cutter)
-        result = cut if isinstance(cut, Shell) else Shell(cut.faces())
+        result = cut if isinstance(cut, Shell) else Shell(_faces_of(cut))
     elif profile is not None:
         result = _replace_relief_faces(shell, _trim_faces(at.frames, profile))
     else:
@@ -2212,7 +2206,7 @@ def _corner_frames(
         if not bends:
             continue
         start = Vector(edge.position_at(0))
-        along = _direction(edge)
+        along = edge.tangent_at()
         offset = corner - start
         if (offset - along * offset.dot(along)).length > _RELIEF_TOLERANCE:
             continue  # the corner is not on this fold line
@@ -2271,8 +2265,7 @@ def _trim_face(frame: UVFrame, profile: Face) -> Face | None:
         ValueError: the cut separates part of the face from the rest
     """
     developed = frame.face.uv_face
-    cut = developed.cut(frame.lift(profile))
-    pieces = [cut] if isinstance(cut, Face) else list(cut.faces())
+    pieces = list(_faces_of(developed.cut(frame.lift(profile))))
     if len(pieces) > 1:
         raise ValueError("the cut separates part of the face from the rest")
     if not pieces or abs(pieces[0].area - developed.area) < _RELIEF_TOLERANCE:
@@ -2423,7 +2416,7 @@ def _flange_gap(shell: Shell, at: _Corner, faces: list | None = None) -> float:
             raise ValueError("flange wall has no free edge")
         edges.append(min(free, key=lambda e: e.distance_to(corner)))
 
-    directions = [_direction(e) for e in edges]
+    directions = [e.tangent_at() for e in edges]
     if directions[0].cross(directions[1]).length > 1e-6:
         raise ValueError(
             "flange edges at this corner are not parallel, so the gap between "
@@ -2565,15 +2558,11 @@ def _relief_default(
 def _fold_outward(face: Face, fold: Edge) -> Vector:
     """The direction across a fold line that points away from a planar face.
 
-    Found by stepping off the line, the way ``flange`` finds it, rather than by
-    asking which side of it the face's centre lies on. A centre says nothing
-    useful about a fold line bounding a hole, where it sits inside the hole and
-    the material is on the far side of the line from it.
+    Read from how the face walks the line rather than from where its centre
+    lies: a centre says nothing useful about a fold line bounding a hole,
+    where it sits inside the hole and the material is on the far side.
     """
-    middle = fold.position_at(0.5)
-    outward = _direction(fold).cross(face.normal_at(middle)).normalized()
-    probe = middle + outward * max(fold.length * 1e-5, 1e-5)
-    return -outward if face.is_inside(probe) else outward
+    return -_topods_material_side(face.wrapped, fold.wrapped)
 
 
 def _bend_end_probe(
@@ -2616,7 +2605,7 @@ def _bend_ends(cylinder: Face, shell: Shell) -> list:
         raise ValueError("bend_relief takes only cylindrical bend faces")
     folds = _bend_folds(cylinder, shell)
     first = folds[0][0]
-    along = _direction(first)
+    along = first.tangent_at()
     step = _RELIEF_PROBE * min(first.length, radius)
     middle = cylinder.center()
 
@@ -2668,7 +2657,7 @@ def _bend_end_frames(
         corners = [Vector(edge.position_at(end)) for end in (0.0, 1.0)]
         if min((corner - point).length for corner in corners) > _RELIEF_TOLERANCE:
             continue
-        if abs(_direction(edge).dot(away)) < 1 - _RELIEF_TOLERANCE:
+        if abs(edge.tangent_at().dot(away)) < 1 - _RELIEF_TOLERANCE:
             continue  # a fold line crossing this one, not the one ending here
         planes = _neighbours(edge, shell, GeomType.PLANE)
         bends = _neighbours(edge, shell, GeomType.CYLINDER)
@@ -2938,12 +2927,7 @@ def _fold_pieces(
 ) -> list[Face]:
     """The parts of a planar face on one side of a line through it."""
     plane = Plane(origin=tuple(origin), z_dir=tuple(across))
-    piece = face.split(plane, keep=Keep.TOP if beyond else Keep.BOTTOM)
-    if piece is None:
-        return []
-    if isinstance(piece, Face):
-        return [piece]
-    return [p for p in piece if isinstance(p, Face)]
+    return list(_faces_of(face.split(plane, keep=Keep.TOP if beyond else Keep.BOTTOM)))
 
 
 def _wrap_strip(

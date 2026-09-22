@@ -9,10 +9,10 @@ from OCP.GProp import GProp_GProps
 
 from build123d import *
 from build123d.operations_sheet import (
+    _bend_pairs,
     _corner_mirror_plane,
     _flange_separation,
     MIN_BEND_RADIUS,
-    _bisection,
     _hem_parameters,
     _outward_direction,
 )
@@ -55,10 +55,9 @@ class TestSheetMetalParameters(unittest.TestCase):
 
 
 class TestBuildSheetBase(unittest.TestCase):
-    def test_accessors_and_pending_edges(self):
+    def test_accessors(self):
         builder = BuildSheet(thickness=1.5)
         self.assertEqual(builder.thickness, 1.5)
-        self.assertIsNone(builder.pending_edges_as_wire)
 
         first = Shell(Face.make_rect(10, 10))
         builder.sheet = first
@@ -67,8 +66,21 @@ class TestBuildSheetBase(unittest.TestCase):
         builder._obj = second
         self.assertTrue(builder.sheet_local.is_same(second))
 
-        builder._add_to_context(Edge.make_line((0, 0), (1, 0)))
-        self.assertIsInstance(builder.pending_edges_as_wire, Wire)
+    def test_edges_are_refused(self):
+        """Nothing in a sheet is made from a line, so a nested BuildLine is an
+        error rather than something quietly kept for an operation that never
+        comes"""
+        with BuildSheet(thickness=1.5) as builder:
+            with BuildSketch():
+                Rectangle(20, 10)
+            with self.assertRaisesRegex(ValueError, "no edges or wires"):
+                with BuildLine():
+                    Line((0, 0), (5, 0))
+            with self.assertRaisesRegex(ValueError, "no edges or wires"):
+                builder._add_to_context(Edge.make_line((0, 0), (1, 0)))
+            with self.assertRaises(NotImplementedError):
+                builder._add_to_pending(Edge.make_line((0, 0), (1, 0)))
+        self.assertEqual(len(builder.sheet.faces()), 1)
 
     def test_bends_and_flats(self):
         """A sheet reads as flats joined by bends, so the two selectors say
@@ -2483,8 +2495,6 @@ class TestHemParameters(unittest.TestCase):
         self.assertAlmostEqual(residual, 0, 6)
 
     def test_errors(self):
-        with self.assertRaisesRegex(ValueError, "unexpected incorrect geometry"):
-            _bisection(lambda value: value**2 + 1, -1, 1)
         with self.assertRaises(ValueError):
             _hem_parameters(HemType.OPEN, 1, 8, -1, None, None)
         with self.assertRaises(ValueError):
@@ -2528,9 +2538,11 @@ class TestExcludedOperations(unittest.TestCase):
     def test_make_brake_formed_not_available_in_build_sheet(self):
         with self.assertRaises(RuntimeError):
             with BuildSheet(thickness=1):
-                with BuildLine():
-                    Polyline((0, 0), (20, 0), (20, 15))
-                make_brake_formed(thickness=1, station_widths=30)
+                make_brake_formed(
+                    thickness=1,
+                    station_widths=30,
+                    line=Polyline((0, 0), (20, 0), (20, 15)),
+                )
 
 
 class TestCornerRelief(unittest.TestCase):
@@ -3485,27 +3497,45 @@ class TestSheetShells(unittest.TestCase):
         self.assertAlmostEqual(larger.area, 80, 6)
         self.assertAlmostEqual(smaller.area, 80, 6)
         # the wrong thickness is refused rather than replaced by a found one
-        with self.assertRaisesRegex(ValueError, "measure 1.2 does not leave"):
+        with self.assertRaisesRegex(ValueError, "1.2 apart form"):
             sheet_shells(part, thickness=1.2)
         with self.assertRaisesRegex(ValueError, "thickness must be positive"):
             sheet_shells(part, thickness=0)
 
-    def test_unsewable_leftovers_are_passed_over(self):
-        """The faces a wrong distance leaves are arbitrary; the kernel failing
-        on them rules that distance out and the search goes on"""
-        sew_faces = Face.sew_faces
-        calls = []
+    def test_bends_settle_the_thickness(self):
+        """A bend's two surfaces are coaxial cylinders a thickness apart; a
+        rolled tube has no flat but its ends, which measure its length"""
+        larger, smaller, thickness = sheet_shells(Cylinder(20, 100) - Cylinder(18, 100))
+        self.assertAlmostEqual(thickness, 2, 6)
+        self.assertAlmostEqual(larger.area, 2 * pi * 20 * 100, 4)
+        self.assertAlmostEqual(smaller.area, 2 * pi * 18 * 100, 4)
+        # a counterbore's cylinders are coaxial too, but end to end
+        plate = Box(40, 30, 3) - Cylinder(3, 3) - Pos(0, 0, 1) * Cylinder(6, 1)
+        self.assertEqual(_bend_pairs(plate.faces()), [])
 
-        def fail_first(faces):
-            calls.append(len(calls))
-            if len(calls) == 1:
-                raise RuntimeError("could not sew")
-            return sew_faces(faces)
-
-        with patch.object(Face, "sew_faces", side_effect=fail_first):
-            _, _, thickness = sheet_shells(self.bracket())
-        self.assertAlmostEqual(thickness, 1.5, 4)
-        self.assertGreater(len(calls), 1)
+    def test_a_face_pairs_with_the_first_face_behind_it(self):
+        """A channel's wall is a sheet thick, though its shadow goes on across
+        the web to the slot walls a hair further and the far wall beyond"""
+        profile = Rectangle(110, 60, align=(Align.CENTER, Align.MIN)) - Rectangle(
+            90, 60, align=(Align.CENTER, Align.MIN)
+        ).moved(Pos(0, 10))
+        channel = extrude(profile.face(), 300)
+        slots = [
+            extrude(
+                Plane.XZ.offset(-20)
+                * SlotOverall(24, 8, rotation=90).face().moved(Pos(x, z)),
+                40,
+            )
+            for x in (-40, 40)
+            for z in (50, 150, 250)
+        ]
+        larger, smaller, thickness = sheet_shells(channel - slots)
+        self.assertAlmostEqual(thickness, 10, 6)
+        self.assertEqual(len(larger.faces()), 3)
+        self.assertEqual(len(smaller.faces()), 3)
+        self.assertAlmostEqual(
+            larger.area, (110 + 2 * 60) * 300 - 6 * (16 * 8 + pi * 16), 4
+        )
 
     def test_thickness_is_as_measured(self):
         """A sixteenth of an inch, which does not round to three places"""
@@ -3561,10 +3591,12 @@ class TestSheetShells(unittest.TestCase):
     def test_refusals(self):
         with self.assertRaisesRegex(ValueError, "one solid"):
             sheet_shells(Box(1, 1, 1) + Pos(5, 0, 0) * Box(1, 1, 1))
-        # every face of a cube measures the same; a sphere's measures nothing
-        for solid in (Box(10, 10, 10), Sphere(5)):
-            with self.assertRaisesRegex(ValueError, "never leaves the two sides"):
-                sheet_shells(solid)
+        # a cube's faces all pair at the same distance, into one surface; a
+        # sphere has no pair at all
+        with self.assertRaisesRegex(ValueError, "not the two sides"):
+            sheet_shells(Box(10, 10, 10))
+        with self.assertRaisesRegex(ValueError, "no pair of faces"):
+            sheet_shells(Sphere(5))
         with self.assertRaisesRegex(ValueError, "tolerance"):
             sheet_shells(Box(40, 30, 2), tolerance=0)
 

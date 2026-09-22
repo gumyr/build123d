@@ -33,6 +33,7 @@ import random
 import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
+from OCP.BRep import BRep_Tool
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.gp import gp_Ax3, gp_Dir, gp_Pnt
 from OCP.Geom import Geom_RectangularTrimmedSurface
@@ -1439,6 +1440,7 @@ class TestFace(unittest.TestCase):
         trim_face = Face(BRepBuilderAPI_MakeFace(trim_surf, 1e-6).Face())
         self.assertAlmostEqual(trim_face.axis_of_rotation.direction, (0, 0, 1), 5)
         self.assertAlmostEqual(trim_face.axis_of_rotation.position, (0, 0, 0), 5)
+        self.assertAlmostEqual(trim_face.radius, 2.0, 5)
 
         # Geom_OffsetSurface
         cyl_off_surf = Geom_OffsetSurface(cyl_surf, 0.5)
@@ -1796,6 +1798,16 @@ class TestFaceProperties(unittest.TestCase):
                 lateral = Cone(bottom, top, height).faces().filter_by(GeomType.CONE)[0]
                 expected = math.degrees(math.atan((bottom - top) / height))
                 self.assertAlmostEqual(abs(lateral.semi_angle), expected, 5)
+
+    def test_semi_angle_of_a_trimmed_cone(self):
+        """A cone that arrived as a trimmed surface is still a cone"""
+        lateral = Cone(5, 0, 5).faces().filter_by(GeomType.CONE)[0]
+        trimmed = Geom_RectangularTrimmedSurface(
+            BRep_Tool.Surface_s(lateral.wrapped), 0.0, 1.0, 0.0, 2.0
+        )
+        face = Face(BRepBuilderAPI_MakeFace(trimmed, 1e-6).Face())
+        self.assertEqual(face.geom_type, GeomType.CONE)
+        self.assertAlmostEqual(abs(face.semi_angle), 45, 5)
 
     def test_semi_angle_of_other_surfaces(self):
         self.assertIsNone(Rectangle(1, 1).face().semi_angle)

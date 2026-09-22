@@ -27,16 +27,19 @@ label.
 How it finds them
 ******************
 
-The thickness faces, the narrow faces along every edge, hole, relief and hem,
-are found by measurement rather than by type. Every face is measured between
-its non-adjacent boundary edges. Each thickness face has two boundary edges
-exactly the thickness apart, so taking away the faces that measure the
-thickness leaves the two surfaces, and the thickness is the smallest distance
-shared by two or more faces that does so. The smallest matters: along an
-extruded profile, a channel or a trough, every sheet face measures the length
-of the part, and taking those away also leaves two surfaces, its two ends.
-Every face with a pair of edges at the thickness is then a thickness face, and
-what remains sews into the two surfaces.
+The two surfaces are found as pairs of faces with the sheet between them,
+rather than by the type of any face. A bend is two coaxial cylinders lying
+side by side whose radii differ by the thickness, and nothing else on a
+sheet-metal part is, so where the part has bends they settle the thickness
+outright - a rolled tube has no flat at all but its two ends. A flat is two
+planar faces facing away from each other with the sheet between: each planar
+face casts its shadow into the material, holes and all, and pairs with the
+first face facing back that the shadow falls on. The faces of the sheet's
+edges pair the same way across its width, but a sheet's faces are far larger
+than its edge faces, so the distance the most face area agrees on is the
+thickness. The faces of pairs at that distance are the surfaces, and sew into
+the two sides of the sheet; everything else - every edge face, hole wall,
+relief and hem end - is thickness.
 
 ``thickness``, when the sheet's thickness is known, is taken as given and
 nothing is searched for. It settles a part whose own measurements are
@@ -47,8 +50,8 @@ than replaced by one that does.
 fraction of it, and still count. Offset surfaces are approximations, and the
 blended corner faces of a relief can measure a few millionths off; the default
 of 1e-4 is generous for that and still far below any feature size. It only
-needs changing if a part comes back with too few or too many thickness faces,
-which shows up as the surfaces failing to split in two.
+needs changing if a part comes back with too few or too many surface faces,
+which shows up as the surfaces failing to sew into two.
 
 ********************
 Back into the model
@@ -73,11 +76,11 @@ What it refuses
 ***************
 
 * A shape that does not hold exactly one solid.
-* A given ``thickness`` that is not positive, or whose faces do not leave
-  exactly two surfaces when taken away.
-* A solid with no distance that is a thickness, one whose faces leave exactly
-  two surfaces when taken away: a sphere, which measures nothing, a cube, whose
-  every face measures the same, or a welded assembly of sheets.
+* A given ``thickness`` that is not positive, or at which the paired faces do
+  not form exactly two surfaces.
+* A solid with no pair of faces a sheet apart, such as a sphere, or whose
+  paired faces do not form two surfaces: a cube, whose six faces pair into one
+  closed surface, or a welded assembly of sheets.
 * A ``tolerance`` that is not positive.
 
 *******
