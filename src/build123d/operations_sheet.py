@@ -30,45 +30,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import combinations
-from math import asin, atan, atan2, cos, degrees, pi, radians, sin, sqrt, tan
+from math import asin, atan, cos, degrees, radians, sin, sqrt, tan
 from statistics import median
 from typing import Callable, Literal, overload
 
-import numpy as np
-from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Curve2d, BRepAdaptor_Surface
-from OCP.BRepBuilderAPI import (
-    BRepBuilderAPI_GTransform,
-    BRepBuilderAPI_MakeEdge,
-    BRepBuilderAPI_MakeFace,
-    BRepBuilderAPI_MakeWire,
-)
-from OCP.BRepLib import BRepLib
-from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
-from OCP.BRep import BRep_Builder, BRep_Tool
-from OCP.Geom2d import (
-    Geom2d_Circle,
-    Geom2d_Curve,
-    Geom2d_Ellipse,
-    Geom2d_Line,
-    Geom2d_TrimmedCurve,
-)
-from OCP.Geom2dAdaptor import Geom2dAdaptor_Curve
-from OCP.Geom2dInt import Geom2dInt_GInter
-from OCP.Geom import Geom_CylindricalSurface, Geom_Plane, Geom_Surface
-from OCP.GeomProjLib import GeomProjLib
-from OCP.IntTools import IntTools_FClass2d
-from OCP.ShapeFix import ShapeFix_Face
-from OCP.gp import gp_Ax3, gp_Ax22d, gp_Dir2d, gp_Pln, gp_Pnt, gp_Pnt2d
-import OCP.TopAbs as ta
-from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import (
-    TopoDS,
-    TopoDS_Edge,
-    TopoDS_Face,
-    TopoDS_Vertex,
-    TopoDS_Wire,
-)
+from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+from OCP.Geom import Geom_CylindricalSurface
+from OCP.gp import gp_Ax3
 
 from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_enums import (
@@ -87,8 +55,6 @@ from build123d.sheet_utils import (
     MIN_BEND_RADIUS,
     SheetMetalParameters,
     is_positive_bend,
-    _topods_entities,
-    _uv_topods_face_with_map,
     bend_allowance,
     neutral_radius,
     reference_radius,
@@ -101,6 +67,7 @@ from build123d.topology import (
     Shell,
     Sketch,
     Solid,
+    UVFrame,
     Vertex,
     Wire,
     topo_explore_common_vertex,
@@ -197,10 +164,20 @@ def _current_sheet(context: BuildSheet, shapes: list, what: str) -> Shell:
     """
     sheet = context.sheet_local
     for shape in shapes:
-        candidates = getattr(
-            sheet, {Vertex: "vertices", Edge: "edges"}.get(type(shape), "faces")
-        )()
-        if find_same_topods(shape.wrapped, (c.wrapped for c in candidates)) is None:
+        if isinstance(shape, Vertex):
+            # a vertex names a place, and a face rebuilt around a cut keeps
+            # its other corners where they were though none is the same vertex
+            found = any(
+                (Vector(candidate) - Vector(shape)).length <= TOLERANCE
+                for candidate in sheet.vertices()
+            )
+        else:
+            candidates = sheet.edges() if isinstance(shape, Edge) else sheet.faces()
+            found = (
+                find_same_topods(shape.wrapped, (c.wrapped for c in candidates))
+                is not None
+            )
+        if not found:
             raise ValueError(
                 f"{what} are not part of the current sheet. Every operation "
                 "resews the shell, so a selection made before an earlier operation "
@@ -1241,6 +1218,14 @@ def _bend_beyond(
     return cylinder, cylinder.width * neutral / cylinder.radius
 
 
+def _onto_surface(face: Face, developed: Face) -> Face:
+    """The face whose outline in ``face``'s parameters is ``developed`` - the
+    inverse of ``Face.uv_face``, so a face can be reshaped in the plane and
+    put back on its surface."""
+    (result,) = UVFrame(face, Matrix()).write_face(developed)
+    return result
+
+
 def _bend_miter_cut(
     shell: Shell,
     cylinder: Face,
@@ -1249,7 +1234,7 @@ def _bend_miter_cut(
     reach: float,
     allowance: float,
     parameters: SheetMetalParameters,
-) -> tuple[Face, _FlatFrame, float, float]:
+) -> tuple[Face, UVFrame, float, float]:
     """Where a miter's cut continues across the bend, in the bend's flat frame.
 
     A straight line in the flat pattern is not a plane section of the formed
@@ -1281,7 +1266,7 @@ def _remodel_mitered_bends(cuts: list) -> list[tuple[Face, Face]]:
 
 
 def _remodel_bend(
-    cylinder: Face, frame: _FlatFrame, reach: float, allowance: float
+    cylinder: Face, frame: UVFrame, reach: float, allowance: float
 ) -> Face:
     """A bend with one end re-cut along a miter, in its development.
 
@@ -1296,7 +1281,7 @@ def _remodel_bend(
     """
     if abs(reach) < _RELIEF_TOLERANCE:
         return cylinder
-    developed = Face(_uv_topods_face_with_map(cylinder.wrapped)[0])
+    developed = cylinder.uv_face
     corners = [
         frame.to_uv(0.0, 0.0),
         frame.to_uv(0.0, allowance),
@@ -1304,17 +1289,14 @@ def _remodel_bend(
     ]
     # the same way up as the development, or the fuse leaves them as two faces
     triangle = _orient_face(
-        Face(Wire.make_polygon([Vector(c.X(), c.Y(), 0.0) for c in corners])),
-        developed.normal_at(developed.center()),
+        Face(Wire.make_polygon(corners)), developed.normal_at(developed.center())
     )
     reshaped = developed.cut(triangle) if reach > 0 else developed.fuse(triangle)
     pieces = [reshaped] if isinstance(reshaped, Face) else list(reshaped.faces())
     if len(pieces) != 1:
         raise ValueError("the miter cuts the bend into pieces")
-    surface = BRep_Tool.Surface_s(cylinder.wrapped)
     return _orient_face(
-        _face_onto_surface(pieces[0].wrapped, surface),
-        cylinder.normal_at(cylinder.center()),
+        _onto_surface(cylinder, pieces[0]), cylinder.normal_at(cylinder.center())
     )
 
 
@@ -1950,7 +1932,7 @@ def corner_relief(
     values = {name: measurement(name) for name in required}
     _reject_unwanted_relief_keywords(relief_type, supplied, required)
 
-    profile: list | None = None
+    profile: Face | None = None
     reach = 0.0
     if relief_type is ReliefType.ROUND:
         profile = _round_relief_profile(values["radius"])
@@ -1978,7 +1960,7 @@ def _cut_corner_relief(
     shell: Shell,
     vertex: Vertex,
     relief_type: ReliefType,
-    profile: list | None,
+    profile: Face | None,
     depth: float,
     parameters: SheetMetalParameters,
 ) -> Shell:
@@ -2170,254 +2152,51 @@ def bend_relief(
 _RELIEF_TOLERANCE = 1e-7
 
 
-@dataclass(frozen=True)
-class _FlatLine:
-    """A straight run of a flat-pattern profile."""
+def _affine_frame(
+    face: Face,
+    origin: Vector,
+    axes: tuple[Vector, Vector],
+    scales: tuple[float, float] = (1.0, 1.0),
+) -> UVFrame:
+    """The flat frame of a planar or cylindrical face whose flat point (x, y)
+    lies at ``origin + axes[0] * x + axes[1] * y``, as far as the face is flat.
 
-    start: tuple[float, float]
-    end: tuple[float, float]
-
-    def point_at(self, fraction: float) -> tuple[float, float]:
-        """A point along the segment, 0 at the start and 1 at the end."""
-        (x0, y0), (x1, y1) = self.start, self.end
-        return (x0 + fraction * (x1 - x0), y0 + fraction * (y1 - y0))
-
-
-@dataclass(frozen=True)
-class _FlatArc:
-    """A circular arc of a flat-pattern profile, counter-clockwise."""
-
-    center: tuple[float, float]
-    radius: float
-    start_angle: float  # radians
-    end_angle: float  # radians, greater than start_angle
-
-    def point_at(self, fraction: float) -> tuple[float, float]:
-        """A point along the arc, 0 at the start and 1 at the end."""
-        angle = self.start_angle + fraction * (self.end_angle - self.start_angle)
-        return (
-            self.center[0] + self.radius * cos(angle),
-            self.center[1] + self.radius * sin(angle),
-        )
-
-    @property
-    def start(self) -> tuple[float, float]:
-        """First point of the arc."""
-        return self.point_at(0.0)
-
-    @property
-    def end(self) -> tuple[float, float]:
-        """Last point of the arc."""
-        return self.point_at(1.0)
-
-
-def _circle_profile(cx: float, cy: float, radius: float) -> list:
-    """A closed circle as four quarter arcs."""
-    quarters = [(0, pi / 2), (pi / 2, pi), (pi, 3 * pi / 2), (3 * pi / 2, 2 * pi)]
-    return [_FlatArc((cx, cy), radius, a, b) for a, b in quarters]
-
-
-def _rectangle_profile(cx: float, cy: float, width: float, height: float) -> list:
-    """A closed axis-aligned rectangle as four lines."""
-    half_w, half_h = width / 2, height / 2
-    corners = [
-        (cx - half_w, cy - half_h),
-        (cx + half_w, cy - half_h),
-        (cx + half_w, cy + half_h),
-        (cx - half_w, cy + half_h),
+    Both surfaces develop affinely: a flat direction's rate of change of a
+    parameter is its component along that parameter's derivative over the
+    derivative's squared length, the same everywhere on the face. A flat axis
+    that runs into a bend is measured on the blank, so it is scaled by the
+    surface radius over the neutral one.
+    """
+    u0, v0 = face.param_at_point(origin, normalize=False)
+    d_u = face.derivative_at(u0, v0, 1, 0, normalize=False)
+    d_v = face.derivative_at(u0, v0, 0, 1, normalize=False)
+    d_u, d_v = d_u / d_u.dot(d_u), d_v / d_v.dot(d_v)
+    rates = [
+        (axis.dot(d_u) * scale, axis.dot(d_v) * scale)
+        for axis, scale in zip(axes, scales)
     ]
-    return [_FlatLine(corners[i], corners[(i + 1) % 4]) for i in range(len(corners))]
-
-
-def _obround_profile(cx: float, cy: float, length: float, height: float) -> list:
-    """A closed slot: two straight flanks joined by semicircular ends.
-
-    Mixes both segment kinds, which is what every relief shape but ROUND
-    needs.
-    """
-    radius = height / 2
-    flank = (length - height) / 2
-    profile: list = [
-        _FlatLine((cx - flank, cy - radius), (cx + flank, cy - radius)),
-        _FlatArc((cx + flank, cy), radius, -pi / 2, pi / 2),
-        _FlatLine((cx + flank, cy + radius), (cx - flank, cy + radius)),
-        _FlatArc((cx - flank, cy), radius, pi / 2, 3 * pi / 2),
-    ]
-    return profile
-
-
-def _rotate_profile(profile: list, angle: float, about=(0.0, 0.0)) -> list:
-    """Turn a flat profile about a point, angle in radians."""
-
-    def spin(point):
-        dx, dy = point[0] - about[0], point[1] - about[1]
-        return (
-            about[0] + dx * cos(angle) - dy * sin(angle),
-            about[1] + dx * sin(angle) + dy * cos(angle),
-        )
-
-    turned: list = []
-    for seg in profile:
-        if isinstance(seg, _FlatLine):
-            turned.append(_FlatLine(spin(seg.start), spin(seg.end)))
-        else:
-            turned.append(
-                _FlatArc(
-                    spin(seg.center),
-                    seg.radius,
-                    seg.start_angle + angle,
-                    seg.end_angle + angle,
-                )
-            )
-    return turned
-
-
-@dataclass
-class _FlatFrame:
-    """Maps flat-pattern coordinates into one face's UV domain.
-
-    The map is affine for both planar and cylindrical faces, so a flat line
-    is a line in UV and a flat circle is a conic - nothing is approximated.
-    """
-
-    face: Face
-    matrix: np.ndarray  # 2x2, flat -> uv
-    offset: np.ndarray  # uv of flat (0, 0)
-
-    def to_uv(self, x: float, y: float) -> gp_Pnt2d:
-        """Flat-pattern point as a parameter-space point on this face."""
-        u, v = self.matrix @ np.array([x, y]) + self.offset
-        return gp_Pnt2d(u, v)
-
-    @property
-    def surface(self):
-        """The face's underlying geometric surface."""
-        return BRep_Tool.Surface_s(self.face.wrapped)
-
-    def segment(self, seg) -> tuple:
-        """A flat segment's exact image in this face's UV domain.
-
-        Returns ``(curve2d, first, last, flipped)`` with ``first < last``.
-        ``flipped`` says the curve's parameter runs against the segment's own
-        direction, which happens when the development mirrors the face.
-        """
-        if isinstance(seg, _FlatLine):
-            start, end = self.to_uv(*seg.start), self.to_uv(*seg.end)
-            direction = np.array([end.X() - start.X(), end.Y() - start.Y()])
-            length = float(np.hypot(*direction))
-            curve = Geom2d_Line(start, gp_Dir2d(*direction))
-            return curve, 0.0, length, False
-
-        curve = self.circle(seg.center[0], seg.center[1], seg.radius)
-        first, last, middle = (
-            self.conic_parameter(angle)
-            for angle in (
-                seg.start_angle,
-                seg.end_angle,
-                (seg.start_angle + seg.end_angle) / 2,
-            )
-        )
-        # a mirroring development reverses the parameter sense, and then the
-        # span from first to last is the complementary arc
-        flipped = not _between(middle, first, last, curve)
-        if flipped:
-            first, last = last, first
-        if last < first:
-            last += curve.Period()
-        return curve, first, last, flipped
-
-    def conic_parameter(self, angle: float) -> float:
-        """Where a flat circle's point at an angle lands on its conic image.
-
-        The affine part factors as a rotation, a scaling along the conic's
-        axes and another rotation; the first rotation is all that moves the
-        angle, since the scaling is what the conic's own parameter absorbs.
-        """
-        _, _, right = np.linalg.svd(self.matrix)
-        turned = right @ np.array([cos(angle), sin(angle)])
-        return atan2(turned[1], turned[0]) % (2 * pi)
-
-    def circle(self, cx: float, cy: float, radius: float):
-        """The flat circle's exact image in this face's UV domain.
-
-        A rigid development (a planar face) leaves a circle a circle; a
-        cylindrical development scales one axis by 1/bend radius, which turns
-        it into an ellipse.
-        """
-        center = self.to_uv(cx, cy)
-        # singular values of the affine part give the conic's semi-axes, and
-        # the left factor their directions - a mirrored pair where the
-        # development mirrors the face, which the axis system carries
-        left, scales, _ = np.linalg.svd(self.matrix)
-        axes = gp_Ax22d(
-            center,
-            gp_Dir2d(left[0, 0], left[1, 0]),
-            gp_Dir2d(left[0, 1], left[1, 1]),
-        )
-        major, minor = radius * scales[0], radius * scales[1]
-        if abs(major - minor) < _RELIEF_TOLERANCE:
-            return Geom2d_Circle(axes, major)
-        return Geom2d_Ellipse(axes, major, minor)
-
-
-def _plane_frame(face: Face, origin: Vector, axes: tuple[Vector, Vector]) -> _FlatFrame:
-    """The frame of a planar face whose flat point (x, y) lies at
-    ``origin + axes[0] * x + axes[1] * y``.
-
-    A plane's parameters are distances along its own two directions, so the
-    map is read straight off them.
-    """
-    position = BRepAdaptor_Surface(face.wrapped).Plane().Position()
-    base = Vector(position.Location())
-    directions = [Vector(position.XDirection()), Vector(position.YDirection())]
-    matrix = np.array(
-        [[axis.dot(direction) for axis in axes] for direction in directions]
+    return UVFrame(
+        face,
+        Matrix(
+            [
+                [rates[0][0], rates[1][0], 0.0, u0],
+                [rates[0][1], rates[1][1], 0.0, v0],
+                [0.0, 0.0, 1.0, 0.0],
+            ]
+        ),
     )
-    offset = np.array([(origin - base).dot(direction) for direction in directions])
-    return _FlatFrame(face=face, matrix=matrix, offset=offset)
-
-
-def _cylinder_frame(
-    face: Face, corner: Vector, unroll: int, slide: Vector, rolling: float
-) -> _FlatFrame:
-    """The frame of a bend face unrolled flat about a fold line.
-
-    ``corner`` is a point on the fold line, ``slide`` runs along it, and the
-    flat axis numbered ``unroll`` measures past it into the bend while the
-    other measures along it. A cylinder's ``u`` is the angle about its axis
-    and ``v`` the distance along it, so the fold line is a line of constant
-    ``u`` and the bend spans from there to the face's other ``u`` bound, at
-    ``rolling`` units of blank per radian.
-    """
-    position = BRepAdaptor_Surface(face.wrapped).Cylinder().Position()
-    axis = Vector(position.Direction())
-    spoke = corner - Vector(position.Location())
-    v_corner = spoke.dot(axis)
-    radial = spoke - axis * v_corner
-    u_corner = atan2(
-        radial.dot(Vector(position.YDirection())),
-        radial.dot(Vector(position.XDirection())),
-    )
-    # the face may be parameterised any number of turns from where atan2 lands
-    u_min, u_max, _, _ = BRepTools.UVBounds_s(face.wrapped)
-    u_corner += 2 * pi * round(((u_min + u_max) / 2 - u_corner) / (2 * pi))
-    sign = 1.0 if abs(u_corner - u_min) < abs(u_corner - u_max) else -1.0
-
-    matrix = np.zeros((2, 2))
-    matrix[0, unroll] = sign / rolling
-    matrix[1, 1 - unroll] = slide.dot(axis)
-    return _FlatFrame(face=face, matrix=matrix, offset=np.array([u_corner, v_corner]))
 
 
 def _corner_frames(
     shell: Shell, base: Face, corner: Vector, parameters: SheetMetalParameters
-) -> tuple[list[_FlatFrame], bool]:
+) -> tuple[list[UVFrame], list[Vector], bool]:
     """Flat frames for the faces meeting at one corner of a planar face.
 
     All three share one flat coordinate system with its origin at ``corner``:
     ``x`` measures past the tangent line of one bend and ``y`` past the other.
-    Returns the base's frame followed by the two bends', and whether the
-    sheet wraps around the corner rather than stopping at it.
+    Returns the base's frame followed by the two bends', the 3D directions of
+    the two flat axes, and whether the sheet wraps around the corner rather
+    than stopping at it.
     """
     # The two bends whose tangent lines cross at this corner. They are found
     # by line rather than by adjacency, because a flange gap pulls a bend back
@@ -2446,7 +2225,7 @@ def _corner_frames(
     # each bend unrolls perpendicular to its own tangent line, away from the
     # base: x unrolls the first bend and y the second
     axis_dir = [_fold_outward(base, edge) for edge, _ in touching]
-    frames = [_plane_frame(base, corner, (axis_dir[0], axis_dir[1]))]
+    frames = [_affine_frame(base, corner, (axis_dir[0], axis_dir[1]))]
     for index, (_, cylinder) in enumerate(touching):
         # measured on the neutral axis, so the flat coordinates are those of
         # the blank rather than of the reference surface
@@ -2454,10 +2233,12 @@ def _corner_frames(
         if radius is None:
             raise ValueError("relief expects a cylindrical bend face")
         rolling = neutral_radius(radius, parameters, is_positive_bend(cylinder.wrapped))
+        scale = radius / rolling
+        scales = (scale, 1.0) if index == 0 else (1.0, scale)
         frames.append(
-            _cylinder_frame(cylinder, corner, index, axis_dir[1 - index], rolling)
+            _affine_frame(cylinder, corner, (axis_dir[0], axis_dir[1]), scales)
         )
-    return frames, _corner_is_concave(base, corner, axis_dir)
+    return frames, axis_dir, _corner_is_concave(base, corner, axis_dir)
 
 
 def _corner_is_concave(base: Face, corner: Vector, axis_dir: list) -> bool:
@@ -2475,418 +2256,43 @@ def _corner_is_concave(base: Face, corner: Vector, axis_dir: list) -> bool:
 # --------------------------------------------------------------------------
 # trimming
 #
-# A profile is cut into each face it crosses inside that face's parameter
-# space. Its exact image there is intersected with the face's boundary
-# curves, the pieces that land inside the face become new boundary edges, and
-# the boundary between where such a piece enters and where it leaves is
-# dropped. Nothing is intersected in 3D. Every edge has to carry a 3D curve,
-# so the new edges are given one approximated from their exact pcurve, and
-# they carry the tolerance of that approximation - but the topology was
-# settled before it was made.
-#
-# A profile runs with the material it removes on its left, so which side of
-# a cut to keep is a matter of orientation rather than of area.
+# A profile is cut out of each face it crosses in that face's parameter
+# space: the face is laid out on the uv plane, the profile's exact image is
+# taken out of it there by a planar boolean, and what is left is written back
+# onto the surface with its outline as its pcurves. Nothing is intersected in
+# 3D, and the topology is settled before any 3D curve is approximated.
 # --------------------------------------------------------------------------
 
-_CLIP_TOLERANCE = 1e-9  # in parameter space, where every curve is exact
 
+def _trim_face(frame: UVFrame, profile: Face) -> Face | None:
+    """A flat profile cut out of the frame's face, or None where it misses.
 
-@dataclass
-class _Bound:
-    """One edge of a face's boundary, as walked with the material on the left."""
-
-    edge: TopoDS_Edge  # oriented as it is walked
-    curve: Geom2d_Curve  # its pcurve on the face
-    first: float
-    last: float
-
-    @property
-    def walk(self) -> tuple[float, float]:
-        """Parameters at the start and end of the walk along this edge."""
-        if self.edge.Orientation() == ta.TopAbs_REVERSED:
-            return self.last, self.first
-        return self.first, self.last
-
-    def position(self, parameter: float) -> float:
-        """How far along the walk a parameter lies, from 0 to 1."""
-        start, end = self.walk
-        return (parameter - start) / (end - start)
-
-    def vertex(self, parameter: float) -> TopoDS_Vertex:
-        """The vertex at a parameter, the edge's own where it has one."""
-        start, end = self.walk
-        if abs(parameter - start) < _RELIEF_TOLERANCE:
-            return TopExp.FirstVertex_s(self.edge, True)
-        if abs(parameter - end) < _RELIEF_TOLERANCE:
-            return TopExp.LastVertex_s(self.edge, True)
-        vertex = TopoDS_Vertex()
-        BRep_Builder().MakeVertex(
-            vertex,
-            BRepAdaptor_Curve(self.edge).Value(parameter),
-            max(TOLERANCE, 2 * BRep_Tool.Tolerance_s(self.edge)),
-        )
-        return vertex
-
-    def part(
-        self, start: float, end: float, first: TopoDS_Vertex, last: TopoDS_Vertex
-    ) -> list[TopoDS_Edge]:
-        """The stretch of this edge walked from one parameter to another.
-
-        The whole edge is itself; a part is an empty copy of it - the same
-        curves, and so the same geometry its neighbour across the edge sees -
-        cut down to the range.
-        """
-        if abs(end - start) < _RELIEF_TOLERANCE:
-            return []
-        walk = self.walk
-        if abs(start - walk[0]) < _RELIEF_TOLERANCE:
-            if abs(end - walk[1]) < _RELIEF_TOLERANCE:
-                return [self.edge]
-        part = TopoDS.Edge(self.edge.EmptyCopied().Oriented(ta.TopAbs_FORWARD))
-        builder = BRep_Builder()
-        builder.Range(part, min(start, end), max(start, end))
-        low, high = (first, last) if start < end else (last, first)
-        builder.Add(part, low.Oriented(ta.TopAbs_FORWARD))
-        builder.Add(part, high.Oriented(ta.TopAbs_REVERSED))
-        return [TopoDS.Edge(part.Oriented(self.edge.Orientation()))]
-
-
-def _face_bounds(face: TopoDS_Face) -> list[tuple[TopoDS_Wire, list[_Bound]]]:
-    """Every wire of a FORWARD face, with its edges in walking order."""
-    wires = []
-    explorer = TopExp_Explorer(face, ta.TopAbs_WIRE)
-    while explorer.More():
-        wire = TopoDS.Wire(explorer.Current())
-        bounds = []
-        walker = BRepTools_WireExplorer(wire, face)
-        while walker.More():
-            edge = walker.Current()
-            adaptor = BRepAdaptor_Curve2d(edge, face)
-            bounds.append(
-                _Bound(
-                    edge,
-                    adaptor.Curve(),
-                    adaptor.FirstParameter(),
-                    adaptor.LastParameter(),
-                )
-            )
-            walker.Next()
-        wires.append((wire, bounds))
-        explorer.Next()
-    return wires
-
-
-@dataclass(frozen=True)
-class _Hit:
-    """Where a profile meets a face's boundary."""
-
-    wire: int
-    bound: int
-    parameter: float
-
-
-@dataclass
-class _Piece:
-    """A stretch of a profile's image in one face's parameter space.
-
-    ``flipped`` says the profile runs this curve from ``last`` to ``first``.
-    ``hits`` are where its start and end, in the profile's order, meet the
-    boundary - None where they do not.
+    Raises:
+        ValueError: the cut separates part of the face from the rest
     """
-
-    curve: Geom2d_Curve
-    first: float
-    last: float
-    flipped: bool
-    hits: tuple
-
-    def reversed(self) -> "_Piece":
-        """This piece run the other way."""
-        return _Piece(
-            self.curve, self.first, self.last, not self.flipped, self.hits[::-1]
-        )
-
-    @property
-    def start(self) -> float:
-        """Parameter at the profile's start of this piece."""
-        return self.last if self.flipped else self.first
-
-    @property
-    def end(self) -> float:
-        """Parameter at the profile's end of this piece."""
-        return self.first if self.flipped else self.last
+    developed = frame.face.uv_face
+    cut = developed.cut(frame.lift(profile))
+    pieces = [cut] if isinstance(cut, Face) else list(cut.faces())
+    if len(pieces) > 1:
+        raise ValueError("the cut separates part of the face from the rest")
+    if not pieces or abs(pieces[0].area - developed.area) < _RELIEF_TOLERANCE:
+        return None
+    return _onto_surface(frame.face, pieces[0])
 
 
-def _clip_profile(
-    frame: _FlatFrame, face: TopoDS_Face, bounds: list, profile: list, closed: bool
-) -> list[list[_Piece]]:
-    """The runs of a profile that lie inside a face, in its parameter space.
-
-    Every segment is broken where it crosses the boundary, and each piece is
-    inside or outside as a whole. Consecutive inside pieces make a run.
-    """
-    classifier = IntTools_FClass2d(face, _CLIP_TOLERANCE)
-    boundary = [
-        (
-            (wire_index, bound_index),
-            Geom2dAdaptor_Curve(
-                Geom2d_TrimmedCurve(bound.curve, bound.first, bound.last)
-            ),
-        )
-        for wire_index, (_, wire) in enumerate(bounds)
-        for bound_index, bound in enumerate(wire)
-    ]
-
-    ordered: list[tuple[bool, _Piece]] = []
-    for seg in profile:
-        curve, first, last, flipped = frame.segment(seg)
-        span = Geom2dAdaptor_Curve(Geom2d_TrimmedCurve(curve, first, last))
-        hits: dict[float, _Hit] = {}
-        for where, edge_curve in boundary:
-            crossings = Geom2dInt_GInter(
-                span, edge_curve, _CLIP_TOLERANCE, _CLIP_TOLERANCE
-            )
-            for index in range(1, crossings.NbPoints() + 1):
-                point = crossings.Point(index)
-                found = point.ParamOnFirst()
-                if curve.IsPeriodic():  # reported within one turn of the origin
-                    found += curve.Period() * round((first - found) / curve.Period())
-                    if found < first - _CLIP_TOLERANCE:
-                        found += curve.Period()
-                # a crossing at a vertex is reported by both edges there
-                if any(abs(found - known) < _CLIP_TOLERANCE for known in hits):
-                    continue
-                hits[found] = _Hit(*where, point.ParamOnSecond())
-
-        breaks = [
-            first,
-            *sorted(p for p in hits if first + 1e-7 < p < last - 1e-7),
-            last,
-        ]
-        pieces = []
-        for lower, upper in zip(breaks, breaks[1:]):
-            inside = (
-                classifier.Perform(curve.Value((lower + upper) / 2)) == ta.TopAbs_IN
-            )
-            ends = tuple(
-                next((hit for at, hit in hits.items() if abs(at - p) < 1e-7), None)
-                for p in (lower, upper)
-            )
-            pieces.append(
-                (
-                    inside,
-                    _Piece(curve, lower, upper, flipped, ends[:: -1 if flipped else 1]),
-                )
-            )
-        ordered.extend(reversed(pieces) if flipped else pieces)
-
-    runs: list[list[_Piece]] = []
-    current: list[_Piece] = []
-    for inside, piece in ordered:
-        if inside:
-            current.append(piece)
-        elif current:
-            runs.append(current)
-            current = []
-    if current:
-        runs.append(current)
-    # a closed profile's first and last pieces adjoin
-    if closed and len(runs) > 1 and ordered[0][0] and ordered[-1][0]:
-        runs[0] = runs.pop() + runs[0]
-    return runs
-
-
-def _trim_face(
-    frame: _FlatFrame, face: Face, profile: list, closed: bool = True
-) -> Face:
-    """Cut a flat profile out of one face, in its own parameter space.
-
-    The profile runs with the material it removes on its left. A face is
-    handled FORWARD, where that puts its own material on the left of its
-    boundary too, and given its orientation back afterwards.
-    """
-    forward = TopoDS.Face(face.wrapped.Oriented(ta.TopAbs_FORWARD))
-    bounds = _face_bounds(forward)
-    runs = _clip_profile(frame, forward, bounds, profile, closed)
-    if not runs:
-        return face
-    # the development may mirror the face, and then the removed material is
-    # on the profile's right in parameter space
-    if np.linalg.det(frame.matrix) < 0:
-        runs = [[piece.reversed() for piece in reversed(run)] for run in runs]
-    for run in runs:
-        start, end = run[0].hits[0], run[-1].hits[1]
-        if start is None or end is None:
-            raise ValueError(
-                "the profile lies inside the face"
-                if closed
-                else "the cut does not reach the boundary of the face"
-            )
-        if start.wire != end.wire:
-            raise ValueError(
-                "the profile crosses from one boundary of the face to another"
-            )
-
-    rebuilt = _rebuild_face(forward, bounds, runs)
-    return Face(TopoDS.Face(rebuilt.Oriented(face.wrapped.Orientation())))
-
-
-def _rebuild_face(face: TopoDS_Face, bounds: list, runs: list) -> TopoDS_Face:
-    """A face with its boundary re-routed along some runs of a profile.
-
-    Walking a wire with the material on the left, a run's start is where the
-    walk leaves what is kept and its end is where the walk comes back to it,
-    so the boundary is kept from each run's end to the next run's start and
-    the runs themselves are walked backwards in between.
-    """
-    location = TopLoc_Location()
-    surface = BRep_Tool.Surface_s(face, location)
-    tolerance = BRep_Tool.Tolerance_s(face)
-    builder = BRep_Builder()
-
-    def point_of(curve, parameter: float) -> gp_Pnt:
-        uv = curve.Value(parameter)
-        return surface.Value(uv.X(), uv.Y()).Transformed(location.Transformation())
-
-    def run_edges(run: list, first: TopoDS_Vertex, last: TopoDS_Vertex) -> list:
-        """The run as edges, walked backwards from ``last`` to ``first``."""
-        vertices = [first]
-        for piece in run[:-1]:
-            vertex = TopoDS_Vertex()
-            builder.MakeVertex(vertex, point_of(piece.curve, piece.end), TOLERANCE)
-            vertices.append(vertex)
-        vertices.append(last)
-        edges = []
-        for piece, start, end in zip(run, vertices, vertices[1:]):
-            low, high = (end, start) if piece.flipped else (start, end)
-            edge = TopoDS_Edge()
-            builder.MakeEdge(edge)
-            builder.UpdateEdge(edge, piece.curve, surface, location, tolerance)
-            builder.Range(edge, piece.first, piece.last)
-            builder.Add(edge, low.Oriented(ta.TopAbs_FORWARD))
-            builder.Add(edge, high.Oriented(ta.TopAbs_REVERSED))
-            BRepLib.BuildCurves3d_s(edge)
-            # walked backwards, so against the profile's own direction
-            edges.append(
-                TopoDS.Edge(
-                    edge.Oriented(
-                        ta.TopAbs_FORWARD if piece.flipped else ta.TopAbs_REVERSED
-                    )
-                )
-            )
-        return list(reversed(edges))
-
-    rebuilt = TopoDS_Face()
-    builder.MakeFace(rebuilt, surface, location, tolerance)
-    for wire_index, (wire, wire_bounds) in enumerate(bounds):
-        here = [run for run in runs if run[0].hits[0].wire == wire_index]
-        if not here:
-            builder.Add(rebuilt, wire)
-            continue
-
-        # every hit on this wire in walking order, with its vertex made once
-        stops = []
-        for run in here:
-            for hit, kind in ((run[0].hits[0], "start"), (run[-1].hits[1], "end")):
-                bound = wire_bounds[hit.bound]
-                stops.append(
-                    (
-                        (hit.bound, bound.position(hit.parameter)),
-                        kind,
-                        run,
-                        hit,
-                        bound.vertex(hit.parameter),
-                    )
-                )
-        stops.sort(key=lambda stop: stop[0])
-        count = len(wire_bounds)
-
-        # follow the boundary from each run's start to the next run's end,
-        # then that run backwards to its own start, until the loop closes
-        starts = {index for index, stop in enumerate(stops) if stop[1] == "start"}
-        loops = []
-        while starts:
-            new_wire = TopoDS_Wire()
-            builder.MakeWire(new_wire)
-            opening = cursor = starts.pop()
-            while True:
-                _, _, _, hit, vertex = stops[cursor]
-                _, next_kind, ending, next_hit, next_vertex = stops[
-                    (cursor + 1) % len(stops)
-                ]
-                if next_kind != "end":
-                    raise ValueError("the profile runs cross each other on the face")
-                leaving = wire_bounds[hit.bound]
-                arriving = wire_bounds[next_hit.bound]
-                if hit.bound == next_hit.bound and (
-                    leaving.position(hit.parameter)
-                    <= arriving.position(next_hit.parameter)
-                ):
-                    edges = leaving.part(
-                        hit.parameter, next_hit.parameter, vertex, next_vertex
-                    )
-                else:
-                    edges = leaving.part(
-                        hit.parameter,
-                        leaving.walk[1],
-                        vertex,
-                        leaving.vertex(leaving.walk[1]),
-                    )
-                    between = (hit.bound + 1) % count
-                    while between != next_hit.bound:
-                        edges.append(wire_bounds[between].edge)
-                        between = (between + 1) % count
-                    edges += arriving.part(
-                        arriving.walk[0],
-                        next_hit.parameter,
-                        arriving.vertex(arriving.walk[0]),
-                        next_vertex,
-                    )
-                cursor = next(
-                    index
-                    for index, stop in enumerate(stops)
-                    if stop[2] is ending and stop[1] == "start"
-                )
-                for edge in edges + run_edges(ending, stops[cursor][4], next_vertex):
-                    builder.Add(new_wire, edge)
-                if cursor == opening:
-                    break
-                starts.remove(cursor)
-            loops.append(new_wire)
-        if len(loops) > 1:
-            raise ValueError("the cut separates part of the face from the rest")
-        builder.Add(rebuilt, loops[0])
-    return rebuilt
-
-
-def _trim_faces(frames: list, profile: list, closed: bool = True) -> dict:
+def _trim_faces(frames: list[UVFrame], profile: Face) -> dict[Face, Face]:
     """Cut a profile into every face it crosses, as ``{face: trimmed face}``."""
     trimmed = {}
     for frame in frames:
-        result = _trim_face(frame, frame.face, profile, closed)
-        if result is not frame.face:
+        result = _trim_face(frame, profile)
+        if result is not None:
             trimmed[frame.face] = result
     return trimmed
-
-
-def _between(value: float, first: float, last: float, curve) -> bool:
-    """Is a parameter inside the periodic span from first to last?"""
-    period = curve.Period() if curve.IsPeriodic() else None
-    if period is None:
-        return min(first, last) <= value <= max(first, last)
-    span = (last - first) % period
-    return ((value - first) % period) <= span
 
 
 # --------------------------------------------------------------------------
 # guards
 # --------------------------------------------------------------------------
-
-
-def _flat_to_3d(frame: _FlatFrame, x: float, y: float) -> Vector:
-    """A flat-pattern point as a 3D point on the frame's face."""
-    uv = frame.to_uv(x, y)
-    return Vector(frame.surface.Value(uv.X(), uv.Y()))
 
 
 def _check_corner_detached(before: Shell, after: Shell, corner: Vector) -> None:
@@ -2934,7 +2340,8 @@ class _Corner:
 
     base: Face
     point: Vector
-    frames: list[_FlatFrame]  # the base's frame, then the two bends'
+    frames: list[UVFrame]  # the base's frame, then the two bends'
+    axes: list[Vector]  # the flat axes in 3D, each into one bend
     wrapped: bool  # the sheet wraps around the corner rather than stopping
 
     @property
@@ -2944,17 +2351,16 @@ class _Corner:
         The two unroll directions are the frames' flat axes; their difference
         bisects the corner, so the two flanges sit symmetrically either side.
         """
-        first = _flat_to_3d(self.frames[0], 1.0, 0.0) - self.point
-        second = _flat_to_3d(self.frames[0], 0.0, 1.0) - self.point
-        return (first.normalized() - second.normalized()).normalized()
+        first, second = (axis.normalized() for axis in self.axes)
+        return (first - second).normalized()
 
 
 def _corner_at(
     shell: Shell, base: Face, corner: Vector, parameters: SheetMetalParameters
 ) -> _Corner:
     """Lay a corner out flat, once, for whatever relief is cut there."""
-    frames, wrapped = _corner_frames(shell, base, corner, parameters)
-    return _Corner(base, corner, frames, wrapped)
+    frames, axes, wrapped = _corner_frames(shell, base, corner, parameters)
+    return _Corner(base, corner, frames, axes, wrapped)
 
 
 def _corner_mirror_plane(
@@ -3026,19 +2432,31 @@ def _flange_gap(shell: Shell, at: _Corner, faces: list | None = None) -> float:
     return edges[0].distance_to(edges[1])
 
 
-def _round_relief_profile(radius: float) -> list:
+def _round_relief_profile(radius: float) -> Face:
     """A circular corner relief, centred on the corner."""
-    return _circle_profile(0.0, 0.0, radius)
+    return Face(Wire.make_circle(radius))
 
 
-def _square_relief_profile(size: float) -> list:
+def _square_relief_profile(size: float) -> Face:
     """A square corner relief, aligned with the two bend lines."""
-    return _rectangle_profile(0.0, 0.0, size, size)
+    return Face.make_rect(size, size)
 
 
-def _obround_relief_profile(length: float, width: float) -> list:
+def _obround_relief_profile(length: float, width: float) -> Face:
     """A slotted corner relief lying on the diagonal between the two bends."""
-    return _rotate_profile(_obround_profile(0.0, 0.0, length, width), pi / 4)
+    radius = width / 2
+    flank = length / 2 - radius
+    slot = Face(
+        Wire(
+            [
+                Edge.make_line((-radius, flank), (-radius, -flank)),
+                Edge.make_circle(radius, Plane((0, -flank, 0)), 180, 360),
+                Edge.make_line((radius, -flank), (radius, flank)),
+                Edge.make_circle(radius, Plane((0, flank, 0)), 0, 180),
+            ]
+        )
+    )
+    return slot.rotate(Axis.Z, 45)
 
 
 def _constant_width_cutter(shell: Shell, at: _Corner, depth: float) -> Solid:
@@ -3268,8 +2686,8 @@ def _bend_end_frames(
     # measured on the neutral axis, so the flat coordinates are the blank's
     rolling = neutral_radius(radius, parameters, is_positive_bend(cylinder.wrapped))
     frames = [
-        _plane_frame(base, point, (away, outward)),
-        _cylinder_frame(cylinder, point, 1, away, rolling),
+        _affine_frame(base, point, (away, outward)),
+        _affine_frame(cylinder, point, (away, outward), (1.0, radius / rolling)),
     ]
     step = _RELIEF_PROBE * min(edge.length, radius)
     # the notch's open ends stop where the base does, a probe's step past it so
@@ -3298,28 +2716,31 @@ def _base_reach(base: Face, start: Vector, outward: Vector, step: float) -> floa
     return min(ahead) if ahead else 0.0
 
 
-def _bend_square_profile(depth: float, width: float, reach: float = 0.0) -> list:
-    """A square-cornered notch, open across the fold line.
+def _bend_square_profile(depth: float, width: float, reach: float = 0.0) -> Face:
+    """A square-cornered notch across the fold line.
 
-    The open ends stop ``reach`` past the line, where the base's free edge is,
-    so the notch also takes the strip a bend's setback leaves beside its end.
+    It stops ``reach`` past the line, just beyond the base's free edge, so
+    the notch also takes the strip a bend's setback leaves beside its end.
     """
-    return [
-        _FlatLine((0.0, reach), (0.0, -depth)),
-        _FlatLine((0.0, -depth), (width, -depth)),
-        _FlatLine((width, -depth), (width, reach)),
-    ]
+    return Face.make_rect(width, depth + reach).moved(
+        Location((width / 2, (reach - depth) / 2, 0))
+    )
 
 
-def _bend_obround_profile(depth: float, width: float, reach: float = 0.0) -> list:
-    """A round-ended notch, open across the fold line; see the square one."""
+def _bend_obround_profile(depth: float, width: float, reach: float = 0.0) -> Face:
+    """A round-ended notch across the fold line; see the square one."""
     radius = width / 2
     flank = depth - radius
-    return [
-        _FlatLine((0.0, reach), (0.0, -flank)),
-        _FlatArc((radius, -flank), radius, pi, 2 * pi),
-        _FlatLine((width, -flank), (width, reach)),
-    ]
+    return Face(
+        Wire(
+            [
+                Edge.make_line((0, reach), (0, -flank)),
+                Edge.make_circle(radius, Plane((radius, -flank, 0)), 180, 360),
+                Edge.make_line((width, -flank), (width, reach)),
+                Edge.make_line((width, reach), (0, reach)),
+            ]
+        )
+    )
 
 
 def _cut_bend_relief(
@@ -3334,7 +2755,7 @@ def _cut_bend_relief(
     frames, probe, step, reach = _bend_end_frames(shell, point, away, parameters)
 
     if relief_type is ReliefType.ROUND:
-        profile = _circle_profile(0.0, 0.0, values["radius"])
+        profile = _round_relief_profile(values["radius"])
     else:
         shape = (
             _bend_square_profile
@@ -3343,12 +2764,10 @@ def _cut_bend_relief(
         )
         profile = shape(values["depth"], values["width"], reach)
 
-    # a notch is open along the fold line, so it lands on the base alone; a
-    # round relief is a hole centred on the end of the line and reaches into
-    # the bend as well
-    result = _replace_relief_faces(
-        shell, _trim_faces(frames, profile, closed=relief_type is ReliefType.ROUND)
-    )
+    # a notch stops at the fold line, so it lands on the base alone; a round
+    # relief is a hole centred on the end of the line and reaches into the
+    # bend as well
+    result = _replace_relief_faces(shell, _trim_faces(frames, profile))
     _check_bend_end_relieved(result, probe, step)
     return result
 
@@ -3527,82 +2946,6 @@ def _fold_pieces(
     return [p for p in piece if isinstance(p, Face)]
 
 
-def _bent_edge(
-    flat: Geom2d_Curve, first: float, last: float, surface: Geom_Surface
-) -> TopoDS_Edge:
-    """An edge on a cylinder from its curve in the cylinder's parameters.
-
-    A segment along one parameter is one of the cylinder's own iso-curves - a
-    line along the axis or an arc about it - and is built from that, so the
-    bend's fold lines and rims stay exact lines and circles whatever form the
-    flat curve arrived in. Any other curve, a slanted end or a hole, gets its
-    3D form from the kernel.
-    """
-    points = [flat.Value(first + (last - first) * step / 4) for step in range(5)]
-    iso = None
-    if all(abs(pt.X() - points[0].X()) < _RELIEF_TOLERANCE for pt in points):
-        # constant angle: a line along the axis
-        iso = (
-            surface.UIso(points[0].X()),
-            Geom2d_Line(gp_Pnt2d(points[0].X(), 0.0), gp_Dir2d(0.0, 1.0)),
-            sorted((points[0].Y(), points[-1].Y())),
-        )
-    elif all(abs(pt.Y() - points[0].Y()) < _RELIEF_TOLERANCE for pt in points):
-        # constant height: an arc about the axis
-        iso = (
-            surface.VIso(points[0].Y()),
-            Geom2d_Line(gp_Pnt2d(0.0, points[0].Y()), gp_Dir2d(1.0, 0.0)),
-            sorted((points[0].X(), points[-1].X())),
-        )
-    if iso is not None:
-        curve3d, pcurve, (low, high) = iso
-        edge = BRepBuilderAPI_MakeEdge(curve3d, low, high).Edge()
-        BRep_Builder().UpdateEdge(edge, pcurve, surface, TopLoc_Location(), TOLERANCE)
-        return edge
-    edge = BRepBuilderAPI_MakeEdge(
-        Geom2d_TrimmedCurve(flat, first, last), surface
-    ).Edge()
-    BRepLib.BuildCurves3d_s(edge)
-    return edge
-
-
-def _face_onto_surface(uv_face: TopoDS_Face, surface: Geom_Surface) -> Face:
-    """The face whose outline in ``surface``'s parameters is ``uv_face``.
-
-    The inverse of the development ``unfold`` makes: a planar face drawn in the
-    XY plane, holes and all, becomes the face with that outline on the surface.
-    Each edge's curve is read in the XY plane's own coordinates - a projection
-    that is exact for a curve lying in the plane - and carried over as the
-    pcurve on the surface.
-    """
-    xy_plane = Geom_Plane(gp_Pln())
-
-    def onto(wire: TopoDS_Wire) -> TopoDS_Wire:
-        maker = BRepBuilderAPI_MakeWire()
-        explorer = BRepTools_WireExplorer(wire)
-        while explorer.More():
-            edge = explorer.Current()
-            first, last = BRep_Tool.Range_s(edge)
-            curve3d = BRep_Tool.Curve_s(edge, first, last)
-            flat = GeomProjLib.Curve2d_s(curve3d, first, last, xy_plane)
-            maker.Add(_bent_edge(flat, first, last, surface))
-            explorer.Next()
-        return maker.Wire()
-
-    face_maker = BRepBuilderAPI_MakeFace(
-        surface, onto(BRepTools.OuterWire_s(uv_face)), True
-    )
-    for wire in _topods_entities(uv_face, ta.TopAbs_WIRE):
-        if not wire.IsSame(BRepTools.OuterWire_s(uv_face)):
-            face_maker.Add(onto(TopoDS.Wire(wire)))
-    # the parameter map may mirror the outline, and then the holes run the
-    # wrong way round for the face MakeFace settled on; the kernel puts that right
-    fixer = ShapeFix_Face(face_maker.Face())
-    fixer.Perform()
-    fixer.FixOrientation()
-    return Face(fixer.Face())
-
-
 def _wrap_strip(
     strip: Face,
     near: Vector,
@@ -3619,9 +2962,9 @@ def _wrap_strip(
     change from those to the cylinder's: distance past the near line becomes
     angle about the axis, at ``angle / allowance`` per unit of blank, and
     distance along the line becomes distance along the axis. So the strip is
-    moved into the frame of the roll, scaled, and given the cylinder as its
-    surface with its outline kept - the reverse of what ``unfold`` does to a
-    bend. Holes, notches, tapers and corner rounds come with it.
+    moved into the frame of the roll and written onto the cylinder through a
+    frame with that map - the reverse of what ``unfold`` does to a bend.
+    Holes, notches, tapers and corner rounds come with it.
     """
     sign = 1.0 if angle > 0 else -1.0
     along = (across.cross(normal) * sign).normalized()  # the cylinder's axis
@@ -3630,21 +2973,17 @@ def _wrap_strip(
     surface = Geom_CylindricalSurface(
         gp_Ax3(axis_point.to_pnt(), along.to_dir(), spoke.to_dir()), surface_radius
     )
+    cylinder = Face(BRepBuilderAPI_MakeFace(surface, TOLERANCE).Face())
     # the strip in the frame of the roll: x past the near line, y along it
     frame = Plane(origin=near, x_dir=across, z_dir=across.cross(along))
     flat = frame.to_local_coords(strip)
     # distance past the near line becomes angle about the axis
     turn = radians(abs(angle)) / allowance
     to_angle = Matrix(
-        [
-            [turn, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
+        [[turn, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]]
     )
-    in_parameters = BRepBuilderAPI_GTransform(flat.wrapped, to_angle.wrapped, True)
-    return _face_onto_surface(TopoDS.Face(in_parameters.Shape()), surface)
+    (rolled,) = UVFrame(cylinder, to_angle).write_face(flat)
+    return rolled
 
 
 def _fold_setback(
