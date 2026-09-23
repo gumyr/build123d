@@ -211,7 +211,8 @@ def _create_xde(
         if node.wrapped is None:
             continue
 
-        parent = getattr(node, "parent", None)
+        # Don't set parent if node is the one getting exported.
+        parent = None if node is to_export else getattr(node, "parent", None)
         if parent is None:
             node_label = shape_tool.AddShape(node.wrapped, False)
         else:
