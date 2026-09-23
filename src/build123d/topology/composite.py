@@ -876,7 +876,14 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 # Unwrap recursively and copy attributes down
                 unwrapped = single_element.unwrap(fully)
                 if not fully:
-                    unwrapped = type(self)(unwrapped.wrapped)
+                    # the one wrapper left is a plain Part, Sketch, Curve or
+                    # Compound: a custom object's own class cannot be rebuilt
+                    # from a bare shape, its constructor takes its parameters
+                    wrapper = next(
+                        (cls for cls in (Part, Sketch, Curve) if isinstance(self, cls)),
+                        Compound,
+                    )
+                    unwrapped = wrapper(unwrapped.wrapped)
                 self.copy_attributes_to(unwrapped, ["wrapped", "_NodeMixin__children"])
                 return unwrapped
 
