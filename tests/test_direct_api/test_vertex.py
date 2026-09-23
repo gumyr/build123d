@@ -28,12 +28,14 @@ license:
 
 import unittest
 
-from build123d.build_enums import Align, Convexity, GeomType
+from build123d.build_enums import Align, Convexity, GeomType, Keep, Mode
 from build123d.geometry import Axis, Location, Plane, Pos, Vector
 from build123d.objects_part import Box
+from build123d.build_sketch import BuildSketch
 from build123d.objects_sketch import Rectangle
+from build123d.operations_generic import fillet
 from build123d.operations_part import extrude
-from build123d.topology import Edge, Face, Solid, Vertex, Wire
+from build123d.topology import Edge, Face, Sketch, Solid, Vertex, Wire
 
 
 class TestVertex(unittest.TestCase):
@@ -217,6 +219,37 @@ class TestVertexConvexity(unittest.TestCase):
         # and a moved copy classifies through its unmoved parent
         moved = Pos(X=10) * cross.solid()
         self.assertEqual(self.kinds(moved).count("SADDLE"), 8)
+
+    # -- vertices selected off a sketch --
+
+    def test_a_sketch_vertex_is_a_corner_of_the_face_that_holds_it(self):
+        """A sketch has no creases; its vertices classify as corners of its
+        faces, so selecting from the sketch agrees with selecting from the
+        face, which is what a builder's vertices() does"""
+        outline = Rectangle(10, 10, align=(Align.MIN, Align.MIN)) - Pos(
+            5, 5
+        ) * Rectangle(5, 5, align=(Align.MIN, Align.MIN))
+        via_sketch = outline.vertices().filter_by(Convexity.CONCAVE)
+        via_face = outline.faces()[0].vertices().filter_by(Convexity.CONCAVE)
+        self.assertEqual(len(via_sketch), 1)
+        self.assertTrue(via_sketch[0].is_same(via_face[0]))
+        with BuildSketch() as sketch:
+            Rectangle(10, 10)
+            Rectangle(4, 4, mode=Mode.SUBTRACT)
+            corners = sketch.vertices().filter_by(Convexity.CONCAVE)
+            self.assertEqual(len(corners), 4)
+            fillet(corners, 1)
+        self.assertEqual(len(sketch.sketch.edges().filter_by(GeomType.CIRCLE)), 4)
+
+    def test_a_vertex_shared_by_two_faces_of_a_sketch_is_ambiguous(self):
+        pair = Sketch(list(Rectangle(4, 2).face().split(Plane.YZ, keep=Keep.BOTH)))
+        shared = [v for v in pair.vertices() if abs(v.X) < 1e-6]
+        self.assertEqual(len(shared), 2)
+        with self.assertRaisesRegex(ValueError, "corner of 2 faces"):
+            _ = shared[0].convexity
+        # selected through a face, the same vertex is one of its corners
+        through_face = pair.faces()[0].vertices().sort_by(Axis.X)[-1]
+        self.assertEqual(through_face.convexity, Convexity.CONVEX)
 
     def test_a_lone_vertex_has_nothing_to_classify_against(self):
         with self.assertRaisesRegex(ValueError, "not selected from a shape"):
