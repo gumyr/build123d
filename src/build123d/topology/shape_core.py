@@ -1826,7 +1826,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self._wrapped is None:
             raise ValueError("Cannot locate an empty shape")
         shape_copy = copy.deepcopy(self, None)
-        shape_copy.wrapped.Location(loc.wrapped)
+        shape_copy.wrapped = tcast(TOPODS, downcast(self.wrapped.Located(loc.wrapped)))
         return shape_copy
 
     def mesh(self, tolerance: float, angular_tolerance: float = 0.1):

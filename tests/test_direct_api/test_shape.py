@@ -285,6 +285,17 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(relocated_bounding_box.min.Z, -2, 5)
         self.assertAlmostEqual(relocated_bounding_box.max.Z, 2, 5)
 
+    def test_located_vertex(self):
+        """located() replaces a vertex's location rather than adding to it."""
+        moved = Vertex().moved(Pos(-2.5, 0, 0))
+        self.assertAlmostEqual(moved.located(Pos(1, 0, 0)).X, 1, 5)
+
+        extracted = Compound([moved]).vertices()[0]
+        self.assertAlmostEqual(extracted.located(Pos(1, 0, 0)).X, 1, 5)
+
+        box = Solid.make_box(1, 1, 1).moved(Pos(-2.5, 0, 0))
+        self.assertAlmostEqual(box.located(Pos(1, 0, 0)).bounding_box().min.X, 1, 5)
+
     def test_is_equal(self):
         box = Solid.make_box(1, 1, 1)
         self.assertTrue(box.is_equal(box))
