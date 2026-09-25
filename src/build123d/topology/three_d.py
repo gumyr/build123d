@@ -56,7 +56,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from math import cos, radians, tan
-from typing import TYPE_CHECKING, ClassVar, Literal, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from bd_materials import FinishedMaterial
 
@@ -252,7 +252,9 @@ class Mixin3D(Shape[TOPODS]):
         native_edges = [e.wrapped for e in edge_list]
 
         # make a edge --> faces mapping
-        edge_face_map = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        edge_face_map = (
+            IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
         TopExp.MapShapesAndAncestors_s(
             self.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, edge_face_map
         )
@@ -1276,7 +1278,10 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 intersection to stop at. Defaults to ``Until.NEXT``.
 
         Raises:
-            ValueError: If the provided profile does not intersect the target.
+            ValueError: If the provided profile does not intersect the target,
+                or the surface reached does not cut the extrusion - the
+                profile lies in it, as a sketch drawn on a face of the target
+                does with ``Until.NEXT``.
 
         Returns:
             Solid: The extruded and limited solid.
@@ -1331,22 +1336,21 @@ class Solid(Mixin3D[TopoDS_Solid]):
         limit = modified_target_surfaces[
             0 if until in [Until.NEXT, Until.PREVIOUS] else -1
         ]
-        keep: Literal[Keep.TOP, Keep.BOTTOM] = (
-            Keep.TOP if until in [Until.NEXT, Until.PREVIOUS] else Keep.BOTTOM
-        )
 
-        # 4: Split the extrusion by the appropriate shell
-        clipped_extrusion = extrusion.split(limit, keep=keep)
+        # 4: Split the extrusion by that surface
+        pieces = extrusion.split(limit, keep=Keep.ALL)
+        if len(pieces) < 2:
+            raise ValueError(
+                "the surface reached does not cut the extrusion - the profile "
+                "lies in it, or only touches it"
+            )
 
-        # 5: Return the appropriate type
-        if clipped_extrusion is None:
-            raise RuntimeError("Extrusion is None")  # None isn't an option here
-        if isinstance(clipped_extrusion, Solid):
-            return clipped_extrusion
-        #  isinstance(clipped_extrusion, list):
-        return ShapeList(clipped_extrusion).sort_by(Axis(profile.center(), direction))[
-            0
-        ]
+        # 5: The profile is the extrusion's own base face and survives the
+        #    split, so the piece to return is the one that holds it
+        for piece in pieces:
+            if any(face.wrapped.IsSame(profile.wrapped) for face in piece.faces()):
+                return piece
+        raise RuntimeError("Extrusion is None")  # None isn't an option here
 
     @classmethod
     def from_bounding_box(cls, bbox: BoundBox | OrientedBoundBox) -> Solid:
