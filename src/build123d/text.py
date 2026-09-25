@@ -138,7 +138,7 @@ class FontManager:
         return self.manager.FindFont(TCollection_AsciiString(name), FONT_ASPECT[style])
 
     def register_font(
-        self, path: str, override: bool = False, single_stroke=False
+        self, path: str, override: bool = False, single_stroke: bool = False
     ) -> list[str]:
         """Register all font faces in a font file and return font face names."""
         _, ext = os.path.splitext(path)
@@ -171,17 +171,17 @@ class FontManager:
         return font_faces
 
     def register_folder(
-        self, path: str, override: bool = False, single_stroke=False
+        self, path: str, override: bool = False, single_stroke: bool = False
     ) -> list[str]:
         """Register all fonts in a folder"""
         exts = ["ttf", "otf", "ttc"]
-        font_faces = []
+        font_faces: list[str] = []
         for ext in exts:
             search = os.path.join(os.path.normpath(path), "*" + ext)
             results = glob.glob(search)
             for result in results:
-                font_faces += self.register_font(result, override, single_stroke)
-
+                if os.path.isfile(result):
+                    font_faces += self.register_font(result, override, single_stroke)
         return list(set(font_faces))
 
     def register_system_fonts(self):
