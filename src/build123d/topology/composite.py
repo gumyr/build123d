@@ -744,6 +744,38 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         return results
 
+    def _global_elements(self) -> list[Shape]:
+        """The immediate elements of this Compound, placed in global coordinates.
+
+        An assembly stores each child at a location relative to its parent, so
+        a child is copied to its global location before being compared with
+        anything outside the assembly. The copy is detached from the assembly
+        it came from: left attached, its own children would resolve their
+        global locations through ancestor locations that have already been
+        applied here.
+
+        A Compound without children is a plain OCCT compound whose sub-shapes
+        already carry the accumulated location, so they are returned as is.
+
+        Returns:
+            list[Shape]: elements positioned in global space
+        """
+        if not self.children:
+            return list(self)
+
+        # Moving each child by the locations accumulated down to this Compound
+        # leaves the child's own placement intact, however it is represented -
+        # a Vertex, for instance, carries its position in its geometry rather
+        # than in its Location.
+        base = self.global_location
+
+        elements: list[Shape] = []
+        for child in self.children:
+            placed = child.moved(base)
+            placed.parent = None
+            elements.append(placed)
+        return elements
+
     def _intersect(
         self,
         other: Shape | Vector | Location | Axis | Plane,
@@ -768,13 +800,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # Convert geometry objects
         other = Shape.as_shape(other)
 
-        # Get self elements: assembly children or OCCT direct children
-        if self.children:
-            self_elements = [
-                c.moved(c.location.inverse() * c.global_location) for c in self.children
-            ]
-        else:
-            self_elements = list(self)
+        self_elements = self._global_elements()
         if not self_elements:
             return None
 
@@ -782,13 +808,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         # Distribute over elements (OR semantics for Compound arguments)
         if isinstance(other, Compound):
-            if other.children:
-                other_elements = [
-                    c.moved(c.location.inverse() * c.global_location)
-                    for c in other.children
-                ]
-            else:
-                other_elements = list(other)
+            other_elements = other._global_elements()
         else:
             other_elements = [other]
 
@@ -810,8 +830,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
     ) -> ShapeList[Vertex | Edge | Face]:
         """Distribute touch over compound elements.
 
-        Iterates over elements and collects touch results. Only Solid and
-        Face elements produce boundary contacts; other shapes return empty.
+        Iterates over elements, placed in global coordinates, and collects
+        touch results. Only Solid and Face elements produce boundary contacts;
+        other shapes return empty.
 
         Args:
             other: Shape to check boundary contacts with
@@ -822,10 +843,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """
         results: ShapeList = ShapeList()
 
-        # Get elements: assembly children or OCCT direct children
-        elements = self.children if self.children else list(self)
-
-        for elem in elements:
+        for elem in self._global_elements():
             results.extend(elem.touch(other, tolerance))
 
         return ShapeList(set(results))
