@@ -180,8 +180,8 @@ class FontManager:
             search = os.path.join(os.path.normpath(path), "*" + ext)
             results = glob.glob(search)
             for result in results:
-                font_faces += self.register_font(result, override, single_stroke)
-
+                if os.path.isfile(result):
+                    font_faces += self.register_font(result, override, single_stroke)
         return list(set(font_faces))
 
     def register_system_fonts(self):
