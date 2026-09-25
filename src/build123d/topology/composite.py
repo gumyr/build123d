@@ -818,8 +818,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """
         results: ShapeList = ShapeList()
 
-        # Get elements: assembly children or OCCT direct children
-        elements = self.children if self.children else list(self)
+        # Get elements: assembly parts or OCCT direct children
+        elements = self._parts_at_global_location() if self.children else list(self)
 
         for elem in elements:
             results.extend(elem.touch(other, tolerance))

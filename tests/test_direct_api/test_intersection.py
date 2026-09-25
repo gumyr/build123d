@@ -641,6 +641,44 @@ def test_compound_intersection_part_with_child_parts():
     assert assembly.intersect(probe.moved(Pos(0.2, 0.2, 0.2))) is None
 
 
+def test_compound_touch_after_moving_parent():
+    """Touch uses the global pose of assembly children."""
+    assembly = Compound(children=[Solid.make_box(1, 1, 1)])
+    assembly.location = Location((10, 0, 0))
+
+    neighbour = Solid.make_box(1, 1, 1).moved(Location((11, 0, 0)))
+    ghost_neighbour = Solid.make_box(1, 1, 1).moved(Location((1, 0, 0)))
+
+    assert any(isinstance(s, Face) for s in assembly.touch(neighbour))
+    assert not assembly.touch(ghost_neighbour)
+
+
+def test_compound_touch_rotated_child_in_rotated_parent():
+    """Touch uses the global pose of a rotated child in a rotated parent."""
+    child = Solid.make_box(4, 2, 2)
+    child.location = Location((5, 0, 0), (0, 0, 30))
+    assembly = Compound(children=[child])
+    assembly.location = Location((10, 0, 0), (0, 0, 90))
+
+    neighbour = Solid.make_box(4, 2, 2).located(
+        assembly.location * child.location * Location((4, 0, 0))
+    )
+
+    assert any(isinstance(s, Face) for s in assembly.touch(neighbour))
+
+
+def test_compound_touch_part_with_child_parts():
+    """Touch sees a solid with child parts as well as its children."""
+    solid = Solid.make_box(1, 1, 1)
+    attached = Solid.make_box(1, 1, 1).moved(Pos(5, 0, 0))
+    attached.parent = solid
+    assembly = Compound(children=[solid])
+    assembly.location = Location((10, 0, 0))
+
+    assert assembly.touch(Solid.make_box(1, 1, 1).moved(Pos(11, 0, 0)))
+    assert assembly.touch(Solid.make_box(1, 1, 1).moved(Pos(16, 0, 0)))
+
+
 # FreeCAD issue example
 c1 = CenterArc((0, 0), 10, 0, 360).edge()
 c2 = CenterArc((19, 0), 10, 0, 360).edge()
