@@ -310,6 +310,63 @@ class TestDoChildrenIntersect(unittest.TestCase):
         self.assertTrue(intersects)
         self.assertIn(assembly, pair)
 
+    def test_nested_sub_assemblies_that_stay_apart(self):
+        """A sub-assembly contains its own parts, which is not a collision."""
+        assembly = Compound(
+            label="asm",
+            children=[
+                Compound(label="a", children=[Solid.make_box(1, 1, 1)]),
+                Compound(
+                    label="b", children=[Solid.make_box(1, 1, 1, Plane((5, 0, 0)))]
+                ),
+            ],
+        )
+        self.assertFalse(assembly.do_children_intersect()[0])
+
+    def test_nested_parts_that_overlap_after_placement(self):
+        """Parts are compared where their sub-assemblies place them."""
+        part_a = Solid.make_box(1, 1, 1)
+        part_b = Solid.make_box(1, 1, 1, Plane((5, 0, 0)))
+        sub_assembly = Compound(label="b", children=[part_b])
+        sub_assembly.location = Location((-4.5, 0, 0))
+        assembly = Compound(
+            label="asm",
+            children=[Compound(label="a", children=[part_a]), sub_assembly],
+        )
+
+        intersects, pair, volume = assembly.do_children_intersect()
+        self.assertTrue(intersects)
+        self.assertEqual(set(pair), {part_a, part_b})
+        self.assertAlmostEqual(volume, 0.5, 5)
+
+    def test_nested_parts_apart_after_placement(self):
+        """Parts that only overlap in their local frames do not collide."""
+        sub_assembly = Compound(
+            label="b", children=[Solid.make_box(1, 1, 1, Plane((0.5, 0, 0)))]
+        )
+        sub_assembly.location = Location((5, 0, 0))
+        assembly = Compound(
+            label="asm",
+            children=[
+                Compound(label="a", children=[Solid.make_box(1, 1, 1)]),
+                sub_assembly,
+            ],
+        )
+        self.assertFalse(assembly.do_children_intersect()[0])
+
+    def test_child_parts_of_a_part(self):
+        """The child parts of a Solid are compared along with it."""
+        solid = Solid.make_box(1, 1, 1)
+        attached = Solid.make_box(1, 1, 1, Plane((5, 0, 0)))
+        attached.parent = solid
+        neighbour = Solid.make_box(1, 1, 1, Plane((5.5, 0, 0)))
+        assembly = Compound(label="asm", children=[solid, neighbour])
+
+        intersects, pair, volume = assembly.do_children_intersect()
+        self.assertTrue(intersects)
+        self.assertEqual(set(pair), {attached, neighbour})
+        self.assertAlmostEqual(volume, 0.5, 5)
+
 
 class TestCurveOperators(unittest.TestCase):
     """@ and % were covered; ^ was not."""

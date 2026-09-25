@@ -656,7 +656,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         Determine if any of the child objects within a Compound/assembly intersect by
         intersecting each of the shapes with each other and checking for
-        a common volume.
+        a common volume. The parts of an assembly, the nodes with their own
+        geometry, are compared at their global locations.
 
         Args:
             include_parent (bool, optional): check parent for intersections. Defaults to False.
@@ -666,12 +667,16 @@ class Compound(Mixin3D[TopoDS_Compound]):
             tuple[bool, tuple[Shape, Shape], float]:
                 do the object intersect, intersecting objects, volume of intersection
         """
-        children: list[Shape] = list(PreOrderIter(self))
-        if not include_parent:
-            children.pop(0)  # remove parent
+        # A sub-assembly always contains its own parts, so only the parts are
+        # compared; the reported pair holds the original objects
+        children: list[Shape] = self._parts() if self.children else []
+        placed: list[Shape] = self._parts_at_global_location() if self.children else []
+        if include_parent:
+            children.insert(0, self)
+            placed.insert(0, Compound(placed) if placed else self)
         # children_bbox = [child.bounding_box().to_solid() for child in children]
         children_bbox = [
-            Solid.from_bounding_box(child.bounding_box()) for child in children
+            Solid.from_bounding_box(child.bounding_box()) for child in placed
         ]
         child_index_pairs = [
             tuple(map(int, comb))
@@ -684,8 +689,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 children_bbox[child_index_pair[1]]
             )
             if bbox_intersection is not None:
-                obj_intersection = children[child_index_pair[0]].intersect(
-                    children[child_index_pair[1]]
+                obj_intersection = placed[child_index_pair[0]].intersect(
+                    placed[child_index_pair[1]]
                 )
                 if obj_intersection is not None:
                     common_volume = sum(s.volume for s in obj_intersection.solids())
