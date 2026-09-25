@@ -594,6 +594,53 @@ def test_compound_intersection_after_moving_parent():
     assert moved_assembly.intersect(Solid.make_box(1, 1, 1)) is None
 
 
+def test_compound_intersection_rotated_child_in_rotated_parent():
+    """Intersection uses the global pose of a rotated child in a rotated parent."""
+    child = Solid.make_box(4, 2, 2)
+    child.location = Location((5, 0, 0), (0, 0, 30))
+    assembly = Compound(children=[child])
+    assembly.location = Location((10, 0, 0), (0, 0, 90))
+
+    placed = Solid.make_box(4, 2, 2).located(assembly.location * child.location)
+    result = assembly.intersect(placed)
+
+    assert result is not None
+    assert sum(s.volume for s in result) == pytest.approx(16)
+    assert assembly.intersect(Solid.make_box(4, 2, 2).located(child.location)) is None
+
+
+def test_compound_intersection_nested_rotated_assembly():
+    """Intersection uses the global pose of a leaf in rotated sub-assemblies."""
+    leaf = Solid.make_box(4, 2, 2)
+    leaf.location = Location((3, 1, 0), (0, 0, 45))
+    sub_assembly = Compound(children=[leaf])
+    sub_assembly.location = Location((0, 20, 0), (0, 90, 0))
+    assembly = Compound(children=[sub_assembly])
+    assembly.location = Location((50, 0, 5), (30, 0, 60))
+
+    placed = Solid.make_box(4, 2, 2).located(leaf.global_location)
+    result = assembly.intersect(placed)
+    flat = Compound(list(assembly.solids())).intersect(placed)
+
+    assert result is not None and flat is not None
+    assert sum(s.volume for s in result) == pytest.approx(16)
+    assert sum(s.volume for s in flat) == pytest.approx(16)
+
+
+def test_compound_intersection_part_with_child_parts():
+    """A solid with child parts is intersected along with its children."""
+    solid = Solid.make_box(1, 1, 1)
+    attached = Solid.make_box(1, 1, 1).moved(Pos(5, 0, 0))
+    attached.parent = solid
+    assembly = Compound(children=[solid])
+    assembly.location = Location((10, 0, 0))
+
+    probe = Solid.make_box(0.5, 0.5, 0.5)
+    assert assembly.intersect(probe.moved(Pos(10.2, 0.2, 0.2))) is not None
+    assert assembly.intersect(probe.moved(Pos(15.2, 0.2, 0.2))) is not None
+    assert assembly.intersect(probe.moved(Pos(0.2, 0.2, 0.2))) is None
+
+
 # FreeCAD issue example
 c1 = CenterArc((0, 0), 10, 0, 360).edge()
 c2 = CenterArc((19, 0), 10, 0, 360).edge()
