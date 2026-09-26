@@ -340,6 +340,10 @@ class DimensionLine(BaseSketchObject):
     Type 2) The text fit within the path and the arrows go outside
     Type 3) Neither the text nor the arrows fit within the path
 
+    Attributes:
+        label_str (str): Resolved text used to create the label. Changing this
+            attribute does not rebuild the geometry.
+
     Args:
         path (PathDescriptor): a very general type of input used to describe the path the
             dimension line will follow.
@@ -392,6 +396,7 @@ class DimensionLine(BaseSketchObject):
 
         # Generate the label
         label_str = draft._label_to_str(label, path_obj, label_angle, tolerance)
+        self.label_str: str = label_str
         label_shape = Text(
             txt=label_str,
             font_size=draft.font_size,
@@ -501,6 +506,10 @@ class ExtensionLine(BaseSketchObject):
     Create a dimension line with two lines extending outward from the part to dimension.
     Typically used for (but not restricted to) outside dimensions, with a pair of lines
     extending from the edge of a part to a dimension line.
+
+    Attributes:
+        label_str (str): Resolved text used to create the label. Changing this
+            attribute does not rebuild the geometry.
 
     Args:
         border (PathDescriptor): a very general type of input defining the object to
@@ -690,6 +699,7 @@ class ExtensionLine(BaseSketchObject):
             mode=Mode.PRIVATE,
         )
         self.dimension = d_line.dimension  #: length of the dimension
+        self.label_str: str = d_line.label_str
 
         e_line_sketch = Sketch(children=e_lines + d_line.faces())
 
