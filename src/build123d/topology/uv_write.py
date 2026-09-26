@@ -78,7 +78,7 @@ from typing import TypeVar
 
 from scipy.integrate import solve_ivp
 
-from OCP.BRep import BRep_Tool
+from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
 from OCP.BRepLib import BRepLib
@@ -209,6 +209,23 @@ class UVFrame:
         if isinstance(self.mapping, Matrix):
             return self.mapping.multiply(Vector(x, y, 0))
         return Vector(*self.mapping(x, y), 0)
+
+    def lift(self, planar: Face) -> Face:
+        """A planar face's image on the uv plane
+
+        The face laid out where it lands in the surface's parameters, as a
+        planar face on ``Plane.XY`` with x as u and y as v, before anything is
+        written. A shape on that plane can be combined with the image of the
+        face itself and written back through an identity frame, which is how
+        a face is reshaped in its own parameter space.
+
+        Args:
+            planar (Face): a planar face on ``Plane.XY``
+
+        Returns:
+            Face: the image, on the uv plane
+        """
+        return self._lift_face(planar)
 
     # ---- writing ----
 
@@ -436,10 +453,41 @@ class UVFrame:
     # result with the face.
 
     def _write_edge(self, lifted: Edge) -> Edge:
-        """A uv-plane edge written onto the surface, its curve the pcurve"""
+        """A uv-plane edge written onto the surface, its curve the pcurve
+
+        A span along one parameter is one of the surface's own iso-curves, a
+        line along a cylinder's axis or a circle about it, and is built from
+        that exactly; any other curve gets its 3D form from the kernel.
+        """
         first, last = BRep_Tool.Range_s(lifted.wrapped)
         curve = BRep_Tool.Curve_s(lifted.wrapped, first, last)
         pcurve = GeomAPI.To2d_s(curve, gp_Pln())
+        points = [pcurve.Value(first + (last - first) * i / 4) for i in range(5)]
+        along_v = all(abs(p.X() - points[0].X()) < 1e-9 for p in points)
+        along_u = all(abs(p.Y() - points[0].Y()) < 1e-9 for p in points)
+        if along_v or along_u:
+            u, v = points[0].X(), points[0].Y()
+            if along_v:
+                iso = self._surface.UIso(u)
+                start, end = points[0].Y(), points[-1].Y()
+            else:
+                iso = self._surface.VIso(v)
+                start, end = points[0].X(), points[-1].X()
+            edge = BRepBuilderAPI_MakeEdge(iso, min(start, end), max(start, end)).Edge()
+            # the iso-curve's parameter is the surface's other parameter, but
+            # a periodic one may have been moved by whole periods into the
+            # curve's own range; the pcurve follows the range the edge got
+            shift = BRep_Tool.Range_s(edge)[0] - min(start, end)
+            if along_v:
+                pcurve = Geom2d_Line(gp_Pnt2d(u, -shift), gp_Dir2d(0.0, 1.0))
+            else:
+                pcurve = Geom2d_Line(gp_Pnt2d(-shift, v), gp_Dir2d(1.0, 0.0))
+            BRep_Builder().UpdateEdge(
+                edge, pcurve, self._surface, TopLoc_Location(), TOLERANCE
+            )
+            # built from low to high parameter, which may be against the lifted
+            # edge's own direction
+            return Edge(TopoDS.Edge(edge.Reversed()) if start > end else edge)
         edge = BRepBuilderAPI_MakeEdge(pcurve, self._surface, first, last).Edge()
         if not BRepLib.BuildCurves3d_s(
             edge, min(self.tolerance, 1e-5), GeomAbs_Shape.GeomAbs_C1, 14, 0
@@ -647,8 +695,9 @@ def _conic_image(
     rotation = atan2(r10, r00)
     if r00 * r11 - r01 * r10 > 0:
         return image, first + rotation, last + rotation
-    # mirrored: image angle is rotation - t, so walk the reversed curve
-    return image.Reversed(), rotation - last, rotation - first
+    # mirrored: image angle is rotation - t. The reversed curve's point at p is
+    # the image's at -p, so its parameter is t - rotation, and increases with t
+    return image.Reversed(), first - rotation, last - rotation
 
 
 # ---------------------------------------------------------------------------

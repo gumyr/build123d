@@ -1010,7 +1010,8 @@ class TestValidateInputs(unittest.TestCase):
             with BuildPart():
                 Circle(1)
         self.assertEqual(
-            "BuildPart doesn't have a Circle object or operation (Circle applies to ['BuildSketch'])",
+            "BuildPart doesn't have a Circle object or operation "
+            "(Circle applies to ['BuildSketch', 'BuildSheet'])",
             str(rte.exception),
         )
 
@@ -1045,7 +1046,9 @@ class TestValidateInputs(unittest.TestCase):
         """An object built elsewhere and then handed to the wrong builder."""
         circle = Circle(1)
         with BuildPart() as builder:
-            with self.assertRaisesRegex(RuntimeError, "applies to \\['BuildSketch'\\]"):
+            with self.assertRaisesRegex(
+                RuntimeError, "applies to \\['BuildSketch', 'BuildSheet'\\]"
+            ):
                 builder.validate_inputs(circle)
 
     def test_wrong_builder_for_an_operation(self):

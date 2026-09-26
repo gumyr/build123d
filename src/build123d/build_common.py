@@ -143,27 +143,35 @@ def flatten_sequence(*obj: T) -> ShapeList[Any]:
 
 operations_apply_to = {
     "add": ["BuildPart", "BuildSketch", "BuildLine"],
-    "insert": ["BuildPart", "BuildSketch", "BuildLine"],
+    "insert": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
+    "bend": ["BuildSheet"],
+    "bend_relief": ["BuildSheet"],
     "bounding_box": ["BuildPart", "BuildSketch", "BuildLine"],
-    "chamfer": ["BuildPart", "BuildSketch", "BuildLine"],
+    "chamfer": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
+    "corner_relief": ["BuildSheet"],
     "draft": ["BuildPart"],
     "extrude": ["BuildPart"],
-    "fillet": ["BuildPart", "BuildSketch", "BuildLine"],
+    "fillet": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
+    "flange": ["BuildSheet"],
     "full_round": ["BuildSketch"],
+    "hem": ["BuildSheet"],
+    "jog": ["BuildSheet"],
     "loft": ["BuildPart"],
     "make_brake_formed": ["BuildPart"],
     "make_face": ["BuildSketch"],
     "make_hull": ["BuildSketch"],
-    "mirror": ["BuildPart", "BuildSketch", "BuildLine"],
+    "mirror": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
+    "miter": ["BuildSheet"],
     "offset": ["BuildPart", "BuildSketch", "BuildLine"],
     "project": ["BuildPart", "BuildSketch", "BuildLine"],
     "project_workplane": ["BuildPart"],
     "revolve": ["BuildPart"],
     "scale": ["BuildPart", "BuildSketch", "BuildLine"],
     "section": ["BuildPart"],
-    "split": ["BuildPart", "BuildSketch", "BuildLine"],
+    "split": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
     "sweep": ["BuildPart", "BuildSketch"],
     "thicken": ["BuildPart"],
+    "unfold": ["BuildSheet"],
 }
 
 B = TypeVar("B", bound="Builder")
@@ -224,6 +232,7 @@ class Builder(ABC, Generic[ShapeT]):
         self.placements = self.output_placements
         self._scope_context: AbstractContextManager[BuildScope] | None = None
         self._placed_obj: Shape | None = None
+        self._published_obj: Shape | None = None
         current_frame = inspect.currentframe()
         assert current_frame is not None
         assert current_frame.f_back is not None
@@ -319,6 +328,14 @@ class Builder(ABC, Generic[ShapeT]):
     def _exit_extras(self):
         """Any builder specific exit actions"""
 
+    def _publication_product(self) -> Shape | None:
+        """Return the local object published to the parent on context exit."""
+        return self._obj
+
+    def _publication_result_type(self) -> Type[Shape] | None:
+        """Return the wrapper type used for placed publication products."""
+        return getattr(type(self), "_sub_class", None)
+
     def __exit__(self, exception_type, exception_value, traceback):
         """Upon exiting restore context and send object to parent"""
         scope = _get_build_scope()
@@ -330,7 +347,11 @@ class Builder(ABC, Generic[ShapeT]):
             self._scope_context.__exit__(exception_type, exception_value, traceback)
 
         try:
-            local_product = self._obj
+            construction_product = self._obj
+        except AttributeError:
+            construction_product = None
+        try:
+            local_product = self._publication_product()
         except AttributeError:
             local_product = None
         if local_product is not None and self._label:
@@ -344,11 +365,21 @@ class Builder(ABC, Generic[ShapeT]):
                     f"{self._obj_name} is None - {self._tag} didn't create anything",
                     stacklevel=2,
                 )
-        self._placed_obj = _PublicationService.publish(
+        self._published_obj = _PublicationService.publish(
             local_product,
             scope,
             self.mode,
-            result_type=getattr(type(self), "_sub_class", None),
+            result_type=self._publication_result_type(),
+            source=self,
+        )
+        self._placed_obj = (
+            self._published_obj
+            if local_product is construction_product
+            else _PublicationService.place(
+                construction_product,
+                scope,
+                result_type=getattr(type(self), "_sub_class", None),
+            )
         )
 
         logger.info("Exiting %s", type(self).__name__)
@@ -408,6 +439,24 @@ class Builder(ABC, Generic[ShapeT]):
             logger.info("%s context requested by %s", context_name, caller_name)
 
         return cast(B, result)
+
+    def _accept_publication(
+        self, build_product: Shape, source: Builder | None, mode: Mode
+    ) -> None:
+        """Receive a product published by a nested Builder or object
+
+        Called on the publication target with the producing Builder, if any, so a
+        Builder that needs construction metadata from its child can read it from
+        that Builder rather than from the published topology. The default is to
+        combine the product into this Builder's context.
+
+        Args:
+            build_product (Shape): the placed product being published
+            source (Builder | None): Builder that produced it, None for objects
+            mode (Mode): combination mode
+        """
+        del source
+        self._add_to_context(build_product, mode=mode)
 
     def _add_to_context(
         self,
@@ -1629,6 +1678,11 @@ class _PublicationService:
                     if build_product._dim is not None
                     else Compound
                 )
+            if not issubclass(result_type, Compound):
+                # Curve, Sketch and Part are Compounds and can hold one copy per
+                # placement; a concrete topology type such as Shell cannot, so
+                # collect those placements in a plain Compound instead.
+                result_type = Compound
             result = result_type(Compound(placed).wrapped)
         build_product.copy_attributes_to(
             result,
@@ -1646,8 +1700,14 @@ class _PublicationService:
         result_type: Type[Shape] | None = None,
         place: bool = True,
         preserve_identity: bool = False,
+        source: Builder | None = None,
     ) -> Shape | None:
-        """Place a product and dispatch it once to its publication target."""
+        """Place a product and dispatch it once to its publication target.
+
+        ``source`` is the Builder that produced the product, when a Builder did,
+        and is passed to the target so construction metadata can travel between
+        Builders instead of being attached to the published Shape.
+        """
         placed = (
             cls.place(build_product, scope, result_type=result_type)
             if place
@@ -1666,12 +1726,17 @@ class _PublicationService:
         if placed is None or target is None or mode == Mode.PRIVATE:
             return placed
 
-        if target._tag not in {"BuildPart", "BuildSketch", "BuildLine"}:
+        if target._tag not in {
+            "BuildPart",
+            "BuildSheet",
+            "BuildSketch",
+            "BuildLine",
+        }:
             raise RuntimeError(
                 f"Unsupported publication target {type(target).__name__}"
             )
 
-        target._add_to_context(placed, mode=mode)
+        target._accept_publication(placed, source, mode)
         return placed
 
 
