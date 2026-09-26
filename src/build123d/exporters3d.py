@@ -57,7 +57,9 @@ from OCP.TCollection import (
     TCollection_ExtendedString,
     TCollection_HAsciiString,
 )
-from OCP.collections import IndexedDataMap_TCollection_AsciiString_TCollection_AsciiString
+from OCP.collections import (
+    IndexedDataMap_TCollection_AsciiString_TCollection_AsciiString,
+)
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
@@ -124,6 +126,24 @@ def _create_xde(
     # Create a label map to find the appropriate label for all shapes
     label_map: dict[Shape, TDF_Label] = {}
 
+    # Effective display name of each node: an unlabeled node inherits the name
+    # of its nearest labeled ancestor so user defined names replace the
+    # auto-generated ones (e.g. "SOLID") at every level of the assembly. That
+    # label and every node inheriting it are numbered from 0, so every
+    # product in the file has a name of its own
+    name_map: dict[Shape | None, str] = {}
+    numbered: dict[str, int] = {}
+
+    # the labeled nodes whose names unlabeled descendants will inherit
+    shared: set[Shape] = set()
+    if auto_naming:
+        source: dict[Shape | None, Shape | None] = {}
+        for node in PreOrderIter(to_export):
+            above = source.get(getattr(node, "parent", None))
+            source[node] = node if node.label else above
+            if not node.label and above is not None:
+                shared.add(above)
+
     def resolve_component_parent_label(label: TDF_Label) -> TDF_Label:
         """Return a label suitable for assembly operations.
 
@@ -142,12 +162,13 @@ def _create_xde(
                 return referred
         return label
 
-    def set_name_and_color(node: Shape, node_label: TDF_Label) -> None:
+    def set_name_and_color(node: Shape, node_label: TDF_Label, name: str) -> None:
         """Assign label/color metadata for one XDE node label.
 
         Behavior:
-        - Sets `TDataStd_Name` on the instance label and, when applicable,
-          also on the referred shape label so STEP PRODUCT names persist.
+        - Sets `TDataStd_Name` to `name` on the instance label and, when
+          applicable, also on the referred shape label so STEP PRODUCT names
+          persist.
         - Sets generic color on the instance label and referred label.
         - For leaf `Compound` wrappers (`Part`, `Sketch`, `Curve`), propagates
           color to relevant sub-shapes (solid/face/edge) using appropriate
@@ -156,17 +177,15 @@ def _create_xde(
         if node_label.IsNull():
             return
 
-        if node.label:
-            TDataStd_Name.Set_s(node_label, TCollection_ExtendedString(node.label))
+        if name:
+            TDataStd_Name.Set_s(node_label, TCollection_ExtendedString(name))
             if XCAFDoc_ShapeTool.IsReference_s(node_label):
                 referred = TDF_Label()
                 if (
                     XCAFDoc_ShapeTool.GetReferredShape_s(node_label, referred)
                     and not referred.IsNull()
                 ):
-                    TDataStd_Name.Set_s(
-                        referred, TCollection_ExtendedString(node.label)
-                    )
+                    TDataStd_Name.Set_s(referred, TCollection_ExtendedString(name))
 
         if node.color is not None:
             node_color_type = XCAFDoc_ColorType.XCAFDoc_ColorGen
@@ -225,8 +244,15 @@ def _create_xde(
             continue
 
         label_map[node] = node_label
-        if node.label or node.color is not None:
-            set_name_and_color(node, node_label)
+        inherited = name_map.get(parent, "")
+        name_map[node] = node.label or inherited
+        node_name = node.label
+        if auto_naming and (node in shared or (not node_name and inherited)):
+            index = numbered.get(name_map[node], 0)
+            node_name = f"{name_map[node]}-{index}"
+            numbered[name_map[node]] = index + 1
+        if node_name or node.color is not None:
+            set_name_and_color(node, node_label, node_name)
 
     shape_tool.UpdateAssemblies()
 
@@ -374,7 +400,10 @@ def export_step(
 
     Export a build123d Shape or assembly with color and label attributes.
     Note that if the color of a node in an assembly isn't set, it will be
-    assigned the color of its nearest ancestor.
+    assigned the color of its nearest ancestor. Likewise, a node without a
+    label is exported under the name of its nearest labeled ancestor, and
+    that label and every node inheriting it are numbered from 0 - "box-0",
+    "box-1" - so that every product in the file has a name of its own.
 
     Args:
         to_export (Shape): object or assembly
