@@ -656,7 +656,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         Determine if any of the child objects within a Compound/assembly intersect by
         intersecting each of the shapes with each other and checking for
-        a common volume.
+        a common volume. The parts of an assembly, the nodes with their own
+        geometry, are compared at their global locations.
 
         Args:
             include_parent (bool, optional): check parent for intersections. Defaults to False.
@@ -666,12 +667,16 @@ class Compound(Mixin3D[TopoDS_Compound]):
             tuple[bool, tuple[Shape, Shape], float]:
                 do the object intersect, intersecting objects, volume of intersection
         """
-        children: list[Shape] = list(PreOrderIter(self))
-        if not include_parent:
-            children.pop(0)  # remove parent
+        # A sub-assembly always contains its own parts, so only the parts are
+        # compared; the reported pair holds the original objects
+        children: list[Shape] = self._parts() if self.children else []
+        placed: list[Shape] = self._parts_at_global_location() if self.children else []
+        if include_parent:
+            children.insert(0, self)
+            placed.insert(0, Compound(placed) if placed else self)
         # children_bbox = [child.bounding_box().to_solid() for child in children]
         children_bbox = [
-            Solid.from_bounding_box(child.bounding_box()) for child in children
+            Solid.from_bounding_box(child.bounding_box()) for child in placed
         ]
         child_index_pairs = [
             tuple(map(int, comb))
@@ -684,8 +689,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 children_bbox[child_index_pair[1]]
             )
             if bbox_intersection is not None:
-                obj_intersection = children[child_index_pair[0]].intersect(
-                    children[child_index_pair[1]]
+                obj_intersection = placed[child_index_pair[0]].intersect(
+                    placed[child_index_pair[1]]
                 )
                 if obj_intersection is not None:
                     common_volume = sum(s.volume for s in obj_intersection.solids())
@@ -757,7 +762,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
             Compound([a, b]).intersect(Compound([c, d])) = (a ∩ c) ∪ (a ∩ d) ∪ (b ∩ c) ∪ (b ∩ d)
 
         Handles both build123d assemblies (children) and OCCT Compounds (list()).
-        Nested Compounds are handled by recursion.
+        Assemblies are flattened to their parts, each placed at its global
+        location; nested OCCT Compounds are handled by recursion.
 
         Args:
             other: Shape or geometry object to intersect with
@@ -768,11 +774,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # Convert geometry objects
         other = Shape.as_shape(other)
 
-        # Get self elements: assembly children or OCCT direct children
+        # Get self elements: assembly parts or OCCT direct children
         if self.children:
-            self_elements = [
-                c.moved(c.location.inverse() * c.global_location) for c in self.children
-            ]
+            self_elements = self._parts_at_global_location()
         else:
             self_elements = list(self)
         if not self_elements:
@@ -783,10 +787,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # Distribute over elements (OR semantics for Compound arguments)
         if isinstance(other, Compound):
             if other.children:
-                other_elements = [
-                    c.moved(c.location.inverse() * c.global_location)
-                    for c in other.children
-                ]
+                other_elements = other._parts_at_global_location()
             else:
                 other_elements = list(other)
         else:
@@ -822,8 +823,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """
         results: ShapeList = ShapeList()
 
-        # Get elements: assembly children or OCCT direct children
-        elements = self.children if self.children else list(self)
+        # Get elements: assembly parts or OCCT direct children
+        elements = self._parts_at_global_location() if self.children else list(self)
 
         for elem in elements:
             results.extend(elem.touch(other, tolerance))
@@ -891,6 +892,27 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         # If there are no elements or more than one element, return self
         return self
+
+    def _parts(self) -> list[Shape]:
+        """Return the parts of this assembly, the nodes with their own geometry.
+
+        A Compound with children is only the sum of its children, so it is
+        represented by them. Any other node is a part, including a Solid that
+        has child parts of its own.
+        """
+        return [
+            node
+            for node in PreOrderIter(self)
+            if node is not self and not (isinstance(node, Compound) and node.children)
+        ]
+
+    def _parts_at_global_location(self) -> list[Shape]:
+        """Return the parts of this assembly, each placed at its global location."""
+        return [
+            part.moved(part.parent.global_location)
+            for part in self._parts()
+            if part.parent is not None
+        ]
 
     def _post_attach(self, parent: Compound):
         """Method call after attaching to `parent`."""
