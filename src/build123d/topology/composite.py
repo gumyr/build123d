@@ -77,7 +77,7 @@ from OCP.Graphic3d import (
     Graphic3d_VTA_TOPFIRSTLINE,
 )
 from OCP.GProp import GProp_GProps
-from OCP.NCollection import NCollection_Utf8String
+from OCP.NCollection import NCollection_String
 from OCP.StdPrs import StdPrs_BRepTextBuilder as Font_BRepTextBuilder, StdPrs_BRepFont
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopoDS import (
@@ -380,7 +380,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # Write text to shape
         builder = Font_BRepTextBuilder()
         brep_font = StdPrs_BRepFont(
-            NCollection_Utf8String(system_font.FontName().ToCString()),
+            NCollection_String(system_font.FontName().ToCString()),
             FONT_ASPECT[font_style],
             float(font_size),
         )
@@ -392,7 +392,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             TopoDS.Compound(
                 builder.Perform(
                     brep_font,
-                    NCollection_Utf8String(txt),
+                    NCollection_String(txt),
                     gp_Ax3(),
                     horiz_align,
                     vert_align,
@@ -876,7 +876,14 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 # Unwrap recursively and copy attributes down
                 unwrapped = single_element.unwrap(fully)
                 if not fully:
-                    unwrapped = type(self)(unwrapped.wrapped)
+                    # the one wrapper left is a plain Part, Sketch, Curve or
+                    # Compound: a custom object's own class cannot be rebuilt
+                    # from a bare shape, its constructor takes its parameters
+                    wrapper = next(
+                        (cls for cls in (Part, Sketch, Curve) if isinstance(self, cls)),
+                        Compound,
+                    )
+                    unwrapped = wrapper(unwrapped.wrapped)
                 self.copy_attributes_to(unwrapped, ["wrapped", "_NodeMixin__children"])
                 return unwrapped
 

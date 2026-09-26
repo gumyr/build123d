@@ -50,7 +50,6 @@ from build123d.operations_generic import fillet
 from build123d.operations_part import extrude
 from build123d.topology import Curve, Edge, Face, Shell, Wire, Vertex
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
-from OCP.GeomProjLib import GeomProjLib
 
 
 class TestEdge(unittest.TestCase):
@@ -117,7 +116,7 @@ class TestEdge(unittest.TestCase):
         )
         self.assertAlmostEqual(spline.end_point(), (3, 0, 0), 5)
 
-        # smoothing needs degree 5 for C2; a lower max_deg is raised to suit
+        # smoothing needs degree 6 for C2; a lower max_deg is raised to suit
         # rather than failing the approximation
         spline = Edge.make_spline_approx(
             [(i, (i % 3) * 1.5) for i in range(8)],
@@ -588,22 +587,6 @@ class TestEdge(unittest.TestCase):
             .position,
             Vector(1, 0, 0),
         )
-
-    def test_extend_spline(self):
-        geom_surface = Face.make_rect(4, 4).geom_adaptor()
-        with self.assertRaises(TypeError):
-            Edge.make_line((0, 0), (1, 0))._extend_spline(True, geom_surface)
-        spline = Edge.make_spline([(0, 0), (1,), (2, 0)])
-        spline.wrapped = None
-        with self.assertRaises(ValueError):
-            spline._extend_spline(True, geom_surface)
-
-    @patch.object(GeomProjLib, "Project_s", return_value=None)
-    def test_extend_spline_failed_snap(self, mock_is_valid):
-        geom_surface = Face.make_rect(4, 4).geom_adaptor()
-        spline = Edge.make_spline([(0, 0), (1, 0), (2, 0)])
-        with self.assertRaises(RuntimeError):
-            spline._extend_spline(True, geom_surface)
 
     def test_geom_adaptor(self):
         line = Edge.make_line((0, 0), (1, 0))

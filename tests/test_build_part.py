@@ -28,7 +28,7 @@ license:
 
 import unittest
 from abc import ABC, abstractmethod
-from math import pi, sin
+from math import pi, sin, sqrt
 from unittest.mock import MagicMock, patch, PropertyMock
 
 from build123d import *
@@ -537,6 +537,27 @@ class TestExtrude(unittest.TestCase):
 
         self.assertAlmostEqual(p.part.volume, 72.313, 2)
 
+    def test_extrude_until_from_a_face_of_the_target(self):
+        """A sketch drawn on a face of the target extrudes into it: LAST
+        reaches the far side of the material, a cavity's underside here.
+        NEXT reaches the face the sketch lies in, which cuts nothing"""
+        with BuildPart() as body:
+            with BuildSketch(Plane.YZ.offset(-10)):
+                Rectangle(20, 10, align=(Align.CENTER, Align.MIN))
+                with Locations((0, 1)):
+                    Circle(6, align=(Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+            extrude(amount=20)
+            with BuildSketch(Plane.XY.offset(0)) as cross:
+                RectangleRounded(10, 3, 1, rotation=0)
+                RectangleRounded(10, 3, 1, rotation=90)
+            rib = extrude(until=Until.LAST, mode=Mode.PRIVATE)
+            self.assertTrue(rib.is_valid)
+            self.assertAlmostEqual(rib.bounding_box().min.Z, 0, 6)
+            self.assertAlmostEqual(rib.bounding_box().max.Z, 7 - sqrt(36 - 25), 4)
+            self.assertAlmostEqual(rib.volume, 72.302, 2)
+            with self.assertRaisesRegex(ValueError, "does not cut the extrusion"):
+                extrude(cross.sketch, until=Until.NEXT, mode=Mode.PRIVATE)
+
     def test_extrude_until_errors(self):
         with self.assertRaises(ValueError):
             extrude(
@@ -561,11 +582,14 @@ class TestExtrude(unittest.TestCase):
                 extrude(profile, dir=direction, until=Until.NEXT, target=target)
 
     def test_extrude_until_invalid_split(self):
+        """The piece returned is the one holding the profile as a face; a
+        split that hands back pieces without it is a kernel failure"""
         profile = Face.make_rect(1, 1)
         target = Box(2, 2, 2)
         direction = Vector(0, 0, 1)
 
-        with patch("build123d.topology.three_d.Solid.split", return_value=None):
+        strangers = [Box(1, 1, 1).solid(), Box(1, 1, 1).solid()]
+        with patch("build123d.topology.three_d.Solid.split", return_value=strangers):
             with self.assertRaises(RuntimeError):
                 extrude(profile, dir=direction, until=Until.NEXT, target=target)
 

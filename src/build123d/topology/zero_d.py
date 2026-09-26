@@ -64,9 +64,11 @@ from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve2d
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 from OCP.BRepTools import BRepTools
-from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+from OCP.IntTools import IntTools_FClass2d
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
+from OCP.collections import (
+    IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
+)
 from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Vertex, TopoDS_Edge
 from OCP.gp import gp_Pnt, gp_Pnt2d, gp_Vec2d
 from build123d.geometry import (
@@ -171,6 +173,11 @@ class Vertex(Shape[TopoDS_Vertex]):
         The corner is read in the face's own parameters, so a corner on a
         curved face classifies the same way as one on a flat face.
 
+        Selected straight off a sketch or another shape made of faces alone,
+        the vertex is a corner of the one face that holds it, and classifies
+        as above; a vertex shared by two such faces has two corners, and has
+        to be selected through the face meant.
+
         Selected straight off a solid or shell, the vertex is classified by the
         edges meeting there: ``CONVEX`` where every crease is convex, as at the
         corner of a box, ``CONCAVE`` where every crease is concave, as at the
@@ -184,6 +191,8 @@ class Vertex(Shape[TopoDS_Vertex]):
                 its face's parameters, for instance
         """
         face = self._owning_face()
+        if face is None:
+            face = self._only_face()
         if face is not None:
             return self._corner_convexity(face)
         return self._crease_convexity()
@@ -194,6 +203,43 @@ class Vertex(Shape[TopoDS_Vertex]):
             if step.wrapped is not None and step.wrapped.ShapeType() == ta.TopAbs_FACE:
                 return TopoDS.Face(step.wrapped)
         return None
+
+    def _only_face(self) -> TopoDS_Face | None:
+        """The one face of a sketch-like parent that holds this vertex.
+
+        A shape with no solid or shell in it, a sketch or a lone face, has no
+        creases to classify by, so its vertices are corners of its faces. None
+        where the parent has solids or shells, or no face holds the vertex.
+
+        Raises:
+            ValueError: the vertex is a corner of more than one face
+        """
+        parent = self.topo_parent
+        if (
+            parent is None
+            or parent.wrapped is None
+            or parent.solids()
+            or parent.shells()
+        ):
+            return None
+        holding = []
+        explorer = TopExp_Explorer(parent.wrapped, ta.TopAbs_FACE)
+        while explorer.More():
+            face = TopoDS.Face(explorer.Current())
+            vertices = TopExp_Explorer(face, ta.TopAbs_VERTEX)
+            while vertices.More():
+                if vertices.Current().IsSame(self.wrapped):
+                    holding.append(face)
+                    break
+                vertices.Next()
+            explorer.Next()
+        if len(holding) > 1:
+            raise ValueError(
+                f"this vertex is a corner of {len(holding)} faces of the "
+                f"{type(parent).__name__} it was selected from, and classifies "
+                "differently in each - select it through the face meant"
+            )
+        return holding[0] if holding else None
 
     def _face_tangents(self, face: TopoDS_Face) -> list[tuple[float, float]]:
         """Unit directions leading away from this vertex in the face's uv.
@@ -252,7 +298,7 @@ class Vertex(Shape[TopoDS_Vertex]):
         step = 1e-4 * ((u_max - u_min) ** 2 + (v_max - v_min) ** 2) ** 0.5 / span
         here = BRep_Tool.Parameters_s(self.wrapped, face)
         probe = gp_Pnt2d(here.X() + bisector[0] * step, here.Y() + bisector[1] * step)
-        inside = BRepTopAdaptor_FClass2d(face, TOLERANCE).Perform(probe) == ta.TopAbs_IN
+        inside = IntTools_FClass2d(face, TOLERANCE).Perform(probe) == ta.TopAbs_IN
         return Convexity.CONVEX if inside else Convexity.CONCAVE
 
     def _crease_convexity(self) -> Convexity:
@@ -263,7 +309,9 @@ class Vertex(Shape[TopoDS_Vertex]):
                 "this vertex was not selected from a shape, so there is nothing "
                 "to classify it against - take it from a face or solid"
             )
-        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        vertex_edge_map = (
+            IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
         TopExp.MapShapesAndAncestors_s(
             parent.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
         )

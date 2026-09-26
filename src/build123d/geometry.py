@@ -41,7 +41,7 @@ import json
 import logging
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from math import degrees, log10, pi, prod, radians
+from math import copysign, degrees, log10, pi, prod, radians
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -77,6 +77,7 @@ from OCP.gp import (
     gp_Pnt,
     gp_Quaternion,
     gp_Trsf,
+    gp_TrsfForm,
     gp_Vec,
     gp_XYZ,
 )
@@ -517,28 +518,32 @@ class Vector:
         return gp_Dir(self.wrapped.XYZ())
 
     def transform(self, affine_transform: Matrix, is_direction: bool = False) -> Vector:
-        """Apply affine transformation
+        """Multiply this vector by a transformation matrix
+
+        Returns ``affine_transform @ self``: the vector rotated, scaled, sheared
+        and translated as the matrix prescribes. Any affine matrix is accepted,
+        not only rotations, translations and uniform scales.
 
         Args:
             affine_transform (Matrix): affine transformation matrix
-            is_direction (bool, optional): Should self be transformed as a vector or direction?
-                Defaults to False (vector)
+            is_direction (bool, optional): treat self as a direction: turned by
+                the matrix but not translated, and returned with unit length.
+                Defaults to False (a point, which is translated).
 
         Returns:
             Vector: transformed vector
         """
-        if not is_direction:
-            # to gp_Pnt to obey build123d transformation convention (in OCP.vectors do not
-            # translate)
-            pnt = self.to_pnt()
-            pnt_t = pnt.Transformed(affine_transform.wrapped.Trsf())
-            return_value = Vector(gp_Vec(pnt_t.XYZ()))
-        else:
-            # to gp_Dir for transformation of "direction vectors" (no translation or scaling)
-            gp_dir = self.to_dir()
-            dir_t = gp_dir.Transformed(affine_transform.wrapped.Trsf())
-            return_value = Vector(gp_Vec(dir_t.XYZ()))
-        return return_value
+        # gp_GTrsf.Transforms applies the general transform directly; converting
+        # to a gp_Trsf first would reject every matrix that is not a similarity
+        coords = self.wrapped.XYZ()
+        affine_transform.wrapped.Transforms(coords)
+        if is_direction:
+            # a direction has no position: remove the translation by
+            # subtracting where the origin lands
+            origin = gp_XYZ(0.0, 0.0, 0.0)
+            affine_transform.wrapped.Transforms(origin)
+            return Vector(coords - origin).normalized()
+        return Vector(coords)
 
     def rotate(self, axis: Axis, angle: float) -> Vector:
         """Rotate about axis
@@ -1121,7 +1126,14 @@ class BoundBox:
         if bounding_box.IsVoid():
             x_min, y_min, z_min, x_max, y_max, z_max = (0.0,) * 6
         else:
-            x_min, y_min, z_min, x_max, y_max, z_max = bounding_box.Get()
+            x_min, y_min, z_min, x_max, y_max, z_max = (
+                bounding_box.GetXMin(),
+                bounding_box.GetYMin(),
+                bounding_box.GetZMin(),
+                bounding_box.GetXMax(),
+                bounding_box.GetYMax(),
+                bounding_box.GetZMax(),
+            )
         self.wrapped = None if bounding_box.IsVoid() else bounding_box
         self.min = Vector(x_min, y_min, z_min)  #: location of minimum corner
         self.max = Vector(x_max, y_max, z_max)  #: location of maximum corner
@@ -2678,14 +2690,55 @@ class Matrix:
                     f"Expected the last row to be [0,0,0,1], but got: {repr(matrix[3])}"
                 )
 
-            # Assign values to matrix
-            for i, row in enumerate(matrix[:3]):
-                for j, element in enumerate(row):
+            for row in matrix[:3]:
+                for element in row:
                     if not isinstance(element, (int, float)):
                         raise TypeError("Only float or int are valid in the matrix")
-                    trsf.SetValue(i + 1, j + 1, element)
+            rows = [[float(element) for element in row] for row in matrix[:3]]
+
+            if Matrix._is_similarity(rows):
+                # A rotation, translation, uniform scale or mirror, or any
+                # product of them: build it as a gp_Trsf so that OCCT records
+                # its form and scale factor and it converts back to a gp_Trsf
+                # wherever one is needed. Filling a gp_GTrsf value by value
+                # marks it gp_Other whatever the values are, and gp_GTrsf.Trsf()
+                # then refuses it.
+                similarity = gp_Trsf()
+                similarity.SetValues(*(value for row in rows for value in row))
+                trsf = gp_GTrsf(similarity)
+            else:
+                # A general affine transformation (non-uniform scale, shear,
+                # projection) is legitimately gp_Other.
+                for i, row in enumerate(rows):
+                    for j, value in enumerate(row):
+                        trsf.SetValue(i + 1, j + 1, value)
 
         self.wrapped = trsf  #: the OCP transformation function
+
+    @staticmethod
+    def _is_similarity(rows: list[list[float]]) -> bool:
+        """Is the 3x3 part a rotation or reflection times a uniform scale?
+
+        ``rows`` are the three rows of the 3x4 matrix as floats. Checked as
+        (M / s)ᵀ (M / s) = I with s the cube root of the determinant.
+        gp_Trsf.SetValues would orthogonalise any matrix it is given without
+        complaint, so this decides whether it may be used.
+        """
+        m = [row[:3] for row in rows]
+        det = (
+            m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+            - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+            + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+        )
+        if abs(det) < TOLERANCE**3:
+            return False  # singular: a projection, which no gp_Trsf can hold
+        scale = copysign(abs(det) ** (1.0 / 3.0), det)
+        for i in range(3):
+            for j in range(3):
+                dot = sum(m[k][i] * m[k][j] for k in range(3)) / (scale * scale)
+                if abs(dot - (1.0 if i == j else 0.0)) > 1e-9:
+                    return False
+        return True
 
     def rotate(self, axis: Axis, angle: float):
         """General rotate about axis by angle in degrees"""
@@ -2722,13 +2775,60 @@ class Matrix:
 
         return [data[j][i] for i in range(4) for j in range(4)]
 
+    def svd(self) -> tuple[Matrix, Vector, Matrix]:
+        """Singular value decomposition of the linear part
+
+        Factors the 3x3 linear part of the transform as
+        ``left @ diag(scales) @ right``: read from the right, ``right`` turns
+        space, the scales stretch it along the three axes, and ``left`` turns
+        it again. Any affine matrix can be read this way, which is what makes
+        the decomposition useful: the scales say how much a transform stretches
+        and whether it mirrors, ``left`` gives the directions it stretches
+        along, and the image of a circle under the transform is an ellipse
+        with the scales as semi-axes and the columns of ``left`` as axes.
+
+        Both ``left`` and ``right`` are proper rotations. When the transform
+        mirrors, the last scale is negative. Scales come in descending order
+        of magnitude, so a transform that acts only in a plane, with a zero
+        scale across it, has its two in-plane axes as the first two columns
+        of ``left`` and the first two rows of ``right``.
+
+        Returns:
+            tuple[Matrix, Vector, Matrix]: ``left``, the scales, ``right``
+        """
+        linear = np.array([[self[row, col] for col in range(3)] for row in range(3)])
+        left, scales, right = np.linalg.svd(linear)
+        if np.linalg.det(left) < 0:
+            left[:, 2] *= -1
+            scales[2] *= -1
+        if np.linalg.det(right) < 0:
+            right[2, :] *= -1
+            scales[2] *= -1
+
+        def as_matrix(rows: np.ndarray) -> Matrix:
+            return Matrix([[*rows[row], 0.0] for row in range(3)])
+
+        return as_matrix(left), Vector(*scales), as_matrix(right)
+
     def __copy__(self) -> Matrix:
         """Return copy of self"""
-        return Matrix(self.wrapped.Trsf())
+        return Matrix(self._copied_trsf())
 
     def __deepcopy__(self, _memo) -> Matrix:
         """Return deepcopy of self"""
-        return Matrix(self.wrapped.Trsf())
+        return Matrix(self._copied_trsf())
+
+    def _copied_trsf(self) -> gp_GTrsf:
+        """An independent copy of the OCP transform
+
+        ``gp_GTrsf`` has no copy constructor in OCP. A similarity is copied
+        through its ``gp_Trsf``, which keeps OCCT's record of its form and
+        scale; a general affine transform, which ``Trsf()`` refuses, is copied
+        from its matrix and translation, which hold everything it has.
+        """
+        if self.wrapped.Form() != gp_TrsfForm.gp_Other:
+            return gp_GTrsf(self.wrapped.Trsf())
+        return gp_GTrsf(self.wrapped.VectorialPart(), self.wrapped.TranslationPart())
 
     def __getitem__(self, row_col: tuple[int, int]) -> float:
         """Provide Matrix[r, c] syntax for accessing individual values. The row
