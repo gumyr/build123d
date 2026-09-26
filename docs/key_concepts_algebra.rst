@@ -7,6 +7,93 @@ Build123d's algebra mode works on objects of the classes ``Shape``, ``Part``, ``
 1. **Object arithmetic**
 2. **Placement arithmetic**
 
+.. _part_sketch_curve:
+
+Part, Sketch and Curve
+=========================
+
+:class:`~topology.Part`, :class:`~topology.Sketch` and :class:`~topology.Curve`
+are specialized :class:`~topology.Compound` classes for collecting geometry of a
+particular dimension. They are shapes that can be placed, selected from and passed
+to operations, and are also the result types exposed by Builders:
+
+.. list-table:: Geometry containers and Builder results
+    :header-rows: 1
+    :widths: 15 30 25 30
+
+    * - Container
+      - Geometry it collects
+      - Select its contents
+      - Builder result
+    * - ``Part``
+      - 3D solids
+      - ``.solids()``
+      - ``BuildPart.part``
+    * - ``Sketch``
+      - 2D faces
+      - ``.faces()``
+      - ``BuildSketch.sketch``
+    * - ``Curve``
+      - 1D edges
+      - ``.edges()``
+      - ``BuildLine.line``
+
+The dimension describes the geometry, not its position: a sketch can be placed on
+``Plane.XZ``, and a curve can follow a path in 3D space. A container can hold more
+than one shape, including disconnected shapes. A ``Part`` is therefore not
+necessarily a single :class:`~topology.Solid`, nor a ``Curve`` a single connected
+:class:`~topology.Wire`. Use the selectors in the table to access the individual
+shapes; these return :class:`~topology.ShapeList` collections.
+
+Primitives often already provide the appropriate container. For example,
+``Box(20, 10, 5)`` is an instance of a ``Part`` subclass, and ``Rectangle(20, 10)``
+is an instance of a ``Sketch`` subclass. Curve primitives can instead be individual
+edges or wires: ``Line`` is an ``Edge`` subclass and ``Polyline`` is a ``Wire``
+subclass. An explicit ``Curve`` can collect their edges.
+
+Changing dimension with operations
+--------------------------------------
+
+Constructing a container groups existing topology; it does not fill an outline,
+extrude faces or fuse solids. Use the corresponding operation to create new
+geometry. For example, ``make_face`` fills a closed planar outline to produce a
+``Sketch``, and ``extrude`` turns that sketch into a ``Part``:
+
+.. code-block:: build123d
+
+    from build123d import Curve, Part, Polyline, Sketch, extrude, make_face
+
+    perimeter = Polyline((0, 0), (20, 0), (20, 10), (0, 10), close=True)
+    outline = Curve(perimeter.edges())
+    profile = make_face(outline.edges())
+    block = extrude(profile, amount=5)
+
+    assert isinstance(outline, Curve)
+    assert isinstance(profile, Sketch)
+    assert isinstance(block, Part)
+
+Wrapping faces in ``Part(...)`` is not a substitute for ``extrude``: supply solids
+to a ``Part``, faces to a ``Sketch`` and edges to a ``Curve``. Similarly, grouping
+two solids in a ``Part`` does not perform a boolean union. To fuse them, use the
+``+`` operator described below.
+
+A container with several solids can be constructed explicitly:
+
+.. code-block:: build123d
+
+    from build123d import Box, Part, Pos
+
+    left = Box(2, 2, 2).solid()
+    right = (Pos(X=5) * Box(2, 2, 2)).solid()
+    blocks = Part([left, right])
+
+    assert len(blocks.solids()) == 2
+
+``.solids()`` retrieves both solids. The singular ``.solid()`` selector is useful
+only when there is exactly one solid; it raises ``ValueError`` for this example.
+The same distinction applies to ``.faces()`` versus ``.face()`` and ``.edges()``
+versus ``.edge()``.
+
 Object arithmetic
 =====================
 
@@ -142,6 +229,28 @@ geometry with ``.line``, ``.sketch``, or ``.part`` before using it in algebra mo
         Cylinder(11, 10)
 
     result = base.part - bore.part
+
+The other Builder results work in the same way. A completed ``BuildLine`` exposes
+a ``Curve`` through ``.line``, and a completed ``BuildSketch`` exposes a ``Sketch``
+through ``.sketch``:
+
+.. code-block:: build123d
+
+    from build123d import BuildLine, BuildSketch, Polyline, Rectangle, extrude, make_face
+
+    with BuildLine() as perimeter:
+        Polyline((0, 0), (20, 0), (20, 10), (0, 10), close=True)
+
+    profile_from_edges = make_face(perimeter.line.edges())
+
+    with BuildSketch() as cross_section:
+        Rectangle(20, 10)
+
+    block_from_sketch = extrude(cross_section.sketch, amount=5)
+
+Both operations above run outside the Builder contexts and take the completed
+geometry explicitly. The resulting shapes can be used with the same selectors and
+placement arithmetic as shapes created entirely in algebra mode.
 
 
 Selecting features of a result
