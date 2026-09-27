@@ -178,14 +178,16 @@ def _create_xde(
             return
 
         if name:
-            TDataStd_Name.Set_s(node_label, TCollection_ExtendedString(name))
+            TDataStd_Name.Set_s(node_label, TCollection_ExtendedString(name, True))
             if XCAFDoc_ShapeTool.IsReference_s(node_label):
                 referred = TDF_Label()
                 if (
                     XCAFDoc_ShapeTool.GetReferredShape_s(node_label, referred)
                     and not referred.IsNull()
                 ):
-                    TDataStd_Name.Set_s(referred, TCollection_ExtendedString(name))
+                    TDataStd_Name.Set_s(
+                        referred, TCollection_ExtendedString(name, True)
+                    )
 
         if node.color is not None:
             node_color_type = XCAFDoc_ColorType.XCAFDoc_ColorGen
