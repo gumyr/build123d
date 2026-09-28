@@ -101,6 +101,7 @@ Table Of Contents
     builders.rst
     joints.rst
     assemblies.rst
+    assembly_mates.rst
     tips.rst
     import_export.rst
     advanced.rst
