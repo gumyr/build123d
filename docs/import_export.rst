@@ -221,8 +221,11 @@ ExportDXF
 ---------
 
 ``ExportDXF`` accepts the standard :class:`~geometry.ColorLike` interface for
-document and layer colors. The older ``ColorIndex`` values remain supported
-during the transition but emit a ``DeprecationWarning``.
+document and layer colors. ColorLike alpha is written as DXF layer transparency.
+True-color black is always ``0x000000``; unlike ACI 7, DXF viewers do not switch
+it to white on dark backgrounds. The older ``ColorIndex`` values remain supported
+during the transition but emit a ``DeprecationWarning`` and will be removed at or
+before version 1.0.0.
 
 .. autoclass:: exporters.ExportDXF
     :noindex:
