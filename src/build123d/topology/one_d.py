@@ -84,7 +84,7 @@ from OCP.BRepBuilderAPI import (
 )
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape, BRepExtrema_SupportType
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet2d
-from OCP.BRepGProp import BRepGProp
+from OCP.BRepGProp import BRepGProp, BRepGProp_Face
 from OCP.BRepLib import BRepLib, BRepLib_FindSurface
 from OCP.BRepLProp import BRepLProp
 from OCP.BRepOffset import BRepOffset_MakeOffset
@@ -142,7 +142,6 @@ from OCP.GeomFill import (
     GeomFill_Frenet,
     GeomFill_TrihedronLaw,
 )
-from OCP.GeomProjLib import GeomProjLib
 from OCP.gp import (
     gp_Ax1,
     gp_Ax2,
@@ -164,12 +163,18 @@ from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
 from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
 from OCP.ShapeFix import ShapeFix_Shape, ShapeFix_Wireframe
 from OCP.Standard import Standard_ConstructionError
-from OCP.TColgp import TColgp_Array1OfPnt, TColgp_Array1OfVec, TColgp_HArray1OfPnt
-from OCP.TColStd import (
-    TColStd_Array1OfInteger,
-    TColStd_Array1OfReal,
-    TColStd_HArray1OfBoolean,
-    TColStd_HArray1OfReal,
+from OCP.collections import (
+    Array1_double,
+    Array1_gp_Pnt,
+    Array1_gp_Vec,
+    Array1_int,
+    HArray1_bool,
+    HArray1_double,
+    HArray1_gp_Pnt,
+    HSequence_TopoDS_Shape,
+    IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
+    IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher,
+    List_TopoDS_Shape,
 )
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp, TopExp_Explorer
@@ -183,12 +188,6 @@ from OCP.TopoDS import (
     TopoDS_Vertex,
     TopoDS_Wire,
 )
-from OCP.TopTools import (
-    TopTools_HSequenceOfShape,
-    TopTools_IndexedDataMapOfShapeListOfShape,
-    TopTools_IndexedMapOfShape,
-    TopTools_ListOfShape,
-)
 from scipy.optimize import minimize_scalar
 from scipy.spatial import ConvexHull
 from typing_extensions import Self
@@ -197,11 +196,13 @@ from build123d.build_enums import (
     AngularDirection,
     CenterOf,
     ContinuityLevel,
+    Convexity,
     FrameMethod,
     GeomType,
     Kind,
     PositionMode,
     Sagitta,
+    Select,
     Side,
     Tangency,
     Unit,
@@ -228,14 +229,17 @@ from .constrained_lines import (
     _make_tan_on_rad_arcs,
     _make_tan_oriented_lines,
 )
+from .history import ShapeHistory, tracked_subshapes
+from .kernel import list_shapes
 from .shape_core import (
     TOPODS,
     Shape,
     ShapeList,
     SkipClean,
     downcast,
+    find_same_topods,
     get_top_level_topods_shapes,
-    shapetype,
+    relocation_between,
     topods_dim,
     unwrap_topods_compound,
 )
@@ -400,9 +404,17 @@ def _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(
 def _splice_wire_fillet_corner(
     corner: _WireFilletCorner, solution: _WireFilletSolution
 ) -> Wire:
-    """Replace two connected edges with a fillet and rebuild the wire."""
+    """Replace two connected edges with a fillet and rebuild the wire.
+
+    The wire returned carries the record of the corner: the vertex removed, the
+    edges beside it trimmed, the arc generated from the vertex, and every other
+    edge modified into the copy ``BRepBuilderAPI_MakeWire`` makes of it.
+    """
 
     all_topods_edges = [edge.wrapped for edge in corner.all_edges]
+    # which original edge each entry came from, for the record
+    sources: list[TopoDS_Shape | None] = list(all_topods_edges)
+    history = ShapeHistory()
 
     # Flip any edges that were reversed during trimming
     indices_to_remove = set()
@@ -410,6 +422,7 @@ def _splice_wire_fillet_corner(
         edge_idx = corner.connected_edge_indices[i]
         if trimmed is None:
             indices_to_remove.add(edge_idx)
+            history.wrapped.Remove(corner.connected_edges[i].wrapped)
             continue
 
         if trimmed.Orientation() != corner.connected_edges[i].wrapped.Orientation():
@@ -426,18 +439,78 @@ def _splice_wire_fillet_corner(
     # Remove consumed edges in reverse order to preserve indices during deletion
     for idx in sorted(indices_to_remove, reverse=True):
         all_topods_edges.pop(idx)
+        sources.pop(idx)
         if idx < insert_index:
             insert_index -= 1
 
     all_topods_edges.insert(insert_index, solution.fillet_topods_edge)
+    sources.insert(insert_index, None)  # the arc comes from the vertex, not an edge
 
-    combined_edges = TopTools_ListOfShape()
-    for topods_edge in all_topods_edges:
-        combined_edges.Append(topods_edge)
+    # MakeWire copies each edge so that neighbours share vertices, so add them
+    # one at a time and record each as it was placed in the wire
+    corner_vertex = corner.vertex.wrapped
     wire_builder = BRepBuilderAPI_MakeWire()
-    wire_builder.Add(combined_edges)
+    for topods_edge, source in zip(all_topods_edges, sources):
+        wire_builder.Add(topods_edge)
+        placed = wire_builder.Edge()
+        if source is None:
+            history.wrapped.AddGenerated(corner_vertex, placed)
+            for arc_end in tracked_subshapes([placed]):
+                if arc_end.ShapeType() == ta.TopAbs_VERTEX:
+                    history.wrapped.AddGenerated(corner_vertex, arc_end)
+        else:
+            if not placed.IsSame(source):
+                history.wrapped.AddModified(source, placed)
+            _record_matching_vertices(history, source, placed)
+    history.wrapped.Remove(corner_vertex)
     wire_builder.Build()
-    return Wire(wire_builder.Wire())
+    return Wire(wire_builder.Wire())._made_by(history)
+
+
+def _joined_wire(
+    edges: Sequence[Edge],
+    before: Iterable[TopoDS_Shape],
+    brought: Iterable[TopoDS_Shape],
+) -> Wire:
+    """A wire from connected edges, with the record of what became of each.
+
+    ``BRepBuilderAPI_MakeWire`` copies every edge so that neighbours share
+    vertices, so each input edge is recorded as modified into the result edge
+    with the same geometry, and its vertices into the ones at the same points.
+    """
+    wire = Wire(edges)
+    history = ShapeHistory(before=before, brought=brought)
+    placed = wire.edges()
+    midpoints = [e.position_at(0.5) for e in placed]
+    for source in edges:
+        midpoint = source.position_at(0.5)
+        distances = [(m - midpoint).length for m in midpoints]
+        match = placed[distances.index(min(distances))]
+        if min(distances) > TOLERANCE:
+            continue  # pragma: no cover - MakeWire keeps every edge it is given
+        if not match.wrapped.IsSame(source.wrapped):
+            history.wrapped.AddModified(source.wrapped, match.wrapped)
+        _record_matching_vertices(history, source.wrapped, match.wrapped)
+    return wire._made_by(history)
+
+
+def _record_matching_vertices(
+    history: ShapeHistory, source: TopoDS_Shape, placed: TopoDS_Shape
+) -> None:
+    """Record the vertices of a rebuilt edge as modified from those at the same points."""
+    placed_vertices = [
+        v for v in tracked_subshapes([placed]) if v.ShapeType() == ta.TopAbs_VERTEX
+    ]
+    for old in tracked_subshapes([source]):
+        if old.ShapeType() != ta.TopAbs_VERTEX:
+            continue
+        old_point = BRep_Tool.Pnt_s(TopoDS.Vertex(old))
+        for new in placed_vertices:
+            if new.IsSame(old):
+                break
+            if BRep_Tool.Pnt_s(TopoDS.Vertex(new)).Distance(old_point) < TOLERANCE:
+                history.wrapped.AddModified(old, new)
+                break
 
 
 def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
@@ -488,32 +561,52 @@ class Mixin1D(Shape[TOPODS]):
         return self.wrapped.Orientation() == TopAbs_Orientation.TopAbs_FORWARD
 
     @property
+    def convexity(self) -> Convexity:
+        """How the shape this edge was selected from sits around it.
+
+        An edge of a solid or shell is a crease between two faces, and the
+        dihedral angle through the material says which way the crease turns:
+        ``CONVEX`` on the outer edge of a box, ``CONCAVE`` at the inner corner
+        of a pocket, ``SMOOTH`` where a fillet meets the face it blends into.
+        The angle is sampled along the edge, so one that turns one way at one
+        end and the other way at the other is a ``SADDLE``. A seam edge, with
+        the same face on both sides, is ``SMOOTH``.
+
+        The faces come from ``topo_parent``, so the edge has to have been
+        selected from a shape rather than built on its own. See
+        :class:`~build_enums.Convexity`.
+
+        Raises:
+            ValueError: the edge has no ``topo_parent``; it lies on one face
+                only, as a boundary edge of a face or open shell does; or more
+                than two faces meet at it
+        """
+        faces = topo_explore_connected_faces(self)
+        if len(faces) == 1:
+            if _edge_is_seam_of(self.wrapped, faces[0]):
+                return Convexity.SMOOTH
+            raise ValueError(
+                "this edge lies on one face only, so there is no crease to "
+                "classify - convexity needs an edge shared by two faces"
+            )
+        if len(faces) != 2:
+            raise ValueError(
+                f"{len(faces)} faces meet at this edge - convexity needs exactly two"
+            )
+        return _dihedral_convexity(self.wrapped, faces[0], faces[1])
+
+    @property
     def is_interior(self) -> bool:
+        """Is this a concave edge of the shape it was selected from?
+
+        Equivalent to ``edge.convexity == Convexity.CONCAVE``: the material
+        closes around the edge by more than half a turn, as at the inner
+        corner of a pocket. See :attr:`convexity`.
+
+        Raises:
+            ValueError: the edge cannot be classified, see :attr:`convexity`
         """
-        Check if the edge is an interior edge.
-
-        An interior edge lies between surfaces that are part of the body (internal
-        to the geometry) and does not form part of the exterior boundary.
-
-        Returns:
-            bool: True if the edge is an interior edge, False otherwise.
-        """
-        # Find the faces connected to this edge and offset them
-        topods_face_pair = topo_explore_connected_faces(self)
-        offset_face_pair = [
-            offset_topods_face(f, self.length / 100) for f in topods_face_pair
-        ]
-
-        # Intersect the offset faces
-        sectionor = BRepAlgoAPI_Section(
-            offset_face_pair[0], offset_face_pair[1], PerformNow=False
-        )
-        sectionor.Build()
-        face_intersection_result = sectionor.Shape()
-
-        # If an edge was created the faces intersect and the edge is interior
-        explorer = TopExp_Explorer(face_intersection_result, ta.TopAbs_EDGE)
-        return explorer.More()
+        return self.convexity == Convexity.CONCAVE
 
     @property
     def length(self) -> float:
@@ -552,24 +645,10 @@ class Mixin1D(Shape[TOPODS]):
 
     def mass(self, mass_unit: Unit = Unit.G, length_unit: Unit = Unit.MM) -> float:
         """mass - the mass of this Edge or Wire, which is always zero"""
+        del mass_unit, length_unit  # a 1D shape has no mass to express in them
         return 0.0
 
     # ---- Class Methods ----
-
-    @classmethod
-    def cast(cls, obj: TopoDS_Shape) -> Vertex | Edge | Wire:
-        "Returns the right type of wrapper, given a OCCT object"
-
-        # Extend the lookup table with additional entries
-        constructor_lut = {
-            ta.TopAbs_VERTEX: Vertex,
-            ta.TopAbs_EDGE: Edge,
-            ta.TopAbs_WIRE: Wire,
-        }
-
-        shape_type = shapetype(obj)
-        # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](downcast(obj))
 
     @classmethod
     def extrude(
@@ -599,7 +678,9 @@ class Mixin1D(Shape[TOPODS]):
     def __add__(self, other: None) -> Self: ...
     @overload
     def __add__(self, other: Shape | Iterable[Shape]) -> Edge | Wire | Curve: ...
-    def __add__(self, other):
+    def __add__(
+        self, other: None | Shape | Iterable[Shape]
+    ) -> Edge | Wire | Curve | Self:
         """fuse shape to wire/edge operator +"""
 
         # Convert `other` to list of base topods objects and filter out None values
@@ -624,27 +705,33 @@ class Mixin1D(Shape[TOPODS]):
             [tcast(Edge | Wire, Mixin1D.cast(s)) for s in topods_summands]
         )
         summand_edges = [e for summand in summands for e in summand.edges()]
+        brought = [s.wrapped for s in summands]
 
         if self._wrapped is None:  # an empty object
             if len(summands) == 1:
                 sum_shape: Edge | Wire | Shape = summands[0]
             else:
                 try:
-                    sum_shape = Wire(summand_edges)
+                    sum_shape = _joined_wire(summand_edges, [], brought)
                 except (ValueError, RuntimeError, Standard_ConstructionError):
                     # pylint: disable=[no-member]
                     sum_shape = summands.first.fuse(*summands[1:])
+                    if sum_shape._history is not None:
+                        sum_shape._history.with_inputs([], brought)
         else:
             try:
-                sum_shape = Wire(self.edges() + ShapeList(summand_edges))
+                sum_shape = _joined_wire(
+                    self.edges() + ShapeList(summand_edges), [self.wrapped], brought
+                )
             except (ValueError, RuntimeError, Standard_ConstructionError):
                 sum_shape = self.fuse(*summands)
 
         if SkipClean.clean:
             sum_shape = sum_shape.clean()
 
-        # If there is only one Edge, return that
-        sum_shape = sum_shape.edge() if len(sum_shape.edges()) == 1 else sum_shape  # type: ignore
+        # If there is only one Edge, return that, with the record of how it was made
+        if len(sum_shape.edges()) == 1:
+            sum_shape = sum_shape.edge()._made_by(sum_shape._history)  # type: ignore
 
         return sum_shape
 
@@ -700,7 +787,6 @@ class Mixin1D(Shape[TOPODS]):
         Returns:
             None |  Plane: Either the common plane or None
         """
-        # pylint: disable=too-many-locals
         # Note: BRepLib_FindSurface is not helpful as it requires the
         # Edges to form a surface perimeter.
         points: list[Vector] = []
@@ -1169,7 +1255,6 @@ class Mixin1D(Shape[TOPODS]):
         Returns:
             Wire: offset wire
         """
-        # pylint: disable=too-many-branches, too-many-locals, too-many-statements
         kind_dict = {
             Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
             Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
@@ -1558,8 +1643,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
     serves as a building block for constructing complex structures, such as wires
     and faces."""
 
-    # pylint: disable=too-many-public-methods
-
     build123d_type: ClassVar[str] = "Edge"
     order = 1.0
     # ---- Constructor ----
@@ -1670,12 +1753,12 @@ class Edge(Mixin1D[TopoDS_Edge]):
         cntl_gp_pnts = [Vector(cntl_pnt).to_pnt() for cntl_pnt in cntl_pnts]
 
         # The poles are stored in an OCCT Array object
-        poles = TColgp_Array1OfPnt(1, len(cntl_gp_pnts))
+        poles = Array1_gp_Pnt(1, len(cntl_gp_pnts))
         for i, cntl_gp_pnt in enumerate(cntl_gp_pnts):
             poles.SetValue(i + 1, cntl_gp_pnt)
 
         if weights:
-            pole_weights = TColStd_Array1OfReal(1, len(weights))
+            pole_weights = Array1_double(1, len(weights))
             for i, weight in enumerate(weights):
                 pole_weights.SetValue(i + 1, float(weight))
             bezier_curve = Geom_BezierCurve(poles, pole_weights)
@@ -2303,7 +2386,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Wire: helix
         """
-        # pylint: disable=too-many-locals
         # 1. build underlying cylindrical/conical surface
         if angle == 0.0:
             geom_surf: Geom_Surface = Geom_CylindricalSurface(
@@ -2424,11 +2506,10 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Edge: the spline
         """
-        # pylint: disable=too-many-locals
         point_vectors = [Vector(point) for point in points]
         if tangents:
             tangent_vectors = tuple(Vector(v) for v in tangents)
-        pnts = TColgp_HArray1OfPnt(1, len(point_vectors))
+        pnts = HArray1_gp_Pnt(1, len(point_vectors))
         for i, point in enumerate(point_vectors):
             pnts.SetValue(i + 1, point.to_pnt())
 
@@ -2441,7 +2522,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
                     "(plus one if periodic), or none specified. Parameter count: "
                     f"{len(parameters)}, point count: {len(point_vectors)}"
                 )
-            parameters_array = TColStd_HArray1OfReal(1, len(parameters))
+            parameters_array = HArray1_double(1, len(parameters))
             for p_index, p_value in enumerate(parameters):
                 parameters_array.SetValue(p_index + 1, p_value)
 
@@ -2462,10 +2543,8 @@ class Edge(Mixin1D[TopoDS_Edge]):
                     )
 
                 # Specify a tangent for each interpolation point:
-                tangents_array = TColgp_Array1OfVec(1, len(tangent_vectors))
-                tangent_enabled_array = TColStd_HArray1OfBoolean(
-                    1, len(tangent_vectors)
-                )
+                tangents_array = Array1_gp_Vec(1, len(tangent_vectors))
+                tangent_enabled_array = HArray1_bool(1, len(tangent_vectors))
                 for t_index, t_value in enumerate(tangent_vectors):
                     tangent_enabled_array.SetValue(t_index + 1, t_value is not None)
                     tangent_vec = t_value if t_value is not None else Vector()
@@ -2524,21 +2603,21 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 unique_knots.append(knot)
                 multiplicities.append(1)
 
-        poles_array = TColgp_Array1OfPnt(1, len(point_vectors))
+        poles_array = Array1_gp_Pnt(1, len(point_vectors))
         for index, point in enumerate(point_vectors, start=1):
             poles_array.SetValue(index, point.to_pnt())
 
-        knots_array = TColStd_Array1OfReal(1, len(unique_knots))
+        knots_array = Array1_double(1, len(unique_knots))
         for index, knot in enumerate(unique_knots, start=1):
             knots_array.SetValue(index, float(knot))
 
-        multiplicities_array = TColStd_Array1OfInteger(1, len(multiplicities))
+        multiplicities_array = Array1_int(1, len(multiplicities))
         for index, multiplicity in enumerate(multiplicities, start=1):
             multiplicities_array.SetValue(index, multiplicity)
 
         weights_list = list(weights) if weights is not None else []
         if weights_list:
-            weights_array = TColStd_Array1OfReal(1, len(weights_list))
+            weights_array = Array1_double(1, len(weights_list))
             for index, weight in enumerate(weights_list, start=1):
                 weights_array.SetValue(index, float(weight))
             spline_geom = Geom_BSplineCurve(
@@ -2580,7 +2659,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 use for variational smoothing. Defaults to None.
             min_deg (int, optional): minimum spline degree. Enforced only when smoothing
                 is None. Defaults to 1.
-            max_deg (int, optional): maximum spline degree. Defaults to 6.
+            max_deg (int, optional): maximum spline degree. Defaults to 6. Raised
+                to 6 when smoothing is used, the lowest degree that can meet the
+                C2 continuity the smoothing algorithm requires.
 
         Raises:
             ValueError: B-spline approximation failed
@@ -2588,13 +2669,16 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Edge: spline
         """
-        pnts = TColgp_HArray1OfPnt(1, len(points))
+        pnts = HArray1_gp_Pnt(1, len(points))
         for i, point in enumerate(points):
             pnts.SetValue(i + 1, Vector(point).to_pnt())
 
         if smoothing:
+            # The smoothing overload asks OCCT for C2 continuity; its Jacobi
+            # basis needs a work degree of at least 2 * (2 + 1) = 6 for that
+            # (PLib_JacobiPolynomial rejects anything smaller since OCCT 8)
             spline_builder = GeomAPI_PointsToBSpline(
-                pnts, *smoothing, DegMax=max_deg, Tol3D=tol
+                pnts, *smoothing, DegMax=max(max_deg, 6), Tol3D=tol
             )
         else:
             spline_builder = GeomAPI_PointsToBSpline(
@@ -2699,52 +2783,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 loc.orientation = Vector(0, 0, 0)
 
         return locations
-
-    def _extend_spline(
-        self,
-        at_start: bool,
-        geom_surface: Geom_Surface,
-        extension_factor: float = 0.1,
-    ):
-        """Helper method to slightly extend an edge that is bound to a surface"""
-        if self._wrapped is None:
-            raise ValueError("Can't extend empty spline")
-        if self.geom_type != GeomType.BSPLINE:
-            raise TypeError("_extend_spline only works with splines")
-
-        u_start: float = self.param_at(0)
-        u_end: float = self.param_at(1)
-
-        curve_original = tcast(
-            Geom_BSplineCurve, BRep_Tool.Curve_s(self.wrapped, u_start, u_end)
-        )
-        n_poles = curve_original.NbPoles()
-        poles = [curve_original.Pole(i + 1) for i in range(n_poles)]
-        # Find position and tangent past end of spline to extend it
-        ends = (-extension_factor, 1) if at_start else (0, 1 + extension_factor)
-        if at_start:
-            new_pole = self.position_at(-extension_factor).to_pnt()
-            poles = [new_pole] + poles
-        else:
-            new_pole = self.position_at(1 + extension_factor).to_pnt()
-            poles = poles + [new_pole]
-        tangents: list[VectorLike] = [self.tangent_at(p) for p in ends]
-
-        pnts: list[VectorLike] = [Vector(p) for p in poles]
-        extended_edge = Edge.make_spline(pnts, tangents=tangents)
-        assert extended_edge.wrapped is not None
-
-        geom_curve = BRep_Tool.Curve_s(
-            extended_edge.wrapped, extended_edge.param_at(0), extended_edge.param_at(1)
-        )
-        snapped_geom_curve = GeomProjLib.Project_s(geom_curve, geom_surface)
-        if snapped_geom_curve is None:
-            raise RuntimeError("Failed to snap extended edge to surface")
-
-        # Build a new projected edge
-        snapped_edge = Edge(BRepBuilderAPI_MakeEdge(snapped_geom_curve).Edge())
-
-        return snapped_edge, snapped_geom_curve
 
     def find_intersection_points(
         self, other: Axis | Edge | None = None, tolerance: float = TOLERANCE
@@ -3141,8 +3179,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
         pnt = Vector(point)
         # Extract the edge's end parameters
-        param_min, param_max = BRep_Tool.Range_s(self.wrapped)
-        param_range = param_max - param_min
+        param_min, _ = BRep_Tool.Range_s(self.wrapped)
 
         # Method 1: the point is a Vertex
 
@@ -3655,7 +3692,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
             edges = placed_edges
 
         wire_builder = BRepBuilderAPI_MakeWire()
-        combined_edges = TopTools_ListOfShape()
+        combined_edges = List_TopoDS_Shape()
         for edge in edges:
             if edge.wrapped is not None:
                 combined_edges.Append(edge.wrapped)
@@ -3691,8 +3728,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
             ShapeList[Wire]: Wires
         """
 
-        edges_in = TopTools_HSequenceOfShape()
-        wires_out = TopTools_HSequenceOfShape()
+        edges_in = HSequence_TopoDS_Shape()
+        wires_out = HSequence_TopoDS_Shape()
 
         for edge in [e for w in wires for e in w.edges()]:
             if edge.wrapped is not None:
@@ -3746,7 +3783,6 @@ class Wire(Mixin1D[TopoDS_Wire]):
         Returns:
             Wire: convex hull perimeter
         """
-        # pylint: disable=too-many-branches, too-many-locals
         # Algorithm:
         # 1) create a cloud of points along all edges
         # 2) create a convex hull which returns facets/simplices as pairs of point indices
@@ -3983,7 +4019,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
         unchamfered_face = _make_topods_face_from_wires(self.wrapped)
         chamfer_builder = BRepFilletAPI_MakeFillet2d(unchamfered_face)
 
-        vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        vertex_edge_map = (
+            IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
         TopExp.MapShapesAndAncestors_s(
             unchamfered_face, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
         )
@@ -3993,8 +4031,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
                 continue
             edge_list = vertex_edge_map.FindFromKey(v.wrapped)
 
-            # Index or iterator access to OCP.TopTools.TopTools_ListOfShape is slow on M1 macs
-            # Using First() and Last() to omit
+            # Only the two ends are wanted; iterating the kernel list through
+            # Python is slow (see kernel.list_shapes), so take them directly
             edges = (
                 Edge(tcast(TopoDS_Edge, downcast(edge_list.First()))),
                 Edge(tcast(TopoDS_Edge, downcast(edge_list.Last()))),
@@ -4018,7 +4056,10 @@ class Wire(Mixin1D[TopoDS_Wire]):
         if not isinstance(chamfered_face, TopoDS_Face):
             raise RuntimeError("An internal error occured creating the chamfer")
         # Return the outer wire
-        return Wire(BRepTools.OuterWire_s(chamfered_face))
+        result = Wire(BRepTools.OuterWire_s(chamfered_face))
+        return result._made_by(
+            ShapeHistory.from_algorithm(chamfer_builder, [self.wrapped], result.wrapped)
+        )
 
     def close(self) -> Wire:
         """Close a Wire"""
@@ -4030,8 +4071,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
         return return_value
 
-    def edges(self) -> ShapeList[Edge]:
-        """edges - all the edges in this Shape"""
+    def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
+        """edges - all the edges in this Shape, in connection order"""
         # The WireExplorer is a tool to explore the edges of a wire in a connection order.
         explorer = BRepTools_WireExplorer(self.wrapped)
 
@@ -4039,12 +4080,10 @@ class Wire(Mixin1D[TopoDS_Wire]):
         while explorer.More():
             next_edge = Edge(explorer.Current())
             # pylint: disable=attribute-defined-outside-init
-            next_edge.topo_parent = (
-                self if self.topo_parent is None else self.topo_parent
-            )
+            next_edge._extracted_from(self)
             edge_list.append(next_edge)
             explorer.Next()
-        return edge_list
+        return self._select(edge_list, select)
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Wire:
         """fillet_2d
@@ -4071,15 +4110,24 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
         # Force the wire to Plane.XY for the fillet operation
         filleted_wire = wire_pln.to_local_coords(self)
+        record = ShapeHistory.from_relocation(self.wrapped, filleted_wire.wrapped)
         for vertex in vertices:
             vertex_local = wire_pln.to_local_coords(vertex)
             current_vertex = filleted_wire.vertices().sort_by_distance(vertex_local)[0]
             if (Vector(current_vertex) - Vector(vertex_local)).length > TOLERANCE:
                 raise ValueError(f"Could not find fillet vertex on wire: {vertex}")
+            before_corner = filleted_wire
             filleted_wire = _fillet_wire_corner(filleted_wire, current_vertex, radius)
+            if filleted_wire is not before_corner:
+                record.merge(filleted_wire._history)
 
         # Return the filleted wire to the wire plane
         globalized_filleted_wire: Wire = wire_pln.from_local_coords(filleted_wire)
+        record.merge(
+            ShapeHistory.from_relocation(
+                filleted_wire.wrapped, globalized_filleted_wire.wrapped
+            )
+        )
 
         # Transform the wire back to the original location not that of the wire_pln
         old_loc = globalized_filleted_wire.location
@@ -4088,17 +4136,22 @@ class Wire(Mixin1D[TopoDS_Wire]):
         geometry_adjust = new_loc.inverse() * old_loc
         trsf = geometry_adjust.wrapped.Transformation()
         base_wire = globalized_filleted_wire.wrapped.Located(TopLoc_Location())
-        transformed = TopoDS.Wire(
-            BRepBuilderAPI_Transform(base_wire, trsf, True).Shape()
+        record.merge(
+            ShapeHistory.from_relocation(globalized_filleted_wire.wrapped, base_wire)
         )
-        final_wire = Wire(transformed)
-        final_wire.location = Location(self._wrapped.Location())
+        transformer = BRepBuilderAPI_Transform(base_wire, trsf, True)
+        transformed = TopoDS.Wire(transformer.Shape())
+        record.merge(ShapeHistory.from_algorithm(transformer, [base_wire], transformed))
+        # Located() returns a new shape, so `transformed` keeps its own location
+        # and the move can be recorded against it
+        final_wire = Wire(TopoDS.Wire(transformed.Located(self._wrapped.Location())))
+        record.merge(ShapeHistory.from_relocation(transformed, final_wire.wrapped))
 
         # Ensure the wire direction is the same
         if self.is_forward != final_wire.is_forward:
             final_wire.wrapped.Reverse()
 
-        return final_wire
+        return final_wire._made_by(record)
 
     def fix_degenerate_edges(self, precision: float) -> Wire:
         """fix_degenerate_edges
@@ -4260,7 +4313,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
             closest_topods_edge_param = extrema.ParOnEdgeS2(1)[0]
         elif supp_type == BRepExtrema_SupportType.BRepExtrema_IsVertex:
             v_hit = tcast(TopoDS_Vertex, downcast(extrema.SupportOnShape2(1)))
-            vertex_edge_map = TopTools_IndexedDataMapOfShapeListOfShape()
+            vertex_edge_map = (
+                IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+            )
             TopExp.MapShapesAndAncestors_s(
                 self.wrapped, ta.TopAbs_VERTEX, ta.TopAbs_EDGE, vertex_edge_map
             )
@@ -4410,7 +4465,6 @@ class Wire(Mixin1D[TopoDS_Wire]):
           ValueError: Only one of direction or center must be provided
 
         """
-        # pylint: disable=too-many-branches
         if self._wrapped is None or not target_object:
             raise ValueError("Can't project empty Wires or to empty Shapes")
 
@@ -4640,8 +4694,8 @@ def edges_to_wires(edges: Iterable[Edge], tol: float = 1e-6) -> ShapeList[Wire]:
 
     """
 
-    edges_in = TopTools_HSequenceOfShape()
-    wires_out = TopTools_HSequenceOfShape()
+    edges_in = HSequence_TopoDS_Shape()
+    wires_out = HSequence_TopoDS_Shape()
 
     for edge in edges:
         if edge.wrapped is not None:
@@ -4678,6 +4732,10 @@ def topo_explore_connected_edges(
         parent: Optional parent Shape. If None, uses edge.topo_parent.
         continuity: Minimum required continuity (C0/G0, C1/G1, C2/G2).
 
+    The edge may be a moved copy of one of the parent's edges - it shares that
+    edge's TShape at another Location - in which case the connected edges are
+    returned in the moved edge's frame.
+
     Returns:
         ShapeList[Edge]: Connected edges meeting the continuity requirement.
     """
@@ -4693,11 +4751,17 @@ def topo_explore_connected_edges(
         raise ValueError("edge has no valid parent")
     if not edge:
         raise ValueError("edge is empty")
-    given_topods_edge = edge.wrapped
     connected_edges = set()
 
     # Find all the TopoDS_Edges for this Shape
     topods_edges = [e.wrapped for e in parent.edges() if e.wrapped is not None]
+
+    # Work with the parent's own copy of the edge so vertices match
+    parent_edge = find_same_topods(edge.wrapped, topods_edges)
+    if parent_edge is None:
+        return ShapeList()
+    given_topods_edge = TopoDS.Edge(parent_edge)
+    relocation = relocation_between(given_topods_edge, edge.wrapped)
 
     for topods_edge in topods_edges:
         # # Don't match with the given edge
@@ -4728,13 +4792,102 @@ def topo_explore_connected_edges(
             if actual_level >= continuity:
                 connected_edges.add(topods_edge)
 
-    return ShapeList(Edge(e) for e in connected_edges)
+    if relocation.IsIdentity():
+        return ShapeList(Edge(e) for e in connected_edges)
+    return ShapeList(Edge(TopoDS.Edge(e.Moved(relocation))) for e in connected_edges)
+
+
+def _edge_is_seam_of(edge: TopoDS_Edge, face: TopoDS_Face) -> bool:
+    """Does ``face`` meet itself along ``edge``, as a cylinder does at its seam?"""
+    count = 0
+    explorer = TopExp_Explorer(face, ta.TopAbs_EDGE)
+    while explorer.More():
+        if explorer.Current().IsSame(edge):
+            count += 1
+        explorer.Next()
+    return count > 1
+
+
+def _edge_as_bounded_by(face: TopoDS_Face, edge: TopoDS_Edge) -> TopoDS_Edge:
+    """``edge`` with the orientation it has in ``face``'s boundary."""
+    explorer = TopExp_Explorer(face, ta.TopAbs_EDGE)
+    while explorer.More():
+        if explorer.Current().IsSame(edge):
+            return TopoDS.Edge(explorer.Current())
+        explorer.Next()
+    raise ValueError("edge is not on the face")
+
+
+def _dihedral_convexity(
+    edge: TopoDS_Edge,
+    face1: TopoDS_Face,
+    face2: TopoDS_Face,
+    samples: int = 7,
+    sin_tolerance: float = 1e-4,
+) -> Convexity:
+    """Classify the crease between two faces along their shared edge.
+
+    At each sample the outward normals of the two faces and the edge tangent,
+    taken in the direction the second face's boundary runs, give the direction
+    leading from the edge into the second face. That direction dips behind the
+    first face's tangent plane at a convex crease and rises above it at a
+    concave one. Normals that agree within ``sin_tolerance`` are a smooth join.
+    Samples where either surface is degenerate, as at a cone's apex, are
+    skipped.
+    """
+    curve = BRepAdaptor_Curve(edge)
+    first, last = curve.FirstParameter(), curve.LastParameter()
+    pcurve1 = BRep_Tool.CurveOnSurface_s(edge, face1, first, last)
+    pcurve2 = BRep_Tool.CurveOnSurface_s(edge, face2, first, last)
+    reversed_in_face2 = (
+        _edge_as_bounded_by(face2, edge).Orientation()
+        == TopAbs_Orientation.TopAbs_REVERSED
+    )
+    props1, props2 = BRepGProp_Face(face1), BRepGProp_Face(face2)
+
+    kinds: set[Convexity] = set()
+    for i in range(samples):
+        param = first + (last - first) * (i + 0.5) / samples
+        point, tangent = gp_Pnt(), gp_Vec()
+        curve.D1(param, point, tangent)
+        uv1, uv2 = pcurve1.Value(param), pcurve2.Value(param)
+        normal1, normal2 = gp_Vec(), gp_Vec()
+        props1.Normal(uv1.X(), uv1.Y(), point, normal1)
+        props2.Normal(uv2.X(), uv2.Y(), point, normal2)
+        if min(tangent.Magnitude(), normal1.Magnitude(), normal2.Magnitude()) < 1e-12:
+            continue
+        tangent.Normalize()
+        normal1.Normalize()
+        normal2.Normalize()
+        if normal1.Crossed(normal2).Magnitude() < sin_tolerance:
+            kinds.add(Convexity.SMOOTH)
+            continue
+        if reversed_in_face2:
+            tangent.Reverse()
+        into_face2 = normal2.Crossed(tangent)
+        kinds.add(
+            Convexity.CONVEX if into_face2.Dot(normal1) < 0 else Convexity.CONCAVE
+        )
+
+    if not kinds:
+        raise ValueError("the faces are degenerate along this edge")
+    turning = kinds - {Convexity.SMOOTH}
+    if not turning:
+        return Convexity.SMOOTH
+    if len(turning) == 1:
+        return turning.pop()
+    return Convexity.SADDLE
 
 
 def topo_explore_connected_faces(
     edge: Edge, parent: Shape | None = None
 ) -> list[TopoDS_Face]:
-    """Given an edge extracted from a Shape, return the topods_faces connected to it"""
+    """Given an edge extracted from a Shape, return the topods_faces connected to it
+
+    The edge may be a moved copy of one of the parent's edges - it shares that
+    edge's TShape at another Location - in which case the faces are returned in
+    the moved edge's frame. An edge the parent doesn't contain has no faces.
+    """
 
     if not edge:
         raise ValueError("Can't explore from an empty edge")
@@ -4744,18 +4897,33 @@ def topo_explore_connected_faces(
         raise ValueError("edge has no valid parent")
 
     # make a edge --> faces mapping
-    edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
+    edge_face_map = (
+        IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+    )
     TopExp.MapShapesAndAncestors_s(
         parent.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, edge_face_map
     )
 
-    # Query the map and select only unique faces
-    unique_face_map = TopTools_IndexedMapOfShape()
-    unique_faces = []
-    if edge_face_map.Contains(edge.wrapped):
-        for face in edge_face_map.FindFromKey(edge.wrapped):
-            unique_face_map.Add(face)
-    for i in range(unique_face_map.Extent()):
-        unique_faces.append(TopoDS.Face(unique_face_map(i + 1)))
+    # Find the parent's own copy of the edge - the map keys on TShape and
+    # Location, so a moved edge isn't found by Contains
+    parent_edge = find_same_topods(
+        edge.wrapped,
+        (edge_face_map.FindKey(i + 1) for i in range(edge_face_map.Extent())),
+    )
+    if parent_edge is None:
+        return []
+    relocation = relocation_between(parent_edge, edge.wrapped)
 
-    return unique_faces
+    # Query the map and select only unique faces
+    unique_face_map = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+    for face in list_shapes(edge_face_map.FindFromKey(parent_edge)):
+        unique_face_map.Add(face)
+    return [
+        TopoDS.Face(unique_face_map(i + 1).Moved(relocation))
+        for i in range(unique_face_map.Extent())
+    ]
+
+
+Shape.register_shape_constructor(ta.TopAbs_EDGE, Edge)
+Shape.register_shape_constructor(ta.TopAbs_WIRE, Wire)
+Shape.register_geometry_constructor(Axis, Edge)

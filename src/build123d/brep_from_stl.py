@@ -1008,6 +1008,10 @@ def validate_bounded_cylinder(
 ) -> bool:
     """Validate that support faces form a bounded cylindrical patch."""
 
+    # each check rejects the candidate outright, so an early return per check
+    # reads better than combining them
+    # pylint: disable=too-many-return-statements
+
     vertices = _unique_face_vertices(support_faces)
     if len(vertices) < 6:
         return False
@@ -1097,6 +1101,10 @@ def fit_local_cylinder(
     max_intersection_face_count: int = 64,
 ) -> CylinderPatch | None:
     """Fit a cylinder patch to local face samples."""
+
+    # each check rejects the candidate outright, so an early return per check
+    # reads better than combining them
+    # pylint: disable=too-many-return-statements
 
     axis_samples = _evenly_spaced_subset(samples, max_pair_face_count)
     records: list[tuple[tuple[int, int], Vector]] = []
@@ -1251,7 +1259,6 @@ def detect_planes_from_normals(
     mesh_index: MeshIndex,
     blocked_indices: set[int] | None = None,
     normal_digits: int = 3,
-    plane_tolerance_factor: float = 0.003,
     min_component_size: int = 2,
     min_two_face_area_factor: float = 0.05,
 ) -> list[PlanePatch]:
@@ -1283,35 +1290,6 @@ def detect_planes_from_normals(
         remaining.difference_update(patch.face_indices)
 
     return plane_patches
-
-
-def detect_planes(
-    mesh,
-    mesh_index: MeshIndex,
-    normal_digits: int = 3,
-    plane_tolerance_factor: float = 0.003,
-    min_component_size: int = 2,
-    min_two_face_area_factor: float = 0.05,
-) -> list[PlanePatch]:
-    """Detect planar regions in a mesh."""
-
-    clean_plane_patches = detect_planes_from_clean_proxy(mesh, mesh_index)
-    clean_plane_indices = (
-        set().union(*(patch.face_indices for patch in clean_plane_patches))
-        if clean_plane_patches
-        else set()
-    )
-    normal_plane_patches = detect_planes_from_normals(
-        mesh,
-        mesh_index,
-        blocked_indices=clean_plane_indices,
-        normal_digits=normal_digits,
-        plane_tolerance_factor=plane_tolerance_factor,
-        min_component_size=min_component_size,
-        min_two_face_area_factor=min_two_face_area_factor,
-    )
-
-    return [*clean_plane_patches, *normal_plane_patches]
 
 
 # Cylinder detection
@@ -1364,6 +1342,10 @@ def fit_local_sphere(
     normal_error_limit: float = 0.08,
 ) -> SpherePatch | None:
     """Fit a sphere patch to local face samples."""
+
+    # each check rejects the candidate outright, so an early return per check
+    # reads better than combining them
+    # pylint: disable=too-many-return-statements
 
     if len(samples) < 4:
         return None
@@ -1861,6 +1843,10 @@ def shapes_to_code(primitives: Iterable[Shape]) -> list[str]:
 
 
 # High-level pipeline
+# Prefix used for each generated variable name, chosen by the shape it builds
+_SHAPE_KEYS = [("Rectangle", "r"), ("Circle", "c"), ("Sphere", "s")]
+
+
 def detect_primitives(
     mesh: Shape,
 ) -> tuple[ShapeList[Face], ShapeList[Face], list[str]]:
@@ -1960,10 +1946,9 @@ def detect_primitives(
     if code_lines:
         num_lines = len(code_lines)
         num_digits = ceil(log10(num_lines))
-        SHAPE_KEYS = [("Rectangle", "r"), ("Circle", "c"), ("Sphere", "s")]
         for i in range(num_lines):
             code_type = next(
-                (key for label, key in SHAPE_KEYS if label in code_lines[i]), None
+                (key for label, key in _SHAPE_KEYS if label in code_lines[i]), None
             )
             code_lines[i] = f"{code_type}{i:0{num_digits}d} = {code_lines[i]}"
 

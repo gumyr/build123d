@@ -27,6 +27,7 @@ license:
 """
 
 # Always equal to any other object, to test that __eq__ cooperation is working
+import copy
 import io
 import math
 import re
@@ -34,9 +35,9 @@ import unittest
 
 from IPython.lib import pretty
 from build123d.build_common import GridLocations, PolarLocations
-from build123d.build_enums import GeomType, SortBy
+from build123d.build_enums import Convexity, GeomType, SortBy
 from build123d.build_part import BuildPart
-from build123d.geometry import Axis, Plane, Vector
+from build123d.geometry import Axis, Plane, Pos, Vector
 from build123d.objects_part import Box, Cylinder
 from build123d.objects_sketch import Circle, RegularPolygon
 from build123d.topology import (
@@ -372,6 +373,38 @@ class TestShapeList(unittest.TestCase):
 
         self.assertEqual([len(group) for group in face_groups], [2, 4])
 
+    def test_filter_by_convexity(self):
+        box = Box(1, 1, 1)
+        self.assertEqual(len(box.edges().filter_by(Convexity.CONVEX)), 12)
+        self.assertEqual(len(box.edges().filter_by(Convexity.CONVEX, reverse=True)), 0)
+        pocket = Box(20, 20, 10) - Pos(Z=5) * Box(10, 10, 10)
+        self.assertEqual(len(pocket.edges().filter_by(Convexity.CONCAVE)), 8)
+        self.assertEqual(len(pocket.faces().filter_by(Convexity.SMOOTH)), 11)
+        self.assertEqual(len(pocket.vertices().filter_by(Convexity.SADDLE)), 4)
+
+    def test_filter_by_convexity_needs_an_element(self):
+        with self.assertRaisesRegex(ValueError, "has no convexity"):
+            ShapeList([Box(1, 1, 1)]).filter_by(Convexity.CONVEX)
+
+    def test_group_by_convexity(self):
+        pocket = Box(20, 20, 10) - Pos(Z=5) * Box(10, 10, 10)
+        groups = pocket.edges().group_by(Convexity)
+        self.assertEqual([len(g) for g in groups], [16, 8])
+        self.assertEqual(len(groups.group(Convexity.CONCAVE)), 8)
+        self.assertEqual(len(groups.group(Convexity.CONVEX)), 16)
+        # the enum is not orderable, so sorting by it is not a thing
+        with self.assertRaises(TypeError):
+            pocket.edges().sort_by(Edge.convexity)
+
+    def test_topological_distance_moved_shape(self):
+        # A moved copy keeps the unmoved container as topo_parent; peers are
+        # matched by TShape so the graph is still reachable
+        moved_box = Pos(X=10) * Box(1, 1, 1).solid()
+        edges = moved_box.edges()
+        edge_groups = edges.group_by(topo_distance_to(edges[0]))
+
+        self.assertEqual([len(group) for group in edge_groups], [1, 4, 6, 1])
+
     def test_topological_distance_requires_topo_parent(self):
         faces = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
 
@@ -530,6 +563,27 @@ class TestShapeList(unittest.TestCase):
         self.assertEqual(
             tuple(ShapeList(Vertex(i, 0, 0) for i in range(3)).center()), (1, 0, 0)
         )
+
+
+class TestShapeListEmptyAxis(unittest.TestCase):
+    """Axis.__init__ always builds a gp_Ax1, so an axis with no OCP object can
+    only be produced by clearing the private attribute."""
+
+    @staticmethod
+    def _empty_axis() -> Axis:
+        axis = copy.copy(Axis.Z)
+        axis._wrapped = None
+        return axis
+
+    def test_group_by_empty_axis(self):
+        faces = Box(1, 1, 1).faces()
+        with self.assertRaisesRegex(ValueError, "Cannot group by an empty axis"):
+            faces.group_by(self._empty_axis())
+
+    def test_sort_by_empty_axis(self):
+        faces = Box(1, 1, 1).faces()
+        with self.assertRaisesRegex(ValueError, "Cannot sort by an empty axis"):
+            faces.sort_by(self._empty_axis())
 
 
 class TestShapeListAddition(unittest.TestCase):

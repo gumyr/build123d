@@ -1209,7 +1209,7 @@ def test_detect_planes_cylinders_and_spheres_skip_invalid_candidates(monkeypatch
         bfs, "_plane_like_face_components", lambda *_args, **_kwargs: [[0, 1, 2, 3]]
     )
     monkeypatch.setattr(bfs, "_build_plane_patch", lambda *_args, **_kwargs: None)
-    assert bfs.detect_planes(mesh, mesh_index) == []
+    assert bfs.detect_planes_from_normals(mesh, mesh_index) == []
 
     monkeypatch.setattr(
         bfs, "_group_indices_by_area", lambda *_args, **_kwargs: [[0, 1, 2, 3]]
@@ -1296,7 +1296,9 @@ def test_detect_planes_accepts_two_face_component(monkeypatch):
     )
     monkeypatch.setattr(bfs, "_build_plane_patch", lambda *_args, **_kwargs: patch)
 
-    assert bfs.detect_planes(mesh, mesh_index, min_two_face_area_factor=0.0) == [patch]
+    assert bfs.detect_planes_from_normals(
+        mesh, mesh_index, min_two_face_area_factor=0.0
+    ) == [patch]
 
 
 def test_detect_cylinders_additional_continue_paths(monkeypatch):

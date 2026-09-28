@@ -59,7 +59,7 @@ def _pack2d(
     def find_node(start, w, h):
         if start.used:
             return find_node(start.right, w, h) or find_node(start.down, w, h)
-        if o[1] <= start.w and o[2] <= start.h:
+        if w <= start.w and h <= start.h:
             return start
         return None
 
@@ -84,7 +84,7 @@ def _pack2d(
             return grow_right(w, h)
         if can_grow_down:
             return grow_down(w, h)
-        assert False, f"Failed to grow! root: {root}, w: {w}, h: {h}"
+        raise RuntimeError(f"Failed to grow! root: {root}, w: {w}, h: {h}")
 
     def grow_right(w, h):
         nonlocal root
@@ -98,7 +98,7 @@ def _pack2d(
             right=_Node(x=root.w, w=w, h=root.h),
         )
         node = find_node(root, w, h)
-        assert node, "Failed to grow right! root: {root}, w: {w}, h: {h}"
+        assert node, f"Failed to grow right! root: {root}, w: {w}, h: {h}"
         return split_node(node, w, h)
 
     def grow_down(w, h):
@@ -113,10 +113,11 @@ def _pack2d(
             right=root,
         )
         node = find_node(root, w, h)
-        assert node, "Failed to grow down! root: {root}, w: {w}, h: {h}"
+        assert node, f"Failed to grow down! root: {root}, w: {w}, h: {h}"
         return split_node(node, w, h)
 
-    assert len(objects) > 0
+    if not objects:
+        raise ValueError("no objects to pack")
     sorted_objects = sorted(
         [(i, width_fn(o), length_fn(o)) for (i, o) in enumerate(objects)],
         key=lambda d: min(d[1], d[2]),

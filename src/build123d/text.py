@@ -32,7 +32,7 @@ from OCP.Font import (
     Font_SystemFont,
 )
 from OCP.TCollection import TCollection_AsciiString
-from OCP.TColStd import TColStd_SequenceOfHAsciiString
+from OCP.collections import Sequence_TCollection_HAsciiString
 
 from build123d.build_enums import FontStyle
 
@@ -87,7 +87,7 @@ class FontManager:
         self.manager = Font_FontMgr.GetInstance_s()
 
         # Check if OCP manager is already initialized. "singleline" alias is canary
-        aliases = TColStd_SequenceOfHAsciiString()
+        aliases = Sequence_TCollection_HAsciiString()
         self.manager.GetAllAliases(aliases)
         aliases = [aliases.Value(i).ToCString() for i in range(1, aliases.Length() + 1)]
 
@@ -138,7 +138,7 @@ class FontManager:
         return self.manager.FindFont(TCollection_AsciiString(name), FONT_ASPECT[style])
 
     def register_font(
-        self, path: str, override: bool = False, single_stroke=False
+        self, path: str, override: bool = False, single_stroke: bool = False
     ) -> list[str]:
         """Register all font faces in a font file and return font face names."""
         _, ext = os.path.splitext(path)
@@ -171,17 +171,17 @@ class FontManager:
         return font_faces
 
     def register_folder(
-        self, path: str, override: bool = False, single_stroke=False
+        self, path: str, override: bool = False, single_stroke: bool = False
     ) -> list[str]:
         """Register all fonts in a folder"""
         exts = ["ttf", "otf", "ttc"]
-        font_faces = []
+        font_faces: list[str] = []
         for ext in exts:
             search = os.path.join(os.path.normpath(path), "*" + ext)
             results = glob.glob(search)
             for result in results:
-                font_faces += self.register_font(result, override, single_stroke)
-
+                if os.path.isfile(result):
+                    font_faces += self.register_font(result, override, single_stroke)
         return list(set(font_faces))
 
     def register_system_fonts(self):

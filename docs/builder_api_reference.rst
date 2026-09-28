@@ -30,6 +30,7 @@ Enums
 
 .. autoclass:: Align
 .. autoclass:: CenterOf
+.. autoclass:: Convexity
 .. autoclass:: FontStyle
 .. autoclass:: GeomType
 .. autoclass:: Keep

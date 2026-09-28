@@ -56,11 +56,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from math import cos, radians, tan
-from typing import TYPE_CHECKING, ClassVar, Literal, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from bd_materials import FinishedMaterial
 
 import OCP.TopAbs as ta
+from OCP.BRep import BRep_Builder
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
@@ -95,13 +96,16 @@ from OCP.TopoDS import (
     TopoDS,
     TopoDS_Compound,
     TopoDS_Face,
+    TopoDS_Iterator,
     TopoDS_Shape,
     TopoDS_Shell,
     TopoDS_Solid,
     TopoDS_Wire,
 )
-from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListOfShape
-from typing_extensions import Self
+from OCP.collections import (
+    IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
+    List_TopoDS_Shape,
+)
 
 from build123d.build_enums import (
     CenterOf,
@@ -137,6 +141,8 @@ from .shape_core import (
     unwrap_topods_compound,
     _make_topods_compound_from_shapes,
 )
+from .history import ShapeHistory
+from .kernel import list_shapes
 from .two_d import Face, Mixin2D, Shell, sort_wires_by_build_order
 from .utils import (
     _extrude_topods_shape,
@@ -162,24 +168,6 @@ class Mixin3D(Shape[TOPODS]):
         return 3
 
     # ---- Class Methods ----
-
-    @classmethod
-    def cast(cls, obj: TopoDS_Shape) -> Self:
-        "Returns the right type of wrapper, given a OCCT object"
-
-        # define the shape lookup table for casting
-        constructor_lut = {
-            ta.TopAbs_VERTEX: Vertex,
-            ta.TopAbs_EDGE: Edge,
-            ta.TopAbs_WIRE: Wire,
-            ta.TopAbs_FACE: Face,
-            ta.TopAbs_SHELL: Shell,
-            ta.TopAbs_SOLID: Solid,
-        }
-
-        shape_type = shapetype(obj)
-        # NB downcast is needed to handle TopoDS_Shape types
-        return constructor_lut[shape_type](downcast(obj))
 
     @classmethod
     def extrude(
@@ -264,7 +252,9 @@ class Mixin3D(Shape[TOPODS]):
         native_edges = [e.wrapped for e in edge_list]
 
         # make a edge --> faces mapping
-        edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
+        edge_face_map = (
+            IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
         TopExp.MapShapesAndAncestors_s(
             self.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, edge_face_map
         )
@@ -298,7 +288,11 @@ class Mixin3D(Shape[TOPODS]):
                 "Failed creating a chamfer, try a smaller length value(s)"
             ) from err
 
-        return new_shape
+        return new_shape._made_by(
+            ShapeHistory.from_algorithm(
+                chamfer_builder, [self.wrapped], new_shape.wrapped
+            )
+        )
 
     def dprism(
         self,
@@ -383,7 +377,11 @@ class Mixin3D(Shape[TOPODS]):
                 f" or use max_fillet() to find the largest valid fillet radius"
             ) from err
 
-        return new_shape
+        return new_shape._made_by(
+            ShapeHistory.from_algorithm(
+                fillet_builder, [self.wrapped], new_shape.wrapped
+            )
+        )
 
     def hollow(
         self,
@@ -419,7 +417,7 @@ class Mixin3D(Shape[TOPODS]):
             Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
         }
 
-        occ_faces_list = TopTools_ListOfShape()
+        occ_faces_list = List_TopoDS_Shape()
         for face in faces:
             occ_faces_list.Append(face.wrapped)
 
@@ -472,14 +470,7 @@ class Mixin3D(Shape[TOPODS]):
                 (shapes touching the solid's surface without penetrating)
         """
         # Convert geometry objects to shapes
-        if isinstance(other, Vector):
-            other = Vertex(other)
-        elif isinstance(other, Location):
-            other = Vertex(other.position)
-        elif isinstance(other, Axis):
-            other = Edge(other)
-        elif isinstance(other, Plane):
-            other = Face(other)
+        other = Shape.as_shape(other)
 
         def filter_redundant_touches(items: ShapeList) -> ShapeList:
             """Remove vertices/edges that lie on higher-dimensional results."""
@@ -670,7 +661,7 @@ class Mixin3D(Shape[TOPODS]):
             Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
         }
 
-        occ_faces_list = TopTools_ListOfShape()
+        occ_faces_list = List_TopoDS_Shape()
         for face in openings:
             occ_faces_list.Append(face.wrapped)
 
@@ -693,6 +684,8 @@ class Mixin3D(Shape[TOPODS]):
                 "offset Error, an alternative kind may resolve this error"
             ) from err
 
+        if offset_occt_solid.ShapeType() == ta.TopAbs_SOLID:
+            offset_occt_solid = _forward_solid(TopoDS.Solid(offset_occt_solid))
         offset_solid = self.__class__.cast(offset_occt_solid)
         assert offset_solid.wrapped is not None
 
@@ -728,6 +721,41 @@ class Mixin3D(Shape[TOPODS]):
         return Mixin1D.project_to_viewport(
             self, viewport_origin, viewport_up, look_at, focus
         )
+
+
+def _forward_solid(solid: TopoDS_Solid) -> TopoDS_Solid:
+    """The same solid with FORWARD flags on itself and its shells.
+
+    ``BRepOffsetAPI_MakeThickSolid`` can return a solid whose faces point
+    inward under a REVERSED flag on the solid. Everything that composes
+    orientations along the topology accepts it: the volume is positive and
+    ``BRepCheck`` is satisfied. ``BRepFilletAPI_MakeFillet`` does not compose
+    the solid's flag, sees an inside-out solid, and builds an inside-out
+    result. Rebuilding the solid FORWARD, with every face carrying the
+    orientation it had in effect, keeps the geometry and removes the flag.
+    """
+    shells = TopoDS_Iterator(solid, True, True)
+    flags = [solid.Orientation()]
+    while shells.More():
+        flags.append(shells.Value().Orientation())
+        shells.Next()
+    if all(flag == ta.TopAbs_FORWARD for flag in flags):
+        return solid
+
+    builder = BRep_Builder()
+    forward = TopoDS_Solid()
+    builder.MakeSolid(forward)
+    shells = TopoDS_Iterator(solid, True, True)  # orientations composed
+    while shells.More():
+        shell = TopoDS_Shell()
+        builder.MakeShell(shell)
+        faces = TopoDS_Iterator(shells.Value(), True, True)
+        while faces.More():
+            builder.Add(shell, faces.Value())
+            faces.Next()
+        builder.Add(forward, shell)
+        shells.Next()
+    return forward
 
 
 class Solid(Mixin3D[TopoDS_Solid]):
@@ -1163,7 +1191,6 @@ class Solid(Mixin3D[TopoDS_Solid]):
         Returns:
             Solid: extruded cross section
         """
-        # pylint: disable=too-many-locals
         direction = Vector(direction)
 
         if (
@@ -1251,7 +1278,10 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 intersection to stop at. Defaults to ``Until.NEXT``.
 
         Raises:
-            ValueError: If the provided profile does not intersect the target.
+            ValueError: If the provided profile does not intersect the target,
+                or the surface reached does not cut the extrusion - the
+                profile lies in it, as a sketch drawn on a face of the target
+                does with ``Until.NEXT``.
 
         Returns:
             Solid: The extruded and limited solid.
@@ -1279,11 +1309,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
         face_explorer = TopExp_Explorer(target.wrapped, ta.TopAbs_FACE)
         while face_explorer.More():
             target_face = TopoDS.Face(face_explorer.Current())
-            modified_los: TopTools_ListOfShape = history.Modified(target_face)
-            while not modified_los.IsEmpty():
-                modified_face = TopoDS.Face(modified_los.First())
-                modified_los.RemoveFirst()
-                modified_target_faces.append(modified_face)
+            for modified in list_shapes(history.Modified(target_face)):
+                modified_target_faces.append(TopoDS.Face(modified))
             face_explorer.Next()
 
         # 3: Sew the resulting faces into shells - one for each surface the extrusion
@@ -1309,22 +1336,21 @@ class Solid(Mixin3D[TopoDS_Solid]):
         limit = modified_target_surfaces[
             0 if until in [Until.NEXT, Until.PREVIOUS] else -1
         ]
-        keep: Literal[Keep.TOP, Keep.BOTTOM] = (
-            Keep.TOP if until in [Until.NEXT, Until.PREVIOUS] else Keep.BOTTOM
-        )
 
-        # 4: Split the extrusion by the appropriate shell
-        clipped_extrusion = extrusion.split(limit, keep=keep)
+        # 4: Split the extrusion by that surface
+        pieces = extrusion.split(limit, keep=Keep.ALL)
+        if len(pieces) < 2:
+            raise ValueError(
+                "the surface reached does not cut the extrusion - the profile "
+                "lies in it, or only touches it"
+            )
 
-        # 5: Return the appropriate type
-        if clipped_extrusion is None:
-            raise RuntimeError("Extrusion is None")  # None isn't an option here
-        if isinstance(clipped_extrusion, Solid):
-            return clipped_extrusion
-        #  isinstance(clipped_extrusion, list):
-        return ShapeList(clipped_extrusion).sort_by(Axis(profile.center(), direction))[
-            0
-        ]
+        # 5: The profile is the extrusion's own base face and survives the
+        #    split, so the piece to return is the one that holds it
+        for piece in pieces:
+            if any(face.wrapped.IsSame(profile.wrapped) for face in piece.faces()):
+                return piece
+        raise RuntimeError("Extrusion is None")  # None isn't an option here
 
     @classmethod
     def from_bounding_box(cls, bbox: BoundBox | OrientedBoundBox) -> Solid:
@@ -1856,7 +1882,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 face=None,
                 problematic_shape=draft_angle_builder.ProblematicShape(),
             ) from err
-        return result
+        return result._made_by(
+            ShapeHistory.from_algorithm(
+                draft_angle_builder, [self.wrapped], result.wrapped
+            )
+        )
 
 
 class DraftAngleError(RuntimeError):
@@ -1866,3 +1896,6 @@ class DraftAngleError(RuntimeError):
         super().__init__(message)
         self.face = face
         self.problematic_shape = problematic_shape
+
+
+Shape.register_shape_constructor(ta.TopAbs_SOLID, Solid)

@@ -31,12 +31,25 @@ import unittest
 from pathlib import Path
 
 from build123d.build_common import GridLocations, PolarLocations
-from build123d.build_enums import Align, CenterOf
+from build123d.build_enums import Align, CenterOf, Mode
+from build123d.build_part import BuildPart
 from build123d.geometry import Location, Plane
-from build123d.objects_part import Box
+from build123d.objects_part import BasePartObject, Box
+from build123d.operations_generic import insert
 from build123d.objects_sketch import Circle
 from build123d.text import FontManager
-from build123d.topology import Compound, Edge, Face, ShapeList, Solid, Sketch
+from build123d.build_line import BuildLine
+from build123d.objects_curve import Polyline
+from build123d.topology import (
+    Compound,
+    Curve,
+    Edge,
+    Face,
+    Part,
+    ShapeList,
+    Solid,
+    Sketch,
+)
 
 
 class TestCompound(unittest.TestCase):
@@ -157,6 +170,38 @@ class TestCompound(unittest.TestCase):
         comp4 = comp3.unwrap(fully=True)
         self.assertTrue(isinstance(comp4, Face))
 
+    def test_unwrap_of_a_custom_object_keeps_its_topology_class(self):
+        """A BasePartObject whose product is a compound holding one compound
+        of solids, as the bd_warehouse threads are, unwraps to a Part rather
+        than to a new instance of its own class, whose constructor takes its
+        parameters"""
+
+        class Threaded(BasePartObject):
+            def __init__(self, width: float, mode: Mode = Mode.ADD):
+                self.width = width
+                turns = Compound(
+                    children=[
+                        Solid.make_box(width, width, width),
+                        Solid.make_box(width, width, width).moved(
+                            Location((0, 0, width))
+                        ),
+                    ]
+                )
+                super().__init__(Compound(children=[turns]), mode=mode)
+
+        threaded = Threaded(2, mode=Mode.PRIVATE)
+        unwrapped = threaded.unwrap(fully=False)
+        self.assertIs(type(unwrapped), Part)
+        self.assertEqual(len(unwrapped.solids()), 2)
+        self.assertIs(type(threaded.unwrap(fully=True)), Compound)
+        # which is what insert needs
+        with BuildPart() as part:
+            Box(10, 10, 10)
+            insert(Threaded(2, mode=Mode.PRIVATE).moved(Location((5, 0, 0))))
+        # the cubes stand outside the box, so both are added whole
+        self.assertAlmostEqual(part.part.volume, 1000 + 2 * 8, 6)
+        self.assertTrue(part.part.is_valid)
+
     def test_get_top_level_shapes(self):
         base_shapes = Compound(children=PolarLocations(15, 20) * Box(4, 4, 4))
         fls = base_shapes.get_top_level_shapes()
@@ -166,6 +211,132 @@ class TestCompound(unittest.TestCase):
 
         b1 = Box(1, 1, 1).solid()
         self.assertEqual(b1.get_top_level_shapes()[0], b1)
+
+
+class TestCompoundAlgebra(unittest.TestCase):
+    """Compound's operators, which Part/Sketch/Curve inherit."""
+
+    def test_add_none_returns_self(self):
+        part = Part(Solid.make_box(1, 1, 1).wrapped)
+        self.assertIs(part + None, part)
+
+    def test_adding_1d_content_that_fuses_to_one_edge(self):
+        """Compound holds the 1D branch; Curve inherits Mixin1D.__add__ instead."""
+        collinear = Compound([Edge.make_line((0, 0), (1, 0))])
+        result = collinear + Edge.make_line((1, 0), (2, 0))
+
+        self.assertIsInstance(result, Curve)
+        self.assertEqual(len(result.edges()), 1)
+        self.assertAlmostEqual(result.edges()[0].length, 2, 5)
+
+    def test_adding_1d_content_that_stays_apart(self):
+        separate = Compound([Edge.make_line((0, 0), (1, 0))])
+        result = separate + Edge.make_line((5, 5), (6, 5))
+        self.assertEqual(len(result.edges()), 2)
+
+    def test_intersection_with_no_overlap_is_empty(self):
+        left = Compound([Solid.make_box(1, 1, 1)])
+        right = Compound([Solid.make_box(1, 1, 1, Plane((10, 0, 0)))])
+        result = left & right
+
+        self.assertIsInstance(result, Compound)
+        self.assertFalse(result)
+
+
+class TestCompoundAccessors(unittest.TestCase):
+    def test_compound_and_compounds(self):
+        wrapped = Compound([Solid.make_box(1, 1, 1)])
+        self.assertEqual(len(wrapped.compounds()), 1)
+        self.assertIsInstance(wrapped.compound(), Compound)
+
+    def test_no_compounds_when_not_wrapping_one(self):
+        """A Part can wrap a bare Solid rather than a TopoDS_Compound."""
+        part = Part(Solid.make_box(1, 1, 1).wrapped)
+        self.assertEqual(part.compounds(), ShapeList())
+        with self.assertRaisesRegex(ValueError, "found 0"):
+            part.compound()
+
+
+class TestDoChildrenIntersect(unittest.TestCase):
+    def test_overlapping_children(self):
+        overlapping = Compound(
+            label="asm",
+            children=[
+                Solid.make_box(1, 1, 1),
+                Solid.make_box(1, 1, 1, Plane((0.5, 0, 0))),
+            ],
+        )
+        intersects, _pair, volume = overlapping.do_children_intersect()
+        self.assertTrue(intersects)
+        self.assertGreater(volume, 0)
+
+    def test_children_that_stay_apart(self):
+        apart = Compound(
+            label="asm",
+            children=[
+                Solid.make_box(1, 1, 1),
+                Solid.make_box(1, 1, 1, Plane((5, 0, 0))),
+            ],
+        )
+        self.assertFalse(apart.do_children_intersect()[0])
+
+    def test_only_one_pair_of_several_overlaps(self):
+        """Three children: the first pair is clear, the second is not."""
+        assembly = Compound(
+            label="asm",
+            children=[
+                Solid.make_box(1, 1, 1),
+                Solid.make_box(1, 1, 1, Plane((5, 0, 0))),
+                Solid.make_box(1, 1, 1, Plane((5.5, 0, 0))),
+            ],
+        )
+        intersects, pair, _volume = assembly.do_children_intersect()
+        self.assertTrue(intersects)
+        self.assertNotIn(assembly, pair)
+
+    def test_including_the_parent(self):
+        """The parent's own geometry contains its children, so including it
+        always reports an intersection - between parent and child."""
+        assembly = Compound(
+            label="asm",
+            children=[
+                Solid.make_box(1, 1, 1),
+                Solid.make_box(1, 1, 1, Plane((5, 0, 0))),
+            ],
+        )
+        self.assertFalse(assembly.do_children_intersect()[0])
+
+        intersects, pair, _volume = assembly.do_children_intersect(include_parent=True)
+        self.assertTrue(intersects)
+        self.assertIn(assembly, pair)
+
+
+class TestCurveOperators(unittest.TestCase):
+    """@ and % were covered; ^ was not."""
+
+    def setUp(self):
+        with BuildLine() as builder:
+            Polyline((0, 0), (5, 0), (5, 5))
+        self.curve = builder.line
+
+    def test_location_operator(self):
+        location = self.curve ^ 0.5
+        self.assertIsInstance(location, Location)
+        self.assertAlmostEqual(location.position, (5, 0, 0), 5)
+
+    def test_matches_position_and_tangent(self):
+        self.assertAlmostEqual((self.curve ^ 0.5).position, self.curve @ 0.5, 5)
+        self.assertAlmostEqual((self.curve ^ 0.5).z_axis.direction, self.curve % 0.5, 5)
+
+
+class TestCompoundTreeValidation(unittest.TestCase):
+    def test_parent_must_be_a_compound(self):
+        with self.assertRaisesRegex(ValueError, "must be of type Compound"):
+            Compound()._pre_attach(Solid.make_box(1, 1, 1))
+
+    def test_children_must_be_shapes(self):
+        with self.assertRaisesRegex(ValueError, "must be of type Shape"):
+            Compound()._pre_attach_children([1, 2])
 
 
 if __name__ == "__main__":

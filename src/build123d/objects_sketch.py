@@ -303,7 +303,6 @@ class RegularPolygon(BaseSketchObject):
         align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
-        # pylint: disable=too-many-locals
 
         if side_count < 3:
             raise ValueError(
@@ -624,7 +623,6 @@ class Text(BaseSketchObject):
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
 
-    # pylint: disable=too-many-instance-attributes
     _applies_to = [BuildSketch._tag]
 
     # Text is exceptionally flexible as per user requests
