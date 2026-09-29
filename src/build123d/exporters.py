@@ -587,29 +587,39 @@ class ExportDXF(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    @staticmethod
-    def _color_attribs(color: ColorLike | ColorIndex) -> dict[str, int]:
-        """Convert a color into ezdxf layer attributes."""
+    def _color_attribs(self, color: ColorLike | ColorIndex) -> dict[str, int]:
+        """Convert a color into ezdxf layer attributes.
+
+        DXF versions before R2004 have no true color, so there a ColorLike is
+        written as the nearest AutoCAD Color Index instead.
+        """
         if isinstance(color, ColorIndex):
             warn(
                 "ExportDXF ColorIndex values are deprecated; use ColorLike values "
                 "such as 'red' or 0xFF0000 instead.",
                 DeprecationWarning,
-                stacklevel=3,
+                stacklevel=4,
             )
             return {"color": color.value}
 
         red, green, blue, _ = tuple(Color(color))
-        return {
-            "true_color": ezdxf.rgb2int(
-                (round(red * 255), round(green * 255), round(blue * 255))
-            )
-        }
+        rgb = (round(red * 255), round(green * 255), round(blue * 255))
+        if self._document.dxfversion < ezdxf.DXF2004:
+            return {"color": self._nearest_aci(rgb)}
+        return {"true_color": ezdxf.rgb2int(rgb)}
 
-    @classmethod
-    def _set_layer_color(cls, layer: Any, color: ColorLike | ColorIndex) -> None:
+    @staticmethod
+    def _nearest_aci(rgb: tuple[int, int, int]) -> int:
+        """The AutoCAD Color Index whose palette entry is closest to ``rgb``."""
+
+        def distance(index: int) -> int:
+            return sum((a - b) ** 2 for a, b in zip(rgb, aci2rgb(index)))
+
+        return min(range(1, 256), key=distance)
+
+    def _set_layer_color(self, layer: Any, color: ColorLike | ColorIndex) -> None:
         """Apply color and ColorLike alpha to an ezdxf layer."""
-        layer.update_dxf_attribs(cls._color_attribs(color))
+        layer.update_dxf_attribs(self._color_attribs(color))
         if not isinstance(color, ColorIndex):
             *_, alpha = tuple(Color(color))
             if alpha < 1:
