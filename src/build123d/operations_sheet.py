@@ -145,7 +145,7 @@ def _outward_direction(edge: Edge, support: Face) -> tuple[Vector, Vector]:
     """The in-plane direction out of a face across one of its edges, and the
     face's normal there."""
     outward = -_topods_material_side(support.wrapped, edge.wrapped)
-    return outward, support.normal_at(edge.position_at(0.5)).normalized()
+    return outward, support.normal_at(edge.position_at(0.5))
 
 
 def _current_sheet(context: BuildSheet, shapes: list, what: str) -> Shell:
@@ -290,7 +290,7 @@ def _bend_zone(
 ) -> _BendZone:
     """Place a bend on a free edge of its supporting face."""
     outward, normal = _outward_direction(edge, support)
-    p0, p1 = Vector(edge.position_at(0)), Vector(edge.position_at(1))
+    p0, p1 = edge.position_at(0), edge.position_at(1)
     tangent = edge.tangent_at()
     if sum(gaps) >= edge.length:
         raise ValueError("gaps leave no bend width on the edge")
@@ -318,14 +318,14 @@ def _oblique_reach(
     """
     if gap > 0:
         return 0.0
-    corner = Vector(edge.position_at(end))
+    corner = edge.position_at(end)
     along = edge.tangent_at() * (
         1 if end == 0 else -1
     )  # from the corner, into the edge
     for side in support.edges():
         if side.is_same(edge) or side.geom_type != GeomType.LINE:
             continue
-        ends = [Vector(side.position_at(0)), Vector(side.position_at(1))]
+        ends = [side.position_at(0), side.position_at(1)]
         if min((point - corner).length for point in ends) > TOLERANCE:
             continue
         away = max(ends, key=lambda point: (point - corner).length) - corner
@@ -372,8 +372,8 @@ def _bend_zones(
                 for end in (0, 1)
             ]
             strip = Edge.make_line(
-                Vector(zone.near.position_at(0)) - tangent * reach[0],
-                Vector(zone.near.position_at(1)) + tangent * reach[1],
+                zone.near.position_at(0) - tangent * reach[0],
+                zone.near.position_at(1) + tangent * reach[1],
             )
             takes.append(
                 _orient_face(Face.extrude(strip, zone.outward * setback), zone.normal)
@@ -415,7 +415,7 @@ def _bend_and_leg(
     allowance of them into the bend and swings the rest up as the leg, so
     the outline of the blank comes along.
     """
-    near = Vector(zone.near.position_at(0))
+    near = zone.near.position_at(0)
     if flat is None:
         bend_axis = _bend_axis(near, zone.outward, zone.normal, angle, radius)
         spin = Axis((0, 0, 0), bend_axis.direction)
@@ -806,7 +806,7 @@ def jog(
             )
             folded, _ = _jog_faces(
                 taken + [_orient_face(beyond, zone.normal)],
-                Vector(zone.near.position_at(0)),
+                zone.near.position_at(0),
                 zone.outward,
                 zone.normal,
                 profile,
@@ -1152,7 +1152,7 @@ def _remodel_flange(face: Face, moved: dict[Vertex, Vector]) -> Face:
 
     edges: list[Edge] = []
     for edge in face.outer_wire().order_edges():
-        start, end = Vector(edge.position_at(0)), Vector(edge.position_at(1))
+        start, end = edge.position_at(0), edge.position_at(1)
         new_start, new_end = corner(start), corner(end)
         if new_start == start and new_end == end:
             edges.append(edge)
@@ -1217,7 +1217,7 @@ def _bend_miter_cut(
     """
     tangents = [edge for edge in cylinder.edges() if edge.geom_type == GeomType.LINE]
     fold = max(tangents, key=lambda edge: edge.distance_to(corner))
-    ends = [Vector(fold.position_at(end)) for end in (0.0, 1.0)]
+    ends = [fold.position_at(end) for end in (0.0, 1.0)]
     frames, _, _, _ = _bend_end_frames(
         shell, min(ends, key=lambda point: (point - corner).length), -inward, parameters
     )
@@ -1337,7 +1337,7 @@ def _meet_crossing_miters(
                 if not edge.is_same(first.rim)
                 and _contains_vertex(edge, first.far_vertex)
             )
-            start = Vector(far_side.position_at(0))
+            start = far_side.position_at(0)
             meeting = _lines_meet(
                 first.anchor, first.direction, start, far_side.tangent_at()
             )
@@ -2205,7 +2205,7 @@ def _corner_frames(
         ]
         if not bends:
             continue
-        start = Vector(edge.position_at(0))
+        start = edge.position_at(0)
         along = edge.tangent_at()
         offset = corner - start
         if (offset - along * offset.dot(along)).length > _RELIEF_TOLERANCE:
@@ -2613,7 +2613,7 @@ def _bend_ends(cylinder: Face, shell: Shell) -> list:
     for direction in (along, -along):
         found = []
         for edge, plane in folds:
-            corners = [Vector(edge.position_at(end)) for end in (0.0, 1.0)]
+            corners = [edge.position_at(end) for end in (0.0, 1.0)]
             reach = [(corner - middle).dot(direction) for corner in corners]
             point = corners[0] if reach[0] > reach[1] else corners[1]
             outward = _fold_outward(plane, edge)
@@ -2654,7 +2654,7 @@ def _bend_end_frames(
     for edge in shell.edges():
         if edge.geom_type != GeomType.LINE:
             continue
-        corners = [Vector(edge.position_at(end)) for end in (0.0, 1.0)]
+        corners = [edge.position_at(end) for end in (0.0, 1.0)]
         if min((corner - point).length for corner in corners) > _RELIEF_TOLERANCE:
             continue
         if abs(edge.tangent_at().dot(away)) < 1 - _RELIEF_TOLERANCE:
@@ -2896,7 +2896,7 @@ def _fold_site(
     moving = _fold_moving_faces(shell, face, partner)
     normal = face.normal_at(face.center())
     across = _fold_outward(face, line)
-    near = Vector(line.position_at(0)) - across * setback
+    near = line.position_at(0) - across * setback
     if setback < _RELIEF_TOLERANCE:
         fixed, beyond = [face], []
     else:
