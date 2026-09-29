@@ -22,6 +22,16 @@ Selector Methods
 .. automethod:: build_common::Builder.wires
 .. automethod:: build_common::Builder.solids
 
+****************
+Selector Results
+****************
+
+A selector returns a :class:`~topology.ShapeList`; ``group_by`` returns a
+``GroupBy`` holding one for each group.
+
+.. autoclass:: topology::GroupBy
+   :special-members: __getitem__
+
 *****
 Enums
 *****

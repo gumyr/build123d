@@ -2998,7 +2998,7 @@ K = TypeVar("K", bound=SupportsLessThan)
 
 
 class GroupBy(Generic[T, K]):
-    """Result of a Shape.groupby operation. Groups can be accessed by index or key"""
+    """Result of a ShapeList.group_by operation. Groups can be accessed by index or key"""
 
     # ---- Constructor ----
 
