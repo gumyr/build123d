@@ -5,6 +5,7 @@ import math
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
+import warnings
 from unittest.mock import PropertyMock, patch
 
 import pytest
@@ -43,6 +44,7 @@ from build123d import (
     Wire,
 )
 from build123d.exporters import ColorIndex, ExportSVG, ExportDXF, Drawing, LineType
+import ezdxf
 from ezdxf.colors import RGB
 
 
@@ -185,6 +187,57 @@ class ExportersTestCase(unittest.TestCase):
         )
         svg.add_shape(sketch)
         svg.write("test-colors.svg")
+
+    def test_dxf_color_like(self):
+        """ExportDXF accepts the standard ColorLike interface."""
+        exporter = ExportDXF(color="red")
+        exporter.add_layer("blue", color=0x0000FF)
+
+        self.assertEqual(exporter._document.layers.get("0").rgb, RGB(255, 0, 0))
+        self.assertEqual(exporter._document.layers.get("blue").rgb, RGB(0, 0, 255))
+
+    def test_dxf_color_like_alpha(self):
+        """ExportDXF maps ColorLike alpha to DXF layer transparency."""
+        exporter = ExportDXF(color="#ff000080")
+        exporter.add_layer("green", color=(0.0, 1.0, 0.0, 0.25))
+
+        self.assertAlmostEqual(
+            exporter._document.layers.get("0").transparency,
+            1 - 128 / 255,
+        )
+        self.assertAlmostEqual(
+            exporter._document.layers.get("green").transparency,
+            0.75,
+            delta=1 / 255,
+        )
+
+    def test_dxf_color_index_is_deprecated(self):
+        """Legacy DXF ColorIndex inputs still work while warning users."""
+        with self.assertWarns(DeprecationWarning):
+            exporter = ExportDXF(color=ColorIndex.RED)
+        with self.assertWarns(DeprecationWarning):
+            exporter.add_layer("blue", color=ColorIndex.BLUE)
+
+        self.assertEqual(exporter._document.layers.get("0").color, 1)
+        self.assertEqual(exporter._document.layers.get("blue").color, 5)
+
+        # the warning names the caller's line, not a line inside ExportDXF
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            ExportDXF(color=ColorIndex.RED)
+        self.assertEqual(caught[0].filename, __file__)
+
+    def test_dxf_color_like_before_r2004_uses_nearest_aci(self):
+        """DXF versions without true color get the nearest color index."""
+        exporter = ExportDXF(version=ezdxf.DXF2000, color="red")
+        exporter.add_layer("blue", color=0x0000FF)
+        exporter.add_layer("black", color="black")
+
+        layers = exporter._document.layers
+        self.assertEqual(layers.get("0").color, 1)
+        self.assertEqual(layers.get("blue").color, 5)
+        self.assertEqual(layers.get("black").color, 250)
+        self.assertFalse(layers.get("0").dxf.hasattr("true_color"))
 
     def test_svg_color_like(self):
         """ExportSVG accepts and normalizes the standard ColorLike interface."""

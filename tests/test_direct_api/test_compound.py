@@ -31,9 +31,11 @@ import unittest
 from pathlib import Path
 
 from build123d.build_common import GridLocations, PolarLocations
-from build123d.build_enums import Align, CenterOf
+from build123d.build_enums import Align, CenterOf, Mode
+from build123d.build_part import BuildPart
 from build123d.geometry import Location, Plane
-from build123d.objects_part import Box
+from build123d.objects_part import BasePartObject, Box
+from build123d.operations_generic import insert
 from build123d.objects_sketch import Circle
 from build123d.text import FontManager
 from build123d.build_line import BuildLine
@@ -167,6 +169,38 @@ class TestCompound(unittest.TestCase):
         self.assertTrue(isinstance(next(iter(comp3)), Compound))
         comp4 = comp3.unwrap(fully=True)
         self.assertTrue(isinstance(comp4, Face))
+
+    def test_unwrap_of_a_custom_object_keeps_its_topology_class(self):
+        """A BasePartObject whose product is a compound holding one compound
+        of solids, as the bd_warehouse threads are, unwraps to a Part rather
+        than to a new instance of its own class, whose constructor takes its
+        parameters"""
+
+        class Threaded(BasePartObject):
+            def __init__(self, width: float, mode: Mode = Mode.ADD):
+                self.width = width
+                turns = Compound(
+                    children=[
+                        Solid.make_box(width, width, width),
+                        Solid.make_box(width, width, width).moved(
+                            Location((0, 0, width))
+                        ),
+                    ]
+                )
+                super().__init__(Compound(children=[turns]), mode=mode)
+
+        threaded = Threaded(2, mode=Mode.PRIVATE)
+        unwrapped = threaded.unwrap(fully=False)
+        self.assertIs(type(unwrapped), Part)
+        self.assertEqual(len(unwrapped.solids()), 2)
+        self.assertIs(type(threaded.unwrap(fully=True)), Compound)
+        # which is what insert needs
+        with BuildPart() as part:
+            Box(10, 10, 10)
+            insert(Threaded(2, mode=Mode.PRIVATE).moved(Location((5, 0, 0))))
+        # the cubes stand outside the box, so both are added whole
+        self.assertAlmostEqual(part.part.volume, 1000 + 2 * 8, 6)
+        self.assertTrue(part.part.is_valid)
 
     def test_get_top_level_shapes(self):
         base_shapes = Compound(children=PolarLocations(15, 20) * Box(4, 4, 4))

@@ -31,7 +31,7 @@ import unittest
 
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
 from OCP.BRepPrimAPI import BRepPrimAPI_MakePrism
-from OCP.TopTools import TopTools_ListOfShape
+from OCP.collections import List_TopoDS_Shape
 from OCP.gp import gp_Vec
 
 from build123d.build_enums import Align, GeomType, Select
@@ -179,7 +179,7 @@ class TestShapeHistory(unittest.TestCase):
     def test_helpers(self):
         subs = tracked_subshapes([self.box.wrapped, None])
         self.assertEqual(len(subs), 8 + 12 + 6 + 1)
-        kernel_list = TopTools_ListOfShape()
+        kernel_list = List_TopoDS_Shape()
         for face in self.box.faces():
             kernel_list.Append(face.wrapped)
         self.assertEqual(len(list_shapes(kernel_list)), 6)
