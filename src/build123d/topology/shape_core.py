@@ -133,7 +133,9 @@ from OCP.TopoDS import (
     TopoDS_Vertex,
     TopoDS_Wire,
 )
-from OCP.collections import IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher
+from OCP.collections import (
+    IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
+)
 from OCP.collections import List_TopoDS_Shape
 from OCP.TopTools import TopTools_ShapeMapHasher
 from typing_extensions import Self
@@ -393,10 +395,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """area -the surface area of all faces in this Shape"""
         if self._wrapped is None:
             return 0.0
-        properties = GProp_GProps()
-        BRepGProp.SurfaceProperties_s(self.wrapped, properties)
-
-        return properties.Mass()
+        return _topods_area(self.wrapped)
 
     @property
     def color(self) -> None | Color:
@@ -1093,23 +1092,29 @@ class Shape(NodeMixin, Generic[TOPODS]):
             composite._made_by(next(iter(records.values())))
         return composite
 
+    @staticmethod
+    def _operands(other: None | Shape | Iterable[Shape]) -> list[Shape]:
+        """Flatten a boolean operand into its top-level shapes.
+
+        A single Shape, an iterable of them, or None all reduce to a list;
+        None entries within an iterable are dropped.
+        """
+        if other is None:
+            return []
+        return [
+            shape
+            for o in ([other] if isinstance(other, Shape) else other)
+            if o is not None
+            for shape in o.get_top_level_shapes()
+        ]
+
     @overload
     def __add__(self, other: None) -> Self: ...
     @overload
     def __add__(self, other: Shape | Iterable[Shape]) -> Self | Compound: ...
     def __add__(self, other):
         """fuse shape to self operator +"""
-        # Convert `other` to list of base objects and filter out None values
-        if other is None:
-            summands = []
-        else:
-            summands = [
-                shape
-                # for o in (other if isinstance(other, (list, tuple)) else [other])
-                for o in ([other] if isinstance(other, Shape) else other)
-                if o is not None
-                for shape in o.get_top_level_shapes()
-            ]
+        summands = Shape._operands(other)
         # If there is nothing to add return the original object
         if not summands:
             return self
@@ -1232,17 +1237,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self._wrapped is None:
             raise ValueError("Cannot subtract shape from empty compound")
 
-        # Convert `other` to list of base objects and filter out None values
-        if other is None:
-            subtrahends = []
-        else:
-            subtrahends = [
-                shape
-                # for o in (other if isinstance(other, (list, tuple)) else [other])
-                for o in ([other] if isinstance(other, Shape) else other)
-                if o is not None
-                for shape in o.get_top_level_shapes()
-            ]
+        subtrahends = Shape._operands(other)
         # If there is nothing to subtract return the original object
         if not subtrahends:
             return self
@@ -3244,7 +3239,9 @@ def topo_distance_to(
                     if neighbor is not None and neighbor != vertex_peer:
                         vertex_neighbors[vertex_peer].add(neighbor)
     else:
-        connector_peer_map = IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        connector_peer_map = (
+            IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
         TopExp.MapShapesAndAncestors_s(
             parent.wrapped,
             connector_enum_lut[peer_type],
@@ -3682,8 +3679,8 @@ class ShapeList(list[T]):
         from, with the groups in the enum's definition order.
 
         Args:
-            group_by (Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
-                optional): group and sort criteria, or the ``Convexity`` enum itself.
+            group_by (Callable | Axis | Edge | Wire | SortBy | property, optional):
+                group and sort criteria, or the ``Convexity`` enum itself.
                 Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
             tol_digits (int, optional): Tolerance for building the group keys by
@@ -3809,8 +3806,8 @@ class ShapeList(list[T]):
         objects.
 
         Args:
-            sort_by (Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
-                optional): sort criteria. Defaults to Axis.Z.
+            sort_by (Callable | Axis | Edge | Wire | SortBy | property, optional):
+                sort criteria. Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
 
         Raises:
@@ -4024,6 +4021,31 @@ class SkipClean:
 
     def __exit__(self, exception_type, exception_value, traceback):
         SkipClean.clean = True
+
+
+def _faces_of(result: Shape | Iterable[Shape] | None) -> ShapeList[Face]:
+    """The faces in what an operation returned, whatever form it took: one
+    shape, several, a compound of them, or nothing
+
+    A face is returned as it is, record and all, rather than re-wrapped from
+    the kernel.
+    """
+    if result is None:
+        return ShapeList()
+    faces: ShapeList[Face] = ShapeList()
+    for shape in [result] if isinstance(result, Shape) else result:
+        if shape.wrapped is not None and shapetype(shape.wrapped) == ta.TopAbs_FACE:
+            faces.append(tcast("Face", shape))
+        else:
+            faces.extend(shape.faces())
+    return faces
+
+
+def _topods_area(shape: TopoDS_Shape) -> float:
+    """The surface area of a shape's faces"""
+    properties = GProp_GProps()
+    BRepGProp.SurfaceProperties_s(shape, properties)
+    return properties.Mass()
 
 
 def _sew_topods_faces(faces: Iterable[TopoDS_Face]) -> TopoDS_Shape:

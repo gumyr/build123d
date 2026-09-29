@@ -64,5 +64,21 @@ class TestEnumRepr(unittest.TestCase):
                 self.assertEqual(repr(member), f"<{enum.__name__}.{member._name_}>")
 
 
+class TestSheetMetalEnums(unittest.TestCase):
+    def test_hem_type(self):
+        self.assertEqual(
+            {m.name for m in HemType},
+            {"FLAT", "OPEN", "TEARDROP", "ROLLED"},
+        )
+        self.assertEqual(repr(HemType.FLAT), "<HemType.FLAT>")
+
+    def test_sheet_surface(self):
+        self.assertEqual(
+            {m.name for m in SheetSurface},
+            {"INSIDE", "OUTSIDE", "MID", "NEUTRAL"},
+        )
+        self.assertEqual(repr(SheetSurface.INSIDE), "<SheetSurface.INSIDE>")
+
+
 if __name__ == "__main__":
     unittest.main()

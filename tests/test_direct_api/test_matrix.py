@@ -321,6 +321,32 @@ class TestMatrixValidation(unittest.TestCase):
         projection = Matrix([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 0]])
         self.assertAlmostEqual(projection.multiply(Vector(10, 20, 30)), (10, 20, 0), 7)
 
+    def test_product_keeps_a_similaritys_scale_and_mirror(self):
+        """A mirror or a uniform scale is kept by OCCT as a rotation and a
+        factor; the product with a general affine matrix must carry the factor"""
+        mirror = Matrix([[-1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
+        scale = Matrix([[2, 0, 0, 0], [0, 2, 0, 0], [0, 0, 2, 0]])
+        general = Matrix([[2, 0, 0, 1], [0, 3, 0, 2], [0, 0, 0, 3]])  # not a similarity
+        swap = Matrix([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0]])
+        for left, right in (
+            (mirror, general),
+            (general, mirror),
+            (scale, general),
+            (swap, general),
+            (swap, scale),
+        ):
+            product = left.multiply(right)
+            for row in range(3):
+                for col in range(4):
+                    expected = sum(left[row, k] * right[k, col] for k in range(3))
+                    expected += left[row, 3] if col == 3 else 0.0
+                    self.assertAlmostEqual(product[row, col], expected, 12)
+            # the product applies the right matrix first
+            point = Vector(1, 2, 3)
+            self.assertAlmostEqual(
+                product.multiply(point), left.multiply(right.multiply(point)), 12
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

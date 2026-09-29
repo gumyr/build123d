@@ -30,9 +30,9 @@ import math
 import unittest
 
 from build123d.build_enums import Align, GeomType
-from build123d.geometry import Axis, Matrix, Pos, Rot, Vector
+from build123d.geometry import Axis, Location, Matrix, Pos, Rot, Vector
 from build123d.objects_part import Box, Cone, Cylinder, Sphere, Torus
-from build123d.objects_sketch import Circle, Polygon, Rectangle, Text
+from build123d.objects_sketch import Circle, Polygon, Rectangle, SlotOverall, Text
 from build123d.topology import Edge, Face, Solid, UVFrame, Wire
 from build123d.topology.uv_write import _affine_map, _geodesic_map, _sphere_map
 
@@ -99,6 +99,41 @@ class TestCylinderFrame(unittest.TestCase):
         self.assertIsInstance(pcurve(circle), Geom2d_Ellipse)
         self.assertIsInstance(pcurve(ellipse), Geom2d_Ellipse)
         self.assertIsInstance(pcurve(spline), Geom2d_BSplineCurve)
+
+    def test_iso_curves_are_written_exactly(self):
+        """A span along one parameter is the surface's own line or circle,
+        not an approximation of it, and its direction is kept"""
+        written = self.frame.write_face(Rectangle(4, 6).face())[0]
+        self.assertEqual(
+            sorted(e.geom_type.name for e in written.edges()),
+            ["CIRCLE", "CIRCLE", "LINE", "LINE"],
+        )
+        self.assertTrue(written.is_valid)
+        self.assertAlmostEqual(written.area, 24, 6)
+        # a rectangle with a hole keeps its outline exact and its hole approximate
+        written = self.frame.write_face((Rectangle(4, 6) - Circle(1)).face())[0]
+        self.assertTrue(written.is_valid)
+        self.assertEqual(len(written.edges().filter_by(GeomType.BSPLINE)), 1)
+        self.assertAlmostEqual(written.area, 24 - math.pi, 6)
+        # a sphere's meridians are circles parameterised below zero
+        sphere = Sphere(5).face()
+        frame = sphere.uv_frame(sphere.location_at(0.0, 0.5, x_dir=(0, 1, 0)))
+        pieces = frame.write_face(Rectangle(4, 2).face())
+        self.assertTrue(all(piece.is_valid for piece in pieces))
+        seams = [e for p in pieces for e in p.edges() if e.geom_type == GeomType.CIRCLE]
+        self.assertEqual(len(seams), 2)
+
+    def test_conics_with_indirect_axes(self):
+        """A circle whose own axis system is left-handed, as a slot's end arcs
+        are, is mirrored by its image's parameterisation but not in shape"""
+        for planar in (
+            SlotOverall(12, 4).face(),
+            (Rot(Z=30) * SlotOverall(12, 4)).face(),
+        ):
+            with self.subTest(rotated=planar.center().X != 0):
+                for frame in (self.frame, Face.make_rect(50, 50).uv_frame(Location())):
+                    written = frame.write_face(planar)
+                    self.assertAlmostEqual(sum(f.area for f in written), planar.area, 6)
 
     def test_edges_keep_their_length_and_lie_on_the_surface(self):
         for name, edge in (
