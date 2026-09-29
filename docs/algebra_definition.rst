@@ -53,6 +53,11 @@ with :math:`B^3 \subset C^3, B^2 \subset C^2` and :math:`B^1 \subset C^1`
     * The following relationship holds: :math:`a \; \& \; b = (a + b) + -(a + (-b)) + -(b + (-a))`
 
 
+**Note:** ``Shell`` is not a member of :math:`C^2`. Adding to a ``Shell`` sews faces
+into a single connected surface instead of fusing them, and raises ``ValueError``
+when they cannot be sewn - see :ref:`key_concepts_algebra`.
+
+
 **Abelian groups**
 
 :math:`( C^n, \; c^n_0, \; +, \; -)` :math:`\;`  are abelian groups for :math:`n=1,2,3`.

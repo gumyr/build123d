@@ -30,6 +30,7 @@ import unittest
 from math import atan2, degrees, gamma, pi, sqrt
 
 import pytest
+from OCP.Message import Message, Message_Gravity
 
 from build123d import *
 from build123d.text import FONT_ASPECT, FontManager
@@ -490,10 +491,20 @@ class TestBuildSketchObjects(unittest.TestCase):
 
     def test_text_resolved_font_attributes(self):
         requested_font = "__missing_build123d_font__"
-        resolved_font = FontManager().find_font(requested_font, FontStyle.REGULAR)
 
-        text = Text("test", 2, font=requested_font)
-        compound = Compound.make_text("test", 2, font=requested_font)
+        # The missing font is the point of this test; keep OCCT from writing
+        # its "unable to find font" warning to the console for each lookup
+        printers = list(Message.DefaultMessenger_s().Printers())
+        saved_levels = [printer.GetTraceLevel() for printer in printers]
+        for printer in printers:
+            printer.SetTraceLevel(Message_Gravity.Message_Fail)
+        try:
+            resolved_font = FontManager().find_font(requested_font, FontStyle.REGULAR)
+            text = Text("test", 2, font=requested_font)
+            compound = Compound.make_text("test", 2, font=requested_font)
+        finally:
+            for printer, level in zip(printers, saved_levels):
+                printer.SetTraceLevel(level)
 
         self.assertEqual(text.font, resolved_font.FontName().ToCString())
         self.assertEqual(

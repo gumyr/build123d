@@ -35,8 +35,10 @@ from typing import ClassVar
 
 from build123d.build_common import Builder, logger
 from build123d.build_enums import Mode
+from build123d.build_sheet import BuildSheet
 from build123d.geometry import Location, Plane
-from build123d.topology import Edge, Face, Joint, Part, Solid, Wire
+from build123d.sheet_utils import SheetMetalParameters
+from build123d.topology import Edge, Face, Joint, Part, Shape, Shell, Solid, Wire
 
 
 class BuildPart(Builder[Part]):
@@ -45,9 +47,9 @@ class BuildPart(Builder[Part]):
     The BuildPart class is another subclass of Builder for building parts
     (objects with the property of volume) from sketches or 3D objects.
     It has an _obj property that returns the current part being built, and
-    several pending lists for storing faces, edges, and planes that will be
-    integrated into the final part later. The class overrides the _add_to_pending
-    method of Builder.
+    several pending lists for storing faces, edges, planes, and sheet-metal
+    shells that will be integrated into the final part later. The class
+    overrides the _add_to_pending method of Builder.
 
     Args:
         placements (Plane, optional): output placement(s). Defaults to Plane.XY.
@@ -71,7 +73,29 @@ class BuildPart(Builder[Part]):
         self.pending_face_planes: list[Plane] = []
         self.pending_planes: list[Plane] = []
         self.pending_edges: list[Edge] = []
+        self.pending_sheets: list[tuple[Shell, SheetMetalParameters]] = []
         super().__init__(*placements, mode=mode)
+
+    def _accept_publication(
+        self, build_product: Shape, source: Builder | None, mode: Mode
+    ) -> None:
+        """Capture a nested BuildSheet's shell as pending sheet-metal input.
+
+        The sheet parameters are read from the producing BuildSheet so that
+        construction metadata never has to ride on the published Shell.
+        """
+        if isinstance(source, BuildSheet):
+            shells = (
+                [build_product]
+                if isinstance(build_product, Shell)
+                else list(build_product.shells())
+            )
+            if shells:
+                self.pending_sheets.extend(
+                    (shell, source.sheet_parameters) for shell in shells
+                )
+                return
+        super()._accept_publication(build_product, source, mode)
 
     @property
     def part(self) -> Part | None:
