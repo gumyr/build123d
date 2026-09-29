@@ -245,7 +245,7 @@ def _flange_faces(
     )
     zoned, additions, replaced = _bend_zones(target, edges, gaps, setback)
     for zone, taken in zoned:
-        if setback < _RELIEF_TOLERANCE:
+        if setback < TOLERANCE:
             additions += _bend_and_leg(zone, angle, radius, leg_length)
             continue
         # the flat the bend and its wall are made from: what came out of the
@@ -330,7 +330,7 @@ def _oblique_reach(
             continue
         away = max(ends, key=lambda point: (point - corner).length) - corner
         back, lean = -away.dot(zone.outward), -away.dot(along)
-        if back < setback - _RELIEF_TOLERANCE or not 0 < lean <= back * (1 + 1e-9):
+        if back < setback - TOLERANCE or not 0 < lean <= back * (1 + 1e-9):
             return 0.0
         return setback * lean / back
     return 0.0
@@ -361,7 +361,7 @@ def _bend_zones(
     replaced: list[Face] = []
     for support, group in by_support:
         zones = [_bend_zone(edge, support, gaps, setback) for edge in group]
-        if setback < _RELIEF_TOLERANCE:
+        if setback < TOLERANCE:
             zoned += [(zone, []) for zone in zones]
             continue
         takes = []
@@ -498,7 +498,7 @@ def _band(
 
 def _planar_pieces(result: Shape | list | None) -> list[Face]:
     """The faces a boolean on planar faces left, slivers dropped."""
-    return [face for face in _faces_of(result) if face.area > _RELIEF_TOLERANCE]
+    return [face for face in _faces_of(result) if face.area > _negligible_area(face)]
 
 
 def _apply_faces(
@@ -1145,7 +1145,7 @@ def _remodel_flange(face: Face, moved: dict[Vertex, Vector]) -> Face:
             (
                 new_point
                 for vertex, new_point in moved.items()
-                if (Vector(vertex) - point).length < 1e-7
+                if (Vector(vertex) - point).length < TOLERANCE
             ),
             point,
         )
@@ -1252,7 +1252,7 @@ def _remodel_bend(
     boolean is planar, and the result goes back onto the cylinder the way a
     fold's strip does.
     """
-    if abs(reach) < _RELIEF_TOLERANCE:
+    if abs(reach) < TOLERANCE:
         return cylinder
     developed = cylinder.uv_face
     corners = [
@@ -1511,22 +1511,18 @@ def hem(
     thickened part.
 
     Args:
-        edges (Edge | list[Edge]): Linear free boundary edge or edges to hem.
-        hem_type (HemType, optional): Profile of the hem. Defaults to ``FLAT``.
-        width (float): Length of the folded-back leg, for ``FLAT``, ``OPEN``
-            and ``TEARDROP``.
-        opening (float, optional): Gap between the leg and the sheet. Required
-            and positive for ``OPEN``; accepted by ``TEARDROP``, where it
-            defaults to 0.
-        radius (float, optional): Inside radius of the curl, for ``TEARDROP``
-            and ``ROLLED``. Defaults to the bend radius in
-            ``sheet_parameters``.
-        roll_angle (float, optional): How far the ``ROLLED`` curl turns, in
-            degrees. Defaults to the furthest it can turn before meeting the
-            sheet.
-        sheet_parameters (SheetMetalParameters, optional): Material and
-            reference-surface parameters. Required in Algebra mode and supplied
-            by ``BuildSheet`` in Builder mode.
+        edges: Linear free boundary edge or edges to hem.
+        hem_type: Profile of the hem. Defaults to ``FLAT``.
+        width: Length of the folded-back leg, for ``FLAT``, ``OPEN`` and
+            ``TEARDROP``.
+        opening: Gap between the leg and the sheet. Required and positive for
+            ``OPEN``; accepted by ``TEARDROP``, where it defaults to 0.
+        radius: Inside radius of the curl, for ``TEARDROP`` and ``ROLLED``.
+            Defaults to the bend radius in ``sheet_parameters``.
+        roll_angle: How far the ``ROLLED`` curl turns, in degrees. Defaults to
+            the furthest it can turn before meeting the sheet.
+        sheet_parameters: Material and reference-surface parameters. Required
+            in Algebra mode and supplied by ``BuildSheet`` in Builder mode.
 
     Returns:
         Shell: The updated reference Shell.
@@ -1606,13 +1602,12 @@ def unfold(
     a nesting or cutting workflow wants.
 
     Args:
-        sheet (Shell, optional): reference shell to develop. Defaults to the
-            shell of the active ``BuildSheet``.
-        sheet_parameters (SheetMetalParameters, optional): material and
-            reference-surface parameters. Required in Algebra mode and supplied
-            by ``BuildSheet`` in Builder mode.
-        align (Align | tuple[Align, Align], optional): align MIN, CENTER or MAX
-            of the pattern within Plane.XY. Defaults to Align.NONE.
+        sheet: reference shell to develop. Defaults to the shell of the active
+            ``BuildSheet``.
+        sheet_parameters: material and reference-surface parameters. Required
+            in Algebra mode and supplied by ``BuildSheet`` in Builder mode.
+        align: align MIN, CENTER or MAX of the pattern within Plane.XY.
+            Defaults to Align.NONE.
 
     Raises:
         ValueError: no sheet Shell to unfold
@@ -1664,14 +1659,13 @@ def sheet_shells(
     settles a part whose own measurements are ambiguous.
 
     Args:
-        solid (Solid | Compound): the sheet-metal solid, or a ``Part`` holding
-            exactly one solid.
-        thickness (float, optional): the sheet's thickness, when known.
-            Defaults to None, which finds it by measurement.
-        tolerance (float, optional): how far a measured distance may be from
-            the thickness, as a fraction of it, and still count. Offset
-            surfaces are approximations, so the corner faces of a relief can
-            measure a few millionths off. Defaults to 1e-4.
+        solid: the sheet-metal solid, or a ``Part`` holding exactly one solid.
+        thickness: the sheet's thickness, when known. Defaults to None, which
+            finds it by measurement.
+        tolerance: how far a measured distance may be from the thickness, as a
+            fraction of it, and still count. Offset surfaces are
+            approximations, so the corner faces of a relief can measure a few
+            millionths off. Defaults to 1e-4.
 
     Raises:
         ValueError: the shape holds no single solid, or thickness or
@@ -1870,19 +1864,18 @@ def corner_relief(
     developed blank. ``CONSTANT_WIDTH`` is defined by the formed part instead.
 
     Args:
-        vertices (Vertex | list[Vertex]): Corner vertex or vertices to relieve.
-        relief_type (ReliefType, optional): Shape of the relief. Defaults to
-            ``ROUND``.
-        radius (float): Circle radius for ``ROUND``.
-        size (float): Side length for ``SQUARE``.
-        length (float): Overall length along the diagonal for ``OBROUND``.
-        width (float): Slot width for ``OBROUND``.
-        depth (float): Distance the relief reaches into the sheet for
+        vertices: Corner vertex or vertices to relieve.
+        relief_type: Shape of the relief. Defaults to ``ROUND``.
+        radius: Circle radius for ``ROUND``.
+        size: Side length for ``SQUARE``.
+        length: Overall length along the diagonal for ``OBROUND``.
+        width: Slot width for ``OBROUND``.
+        depth: Distance the relief reaches into the sheet for
             ``CONSTANT_WIDTH``.
-        sheet_parameters (SheetMetalParameters, optional): Material and
-            reference-surface parameters. Required in Algebra mode and supplied
-            by ``BuildSheet`` in Builder mode - a relief is laid out on the
-            blank, so its shape depends on where the neutral axis lies.
+        sheet_parameters: Material and reference-surface parameters. Required
+            in Algebra mode and supplied by ``BuildSheet`` in Builder mode - a
+            relief is laid out on the blank, so its shape depends on where the
+            neutral axis lies.
 
     Returns:
         Shell: The updated reference Shell.
@@ -1963,8 +1956,7 @@ def _cut_corner_relief(
     touching = [
         face
         for face in shell.faces()
-        if face.geom_type == GeomType.PLANE
-        and face.distance_to(corner) < _RELIEF_TOLERANCE
+        if face.geom_type == GeomType.PLANE and face.distance_to(corner) < TOLERANCE
     ]
     if not touching:
         raise ValueError("corner_relief vertices must be a corner of a planar face")
@@ -2042,19 +2034,15 @@ def bend_relief(
     defined where two of them meet - see ``corner_relief``.
 
     Args:
-        bends (Face | list[Face]): Cylindrical bend face or faces to relieve.
-        relief_type (ReliefType, optional): Shape of the relief. Defaults to
-            ``ROUND``.
-        radius (float, optional): Hole radius for ``ROUND``. Defaults to one
-            thickness.
-        depth (float, optional): How far past the fold line the relief reaches,
-            for ``SQUARE`` and ``OBROUND``. Defaults to the bend radius plus
-            one thickness.
-        width (float, optional): Width along the fold line, for ``SQUARE`` and
-            ``OBROUND``. Defaults to one thickness.
-        sheet_parameters (SheetMetalParameters, optional): Material and
-            reference-surface parameters. Required in Algebra mode and supplied
-            by ``BuildSheet`` in Builder mode.
+        bends: Cylindrical bend face or faces to relieve.
+        relief_type: Shape of the relief. Defaults to ``ROUND``.
+        radius: Hole radius for ``ROUND``. Defaults to one thickness.
+        depth: How far past the fold line the relief reaches, for ``SQUARE``
+            and ``OBROUND``. Defaults to the bend radius plus one thickness.
+        width: Width along the fold line, for ``SQUARE`` and ``OBROUND``.
+            Defaults to one thickness.
+        sheet_parameters: Material and reference-surface parameters. Required
+            in Algebra mode and supplied by ``BuildSheet`` in Builder mode.
 
     Returns:
         Shell: The updated reference Shell.
@@ -2143,7 +2131,15 @@ def bend_relief(
 # _constant_width_cutter for why.
 # ---------------------------------------------------------------------------
 
-_RELIEF_TOLERANCE = 1e-7
+
+def _negligible_area(shape: Shape) -> float:
+    """The most area a strip thinner than TOLERANCE can cover on ``shape``.
+
+    A TOLERANCE-wide band along every edge. A face whose area is below its
+    own band is a sliver, and an area taken off a shape that is below the
+    shape's band is nothing a boolean has to be trusted about.
+    """
+    return TOLERANCE * sum(edge.length for edge in shape.edges())
 
 
 def _affine_frame(
@@ -2208,7 +2204,7 @@ def _corner_frames(
         start = edge.position_at(0)
         along = edge.tangent_at()
         offset = corner - start
-        if (offset - along * offset.dot(along)).length > _RELIEF_TOLERANCE:
+        if (offset - along * offset.dot(along)).length > TOLERANCE:
             continue  # the corner is not on this fold line
         touching.append((edge, bends[0]))
     if len(touching) != 2:
@@ -2268,7 +2264,7 @@ def _trim_face(frame: UVFrame, profile: Face) -> Face | None:
     pieces = list(_faces_of(developed.cut(frame.lift(profile))))
     if len(pieces) > 1:
         raise ValueError("the cut separates part of the face from the rest")
-    if not pieces or abs(pieces[0].area - developed.area) < _RELIEF_TOLERANCE:
+    if not pieces or abs(pieces[0].area - developed.area) < _negligible_area(developed):
         return None
     return _onto_surface(frame.face, pieces[0])
 
@@ -2294,12 +2290,12 @@ def _check_corner_detached(before: Shell, after: Shell, corner: Vector) -> None:
     A profile closed at or before the corner still cuts faithfully - it takes
     a lens off an edge - but leaves the corner vertex in place.
     """
-    if any((Vector(v) - corner).length < _RELIEF_TOLERANCE for v in after.vertices()):
+    if any((Vector(v) - corner).length < TOLERANCE for v in after.vertices()):
         raise ValueError(
             "the corner vertex survived the relief - the profile closes at or "
             "before the corner instead of opening through it"
         )
-    if before.area - after.area <= _RELIEF_TOLERANCE:
+    if before.area - after.area <= _negligible_area(before):
         raise ValueError("the relief removed nothing")
 
 
@@ -2485,7 +2481,7 @@ def _constant_width_cutter(shell: Shell, at: _Corner, depth: float) -> Solid:
         for face in faces
         for vertex in face.vertices()
     )
-    overshoot = reach + width / 2 + _RELIEF_TOLERANCE
+    overshoot = reach + width / 2 + TOLERANCE
 
     span = shell.bounding_box().diagonal
     length = depth + overshoot
@@ -2655,9 +2651,9 @@ def _bend_end_frames(
         if edge.geom_type != GeomType.LINE:
             continue
         corners = [edge.position_at(end) for end in (0.0, 1.0)]
-        if min((corner - point).length for corner in corners) > _RELIEF_TOLERANCE:
+        if min((corner - point).length for corner in corners) > TOLERANCE:
             continue
-        if abs(edge.tangent_at().dot(away)) < 1 - _RELIEF_TOLERANCE:
+        if abs(edge.tangent_at().dot(away)) < 1 - TOLERANCE:
             continue  # a fold line crossing this one, not the one ending here
         planes = _neighbours(edge, shell, GeomType.PLANE)
         bends = _neighbours(edge, shell, GeomType.CYLINDER)
@@ -2683,7 +2679,7 @@ def _bend_end_frames(
     # the clip finds the crossing; on the blank's own edge, or a hole's, there
     # is nothing past the line to take
     setback = _base_reach(base, point + away * step, outward, step)
-    reach = setback + step if setback > _RELIEF_TOLERANCE else 0.0
+    reach = setback + step if setback > TOLERANCE else 0.0
     return frames, _bend_end_probe(point, away, outward, step), step, reach
 
 
@@ -2853,7 +2849,7 @@ def _fold_partner(shell: Shell, face: Face, bend_line: Edge) -> Face:
     if partner.geom_type != GeomType.PLANE:
         raise ValueError("the face across bend_line is already bent, not flat")
     normal, other_normal = (f.normal_at(f.center()) for f in (face, partner))
-    if normal.cross(other_normal).length > _RELIEF_TOLERANCE:
+    if normal.cross(other_normal).length > TOLERANCE:
         raise ValueError("the face across bend_line is not coplanar with it")
     return partner
 
@@ -2897,7 +2893,7 @@ def _fold_site(
     normal = face.normal_at(face.center())
     across = _fold_outward(face, line)
     near = line.position_at(0) - across * setback
-    if setback < _RELIEF_TOLERANCE:
+    if setback < TOLERANCE:
         fixed, beyond = [face], []
     else:
         fixed = _fold_pieces(face, near, across, False)

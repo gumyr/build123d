@@ -8,6 +8,7 @@ from OCP.BRepGProp import BRepGProp
 from OCP.GProp import GProp_GProps
 
 from build123d import *
+from build123d.geometry import TOLERANCE
 from build123d.operations_sheet import (
     _bend_pairs,
     _corner_mirror_plane,
@@ -2879,7 +2880,7 @@ class TestCornerRelief(unittest.TestCase):
             sheet_parameters=self.PARAMETERS,
         )
         self.assertFalse(
-            any((Vector(v) - corner).length < 1e-7 for v in result.vertices())
+            any((Vector(v) - corner).length < TOLERANCE for v in result.vertices())
         )
 
     def test_builder_mode(self):
