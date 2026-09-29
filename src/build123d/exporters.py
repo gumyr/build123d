@@ -466,8 +466,10 @@ class ExportDXF(Export2D):
         unit (Unit, optional): The unit used for the exported DXF. It should be
             one of the Unit enums: Unit.MC, Unit.MM, Unit.CM,
             Unit.M, Unit.IN, or Unit.FT. Defaults to Unit.MM.
-        color (Optional[ColorIndex], optional): The default color index for shapes.
-            It can be specified as a ColorIndex enum or None.. Defaults to None.
+        color (ColorLike | None, optional): The default color for shapes. Use a
+            color name, hexadecimal value, or normalized RGB(A) tuple. Legacy
+            ColorIndex values remain supported with a DeprecationWarning.
+            Defaults to None.
         line_weight (Optional[float], optional): The default line weight
             (stroke width) for shapes, in millimeters. . Defaults to None.
         line_type (Optional[LineType], optional): e default line type for shapes.
@@ -479,7 +481,7 @@ class ExportDXF(Export2D):
         .. code-block:: python
 
             exporter = ExportDXF(unit=Unit.MM, line_weight=0.5)
-            exporter.add_layer("Layer 1", color=ColorIndex.RED, line_type=LineType.DASHED)
+            exporter.add_layer("Layer 1", color="red", line_type=LineType.DASHED)
             exporter.add_shape(shape_object, layer="Layer 1")
             exporter.write("output.dxf")
 
@@ -513,7 +515,7 @@ class ExportDXF(Export2D):
         self,
         version: str = ezdxf.DXF2013,
         unit: Unit = Unit.MM,
-        color: ColorIndex | None = None,
+        color: ColorLike | ColorIndex | None = None,
         line_weight: float | None = None,
         line_type: LineType | None = None,
     ):
@@ -533,7 +535,7 @@ class ExportDXF(Export2D):
 
         default_layer = self._document.layers.get("0")
         if color is not None:
-            default_layer.color = color.value
+            self._set_layer_color(default_layer, color)
         if line_weight is not None:
             default_layer.dxf.lineweight = round(line_weight * 100)
         if line_type is not None:
@@ -545,7 +547,7 @@ class ExportDXF(Export2D):
         self,
         name: str,
         *,
-        color: ColorIndex | None = None,
+        color: ColorLike | ColorIndex | None = None,
         line_weight: float | None = None,
         line_type: LineType | None = None,
     ) -> Self:
@@ -555,8 +557,10 @@ class ExportDXF(Export2D):
 
         Args:
             name (str): The name of the layer definition. Must be unique among all layers.
-            color (Optional[ColorIndex], optional): The color index for shapes on this layer.
-                It can be specified as a ColorIndex enum or None. Defaults to None.
+            color (ColorLike | None, optional): The color for shapes on this layer.
+                Use a color name, hexadecimal value, or normalized RGB(A) tuple.
+                Legacy ColorIndex values remain supported with a
+                DeprecationWarning. Defaults to None.
             line_weight (Optional[float], optional): The line weight (stroke width) for shapes
                 on this layer, in millimeters. Defaults to None.
             line_type (Optional[LineType], optional): The line type for shapes on this layer.
@@ -573,14 +577,53 @@ class ExportDXF(Export2D):
             linetype = self._linetype(line_type)
             kwargs["linetype"] = linetype
 
-        if color is not None:
-            kwargs["color"] = color.value
-
         if line_weight is not None:
             kwargs["lineweight"] = round(line_weight * 100)
 
-        self._document.layers.add(name, **kwargs)
+        layer = self._document.layers.add(name, **kwargs)
+        if color is not None:
+            self._set_layer_color(layer, color)
         return self
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    def _color_attribs(self, color: ColorLike | ColorIndex) -> dict[str, int]:
+        """Convert a color into ezdxf layer attributes.
+
+        DXF versions before R2004 have no true color, so there a ColorLike is
+        written as the nearest AutoCAD Color Index instead.
+        """
+        if isinstance(color, ColorIndex):
+            warn(
+                "ExportDXF ColorIndex values are deprecated; use ColorLike values "
+                "such as 'red' or 0xFF0000 instead.",
+                DeprecationWarning,
+                stacklevel=4,
+            )
+            return {"color": color.value}
+
+        red, green, blue, _ = tuple(Color(color))
+        rgb = (round(red * 255), round(green * 255), round(blue * 255))
+        if self._document.dxfversion < ezdxf.DXF2004:
+            return {"color": self._nearest_aci(rgb)}
+        return {"true_color": ezdxf.rgb2int(rgb)}
+
+    @staticmethod
+    def _nearest_aci(rgb: tuple[int, int, int]) -> int:
+        """The AutoCAD Color Index whose palette entry is closest to ``rgb``."""
+
+        def distance(index: int) -> int:
+            return sum((a - b) ** 2 for a, b in zip(rgb, aci2rgb(index)))
+
+        return min(range(1, 256), key=distance)
+
+    def _set_layer_color(self, layer: Any, color: ColorLike | ColorIndex) -> None:
+        """Apply color and ColorLike alpha to an ezdxf layer."""
+        layer.update_dxf_attribs(self._color_attribs(color))
+        if not isinstance(color, ColorIndex):
+            *_, alpha = tuple(Color(color))
+            if alpha < 1:
+                layer.transparency = 1 - alpha
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 

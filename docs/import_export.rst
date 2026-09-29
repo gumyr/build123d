@@ -220,6 +220,15 @@ Enum and are shown in the following diagram:
 ExportDXF
 ---------
 
+``ExportDXF`` accepts the standard :class:`~geometry.ColorLike` interface for
+document and layer colors. ColorLike alpha is written as DXF layer transparency.
+True-color black is always ``0x000000``; unlike ACI 7, DXF viewers do not switch
+it to white on dark backgrounds. DXF versions before R2004 have no true color,
+so for those the nearest AutoCAD Color Index is written instead. The older
+``ColorIndex`` values remain supported
+during the transition but emit a ``DeprecationWarning`` and will be removed at or
+before version 1.0.0.
+
 .. autoclass:: exporters.ExportDXF
     :noindex:
 
