@@ -948,20 +948,19 @@ class TestFace(unittest.TestCase):
 
         self.assertAlmostEqual(patch2.area, 152.670, 3)
 
-        mid_edge = Spline(m1 @ 0.5, (5, 5, -3), m2 @ 0.5)
-
-        patch3 = -Face.make_surface_patch(
+        # Mix both perimeter constraint styles: two edges with support faces,
+        # the third as a plain edge
+        patch3 = Face.make_surface_patch(
             edge_face_constraints=[
                 (m1.edge(), f1, ContinuityLevel.C1),
                 (m2.edge(), f2, ContinuityLevel.C1),
-                (m3.edge(), f3, ContinuityLevel.C1),
             ],
             edge_constraints=[
-                mid_edge.edge(),
+                m3.edge(),
             ],
         )
 
-        self.assertAlmostEqual(patch3.area, 152.643, 3)
+        self.assertAlmostEqual(patch3.area, 151.672, 3)
 
         point = patch.position_at(0.5, 0.5) + (0.5, 0.5)
         patch4 = -Face.make_surface_patch(
