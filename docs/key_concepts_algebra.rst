@@ -47,7 +47,7 @@ Object arithmetic
 .. _algebra_sewing:
 
 Sewing sheet surfaces
-=====================
+---------------------
 
 ``Shell`` objects are sheet surfaces rather than solids, so ``+`` sews their faces
 together along shared edges instead of fusing them. A fuse would leave the faces
@@ -165,6 +165,62 @@ Examples:
         Plane.XZ * Rot(0, 100, 45) * Pos(0,1,2) * Box(1, 2, 3)
 
 
+.. _part_sketch_curve:
+
+Part, Sketch and Curve
+======================
+
+:class:`~topology.Part`, :class:`~topology.Sketch` and :class:`~topology.Curve`
+are :class:`~topology.Compound` subclasses that collect geometry of one dimension.
+They are shapes like any other - they can be placed, selected from and passed to
+operations - and they are what the Builders return:
+
+.. list-table:: Geometry containers and Builder results
+    :header-rows: 1
+    :widths: 15 30 25 30
+
+    * - Container
+      - Geometry it collects
+      - Select its contents
+      - Builder result
+    * - ``Part``
+      - 3D solids
+      - ``.solids()``
+      - ``BuildPart.part``
+    * - ``Sketch``
+      - 2D faces
+      - ``.faces()``
+      - ``BuildSketch.sketch``
+    * - ``Curve``
+      - 1D edges
+      - ``.edges()``
+      - ``BuildLine.line``
+
+The dimension describes the geometry, not its position: a sketch can be placed on
+``Plane.XZ``, and a curve can follow a path in 3D space. A container can hold more
+than one shape, including disconnected shapes, so a ``Part`` is not necessarily a
+single :class:`~topology.Solid`, nor a ``Curve`` a single connected
+:class:`~topology.Wire`. The selectors in the table return the individual shapes
+as a :class:`~topology.ShapeList`.
+
+Primitives usually already are the right container: ``Box(20, 10, 5)`` is a
+``Part`` and ``Rectangle(20, 10)`` is a ``Sketch``. Curve primitives are the
+exception - ``Line`` is an ``Edge`` and ``Polyline`` a ``Wire`` - and a ``Curve``
+can collect their edges when one is needed.
+
+Constructing a container only groups existing geometry. It does not fill an
+outline, extrude faces or fuse solids; the operations do that, and each returns
+the container of the next dimension up:
+
+.. code-block:: build123d
+
+    perimeter = Polyline((0, 0), (20, 0), (20, 10), (0, 10), close=True)
+    profile = make_face(perimeter.edges())  # a Sketch
+    block = extrude(profile, amount=5)  # a Part
+
+In the same way, grouping two solids in a ``Part`` does not fuse them; that is
+what the ``+`` operator above is for.
+
 Combining Builder and algebra modes
 ===================================
 
@@ -181,6 +237,10 @@ geometry with ``.line``, ``.sketch``, or ``.part`` before using it in algebra mo
         Cylinder(11, 10)
 
     result = base.part - bore.part
+
+``BuildLine.line`` and ``BuildSketch.sketch`` work the same way, giving a
+``Curve`` and a ``Sketch`` that operations such as ``make_face`` and ``extrude``
+accept directly.
 
 
 Selecting features of a result
@@ -199,8 +259,8 @@ existed in neither operand:
 
 See :ref:`when a feature came to be <when>` for the details.
 
-Combing both concepts
-==========================
+Combining both concepts
+=======================
 
 **Object arithmetic** and **Placement at locations** can be combined:
 
