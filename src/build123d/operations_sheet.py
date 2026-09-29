@@ -988,7 +988,7 @@ def _miter_support(vertex: Vertex, target: Shell) -> tuple[Face, Edge, Edge, Edg
                     continue
                 if len(_neighbours(rim_edge, target)) != 1:
                     continue
-                if abs(abs(bend_direction.dot(rim_edge.tangent_at())) - 1) > 1e-6:
+                if abs(abs(bend_direction.dot(rim_edge.tangent_at())) - 1) > TOLERANCE:
                     continue
 
                 for side_edge in face.edges().filter_by(GeomType.LINE):
@@ -2352,13 +2352,6 @@ def _corner_at(
     return _Corner(base, corner, frames, axes, wrapped)
 
 
-def _corner_mirror_plane(
-    shell: Shell, base: Face, corner: Vector, parameters: SheetMetalParameters
-):
-    """The plane that bisects a corner, as (origin, unit normal)."""
-    return corner, _corner_at(shell, base, corner, parameters).mirror_normal
-
-
 def _corner_faces(shell: Shell, at: _Corner) -> list:
     """The bends meeting at a corner and the walls they carry."""
     if at.wrapped:
@@ -2376,13 +2369,6 @@ def _corner_faces(shell: Shell, at: _Corner) -> list:
         }
         faces.extend(f for f in neighbours if not f.is_same(base))
     return faces
-
-
-def _flange_separation(
-    shell: Shell, base: Face, corner: Vector, parameters: SheetMetalParameters
-) -> float:
-    """The gap the two flanges leave at a corner, measured from the sheet."""
-    return _flange_gap(shell, _corner_at(shell, base, corner, parameters))
 
 
 def _flange_gap(shell: Shell, at: _Corner, faces: list | None = None) -> float:
@@ -2413,7 +2399,7 @@ def _flange_gap(shell: Shell, at: _Corner, faces: list | None = None) -> float:
         edges.append(min(free, key=lambda e: e.distance_to(corner)))
 
     directions = [e.tangent_at() for e in edges]
-    if directions[0].cross(directions[1]).length > 1e-6:
+    if directions[0].cross(directions[1]).length > TOLERANCE:
         raise ValueError(
             "flange edges at this corner are not parallel, so the gap between "
             "them is not constant - a constant width relief is not defined here"

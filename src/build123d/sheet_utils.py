@@ -192,19 +192,6 @@ def bend_allowance(
     return radians(abs(bend_angle)) * neutral
 
 
-def surface_arc(
-    inside_radius: float, bend_angle: float, parameters: SheetMetalParameters
-) -> float:
-    """The arc length of a bend on the reference surface: what the shell carries.
-
-    Equal to the :func:`bend_allowance` only when the reference surface is the
-    neutral fibre for this bend.
-    """
-    return radians(abs(bend_angle)) * reference_radius(
-        inside_radius, parameters, bend_angle
-    )
-
-
 @dataclass
 class _DevelopedFace:
     """A developed face and its source-edge provenance."""

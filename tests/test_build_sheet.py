@@ -11,8 +11,8 @@ from build123d import *
 from build123d.geometry import TOLERANCE
 from build123d.operations_sheet import (
     _bend_pairs,
-    _corner_mirror_plane,
-    _flange_separation,
+    _corner_at,
+    _flange_gap,
     MIN_BEND_RADIUS,
     _hem_parameters,
     _outward_direction,
@@ -2646,8 +2646,8 @@ class TestCornerRelief(unittest.TestCase):
         # mirror plane by half the flange gap
         base = max(sheet.faces().filter_by(GeomType.PLANE), key=lambda f: f.area)
         parameters = self.two_flange_sheet().sheet_parameters
-        _, normal = _corner_mirror_plane(sheet, base, Vector(corner), parameters)
-        gap = _flange_separation(sheet, base, Vector(corner), parameters)
+        at = _corner_at(sheet, base, Vector(corner), parameters)
+        normal, gap = at.mirror_normal, _flange_gap(sheet, at)
         flanks = 0
         for edge in result.edges():
             if len(topo_explore_connected_faces(edge, result)) != 1:

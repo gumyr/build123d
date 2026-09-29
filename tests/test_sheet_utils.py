@@ -40,7 +40,6 @@ from build123d.sheet_utils import (
     bend_allowance,
     neutral_radius,
     reference_radius,
-    surface_arc,
     surface_offset,
 )
 
@@ -88,16 +87,13 @@ class TestSheetUtils(unittest.TestCase):
                         neutral_radius(shell_radius, parameters, positive), 2.99, 9
                     )
 
-    def test_bend_allowance_and_surface_arc(self):
+    def test_bend_allowance(self):
         parameters = SheetMetalParameters(
             thickness=3, k_factor=0.33, sheet_surface=SheetSurface.OUTSIDE
         )
         # the allowance is the neutral arc, whatever the surface and direction
         self.assertAlmostEqual(bend_allowance(2, 90, parameters), 2.99 * pi / 2, 9)
         self.assertAlmostEqual(bend_allowance(2, -90, parameters), 2.99 * pi / 2, 9)
-        # the arc on the reference surface is what the shell carries
-        self.assertAlmostEqual(surface_arc(2, 90, parameters), 5 * pi / 2, 9)
-        self.assertAlmostEqual(surface_arc(2, -90, parameters), 2 * pi / 2, 9)
 
     def test_raw_uv_edge_preserves_orientation(self):
         face = Face.make_rect(2, 1)
