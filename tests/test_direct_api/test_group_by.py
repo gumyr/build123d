@@ -31,7 +31,7 @@ import unittest
 
 from build123d import Cylinder
 from build123d.geometry import Axis
-from build123d.topology import Edge, Shape, Solid
+from build123d.topology import Edge, Shape, ShapeList, Solid
 from build123d.objects_curve import CenterArc
 
 
@@ -40,6 +40,33 @@ class TestGroupBy(unittest.TestCase):
     def setUp(self):
         # Ensure the class variable is in its default state before each test
         self.v = Solid.make_box(1, 1, 1).vertices().group_by(Axis.Z)
+
+    def test_first_last(self):
+        for reverse in (False, True):
+            with self.subTest(reverse=reverse):
+                grouped = (
+                    Solid.make_box(1, 1, 2).vertices().group_by(Axis.Z, reverse=reverse)
+                )
+                self.assertIs(grouped.first, grouped[0])
+                self.assertIs(grouped.last, grouped[-1])
+                self.assertEqual(
+                    grouped.first.sort_by(Axis.X).first.Z, 2 if reverse else 0
+                )
+                self.assertEqual(
+                    grouped.last.sort_by(Axis.X).last.Z, 0 if reverse else 2
+                )
+
+    def test_first_last_single_group(self):
+        grouped = Solid.make_box(1, 1, 1).edges().group_by(Edge.length)
+        self.assertIs(grouped.first, grouped.last)
+        self.assertEqual(len(grouped.first), 12)
+
+    def test_first_last_empty(self):
+        grouped = ShapeList().group_by(Axis.Z)
+        with self.assertRaises(IndexError):
+            _ = grouped.first
+        with self.assertRaises(IndexError):
+            _ = grouped.last
 
     def test_str(self):
         self.assertEqual(

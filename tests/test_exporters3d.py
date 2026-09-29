@@ -215,6 +215,33 @@ class TestExportStep(DirectApiTestCase):
         )
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('blue')"), -1)
 
+    def test_export_step_name_propagation(self):
+        """Unlabeled nested shapes inherit ancestor names, numbered (issue #1360)"""
+        box = Compound(children=[Box(1, 1, 1).solid()])
+        box.label = "box"
+        sphere = Compound(children=[Sphere(1).solid()])
+        sphere.label = "sphere"
+        part = Box(1, 1, 1)
+        part.label = "part"
+        assembly = Compound(label="assembly", children=[box, sphere, part])
+
+        self.assertTrue(export_step(assembly, "named.step"))
+        with open("named.step", "r") as file:
+            step_data = file.read()
+        os.remove("named.step")
+
+        # No auto-generated names may remain in the exported STEP
+        self.assertEqual(step_data.find("PRODUCT('SOLID'"), -1)
+        self.assertEqual(step_data.find("PRODUCT('COMPOUND'"), -1)
+        # The parts' names propagate to their unlabeled nested shapes, and
+        # each product gets a name of its own
+        for name in ("box-0", "box-1", "sphere-0", "sphere-1"):
+            self.assertEqual(len(re.findall(rf"PRODUCT\('{name}',", step_data)), 1)
+        self.assertEqual(step_data.find("PRODUCT('box',"), -1)
+        # A labeled leaf part, and a label nothing inherits, are as before
+        self.assertEqual(len(re.findall(r"PRODUCT\('part',", step_data)), 1)
+        self.assertNotEqual(step_data.find("PRODUCT('assembly',"), -1)
+
     def test_export_step_component_override_parent_color(self):
         c1 = Sphere(1).solid()
         c1.label = "child_red"

@@ -48,11 +48,11 @@ from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 from OCP.TopExp import TopExp
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Shape
-from OCP.TopTools import (
-    TopTools_DataMapOfShapeShape,
-    TopTools_IndexedMapOfShape,
-    TopTools_ListOfShape,
-    TopTools_MapOfShape,
+from OCP.collections import (
+    DataMap_TopoDS_Shape_TopoDS_Shape_TopTools_ShapeMapHasher,
+    IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher,
+    List_TopoDS_Shape,
+    Map_TopoDS_Shape_TopTools_ShapeMapHasher,
 )
 from typing_extensions import Self
 
@@ -67,12 +67,12 @@ class MakeShapeLike(Protocol):
     """The history interface every BRepBuilderAPI_MakeShape descendant has."""
 
     # pylint: disable=invalid-name,missing-function-docstring
-    def Generated(self, shape: TopoDS_Shape, /) -> TopTools_ListOfShape: ...
-    def Modified(self, shape: TopoDS_Shape, /) -> TopTools_ListOfShape: ...
+    def Generated(self, shape: TopoDS_Shape, /) -> List_TopoDS_Shape: ...
+    def Modified(self, shape: TopoDS_Shape, /) -> List_TopoDS_Shape: ...
 
 
 def _answers(
-    query: Callable[[TopoDS_Shape], TopTools_ListOfShape], shape: TopoDS_Shape
+    query: Callable[[TopoDS_Shape], List_TopoDS_Shape], shape: TopoDS_Shape
 ) -> list[TopoDS_Shape]:
     """What an algorithm says about one sub-shape, or nothing if it will not say."""
     # OCP binds each OCCT failure straight to Exception, with no common base:
@@ -86,7 +86,7 @@ def _answers(
 
 def tracked_subshapes(shapes: Iterable[TopoDS_Shape]) -> list[TopoDS_Shape]:
     """Every distinct vertex, edge, face and solid of the given shapes."""
-    found = TopTools_IndexedMapOfShape()
+    found = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
     for shape in shapes:
         if shape is None or shape.IsNull():
             continue
@@ -161,7 +161,7 @@ class ShapeHistory:
         """
         inputs = list(inputs)
         history = cls(before=inputs)
-        present = TopTools_MapOfShape()
+        present = Map_TopoDS_Shape_TopTools_ShapeMapHasher()
         for sub in tracked_subshapes([result]):
             present.Add(sub)
         for sub in tracked_subshapes(inputs):
@@ -187,7 +187,7 @@ class ShapeHistory:
         """
         inputs = list(inputs)
         history = cls(before=inputs)
-        present = TopTools_MapOfShape()
+        present = Map_TopoDS_Shape_TopTools_ShapeMapHasher()
         for sub in tracked_subshapes([sewing.SewedShape()]):
             present.Add(sub)
         for sub in tracked_subshapes(inputs):
@@ -211,7 +211,7 @@ class ShapeHistory:
         """
         history = cls(before=[before])
         identity = TopLoc_Location()
-        placed = TopTools_DataMapOfShapeShape()
+        placed = DataMap_TopoDS_Shape_TopoDS_Shape_TopTools_ShapeMapHasher()
         for sub in tracked_subshapes([after]):
             placed.Bind(sub.Located(identity), sub)
         for sub in tracked_subshapes([before]):
@@ -341,9 +341,9 @@ class Trace:
     """
 
     def __init__(self, history: ShapeHistory, inputs: Iterable[TopoDS_Shape]):
-        self.untouched = TopTools_MapOfShape()
-        self.modified_from = TopTools_DataMapOfShapeShape()
-        self.generated_from = TopTools_DataMapOfShapeShape()
+        self.untouched = Map_TopoDS_Shape_TopTools_ShapeMapHasher()
+        self.modified_from = DataMap_TopoDS_Shape_TopoDS_Shape_TopTools_ShapeMapHasher()
+        self.generated_from = DataMap_TopoDS_Shape_TopoDS_Shape_TopTools_ShapeMapHasher()
         for sub in tracked_subshapes(inputs):
             self.untouched.Add(sub)
             for shape in history.modified(sub):
