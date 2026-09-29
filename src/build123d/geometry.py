@@ -3399,7 +3399,9 @@ class Plane(metaclass=PlaneMeta):
             locator (Axis | VectorLike | Vertex): A two-tuple specifies local x and y
                 coordinates relative to this plane's origin. A three-tuple, Vector, or
                 Vertex specifies a global point within the plane. An Axis specifies its
-                intersection with the plane.
+                intersection with the plane. A two-tuple was previously read as the
+                global point (x, y, 0); for a transition period a FutureWarning is
+                issued where that reading was valid and differs from the local one.
 
         Raises:
             ValueError: Vertex isn't within plane
@@ -3417,6 +3419,22 @@ class Plane(metaclass=PlaneMeta):
                 raise ValueError(f"{locator} is not located within plane")
         elif isinstance(locator, tuple) and len(locator) == 2:
             new_origin = self.from_local_coords(locator)
+            # A two-tuple used to mean the global point (x, y, 0). Warn where
+            # that reading was valid and lands somewhere else, so existing code
+            # is told rather than silently moved. Remove after a release or two.
+            global_point = Vector(locator)
+            if (
+                self.contains(global_point)
+                and (global_point - new_origin).length > TOLERANCE
+            ):
+                warnings.warn(
+                    f"shift_origin({locator}) now moves the origin in the plane's "
+                    "local coordinates; it previously meant the global point "
+                    f"{tuple(global_point)}. Pass a Vector or a three-tuple for a "
+                    "global point.",
+                    FutureWarning,
+                    stacklevel=2,
+                )
         elif isinstance(locator, (tuple, Vector)):
             new_origin = Vector(locator)
             if not self.contains(locator):

@@ -31,6 +31,7 @@ import copy
 import math
 import random
 import unittest
+import warnings
 
 from OCP.gp import gp_Ax2
 from OCP.TopoDS import TopoDS_Builder, TopoDS_CompSolid
@@ -539,6 +540,19 @@ class TestPlane(unittest.TestCase):
         self.assertEqual(shifted.origin, plane.origin + plane.x_dir + 2 * plane.y_dir)
         self.assertEqual(shifted.x_dir, plane.x_dir)
         self.assertEqual(shifted.z_dir, plane.z_dir)
+
+    def test_shift_origin_local_tuple_transition_warning(self):
+        # warns only where the old global reading was valid and differs
+        with self.assertWarns(FutureWarning):
+            shifted = Plane.YX.shift_origin((1, 2))
+        self.assertEqual(shifted.origin, Vector(2, 1, 0))
+        with self.assertWarns(FutureWarning):
+            Plane.XY.shift_origin((5, 5)).shift_origin((1, 2))
+        # same point either way, or the old reading was not in the plane: silent
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            self.assertEqual(Plane.XY.shift_origin((1, 2)).origin, Vector(1, 2, 0))
+            Plane.isometric.offset(10).shift_origin((1, 2))
 
     def test_shift_origin_global_points(self):
         plane = Plane((10, 20, 30), x_dir=(0, 1, 0), z_dir=(1, 0, 0))
