@@ -535,7 +535,7 @@ class ExportDXF(Export2D):
 
         default_layer = self._document.layers.get("0")
         if color is not None:
-            default_layer.update_dxf_attribs(self._color_attribs(color))
+            self._set_layer_color(default_layer, color)
         if line_weight is not None:
             default_layer.dxf.lineweight = round(line_weight * 100)
         if line_type is not None:
@@ -577,13 +577,12 @@ class ExportDXF(Export2D):
             linetype = self._linetype(line_type)
             kwargs["linetype"] = linetype
 
-        if color is not None:
-            kwargs.update(self._color_attribs(color))
-
         if line_weight is not None:
             kwargs["lineweight"] = round(line_weight * 100)
 
-        self._document.layers.add(name, **kwargs)
+        layer = self._document.layers.add(name, **kwargs)
+        if color is not None:
+            self._set_layer_color(layer, color)
         return self
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -606,6 +605,15 @@ class ExportDXF(Export2D):
                 (round(red * 255), round(green * 255), round(blue * 255))
             )
         }
+
+    @classmethod
+    def _set_layer_color(cls, layer: Any, color: ColorLike | ColorIndex) -> None:
+        """Apply color and ColorLike alpha to an ezdxf layer."""
+        layer.update_dxf_attribs(cls._color_attribs(color))
+        if not isinstance(color, ColorIndex):
+            *_, alpha = tuple(Color(color))
+            if alpha < 1:
+                layer.transparency = 1 - alpha
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 

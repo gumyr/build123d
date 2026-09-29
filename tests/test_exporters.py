@@ -194,6 +194,21 @@ class ExportersTestCase(unittest.TestCase):
         self.assertEqual(exporter._document.layers.get("0").rgb, RGB(255, 0, 0))
         self.assertEqual(exporter._document.layers.get("blue").rgb, RGB(0, 0, 255))
 
+    def test_dxf_color_like_alpha(self):
+        """ExportDXF maps ColorLike alpha to DXF layer transparency."""
+        exporter = ExportDXF(color="#ff000080")
+        exporter.add_layer("green", color=(0.0, 1.0, 0.0, 0.25))
+
+        self.assertAlmostEqual(
+            exporter._document.layers.get("0").transparency,
+            1 - 128 / 255,
+        )
+        self.assertAlmostEqual(
+            exporter._document.layers.get("green").transparency,
+            0.75,
+            delta=1 / 255,
+        )
+
     def test_dxf_color_index_is_deprecated(self):
         """Legacy DXF ColorIndex inputs still work while warning users."""
         with self.assertWarns(DeprecationWarning):
