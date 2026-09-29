@@ -2998,7 +2998,7 @@ K = TypeVar("K", bound=SupportsLessThan)
 
 
 class GroupBy(Generic[T, K]):
-    """Result of a Shape.groupby operation. Groups can be accessed by index or key"""
+    """Result of a ShapeList.group_by operation. Groups can be accessed by index or key"""
 
     # ---- Constructor ----
 
@@ -3024,6 +3024,18 @@ class GroupBy(Generic[T, K]):
         ):
             self.groups.append(ShapeList(shapegroup))
             self.key_to_group_index.append((key, i))
+
+    # ---- Properties ----
+
+    @property
+    def first(self) -> ShapeList[T]:
+        """First group. Raises IndexError if there are no groups."""
+        return self[0]
+
+    @property
+    def last(self) -> ShapeList[T]:
+        """Last group. Raises IndexError if there are no groups."""
+        return self[-1]
 
     # ---- Instance Methods ----
 
