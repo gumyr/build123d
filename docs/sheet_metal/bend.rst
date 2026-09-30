@@ -40,7 +40,22 @@ which swings is the one thing the line cannot say on its own. The way the line
 was selected answers it: a line picked off a face, as
 ``sheet.flats().sort_by(Axis.X)[0].fold_lines()[0]`` does, records that face,
 and ``bend`` holds that face still while everything on the far side of the
-line swings through the angle, carrying whatever is attached to it.
+line swings through the angle, carrying whatever is attached to it. The strip
+the bend rolls up comes off the swinging side, so that flat is also the one
+that gets shorter. Any edge taken from a flat records it, with ``edges()`` as
+much as with ``fold_lines()``; the latter only narrows the choice to the edges
+shared with another flat.
+
+The same blank, split down the middle and bent the same way, gives mirror
+images depending on which flat the line was taken through:
+
+.. image:: ../assets/sheet_metal/bend_side.svg
+    :align: center
+
+.. literalinclude:: ../sheet_metal_examples.py
+    :language: build123d
+    :start-after: [bend_side]
+    :end-before: [bend_side]
 
 A line taken straight off the sheet with ``sheet.edges()`` is refused rather
 than guessed at, because both of its faces are equally its own. Select it

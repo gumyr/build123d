@@ -294,6 +294,33 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
 # [bend_basic]
 render(bracket.sheet, "bend_basic")
 
+
+# [bend_side]
+def held_by(side: int) -> Shell:
+    """A blank split down the middle and bent 90 degrees, holding one flat."""
+    with BuildSheet(thickness=1, bend_radius=2) as bracket:
+        with BuildSketch():
+            Rectangle(24, 16)
+        split(bracket.flats()[0], bisect_by=Plane.YZ, keep=Keep.BOTH)
+        # the line through the flat on this side: that flat stays, the other
+        # rolls into the bend and swings
+        held = bracket.flats().sort_by(Axis.X)[side]
+        bend(held.fold_lines()[0], angle=90)
+    return bracket.sheet
+
+
+# [bend_side]
+# profiles of the two results, with the fold line marked at x = 0
+write_layout(
+    [
+        profile(
+            held_by(side), label, window=(-14, 14, -3, 12), marker=vertical(0, -3, 12)
+        )
+        for side, label in ((0, "held on the left"), (-1, "held on the right"))
+    ],
+    "bend_side",
+)
+
 # [jog_basic]
 with BuildSheet(thickness=1, bend_radius=2) as bracket:
     with BuildSketch():
