@@ -336,6 +336,42 @@ def _oblique_reach(
     return 0.0
 
 
+def _zone_span(
+    edge: Edge,
+    support: Face,
+    zone: _BendZone,
+    gaps: tuple[float, float],
+    setback: float,
+) -> tuple[float, float]:
+    """How far along the near line the strip a set-back bend takes runs, from
+    the near line's start: the edge's span, and on past the ends where a side
+    of the face leans away, see ``_oblique_reach``."""
+    reach = [
+        _oblique_reach(edge, support, zone, setback, gaps[end], end) for end in (0, 1)
+    ]
+    return -reach[0], zone.near.length + reach[1]
+
+
+def _strip_take(zone: _BendZone, span: tuple[float, float], setback: float) -> Face:
+    """The strip a set-back bend takes out of the face behind its line: from
+    the near line to the line, over ``span`` along it."""
+    tangent = zone.near.tangent_at()
+    start = zone.near.position_at(0)
+    strip = Edge.make_line(start + tangent * span[0], start + tangent * span[1])
+    return _orient_face(Face.extrude(strip, zone.outward * setback), zone.normal)
+
+
+def _zone_take(
+    edge: Edge,
+    support: Face,
+    zone: _BendZone,
+    gaps: tuple[float, float],
+    setback: float,
+) -> Face:
+    """The strip a set-back bend takes out of the face behind its edge."""
+    return _strip_take(zone, _zone_span(edge, support, zone, gaps, setback), setback)
+
+
 def _bend_zones(
     target: Shell, edges: list[Edge], gaps: tuple[float, float], setback: float
 ) -> tuple[list[tuple[_BendZone, list[Face]]], list[Face], list[Face]]:
@@ -364,20 +400,10 @@ def _bend_zones(
         if setback < TOLERANCE:
             zoned += [(zone, []) for zone in zones]
             continue
-        takes = []
-        for edge, zone in zip(group, zones):
-            tangent = zone.near.tangent_at()
-            reach = [
-                _oblique_reach(edge, support, zone, setback, gaps[end], end)
-                for end in (0, 1)
-            ]
-            strip = Edge.make_line(
-                zone.near.position_at(0) - tangent * reach[0],
-                zone.near.position_at(1) + tangent * reach[1],
-            )
-            takes.append(
-                _orient_face(Face.extrude(strip, zone.outward * setback), zone.normal)
-            )
+        takes = [
+            _zone_take(edge, support, zone, gaps, setback)
+            for edge, zone in zip(group, zones)
+        ]
         for index, take in enumerate(takes):
             if any(_planar_pieces(take.intersect(other)) for other in takes[:index]):
                 raise ValueError(
@@ -684,11 +710,13 @@ def bend(
     as above; a planar face across the line, coplanar with the one that stays -
     a line already at a bend cannot be bent again; enough sheet past the line
     for the bend allowance, and before it for the setback ``position`` asks
-    for; and material that does not reach round to both sides of the line, as
-    a closed loop of faces would, since that fold would tear the sheet rather
-    than carry it. Whatever is attached to the far side - other bends and
-    flats - swings with it, and the sheet is not checked for running into
-    itself.
+    for; material that does not reach round to both sides of the line, as a
+    closed loop of faces would, since that fold would tear the sheet rather
+    than carry it; and, where the face across the line reaches back behind
+    the line, that material not joined to what swings, since it stays flat
+    hinged to the bend and would otherwise tear. Whatever is attached to the
+    far side - other bends and flats - swings with it, and the sheet is not
+    checked for running into itself.
 
     Args:
         bend_line: Straight edge of the face that stays where it is, shared
@@ -889,6 +917,7 @@ def _jog_faces(
     across: Vector,
     normal: Vector,
     profile: _JogProfile,
+    carried: list[Face] | None = None,
 ) -> tuple[list[Face], Vector]:
     """Fold flat material through a jog: bend, run, bend back, and on.
 
@@ -897,7 +926,8 @@ def _jog_faces(
     first allowance rolls into the first bend, the run swings up onto the
     incline, the next allowance rolls into the second bend, and the rest
     comes out parallel to where it started - so it is only moved, and the
-    translation is returned for anything attached to it.
+    translation is returned for anything attached to it. ``carried`` pieces
+    are moved the same way without going through the bands.
     """
     start_2, start_3, end = profile.stations
     spin = Axis((0, 0, 0), across.cross(normal))
@@ -931,7 +961,10 @@ def _jog_faces(
         profile.surface_2,
         profile.allowance_2,
     )
-    onward = [piece.translate(shift) for piece in _band(flat, near, across, end, None)]
+    onward = [
+        piece.translate(shift)
+        for piece in _band(flat, near, across, end, None) + list(carried or [])
+    ]
     if not (bend_1 and run and bend_2 and onward):
         raise ValueError(
             f"the jog does not fit - it takes {profile.consumed:.4g} of sheet "
@@ -944,9 +977,14 @@ def _jog_fold(
     shell: Shell, face: Face, fold: Edge, profile: _JogProfile, setback: float
 ) -> Shell:
     """Jog a shell along a fold line of one of its planar faces."""
-    site = _fold_site(shell, face, fold, setback, "jog")
+    site = _fold_site(shell, face, fold, setback, profile.consumed - setback, "jog")
     folded, shift = _jog_faces(
-        site.beyond + [site.partner], site.near, site.across, site.normal, profile
+        site.beyond + site.rolled,
+        site.near,
+        site.across,
+        site.normal,
+        profile,
+        site.carried,
     )
     return _reassemble(
         shell, face, site, site.fixed + folded, lambda other: other.translate(shift)
@@ -2858,7 +2896,7 @@ class _FoldSite:
 
     The fixed face is split at the bend's near tangent line: what lies before
     it stays put, and what lies beyond it is the start of the strip that rolls
-    into the bend.
+    into the bend. The far face is sorted into what rolls and what is carried.
     """
 
     partner: Face  # the coplanar face across the line, which swings
@@ -2866,29 +2904,102 @@ class _FoldSite:
     normal: Vector  # the fixed face's normal, the side a positive angle folds to
     across: Vector  # across the line, away from the fixed face
     near: Vector  # a point on the bend's near tangent line
-    fixed: list[Face]  # the fixed face before the near line
-    beyond: list[Face]  # the fixed face past it, taken by a set-back bend
+    fixed: list[Face]  # what stays flat: the fixed face before the near line,
+    # and any of the far face hinged to the fold from behind
+    beyond: list[Face]  # the fixed face past the near line, taken by a set-back bend
+    rolled: list[Face]  # the far face's pieces the fold rolls
+    carried: list[Face]  # the far face's pieces that swing rigidly with it
+
+
+def _touch_along_an_edge(first: Shape, second: Shape) -> bool:
+    """Whether two shapes share a stretch of boundary, not just a point.
+
+    Pieces cut from one face meet along the cut lines, and a piece meets a
+    neighbouring face along that face's own edges, so it is enough to look
+    for an edge of either whose middle lies on the other.
+    """
+    for one, other in ((first, second), (second, first)):
+        for edge in one.edges():
+            if all(
+                other.distance_to(edge.position_at(t)) < TOLERANCE
+                for t in (0.25, 0.5, 0.75)
+            ):
+                return True
+    return False
 
 
 def _fold_site(
-    shell: Shell, face: Face, line: Edge, setback: float, what: str
+    shell: Shell, face: Face, line: Edge, setback: float, reach: float, what: str
 ) -> _FoldSite:
-    """Where a fold along a line of a planar face happens, and what it moves."""
+    """Where a fold along a line of a planar face happens, and what it moves.
+
+    ``setback`` is how far before the line the fold's near tangent line sits,
+    and ``reach`` how far past the line the flat the fold consumes ends. The
+    face across the line is cut at those two lines and its pieces sorted by
+    what they are joined to: a piece between the lines that meets the fold
+    line rolls into the fold; a piece before the near line that meets a rolled
+    piece stays flat, hinged to it; everything else is carried rigidly with
+    the far side, whichever side of the lines it lies on - a blank widening
+    past the line's ends, or the rest of a body that a tear has freed from
+    the fold. A piece that would have to stay flat but is also joined to what
+    swings would tear the sheet, so that fold is refused.
+
+    The fixed face gives up the set-back strip beside the rolled pieces, as
+    the face behind a flange gives up the strip beside the flange.
+    """
     partner = _fold_partner(shell, face, line)
     moving = _fold_moving_faces(shell, face, partner)
-    normal = face.normal_at(face.center())
-    across = _fold_outward(face, line)
-    near = line.position_at(0) - across * setback
+    zone = _bend_zone(line, face, (0.0, 0.0), setback)
+    across, normal = zone.outward, zone.normal
+    near = zone.near.position_at(0)
+    far = near + across * (setback + reach)
+
+    before = _planar_pieces(_fold_pieces(partner, near, across, False))
+    band: list[Face] = []
+    onward: list[Face] = []
+    for piece in _fold_pieces(partner, near, across, True):
+        band += _planar_pieces(_fold_pieces(piece, far, across, False))
+        onward += _planar_pieces(_fold_pieces(piece, far, across, True))
+    rolled = [piece for piece in band if _touch_along_an_edge(piece, line)]
+    stays = [
+        piece
+        for piece in before
+        if any(_touch_along_an_edge(piece, other) for other in rolled)
+    ]
+    carried = (
+        [piece for piece in band if not any(piece is r for r in rolled)]
+        + [piece for piece in before if not any(piece is k for k in stays)]
+        + onward
+    )
+    if len(carried) > 1:  # one rigid piece again where the cut lines divided it
+        carried = _planar_pieces(carried[0].fuse(*carried[1:]))
+    swinging = carried + [other for other in moving if not other.is_same(partner)]
+    if any(_touch_along_an_edge(kept, other) for kept in stays for other in swinging):
+        raise ValueError(
+            f"the face across the {what} line reaches back behind the line, and "
+            "that material is joined to what the fold moves, so the fold would tear "
+            "it - split the sheet so the line runs across it, or relieve it"
+        )
+
     if setback < TOLERANCE:
         fixed, beyond = [face], []
     else:
-        fixed = _fold_pieces(face, near, across, False)
-        beyond = _fold_pieces(face, near, across, True)
+        low, high = _zone_span(line, face, zone, (0.0, 0.0), setback)
+        tangent = zone.near.tangent_at()
+        for piece in rolled:
+            for vertex in piece.vertices():
+                along = (Vector(vertex) - near).dot(tangent)
+                low, high = min(low, along), max(high, along)
+        take = _strip_take(zone, (low, high), setback)
+        beyond = _planar_pieces(face.intersect(take))
+        fixed = _planar_pieces(face.cut(take))
     if not fixed:
         raise ValueError(
             f"the {what} does not fit - it takes {setback:.4g} of sheet before its line"
         )
-    return _FoldSite(partner, moving, normal, across, near, fixed, beyond)
+    return _FoldSite(
+        partner, moving, normal, across, near, fixed + stays, beyond, rolled, carried
+    )
 
 
 def _reassemble(
@@ -3004,17 +3115,17 @@ def _fold(
     surface_radius = reference_radius(radius, parameters, angle)
     allowance = bend_allowance(radius, angle, parameters)
     setback = _fold_setback(position, angle, radius, parameters.thickness, allowance)
-    site = _fold_site(shell, face, bend_line, setback, "bend")
+    site = _fold_site(shell, face, bend_line, setback, allowance - setback, "bend")
     near, across, normal = site.near, site.across, site.normal
 
     # The strip from the near line to the far one rolls into the bend, with
     # whatever the blank's outline does there - holes, notches, tapers - and
     # what lies beyond the far line swings round after it
-    flat = site.beyond + [site.partner]
+    flat = site.beyond + site.rolled
     bend_faces, folded = _roll(
         flat, near, across, normal, angle, surface_radius, allowance
     )
-    moving_legs = _band(flat, near, across, allowance, None)
+    moving_legs = _band(flat, near, across, allowance, None) + site.carried
     if not bend_faces or not moving_legs:
         raise ValueError(
             f"the bend does not fit - it takes {allowance:.4g} of sheet past the "

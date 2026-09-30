@@ -1775,6 +1775,136 @@ class TestBendOutline(unittest.TestCase):
         self.assertEqual(kinds, ["BSPLINE", "BSPLINE", "LINE", "LINE"])
 
 
+class TestFoldExtent(unittest.TestCase):
+    """A fold happens beside its line. The face across the line is sorted by
+    what each piece is joined to: a blank widening past the line swings whole,
+    a body a tear has freed swings whole from either side, and only material
+    that would have to stay flat and swing at once is refused."""
+
+    # the tab of tabbed_body, split at X=10
+    SPLIT = Face.extrude(Line((10, 40, -1), (10, 50, -1)), (0, 0, 2))
+
+    @staticmethod
+    def body_and_tab(tab_width: float = 20, head: float = 0) -> Sketch:
+        """A 60 x 40 body with a tab on its right side from Y=10, and a wider
+        head past the tab if ``head`` is given."""
+        with BuildSketch() as blank:
+            Rectangle(60, 40, align=Align.MIN)
+            with Locations((60, 10)):
+                Rectangle(tab_width, 20, align=Align.MIN)
+            if head:
+                with Locations((60 + tab_width, 0)):
+                    Rectangle(head, 40, align=Align.MIN)
+        return blank.sketch
+
+    @staticmethod
+    def tabbed_body(joined_from: float) -> Sketch:
+        """A 40 x 40 body with a 30 x 10 tab on top, joined to the body only
+        from X=joined_from to X=30."""
+        with BuildSketch() as blank:
+            Rectangle(40, 40, align=Align.MIN)
+            with Locations((0, 40)):
+                Rectangle(30, 10, align=Align.MIN)
+            with Locations((0, 39)):
+                Rectangle(joined_from, 1, align=Align.MIN, mode=Mode.SUBTRACT)
+        return blank.sketch
+
+    def test_a_set_back_bend_takes_only_the_strip_beside_its_line(self):
+        with BuildSheet(thickness=1, bend_radius=1) as bs:
+            insert(self.body_and_tab(), mode=Mode.REPLACE)
+            split(bisect_by=Plane.YZ.offset(60), keep=Keep.BOTH)
+            body = bs.flats().sort_by(Axis.X)[0]
+            bend(body.fold_lines()[0], 90, position=BendPosition.MATERIAL_INSIDE)
+            (bend_face,) = bs.bends()
+            box = bend_face.bounding_box()
+            self.assertAlmostEqual(box.min.Y, 10, 5)
+            self.assertAlmostEqual(box.max.Y, 30, 5)
+            # the body keeps its corners beside the strip
+            base = bs.flats().sort_by(Axis.Z)[0]
+            self.assertAlmostEqual(base.bounding_box().max.X, 60, 5)
+            self.assertTrue(base.is_inside((59.5, 5, 0)))
+        self.assertTrue(bs.sheet.is_valid)
+
+    def test_a_jog_takes_only_the_strip_beside_its_line(self):
+        with BuildSheet(thickness=1, bend_radius=1) as bs:
+            insert(self.body_and_tab(), mode=Mode.REPLACE)
+            split(bisect_by=Plane.YZ.offset(60), keep=Keep.BOTH)
+            body = bs.flats().sort_by(Axis.X)[0]
+            jog(body.fold_lines()[0], offset=5, position=BendPosition.MATERIAL_INSIDE)
+            self.assertEqual(len(bs.bends()), 2)
+            for bend_face in bs.bends():
+                box = bend_face.bounding_box()
+                self.assertAlmostEqual(box.min.Y, 10, 5)
+                self.assertAlmostEqual(box.max.Y, 30, 5)
+        self.assertTrue(bs.sheet.is_valid)
+
+    def test_a_far_face_widening_past_the_bend_swings_whole(self):
+        with BuildSheet(thickness=1, bend_radius=1) as bs:
+            insert(self.body_and_tab(tab_width=10, head=20), mode=Mode.REPLACE)
+            split(bisect_by=Plane.YZ.offset(60), keep=Keep.BOTH)
+            bend(bs.flats().sort_by(Axis.X)[0].fold_lines()[0], 90)
+            wall = bs.flats().sort_by(Axis.Z)[-1]
+            self.assertAlmostEqual(abs(wall.normal_at().X), 1, 6)
+            box = wall.bounding_box()
+            self.assertAlmostEqual(box.min.Y, 0, 5)
+            self.assertAlmostEqual(box.max.Y, 40, 5)
+        self.assertTrue(bs.sheet.is_valid)
+
+    def test_a_freed_tab_folds_the_same_from_either_side(self):
+        """Which side is held is a frame of reference, not a different fold."""
+        for held in ("tab", "body"):
+            with self.subTest(held=held):
+                with BuildSheet(thickness=1, bend_radius=1) as bs:
+                    insert(self.tabbed_body(joined_from=20), mode=Mode.REPLACE)
+                    blank_area = bs.sheet.area
+                    split(bisect_by=self.SPLIT, keep=Keep.BOTH)
+                    flats = bs.flats()
+                    face = (
+                        flats.sort_by(Axis.Y)[-1]
+                        if held == "tab"
+                        else max(flats, key=lambda f: f.area)
+                    )
+                    bend(
+                        face.fold_lines()[0], 90, position=BendPosition.MATERIAL_INSIDE
+                    )
+                    (bend_face,) = bs.bends()
+                    box = bend_face.bounding_box()
+                    self.assertAlmostEqual(box.min.Y, 40, 5)
+                    self.assertAlmostEqual(box.max.Y, 50, 5)
+                    self.assertEqual(len(bs.flats()), 2)
+                self.assertTrue(bs.sheet.is_valid)
+                flat = unfold(bs.sheet, bs.sheet_parameters)
+                self.assertAlmostEqual(precise_area(flat), blank_area, 6)
+
+    def test_material_hinged_behind_the_line_stays_and_is_kept(self):
+        """Held by the tab, a body still joined beside the line folds across,
+        and what lies behind the line stays flat rather than being lost."""
+        with BuildSheet(thickness=1, bend_radius=1) as bs:
+            insert(self.tabbed_body(joined_from=11), mode=Mode.REPLACE)
+            blank_area = bs.sheet.area
+            split(bisect_by=self.SPLIT, keep=Keep.BOTH)
+            tab = bs.flats().sort_by(Axis.Y)[-1]
+            bend(tab.fold_lines()[0], 90, position=BendPosition.MATERIAL_INSIDE)
+            (bend_face,) = bs.bends()
+            box = bend_face.bounding_box()
+            self.assertAlmostEqual(box.min.Y, 0, 5)
+            self.assertAlmostEqual(box.max.Y, 50, 5)
+        self.assertTrue(bs.sheet.is_valid)
+        flat = unfold(bs.sheet, bs.sheet_parameters)
+        self.assertAlmostEqual(precise_area(flat), blank_area, 6)
+
+    def test_a_fold_that_would_tear_the_sheet_is_refused(self):
+        """The same, with a wall along the bottom joining what must stay flat
+        to what swings."""
+        with BuildSheet(thickness=1, bend_radius=1) as bs:
+            insert(self.tabbed_body(joined_from=11), mode=Mode.REPLACE)
+            flange(bs.edges().sort_by(Axis.Y)[0], length=5)
+            split(bisect_by=self.SPLIT, keep=Keep.BOTH)
+            tab = bs.flats().sort_by(Axis.Y)[-1]
+            with self.assertRaisesRegex(ValueError, "would tear"):
+                bend(tab.fold_lines()[0], 90)
+
+
 class TestStaleSelections(unittest.TestCase):
     """Every operation resews the shell, so a selection made before one is stale
     afterwards; the next operation says so instead of failing on geometry."""
