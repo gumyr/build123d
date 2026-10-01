@@ -594,6 +594,43 @@ def test_compound_intersection_after_moving_parent():
     assert moved_assembly.intersect(Solid.make_box(1, 1, 1)) is None
 
 
+def test_compound_intersection_with_rotated_parent():
+    """A child is placed by its parent's location alone.
+
+    The parent's rotation and the child's translation don't commute, so
+    composing them in the wrong order puts the child where it belongs to
+    neither operand - reporting no overlap where there is one, and an
+    overlap where the two shapes are nowhere near each other.
+    """
+    assembly = Rot(0, 0, 90) * Compound(children=[Pos(10, 0, 0) * Box(2, 2, 2)])
+    assert assembly.bounding_box().center().Y == pytest.approx(10)
+
+    overlapping = Pos(0, 10, 0) * Box(2, 2, 2)
+    common = assembly.intersect(overlapping)
+    assert common is not None
+    assert sum(solid.volume for solid in common.solids()) == pytest.approx(8)
+
+    elsewhere = Pos(-10, 20, 0) * Box(2, 2, 2)
+    assert assembly.intersect(elsewhere) is None
+    assert elsewhere.intersect(assembly) is None
+
+
+def test_nested_compound_intersection_applies_each_location_once():
+    """Nesting must not reapply the locations of an element's ancestors."""
+    nested = Compound(children=[Pos(10, 0, 0) * Box(2, 2, 2)])
+    assembly = Rot(0, 0, 90) * Compound(children=[nested])
+    assert assembly.bounding_box().center().Y == pytest.approx(10)
+
+    overlapping = Pos(0, 10, 0) * Box(2, 2, 2)
+    common = assembly.intersect(overlapping)
+    assert common is not None
+    assert sum(solid.volume for solid in common.solids()) == pytest.approx(8)
+
+    elsewhere = Pos(-10, 20, 0) * Box(2, 2, 2)
+    assert assembly.intersect(elsewhere) is None
+    assert elsewhere.intersect(assembly) is None
+
+
 # FreeCAD issue example
 c1 = CenterArc((0, 0), 10, 0, 360).edge()
 c2 = CenterArc((19, 0), 10, 0, 360).edge()
@@ -763,6 +800,17 @@ class TestTouchMethod:
         assert len(result) >= 1
         faces = [r for r in result if isinstance(r, Face)]
         assert len(faces) >= 1
+
+    def test_compound_touch_places_children(self):
+        """Compound.touch() compares its children in global coordinates."""
+        assembly = Rot(0, 0, 90) * Compound(children=[Pos(10, 0, 0) * Box(2, 2, 2)])
+        toucher = Pos(0, 12, 0) * Box(2, 2, 2)  # shares the face at y == 11
+
+        assert len(assembly.touch(toucher)) >= 1
+        assert len(toucher.solids()[0].touch(assembly)) >= 1
+
+        # A box against the child's unplaced position touches nothing
+        assert assembly.touch(Pos(12, 0, 0) * Box(2, 2, 2)) == ShapeList()
 
 
 # ShapeList.expand() tests
