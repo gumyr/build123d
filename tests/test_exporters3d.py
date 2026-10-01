@@ -92,6 +92,11 @@ class TestExportStep(DirectApiTestCase):
         os.remove("box.step")
         self.assertEqual(step_data.count("VERTEX_POINT"), len(b.vertices()))
 
+    def test_export_step_child_of_assembly(self):
+        assembly = Compound(children=[Box(1, 1, 1)])
+        self.assertTrue(export_step(assembly.children[0], "box.step"))
+        os.remove("box.step")
+
     def test_export_step_assembly(self):
         a = Sphere(1).solid()
         a.label = "sphere"
