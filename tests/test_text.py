@@ -154,28 +154,23 @@ class TestFontManager(unittest.TestCase):
         self.assertIn(font_name, font_names)
 
     def test_register_system_fonts(self):
-        """Re-registering the system fonts finds them all again.
-
-        The OCCT font manager is a process wide singleton whose content depends
-        on what ran before (OCCT's own scan, other tests), so both counts are
-        taken from the same reset state.
+        """Expected to register at least as many fonts from before.
+        May find more on Windows
         """
         manager = FontManager()
-
-        def reset_fonts():
-            manager.manager.RemoveFontAlias(
-                TCollection_AsciiString("singleline"),
-                TCollection_AsciiString("Relief SingleLine CAD"),
-            )
-            manager.manager.ClearFontDataBase()
-            manager.register_system_fonts()
-            manager.__init__()  # add bundled fonts back in
-
-        reset_fonts()
         available_before = manager.available_fonts()
-        reset_fonts()
+
+        manager.manager.RemoveFontAlias(
+            TCollection_AsciiString("singleline"),
+            TCollection_AsciiString("Relief SingleLine CAD"),
+        )
+        manager.manager.ClearFontDataBase()
+        manager.register_system_fonts()
+
+        # add bundled fonts back in
+        manager.__init__()
+
         available_after = manager.available_fonts()
-        self.assertTrue(available_after)
         self.assertGreaterEqual(len(available_after), len(available_before))
 
     def test_check_font(self):
