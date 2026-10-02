@@ -290,6 +290,16 @@ class ChamferTests(unittest.TestCase):
             )
         self.assertAlmostEqual(test.sketch.area, 200 - 4 * 0.5, 5)
 
+    def test_sketch_chamfer_with_hole(self):
+        with BuildSketch() as test:
+            Rectangle(20, 20)
+            Rectangle(5, 5, mode=Mode.SUBTRACT)
+            chamfer(test.vertices().group_by(Axis.Y)[-1], length=2)
+        face = test.sketch.face()
+        self.assertTrue(face.is_valid)
+        self.assertEqual(len(face.inner_wires()), 1)
+        self.assertAlmostEqual(face.area, 375 - 2 * 2, 5)
+
     def test_sketch_chamfer_asym_length(self):
         with BuildSketch() as test:
             Rectangle(10, 10)
