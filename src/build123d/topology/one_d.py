@@ -3195,7 +3195,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
             curve_adaptor = BRepAdaptor_Curve(self.wrapped)
             u_value = GCPnts_AbscissaPoint.Length_s(curve_adaptor, param_min, param)
             u_value /= GCPnts_AbscissaPoint.Length_s(curve_adaptor)
-            return u_value
+            # The length is measured along the curve while position_at measures
+            # a reversed edge from its other end
+            return u_value if self.is_forward else 1 - u_value
 
         separation = self.distance_to(pnt)
         if not isclose_b(separation, 0, abs_tol=TOLERANCE):
@@ -3217,6 +3219,8 @@ class Edge(Mixin1D[TopoDS_Edge]):
             param = param_min + ((param - param_min) % curve_adaptor.Period())
         u_value = GCPnts_AbscissaPoint.Length_s(curve_adaptor, param_min, param)
         u_value /= GCPnts_AbscissaPoint.Length_s(curve_adaptor)
+        if not self.is_forward:
+            u_value = 1 - u_value
 
         # Validate that GeomAPI_ProjectPointOnCurve worked correctly
         if (self.position_at(u_value) - pnt).length < TOLERANCE:
@@ -4185,7 +4189,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
     def order_edges(self) -> ShapeList[Edge]:
         """Return the edges in self ordered by wire direction and orientation"""
 
-        sorted_edges = self.edges().sort_by(self)
+        # Sorting by a reversed wire runs against the orientation of its edges
+        sorted_edges = self.edges().sort_by(self, reverse=not self.is_forward)
         ordered_edges = ShapeList([sorted_edges[0]])
 
         for edge in sorted_edges[1:]:
@@ -4357,7 +4362,11 @@ class Wire(Mixin1D[TopoDS_Wire]):
             )
             wire_explorer.Next()
 
-        return distance_along_wire / self.length
+        # The explorer follows the wire's orientation while position_at and
+        # the other methods taking a position measure a reversed wire from
+        # its other end, so that is where the result has to be measured from
+        u_value = distance_along_wire / self.length
+        return u_value if self.is_forward else 1 - u_value
 
     def _occt_param_at(
         self, position: float, position_mode: PositionMode = PositionMode.PARAMETER
@@ -4645,6 +4654,10 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
         # Extract the edges in order
         ordered_edges = self.edges().sort_by(self)
+        if not self.is_forward:
+            # The edges of a reversed wire run against its positions, so turn
+            # each around for the position along it to start where it is met
+            ordered_edges = ShapeList(edge.reversed() for edge in ordered_edges)
 
         # If this is really just an edge, skip the complexity of a Wire
         if len(ordered_edges) == 1:
