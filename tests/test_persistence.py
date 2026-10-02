@@ -1,5 +1,6 @@
 # write me the test for testing the persistence module with unittest
 
+import copy
 import unittest
 from build123d.persistence import (
     serialize_shape,
@@ -85,6 +86,41 @@ class TestPersistence(unittest.TestCase):
         dumped_solid = pickle.dumps(solid)
         retrived_solid = pickle.loads(dumped_solid)
         self.assertAlmostEqual(solid.volume, retrived_solid.volume)
+
+    def test_serialize_operation_result(self):
+        # Operation results carry a history record that can't be pickled; it
+        # is left behind and the shape itself round trips (issue #1478)
+        with BuildPart() as builder:
+            Box(10, 5, 2)
+            Hole(1)
+        results = {
+            "cut": Box(10, 5, 2) - Cylinder(1, 4),
+            "fillet": fillet(Box(10, 5, 2).edges(), 0.5),
+            "chamfer": chamfer(Box(10, 5, 2).edges(), 0.5),
+            "builder part": builder.part,
+        }
+        for name, result in results.items():
+            with self.subTest(name):
+                self.assertIsNotNone(result._history)
+                retrieved = pickle.loads(pickle.dumps(result))
+                self.assertIsNone(retrieved._history)
+                self.assertTrue(retrieved.is_valid)
+                self.assertAlmostEqual(result.volume, retrieved.volume)
+                self.assertEqual(len(result.faces()), len(retrieved.faces()))
+                # the original keeps its record
+                self.assertIsNotNone(result._history)
+
+    def test_serialize_extracted_shape(self):
+        # A sub-shape pickles along with the shape it was extracted from
+        result = Box(10, 5, 2) - Cylinder(1, 4)
+        edge = result.edges().sort_by(Axis.Z)[-1]
+        retrieved = pickle.loads(pickle.dumps(edge))
+        self.assertAlmostEqual(edge.length, retrieved.length)
+
+    def test_copy_keeps_history(self):
+        result = Box(10, 5, 2) - Cylinder(1, 4)
+        self.assertIs(copy.copy(result)._history, result._history)
+        self.assertIs(copy.deepcopy(result)._history, result._history)
 
 
 if __name__ == "__main__":

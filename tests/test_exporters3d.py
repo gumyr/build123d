@@ -92,6 +92,11 @@ class TestExportStep(DirectApiTestCase):
         os.remove("box.step")
         self.assertEqual(step_data.count("VERTEX_POINT"), len(b.vertices()))
 
+    def test_export_step_child_of_assembly(self):
+        assembly = Compound(children=[Box(1, 1, 1)])
+        self.assertTrue(export_step(assembly.children[0], "box.step"))
+        os.remove("box.step")
+
     def test_export_step_assembly(self):
         a = Sphere(1).solid()
         a.label = "sphere"
@@ -214,6 +219,33 @@ class TestExportStep(DirectApiTestCase):
             step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('green')"), -1
         )
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('blue')"), -1)
+
+    def test_export_step_name_propagation(self):
+        """Unlabeled nested shapes inherit ancestor names, numbered (issue #1360)"""
+        box = Compound(children=[Box(1, 1, 1).solid()])
+        box.label = "box"
+        sphere = Compound(children=[Sphere(1).solid()])
+        sphere.label = "sphere"
+        part = Box(1, 1, 1)
+        part.label = "part"
+        assembly = Compound(label="assembly", children=[box, sphere, part])
+
+        self.assertTrue(export_step(assembly, "named.step"))
+        with open("named.step", "r") as file:
+            step_data = file.read()
+        os.remove("named.step")
+
+        # No auto-generated names may remain in the exported STEP
+        self.assertEqual(step_data.find("PRODUCT('SOLID'"), -1)
+        self.assertEqual(step_data.find("PRODUCT('COMPOUND'"), -1)
+        # The parts' names propagate to their unlabeled nested shapes, and
+        # each product gets a name of its own
+        for name in ("box-0", "box-1", "sphere-0", "sphere-1"):
+            self.assertEqual(len(re.findall(rf"PRODUCT\('{name}',", step_data)), 1)
+        self.assertEqual(step_data.find("PRODUCT('box',"), -1)
+        # A labeled leaf part, and a label nothing inherits, are as before
+        self.assertEqual(len(re.findall(r"PRODUCT\('part',", step_data)), 1)
+        self.assertNotEqual(step_data.find("PRODUCT('assembly',"), -1)
 
     def test_export_step_component_override_parent_color(self):
         c1 = Sphere(1).solid()
@@ -387,8 +419,36 @@ class TestExportGltf(DirectApiTestCase):
     #     with self.assertRaises(RuntimeError):
     #         export_gltf(box, "box.gltf")
     #     os.chmod("box.gltf", 0o777)  # Make the file read/write
-    #     os.remove("box.gltf")
-    #     os.remove("box.bin")
+    #         os.remove("box.gltf")
+    #         os.remove("box.bin")
+
+
+def test_export_unicode_labels(tmp_path):
+    """Non-ASCII labels must survive as proper UTF-8 in glTF and STEP exports.
+
+    Regression test: without ``isMultiByte=True`` in ``TCollection_ExtendedString``,
+    UTF-8 bytes were stored one character per byte and re-encoded by the
+    writers, producing mojibake (e.g. "浮筒" -> "æµ®ç...") in glTF node/mesh
+    names and STEP PRODUCT names.
+    """
+    text = "测试浮筒"
+    box = Box(1, 1, 1)
+    box.label = text
+
+    glb_path = tmp_path / "unicode.glb"
+    assert export_gltf(box, glb_path, binary=True)
+    raw = glb_path.read_bytes()
+    json_len = int.from_bytes(raw[12:16], "little")
+    gltf = json.loads(raw[20 : 20 + json_len].decode("utf-8"))
+    assert gltf["nodes"][0]["name"] == text
+    assert gltf["meshes"][0]["name"] == text
+
+    step_path = tmp_path / "unicode.step"
+    assert export_step(box, step_path)
+    step_raw = step_path.read_bytes()
+    assert text.encode("utf-8") in step_raw
+    mojibake = text.encode("utf-8").decode("latin-1").encode("utf-8")
+    assert mojibake not in step_raw
 
 
 @pytest.mark.parametrize(

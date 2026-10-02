@@ -32,7 +32,7 @@ import math
 import unittest
 
 from OCP.gp import gp_Vec, gp_XYZ
-from build123d.geometry import Axis, Location, Plane, Pos, Vector
+from build123d.geometry import Axis, Location, Matrix, Plane, Pos, Vector
 from build123d.topology import Solid, Vertex
 
 
@@ -267,6 +267,13 @@ class TestVector(unittest.TestCase):
         )
         self.assertEqual(
             a.transform(pxy_o1.forward_transform, is_direction=True), a.normalized()
+        )
+
+        # matrices that are not similarities are applied too
+        stretch = Matrix([[2, 0, 0, 1], [0, 1, 0, 0], [0, 0, 1, 0]])
+        self.assertAlmostEqual(a.transform(stretch), (3, 2, 3), 7)
+        self.assertAlmostEqual(
+            a.transform(stretch, is_direction=True), Vector(2, 2, 3).normalized(), 7
         )
         self.assertEqual(
             a.transform(pxy_o1.reverse_transform, is_direction=False), Vector(1, 2, 4)

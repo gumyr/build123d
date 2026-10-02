@@ -421,5 +421,11 @@ class TestLocation(unittest.TestCase):
         self.assertGreater(dot, 0.999, "Orientation is not right-handed")
 
 
+class TestPosValidation(unittest.TestCase):
+    def test_unexpected_keyword(self):
+        with self.assertRaisesRegex(ValueError, "Unexpected argument"):
+            Pos(nonsense=1)
+
+
 if __name__ == "__main__":
     unittest.main()

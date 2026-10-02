@@ -42,7 +42,7 @@ from OCP.Geom import Geom_Circle, Geom_Line, Geom_OffsetCurve
 from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
 from OCP.BRepCheck import BRepCheck_Analyzer
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
-from OCP.TopTools import TopTools_ListOfShape
+from OCP.collections import List_TopoDS_Shape
 
 from build123d import (
     IN,
@@ -62,24 +62,20 @@ from build123d import (
     Helix,
     JernArc,
     Keep,
-    LengthMode,
     Line,
     Mode,
     Plane,
-    PolarLine,
     Polyline,
     Pos,
     Rectangle,
     RectangleRounded,
     Rot,
-    Shape,
     Side,
     Solid,
     Sphere,
     Torus,
     Vector,
     Wire,
-    chamfer,
     export_step,
     extrude,
     fillet,
@@ -105,7 +101,7 @@ from build123d.topology.shape_core import (
 
 def raw_boolean(operation, argument, tool):
     """Run an OCCT boolean without build123d's clean()"""
-    args, tools = TopTools_ListOfShape(), TopTools_ListOfShape()
+    args, tools = List_TopoDS_Shape(), List_TopoDS_Shape()
     args.Append(argument.wrapped)
     tools.Append(tool.wrapped)
     operation.SetArguments(args)
@@ -191,7 +187,7 @@ class TestUnifySameDomainSeams:
         upgrader.Build()
         assert not BRepCheck_Analyzer(upgrader.Shape()).IsValid()
         # guarded call does not
-        unified = unify_same_domain(raw_cut)
+        unified = unify_same_domain(raw_cut)[0]
         assert BRepCheck_Analyzer(unified).IsValid()
         assert Compound.cast(unified).volume == pytest.approx(87.9646, abs=1e-3)
 
@@ -201,7 +197,7 @@ class TestUnifySameDomainSeams:
             BRepAlgoAPI_Fuse(), Box(1, 1, 1), Pos(1, 0, 0) * Box(1, 1, 1)
         )
         assert len(Compound.cast(fused).faces()) > 6
-        assert len(Compound.cast(unify_same_domain(fused)).faces()) == 6
+        assert len(Compound.cast(unify_same_domain(fused)[0]).faces()) == 6
 
 
 class TestUnifySameDomainMirroredGeometry:
@@ -255,79 +251,6 @@ class TestUnifySameDomainMirroredGeometry:
             mirror(about=Plane.XZ)
         assert part.part.is_valid
         assert part.part.volume == pytest.approx(4 * quarter_volume, rel=1e-6)
-
-
-class TestTaperedExtrude:
-    def test_reversed_profile_face_extrudes_along_normal(self):
-        # build123d #987
-        with BuildSketch() as sketch:
-            with BuildLine():
-                right = Line((0, 0), (0, -20))
-                bottom = PolarLine(start=right @ 1, length=10, angle=184)
-                left = PolarLine(
-                    start=bottom @ 1,
-                    length=(right @ 0).Y - (bottom @ 1).Y,
-                    angle=94,
-                    length_mode=LengthMode.VERTICAL,
-                )
-                Line(left @ 1, right @ 0)
-            make_face()
-        face = sketch.sketch.face()
-        assert face.normal_at() == Vector(0, 0, 1)
-        straight = extrude(face, amount=5)
-        tapered = extrude(face, amount=5, taper=1)
-        assert tapered.bounding_box().min.Z == pytest.approx(0, abs=1e-6)
-        assert tapered.bounding_box().max.Z == pytest.approx(5, abs=1e-6)
-        assert 0 < straight.volume - tapered.volume < 20
-
-    def test_collapsing_taper_raises(self):
-        # build123d #567: OCCT returns an open shell without error
-        cross = (Rectangle(10, 1) + Rectangle(1, 10)).face()
-        assert extrude(cross, amount=2, taper=10).is_valid
-        with pytest.raises(ValueError, match="collapses"):
-            extrude(cross, amount=2, taper=15)
-
-
-class TestChamfer2dWithHoles:
-    def test_face_chamfer_keeps_hole(self):
-        # build123d #1216
-        hole_face = Face.make_rect(20, 20) - Face.make_rect(5, 5)
-        corner = hole_face.vertices().group_by(Axis.Y)[-1].sort_by(Axis.X)[0]
-        chamfered = hole_face.chamfer_2d(2, 2, [corner])
-        assert chamfered.is_valid
-        assert len(chamfered.inner_wires()) == 1
-        assert chamfered.area == pytest.approx(375 - 2)
-
-    def test_sketch_chamfer_keeps_hole(self):
-        with BuildSketch() as sketch:
-            Rectangle(20, 20)
-            Rectangle(5, 5, mode=Mode.SUBTRACT)
-            chamfer(sketch.vertices().group_by(Axis.Y)[-1], length=2)
-        face = sketch.sketch.face()
-        assert face.is_valid
-        assert len(face.inner_wires()) == 1
-        assert face.area == pytest.approx(375 - 2 * 2)
-
-
-class TestNonManifoldWireEdges:
-    def test_branching_wire_reports_all_edges(self):
-        # build123d #1205
-        line = Line((0, 0), (30, 0))
-        star = line + Rot(Z=-120) * line + Rot(Z=120) * line
-        assert isinstance(star, Wire)
-        assert len(star.edges()) == 3
-        assert star.length == pytest.approx(90)
-        both = star + Rot(Z=60) * star
-        assert len(both.edges()) == 6
-        assert both.length == pytest.approx(180)
-
-    def test_ordinary_wire_unchanged(self):
-        wire = Wire.make_polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
-        edges = wire.edges()
-        assert len(edges) == 4
-        # connection order preserved
-        for first, second in zip(edges, edges[1:]):
-            assert first.end_point() == second.start_point()
 
 
 class TestStepExportOffsetCurves:
@@ -461,9 +384,9 @@ class TestUnifySameDomainFallbacks:
         upgrader = ShapeUpgrade_UnifySameDomain(raw_cut, True, True, True)
         upgrader.Build()
         invalid = upgrader.Shape()
-        monkeypatch.setattr(shape_core, "_unify_same_domain", lambda *_: invalid)
+        monkeypatch.setattr(shape_core, "_unify_same_domain", lambda *_: (invalid, None))
         with pytest.warns(UserWarning, match="Unable to simplify"):
-            kept = unify_same_domain(raw_cut)
+            kept = unify_same_domain(raw_cut)[0]
         assert BRepCheck_Analyzer(kept).IsValid()
         assert Compound(kept).volume == pytest.approx(Compound(raw_cut).volume)
 
@@ -480,7 +403,7 @@ class TestUnifySameDomainFallbacks:
 
         monkeypatch.setattr(shape_core, "_unify_same_domain", failing_fallback)
         with pytest.warns(UserWarning, match="Unable to simplify"):
-            kept = unify_same_domain(raw_cut)
+            kept = unify_same_domain(raw_cut)[0]
         assert BRepCheck_Analyzer(kept).IsValid()
         assert Compound(kept).volume == pytest.approx(Compound(raw_cut).volume)
 
@@ -503,19 +426,6 @@ class TestUnifySameDomainFallbacks:
         monkeypatch.setattr(Solid, "volume", property(failing_volume))
         empty = raw_boolean(BRepAlgoAPI_Cut(), Box(1, 1, 1), Box(3, 3, 3))
         assert not _is_suspicious_empty_cut(empty, [Box(1, 1, 1)], [Box(2, 2, 2)])
-
-
-class TestChamfer2dEdgeCases:
-    def test_no_vertices_returns_face(self):
-        face = Face.make_rect(20, 20)
-        assert face.chamfer_2d(2, 2, []) is face
-
-    def test_reversed_face_keeps_its_normal(self):
-        hole_face = -(Face.make_rect(20, 20) - Face.make_rect(5, 5))
-        corner = hole_face.vertices().group_by(Axis.Y)[-1].sort_by(Axis.X)[0]
-        chamfered = hole_face.chamfer_2d(2, 2, [corner])
-        assert chamfered.normal_at() == hole_face.normal_at()
-        assert chamfered.area == pytest.approx(375 - 2)
 
 
 class TestOffsetNoOp:
@@ -545,7 +455,7 @@ class TestUnifySameDomainKeepsInput:
             BRepAlgoAPI_Cut(), Torus(0.6, 0.2), Pos(0.18, 0.18, 0.4) * Cylinder(0.5, 1)
         )
         volume = Compound(raw).volume
-        unified = unify_same_domain(raw)
+        unified = unify_same_domain(raw)[0]
         assert BRepCheck_Analyzer(unified).IsValid()
         assert Compound(unified).volume == pytest.approx(volume)
 

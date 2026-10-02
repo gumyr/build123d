@@ -28,7 +28,6 @@ license:
 
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
-# pylint: disable=too-many-lines
 
 import math
 import io
@@ -95,7 +94,6 @@ class Drawing:
         with_hidden: bool = True,
         focus: float | None = None,
     ):
-        # pylint: disable=too-many-locals
         hlr = HLRBRep_Algo()
         hlr.Add(shape.wrapped)
 
@@ -468,8 +466,10 @@ class ExportDXF(Export2D):
         unit (Unit, optional): The unit used for the exported DXF. It should be
             one of the Unit enums: Unit.MC, Unit.MM, Unit.CM,
             Unit.M, Unit.IN, or Unit.FT. Defaults to Unit.MM.
-        color (Optional[ColorIndex], optional): The default color index for shapes.
-            It can be specified as a ColorIndex enum or None.. Defaults to None.
+        color (ColorLike | None, optional): The default color for shapes. Use a
+            color name, hexadecimal value, or normalized RGB(A) tuple. Legacy
+            ColorIndex values remain supported with a DeprecationWarning.
+            Defaults to None.
         line_weight (Optional[float], optional): The default line weight
             (stroke width) for shapes, in millimeters. . Defaults to None.
         line_type (Optional[LineType], optional): e default line type for shapes.
@@ -481,7 +481,7 @@ class ExportDXF(Export2D):
         .. code-block:: python
 
             exporter = ExportDXF(unit=Unit.MM, line_weight=0.5)
-            exporter.add_layer("Layer 1", color=ColorIndex.RED, line_type=LineType.DASHED)
+            exporter.add_layer("Layer 1", color="red", line_type=LineType.DASHED)
             exporter.add_shape(shape_object, layer="Layer 1")
             exporter.write("output.dxf")
 
@@ -515,7 +515,7 @@ class ExportDXF(Export2D):
         self,
         version: str = ezdxf.DXF2013,
         unit: Unit = Unit.MM,
-        color: ColorIndex | None = None,
+        color: ColorLike | ColorIndex | None = None,
         line_weight: float | None = None,
         line_type: LineType | None = None,
     ):
@@ -535,7 +535,7 @@ class ExportDXF(Export2D):
 
         default_layer = self._document.layers.get("0")
         if color is not None:
-            default_layer.color = color.value
+            self._set_layer_color(default_layer, color)
         if line_weight is not None:
             default_layer.dxf.lineweight = round(line_weight * 100)
         if line_type is not None:
@@ -547,7 +547,7 @@ class ExportDXF(Export2D):
         self,
         name: str,
         *,
-        color: ColorIndex | None = None,
+        color: ColorLike | ColorIndex | None = None,
         line_weight: float | None = None,
         line_type: LineType | None = None,
     ) -> Self:
@@ -557,8 +557,10 @@ class ExportDXF(Export2D):
 
         Args:
             name (str): The name of the layer definition. Must be unique among all layers.
-            color (Optional[ColorIndex], optional): The color index for shapes on this layer.
-                It can be specified as a ColorIndex enum or None. Defaults to None.
+            color (ColorLike | None, optional): The color for shapes on this layer.
+                Use a color name, hexadecimal value, or normalized RGB(A) tuple.
+                Legacy ColorIndex values remain supported with a
+                DeprecationWarning. Defaults to None.
             line_weight (Optional[float], optional): The line weight (stroke width) for shapes
                 on this layer, in millimeters. Defaults to None.
             line_type (Optional[LineType], optional): The line type for shapes on this layer.
@@ -575,14 +577,53 @@ class ExportDXF(Export2D):
             linetype = self._linetype(line_type)
             kwargs["linetype"] = linetype
 
-        if color is not None:
-            kwargs["color"] = color.value
-
         if line_weight is not None:
             kwargs["lineweight"] = round(line_weight * 100)
 
-        self._document.layers.add(name, **kwargs)
+        layer = self._document.layers.add(name, **kwargs)
+        if color is not None:
+            self._set_layer_color(layer, color)
         return self
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    def _color_attribs(self, color: ColorLike | ColorIndex) -> dict[str, int]:
+        """Convert a color into ezdxf layer attributes.
+
+        DXF versions before R2004 have no true color, so there a ColorLike is
+        written as the nearest AutoCAD Color Index instead.
+        """
+        if isinstance(color, ColorIndex):
+            warn(
+                "ExportDXF ColorIndex values are deprecated; use ColorLike values "
+                "such as 'red' or 0xFF0000 instead.",
+                DeprecationWarning,
+                stacklevel=4,
+            )
+            return {"color": color.value}
+
+        red, green, blue, _ = tuple(Color(color))
+        rgb = (round(red * 255), round(green * 255), round(blue * 255))
+        if self._document.dxfversion < ezdxf.DXF2004:
+            return {"color": self._nearest_aci(rgb)}
+        return {"true_color": ezdxf.rgb2int(rgb)}
+
+    @staticmethod
+    def _nearest_aci(rgb: tuple[int, int, int]) -> int:
+        """The AutoCAD Color Index whose palette entry is closest to ``rgb``."""
+
+        def distance(index: int) -> int:
+            return sum((a - b) ** 2 for a, b in zip(rgb, aci2rgb(index)))
+
+        return min(range(1, 256), key=distance)
+
+    def _set_layer_color(self, layer: Any, color: ColorLike | ColorIndex) -> None:
+        """Apply color and ColorLike alpha to an ezdxf layer."""
+        layer.update_dxf_attribs(self._color_attribs(color))
+        if not isinstance(color, ColorIndex):
+            *_, alpha = tuple(Color(color))
+            if alpha < 1:
+                layer.transparency = 1 - alpha
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -601,7 +642,7 @@ class ExportDXF(Export2D):
                     description=desc,
                 )
             else:
-                raise ValueError("Unknown linetype `{linetype}`.")
+                raise ValueError(f"Unknown linetype `{linetype}`.")
         return linetype
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -626,10 +667,10 @@ class ExportDXF(Export2D):
             for s in shape:
                 self._add_single_shape(s, layer)
         if self._non_planar_point_count > 0:
-            print("WARNING, exporting non-planar shape to 2D format.")
-            print("  This is probably not what you want.")
-            print(
-                f"  {self._non_planar_point_count} points found outside the XY plane."
+            warn(
+                "Exporting non-planar shape to 2D format; "
+                f"{self._non_planar_point_count} points found outside the XY plane.",
+                stacklevel=2,
             )
         return self
 
@@ -889,7 +930,6 @@ class ExportSVG(Export2D):
 
     """
 
-    # pylint: disable=too-many-instance-attributes
     _Converter = Callable[[Edge], ET.Element]
 
     # These are the units which are available in the Unit enum *and*
@@ -913,6 +953,10 @@ class ExportSVG(Export2D):
                 input_color: ColorLike | ColorIndex | RGB | None,
             ) -> Color | None:
                 """Normalize ColorLike and temporarily supported legacy colors."""
+
+                # four of these returns serve deprecated inputs - ColorIndex,
+                # ezdxf RGB and 0-255 tuples - and go when those are removed
+                # pylint: disable=too-many-return-statements
                 if input_color is None:
                     return None
                 if isinstance(input_color, ColorIndex):
@@ -937,8 +981,7 @@ class ExportSVG(Export2D):
                     isinstance(input_color, tuple)
                     and len(input_color) in (3, 4)
                     and all(
-                        isinstance(component, (int, float))
-                        for component in input_color
+                        isinstance(component, (int, float)) for component in input_color
                     )
                 ):
                     legacy_color = tcast(tuple[float | int, ...], input_color)
@@ -1105,7 +1148,6 @@ class ExportSVG(Export2D):
                 self._add_single_shape(s, _layer, reverse_wires)
 
     def _add_single_shape(self, shape: Shape, layer: _Layer, reverse_wires: bool):
-        # pylint: disable=too-many-locals
         self._non_planar_point_count = 0
         bb = shape.bounding_box()
         self._bounds = self._bounds.add(bb) if self._bounds else bb
@@ -1182,10 +1224,10 @@ class ExportSVG(Export2D):
 
         layer.elements.extend(elements)
         if self._non_planar_point_count > 0:
-            print("WARNING, exporting non-planar shape to 2D format.")
-            print("  This is probably not what you want.")
-            print(
-                f"  {self._non_planar_point_count} points found outside the XY plane."
+            warn(
+                "Exporting non-planar shape to 2D format; "
+                f"{self._non_planar_point_count} points found outside the XY plane.",
+                stacklevel=3,
             )
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1281,7 +1323,6 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _circle_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
-        # pylint: disable=too-many-locals
         if edge.length < 1e-6:
             warn(
                 "Skipping arc that is too small to export safely (length < 1e-6).",
@@ -1333,7 +1374,6 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _ellipse_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
-        # pylint: disable=too-many-locals
         if edge.length < 1e-6:
             warn(
                 "Skipping ellipse that is too small to export safely (length < 1e-6).",
@@ -1563,7 +1603,6 @@ class ExportSVG(Export2D):
             path (PathLike | str | bytes | BytesIO): The file path where the
                 SVG data will be written.
         """
-        # pylint: disable=too-many-locals
         bb = self._bounds
         if bb is None:
             raise ValueError("No shapes to export.")

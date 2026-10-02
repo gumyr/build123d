@@ -28,7 +28,7 @@ license:
 
 import unittest
 from abc import ABC, abstractmethod
-from math import pi, sin
+from math import pi, sin, sqrt
 from unittest.mock import MagicMock, patch, PropertyMock
 
 from build123d import *
@@ -198,6 +198,43 @@ class TestMakeBrakeFormed(unittest.TestCase):
         sheet_metal = make_brake_formed(thickness=0.5, station_widths=1, line=outline)
         self.assertAlmostEqual(sheet_metal.bounding_box().max.Z, 1, 2)
 
+    def test_curve_line(self):
+        with BuildLine() as bl:
+            FilletPolyline((0, 0), (5, 6), (10, 1), radius=1)
+        sheet_metal = make_brake_formed(thickness=0.5, station_widths=1, line=bl.line)
+        self.assertGreater(sheet_metal.volume, 0)
+
+    def test_single_section(self):
+        arc = Edge.make_circle(5, start_angle=0, end_angle=60)
+        sheet_metal = make_brake_formed(thickness=0.5, station_widths=1, line=arc)
+        self.assertGreater(sheet_metal.volume, 0)
+
+    def test_invalid_line_type(self):
+        with self.assertRaisesRegex(ValueError, "either a Curve, Edge or Wire"):
+            make_brake_formed(thickness=0.5, station_widths=1, line=Vertex(0, 0, 0))
+
+    def test_no_line(self):
+        with self.assertRaisesRegex(ValueError, "A line must be provided"):
+            make_brake_formed(thickness=0.5, station_widths=1)
+
+    def test_unsuitable_line(self):
+        outline = FilletPolyline((0, 0), (5, 6), (10, 1), radius=1)
+        with patch(
+            "build123d.operations_part.Plane", side_effect=ValueError("not planar")
+        ):
+            with self.assertRaisesRegex(ValueError, "line not suitable"):
+                make_brake_formed(thickness=0.5, station_widths=1, line=outline)
+
+    def test_invalid_station_widths_type(self):
+        outline = FilletPolyline((0, 0), (5, 6), (10, 1), radius=1)
+        with self.assertRaisesRegex(TypeError, "single number or an iterable"):
+            make_brake_formed(thickness=0.5, station_widths=object(), line=outline)
+
+    def test_wrong_number_of_station_widths(self):
+        outline = FilletPolyline((0, 0), (5, 6), (10, 1), radius=1)
+        with self.assertRaisesRegex(ValueError, r"# vertices in line \(4\)"):
+            make_brake_formed(thickness=0.5, station_widths=[1, 2], line=outline)
+
 
 class TestPartOperationDraft(unittest.TestCase):
 
@@ -298,7 +335,9 @@ class TestBuildPart(unittest.TestCase):
                 Rectangle(5, 5)
             extrude(amount=5)
         self.assertEqual(len(test.faces()), 11)
-        self.assertEqual(len(test.faces(Select.LAST)), 6)
+        # the extrusion's five exposed faces; the box top it merged into was
+        # only rebuilt, so it is not part of the last operation
+        self.assertEqual(len(test.faces(Select.LAST)), 5)
 
     def test_select_solids(self):
         """Test faces()"""
@@ -498,6 +537,27 @@ class TestExtrude(unittest.TestCase):
 
         self.assertAlmostEqual(p.part.volume, 72.313, 2)
 
+    def test_extrude_until_from_a_face_of_the_target(self):
+        """A sketch drawn on a face of the target extrudes into it: LAST
+        reaches the far side of the material, a cavity's underside here.
+        NEXT reaches the face the sketch lies in, which cuts nothing"""
+        with BuildPart() as body:
+            with BuildSketch(Plane.YZ.offset(-10)):
+                Rectangle(20, 10, align=(Align.CENTER, Align.MIN))
+                with Locations((0, 1)):
+                    Circle(6, align=(Align.CENTER, Align.MIN), mode=Mode.SUBTRACT)
+            extrude(amount=20)
+            with BuildSketch(Plane.XY.offset(0)) as cross:
+                RectangleRounded(10, 3, 1, rotation=0)
+                RectangleRounded(10, 3, 1, rotation=90)
+            rib = extrude(until=Until.LAST, mode=Mode.PRIVATE)
+            self.assertTrue(rib.is_valid)
+            self.assertAlmostEqual(rib.bounding_box().min.Z, 0, 6)
+            self.assertAlmostEqual(rib.bounding_box().max.Z, 7 - sqrt(36 - 25), 4)
+            self.assertAlmostEqual(rib.volume, 72.302, 2)
+            with self.assertRaisesRegex(ValueError, "does not cut the extrusion"):
+                extrude(cross.sketch, until=Until.NEXT, mode=Mode.PRIVATE)
+
     def test_extrude_until_errors(self):
         with self.assertRaises(ValueError):
             extrude(
@@ -522,11 +582,14 @@ class TestExtrude(unittest.TestCase):
                 extrude(profile, dir=direction, until=Until.NEXT, target=target)
 
     def test_extrude_until_invalid_split(self):
+        """The piece returned is the one holding the profile as a face; a
+        split that hands back pieces without it is a kernel failure"""
         profile = Face.make_rect(1, 1)
         target = Box(2, 2, 2)
         direction = Vector(0, 0, 1)
 
-        with patch("build123d.topology.three_d.Solid.split", return_value=None):
+        strangers = [Box(1, 1, 1).solid(), Box(1, 1, 1).solid()]
+        with patch("build123d.topology.three_d.Solid.split", return_value=strangers):
             with self.assertRaises(RuntimeError):
                 extrude(profile, dir=direction, until=Until.NEXT, target=target)
 
@@ -542,6 +605,26 @@ class TestExtrude(unittest.TestCase):
         npf = cyl.split(Plane.XZ).faces().filter_by(GeomType.PLANE, reverse=True)[0]
         test_solid = extrude(npf, amount=3, dir=(0, 1, 0))
         self.assertAlmostEqual(test_solid.volume, 2 * 2 * 3, 5)
+
+    def test_non_planar_face_without_dir(self):
+        side = Cylinder(1, 2).faces().filter_by(GeomType.CYLINDER)[0]
+        with self.assertRaisesRegex(ValueError, "dir must be provided"):
+            extrude(side, amount=0.5)
+
+    def test_no_amount_or_until(self):
+        with self.assertRaisesRegex(ValueError, "Either amount or until"):
+            extrude(Rectangle(1, 1).face())
+
+    def test_until_without_target(self):
+        with self.assertRaisesRegex(ValueError, "A target object must be provided"):
+            extrude(Rectangle(1, 1).face(), until=Until.NEXT)
+
+    def test_until_with_empty_context(self):
+        with self.assertRaisesRegex(ValueError, "No target object provided"):
+            with BuildPart():
+                with BuildSketch():
+                    Rectangle(1, 1)
+                extrude(until=Until.NEXT)
 
 
 class TestHole(unittest.TestCase):
@@ -700,6 +783,21 @@ class TestLoft(unittest.TestCase):
         mock_clean.assert_called_once()
 
 
+class TestProjectWorkplane(unittest.TestCase):
+    def test_invalid_context(self):
+        with self.assertRaisesRegex(RuntimeError, "only be used from a BuildPart"):
+            with BuildSketch():
+                project_workplane((0, 0, 0), (1, 0, 0), (0, 0, 1), 10)
+
+    def test_x_dir_perpendicular_to_projection_dir(self):
+        screen = MagicMock()
+        screen.find_intersection_points.return_value = []
+        with patch("build123d.operations_part.Face") as mock_face:
+            mock_face.make_rect.return_value = screen
+            with self.assertRaisesRegex(ValueError, "x_dir perpendicular"):
+                project_workplane((0, 0, 0), (1, 0, 0), (0, 0, 1), 10)
+
+
 class TestRevolve(unittest.TestCase):
     def test_simple_revolve(self):
         with BuildPart() as test:
@@ -788,6 +886,14 @@ class TestRevolve(unittest.TestCase):
     #         with self.assertRaises(ValueError):
     #             revolve(axis=Axis.Z)
 
+    def test_no_profiles(self):
+        with self.assertRaisesRegex(ValueError, "No profiles provided"):
+            revolve()
+
+        with self.assertRaisesRegex(ValueError, "No profiles provided"):
+            with BuildPart():
+                revolve()
+
 
 class TestSection(unittest.TestCase):
     def test_circle(self):
@@ -807,6 +913,20 @@ class TestSection(unittest.TestCase):
         self.assertEqual(len(sec.faces()), 1)
         self.assertAlmostEqual(sec.face().edge().radius, 10, 5)
         self.assertAlmostEqual(sec.face().center(), (-100, 100, 0), 5)
+
+    def test_default_plane_from_context(self):
+        with BuildPart() as bp:
+            Sphere(10)
+            s = section(section_by=None)
+        self.assertAlmostEqual(s.area, 100 * pi, 5)
+
+    def test_no_object(self):
+        with self.assertRaisesRegex(ValueError, "No object to section"):
+            section()
+
+    def test_no_section_planes(self):
+        with self.assertRaisesRegex(ValueError, "Plane\\(s\\) must be provide"):
+            section(Sphere(1), section_by=None)
 
 
 class TestSplit(unittest.TestCase):
@@ -834,6 +954,10 @@ class TestSplit(unittest.TestCase):
         right = split(obj, bisect_by=Plane.YZ, keep=Keep.TOP)
         self.assertLess(right.volume, obj.volume)
 
+    def test_no_objects(self):
+        with self.assertRaisesRegex(ValueError, "objects must be provided"):
+            split()
+
 
 class TestThicken(unittest.TestCase):
     def test_thicken(self):
@@ -857,6 +981,14 @@ class TestThicken(unittest.TestCase):
             sweep((wire ^ 0) * RadiusArc((0, 0), (0, -1), 1), wire), 0.4, both=True
         )
         self.assertAlmostEqual(part.volume, 4.711747154435256, 5)
+
+    def test_no_amount(self):
+        with self.assertRaisesRegex(ValueError, "An amount must be provided"):
+            thicken(Rectangle(1, 1).face())
+
+    def test_no_face(self):
+        with self.assertRaisesRegex(ValueError, "A face or sketch must be provided"):
+            thicken(amount=1)
 
 
 class TestTorus(unittest.TestCase):

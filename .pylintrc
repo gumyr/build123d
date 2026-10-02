@@ -33,3 +33,8 @@ ignored-modules=OCP,vtkmodules,scipy.spatial,ezdxf,anytree,IPython,trianglesolve
 [DESIGN]
 max-args=10
 max-positional-arguments=10
+
+[SIMILARITIES]
+# Constructor plumbing and dimension-parallel topology methods are structurally
+# alike by design; four lines flags shapes rather than duplication.
+min-similarity-lines=7

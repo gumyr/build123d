@@ -30,6 +30,7 @@ import unittest
 from math import atan2, degrees, gamma, pi, sqrt
 
 import pytest
+from OCP.Message import Message, Message_Gravity
 
 from build123d import *
 from build123d.text import FONT_ASPECT, FontManager
@@ -125,7 +126,9 @@ class TestBuildSketch(unittest.TestCase):
             Rectangle(10, 10)
             self.assertEqual(len(test.edges()), 4)
             Rectangle(5, 20, align=(Align.CENTER, Align.MIN))
-            self.assertEqual(len(test.edges(Select.LAST)), 5)
+            # the three edges of the new rectangle that survive the fuse; the
+            # pieces of the old rectangle's split edge were only rebuilt
+            self.assertEqual(len(test.edges(Select.LAST)), 3)
 
     def test_select_faces(self):
         """Test faces()"""
@@ -444,13 +447,10 @@ class TestBuildSketchObjects(unittest.TestCase):
                 # The case where order == 1 is a rhombus so the area should be
                 # exact.
                 if order == 1:
-                    self.assertAlmostEqual(
-                        test.sketch.area,
-                        width * height / 2
-                    )
+                    self.assertAlmostEqual(test.sketch.area, width * height / 2)
                 else:
-                # For cases that are approximated with splines, only check the
-                # area to 5 decimal places.
+                    # For cases that are approximated with splines, only check the
+                    # area to 5 decimal places.
                     area = (
                         width
                         * height
@@ -491,10 +491,20 @@ class TestBuildSketchObjects(unittest.TestCase):
 
     def test_text_resolved_font_attributes(self):
         requested_font = "__missing_build123d_font__"
-        resolved_font = FontManager().find_font(requested_font, FontStyle.REGULAR)
 
-        text = Text("test", 2, font=requested_font)
-        compound = Compound.make_text("test", 2, font=requested_font)
+        # The missing font is the point of this test; keep OCCT from writing
+        # its "unable to find font" warning to the console for each lookup
+        printers = list(Message.DefaultMessenger_s().Printers())
+        saved_levels = [printer.GetTraceLevel() for printer in printers]
+        for printer in printers:
+            printer.SetTraceLevel(Message_Gravity.Message_Fail)
+        try:
+            resolved_font = FontManager().find_font(requested_font, FontStyle.REGULAR)
+            text = Text("test", 2, font=requested_font)
+            compound = Compound.make_text("test", 2, font=requested_font)
+        finally:
+            for printer, level in zip(printers, saved_levels):
+                printer.SetTraceLevel(level)
 
         self.assertEqual(text.font, resolved_font.FontName().ToCString())
         self.assertEqual(

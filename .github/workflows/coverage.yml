@@ -18,23 +18,36 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup/
         with:
-          python-version: "3.10"
+          python-version: "3.14"
           optional-dependencies: "development"
 
       - name: Run tests and collect coverage
-        run: pytest --cov --cov-report=term-missing --cov-report=xml --cov-report=html 
+        run: pytest --cov --cov-report=term-missing --cov-report=xml --cov-report=html
 
       - name: Enforce Patch Coverage
+        if: '!cancelled()'
         run: |
-          diff-cover coverage.xml \
-            --config-file pyproject.toml \
-            --compare-branch=origin/${{ github.base_ref || 'dev' }} \
-            --show-uncovered \
-            --format html:dc-report.html \
-            --format markdown:dc-report.md
-          cat dc-report.md >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage.xml ]; then
+            diff-cover coverage.xml \
+              --config-file pyproject.toml \
+              --compare-branch=origin/${{ github.base_ref || 'dev' }} \
+              --show-uncovered \
+              --format html:dc-report.html \
+              --format markdown:dc-report.md
+          else
+            echo "coverage.xml not found (tests may have crashed before coverage was written)."
+            exit 1
+          fi
+
+      - name: Publish Patch Coverage Summary
+        if: '!cancelled()'
+        run: |
+          if [ -f dc-report.md ]; then
+            cat dc-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload Interactive HTML Coverage Reports
+        if: '!cancelled()'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
         with:
           name: coverage-reports

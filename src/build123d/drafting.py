@@ -187,8 +187,6 @@ class Draft:
 
     """
 
-    # pylint: disable=too-many-instance-attributes
-
     # Class Attributes
     unit_LUT: ClassVar[dict] = {True: "mm", False: '"'}
 
@@ -342,6 +340,10 @@ class DimensionLine(BaseSketchObject):
     Type 2) The text fit within the path and the arrows go outside
     Type 3) Neither the text nor the arrows fit within the path
 
+    Attributes:
+        label_str (str): Resolved text used to create the label. Changing this
+            attribute does not rebuild the geometry.
+
     Args:
         path (PathDescriptor): a very general type of input used to describe the path the
             dimension line will follow.
@@ -379,7 +381,6 @@ class DimensionLine(BaseSketchObject):
         label_angle: bool = False,
         mode: Mode = Mode.ADD,
     ):
-        # pylint: disable=too-many-locals
 
         context = BuildSketch._get_context(self)
         if sketch is None and not (context is None or context.sketch is None):
@@ -395,6 +396,7 @@ class DimensionLine(BaseSketchObject):
 
         # Generate the label
         label_str = draft._label_to_str(label, path_obj, label_angle, tolerance)
+        self.label_str: str = label_str
         label_shape = Text(
             txt=label_str,
             font_size=draft.font_size,
@@ -505,6 +507,10 @@ class ExtensionLine(BaseSketchObject):
     Typically used for (but not restricted to) outside dimensions, with a pair of lines
     extending from the edge of a part to a dimension line.
 
+    Attributes:
+        label_str (str): Resolved text used to create the label. Changing this
+            attribute does not rebuild the geometry.
+
     Args:
         border (PathDescriptor): a very general type of input defining the object to
             be dimensioned. Typically this value would be extracted from the part but is
@@ -554,7 +560,6 @@ class ExtensionLine(BaseSketchObject):
         measurement_direction: VectorLike | None = None,
         mode: Mode = Mode.ADD,
     ):
-        # pylint: disable=too-many-locals
 
         context = BuildSketch._get_context(self)
         if sketch is None and not (context is None or context.sketch is None):
@@ -597,10 +602,6 @@ class ExtensionLine(BaseSketchObject):
             # to the offset (offset is the perpendicular displacement of the line).
             # The 90° rotation in the XY plane is offset × Z.
             measurement_direction = offset_vector.cross(Vector(0, 0, 1))
-            if measurement_direction.length < TOLERANCE:
-                raise ValueError(
-                    "offset vector must have a non-zero component in the XY plane"
-                )
 
         if measurement_direction is not None:
             measure_object_span = object_to_measure.position_at(
@@ -698,6 +699,7 @@ class ExtensionLine(BaseSketchObject):
             mode=Mode.PRIVATE,
         )
         self.dimension = d_line.dimension  #: length of the dimension
+        self.label_str: str = d_line.label_str
 
         e_line_sketch = Sketch(children=e_lines + d_line.faces())
 
@@ -757,7 +759,6 @@ class TechnicalDrawing(BaseSketchObject):
         line_width: float = 0.5,
         mode: Mode = Mode.ADD,
     ):
-        # pylint: disable=too-many-locals
 
         if design_date is None:
             design_date = date.today()

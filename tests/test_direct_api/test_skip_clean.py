@@ -28,7 +28,8 @@ license:
 
 import unittest
 
-from build123d.topology import SkipClean
+from build123d.geometry import Plane
+from build123d.topology import SkipClean, Solid
 
 
 class TestSkipClean(unittest.TestCase):
@@ -62,6 +63,20 @@ class TestSkipClean(unittest.TestCase):
 
         # Ensure `clean` is restored to True after an exception
         self.assertTrue(SkipClean.clean)
+
+    def test_boolean_op_leaves_splitter_faces(self):
+        """Fusing two boxes face to face normally merges the shared faces;
+        inside SkipClean they survive."""
+        left = Solid.make_box(1, 1, 1)
+        right = Solid.make_box(1, 1, 1, Plane((1, 0, 0)))
+
+        cleaned = left.fuse(right)
+        with SkipClean():
+            uncleaned = left.fuse(right)
+
+        self.assertEqual(len(cleaned.faces()), 6)
+        self.assertGreater(len(uncleaned.faces()), 6)
+        self.assertAlmostEqual(uncleaned.volume, cleaned.volume, 6)
 
 
 if __name__ == "__main__":

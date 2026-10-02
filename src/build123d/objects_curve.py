@@ -760,7 +760,7 @@ class ConstrainedArcs(BaseCurveObject):
         tangency_one: tuple[Axis | Edge, Tangency] | Axis | Edge | Vertex | VectorLike,
         *,
         radius: float,
-        center_on: Edge,
+        center_on: Axis | Edge,
         selector: Callable[
             [ShapeList[Edge]], Edge | ShapeList[Edge]
         ] = lambda arcs: arcs,

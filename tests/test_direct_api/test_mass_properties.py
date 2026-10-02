@@ -28,6 +28,7 @@ license:
 
 import unittest
 from build123d.objects_part import Box, Cylinder, Sphere
+from build123d.topology import Solid
 from build123d.geometry import Align, Axis
 from build123d import Sphere, Align, Axis
 from math import pi
@@ -124,6 +125,30 @@ class TestMassProperties(unittest.TestCase):
         self.assertAlmostEqual(
             cylinder.radius_of_gyration(Axis.Z), expected_radius_z, places=5
         )
+
+
+class TestEmptyShapeMassProperties(unittest.TestCase):
+    """Mass properties are undefined for a shape with no geometry."""
+
+    def test_matrix_of_inertia(self):
+        with self.assertRaisesRegex(ValueError, "matrix for empty shape"):
+            Solid().matrix_of_inertia
+
+    def test_principal_properties(self):
+        with self.assertRaisesRegex(ValueError, "properties for empty shape"):
+            Solid().principal_properties
+
+    def test_static_moments(self):
+        with self.assertRaisesRegex(ValueError, "moments for empty shape"):
+            Solid().static_moments
+
+    def test_radius_of_gyration(self):
+        with self.assertRaisesRegex(ValueError, "radius of gyration for empty"):
+            Solid().radius_of_gyration(Axis.Z)
+
+    def test_orientation(self):
+        with self.assertRaisesRegex(ValueError, "orientation of an empty shape"):
+            Solid().orientation
 
 
 if __name__ == "__main__":

@@ -57,20 +57,27 @@ from typing import Any, TYPE_CHECKING
 
 from collections.abc import Iterable
 
-from OCP.BRep import BRep_Tool
+from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve
-from OCP.BRepCheck import BRepCheck_Analyzer
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
-from OCP.BRepTools import BRepTools_ReShape
+from OCP.BRepCheck import BRepCheck_Analyzer
+from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+from OCP.BRepGProp import BRepGProp, BRepGProp_Face
+from OCP.BRepTools import BRepTools, BRepTools_ReShape
 from OCP.GeomAbs import GeomAbs_CurveType
 from OCP.BRepLib import BRepLib_FindSurface
 from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
 from OCP.BRepPrimAPI import BRepPrimAPI_MakePrism
+from OCP.GProp import GProp_GProps
+from OCP.gp import gp_Pnt, gp_Vec
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape
-from OCP.TopAbs import TopAbs_ShapeEnum
+from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp, TopExp_Explorer
-from OCP.TopTools import TopTools_IndexedMapOfShape, TopTools_ListOfShape
+from OCP.collections import (
+    IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher,
+    List_TopoDS_Shape,
+)
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Compound,
@@ -89,11 +96,104 @@ from .shape_core import (
     downcast,
     shapetype,
     _make_topods_compound_from_shapes,
+    _sew_topods_faces,
+    _topods_face_normal_at,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
     from .zero_d import Vertex  # pylint: disable=R0801
     from .one_d import Edge, Wire  # pylint: disable=R0801
+
+
+def _topods_face_position(face: TopoDS_Face, u: float, v: float) -> Vector:
+    """The point of a face at normalized (u, v), each from 0 to 1 across the
+    face's own parameter range."""
+    u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(face)
+    surface = BRep_Tool.Surface_s(face)
+    return Vector(
+        surface.Value(u_min + u * (u_max - u_min), v_min + v * (v_max - v_min))
+    )
+
+
+def _topods_face_normal(face: TopoDS_Face, u: float = 0.5, v: float = 0.5) -> Vector:
+    """The unit normal of a face at normalized (u, v), with the face's own
+    orientation: reversed faces point the other way from their surface."""
+    u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(face)
+    point, normal = gp_Pnt(), gp_Vec()
+    BRepGProp_Face(face).Normal(
+        u_min + u * (u_max - u_min), v_min + v * (v_max - v_min), point, normal
+    )
+    return Vector(normal).normalized()
+
+
+def _topods_face_center(face: TopoDS_Face) -> Vector:
+    """The centre of mass of a face's area."""
+    properties = GProp_GProps()
+    BRepGProp.SurfaceProperties_s(face, properties)
+    return Vector(properties.CentreOfMass())
+
+
+def _topods_point_on_face(
+    face: TopoDS_Face, point: VectorLike, tolerance: float = TOLERANCE
+) -> bool:
+    """Whether a point lies on a face, its boundary included, within a
+    tolerance."""
+    classifier = BRepClass3d_SolidClassifier(face)
+    classifier.Perform(gp_Pnt(*Vector(point)), tolerance)
+    return classifier.IsOnAFace()
+
+
+def _make_topods_shell(faces: Iterable[TopoDS_Face]) -> TopoDS_Shell:
+    """One shell from faces: a single face held in a shell of its own, or
+    several sewn together.
+
+    Raises:
+        ValueError: no faces, or faces that do not sew into one shell
+    """
+    faces = list(faces)
+    if not faces:
+        raise ValueError("a shell needs at least one face")
+    if len(faces) == 1:
+        shell = TopoDS_Shell()
+        builder = BRep_Builder()
+        builder.MakeShell(shell)
+        builder.Add(shell, faces[0])
+        return shell
+    sewn = _sew_topods_faces(faces)
+    if not isinstance(sewn, TopoDS_Shell):
+        raise ValueError("the faces do not sew into one connected shell")
+    return sewn
+
+
+def _topods_material_side(face: TopoDS_Face, edge: TopoDS_Edge) -> Vector:
+    """The direction into a face's material across one of its edges.
+
+    A valid face keeps its material on the left of every wire as it walks
+    it, holes included, so the face's normal crossed with the edge's tangent,
+    both taken at the edge's middle and the tangent as the face walks the
+    edge, points into the material. The edge is read as it occurs in the
+    face, whatever orientation, or moved copy, of it was given.
+
+    Raises:
+        ValueError: the edge is not an edge of the face
+    """
+    occurrence = None
+    explorer = TopExp_Explorer(face, TopAbs_ShapeEnum.TopAbs_EDGE)
+    while explorer.More():
+        if explorer.Current().IsSame(edge):
+            occurrence = TopoDS.Edge(explorer.Current())
+            break
+        if occurrence is None and explorer.Current().IsPartner(edge):
+            occurrence = TopoDS.Edge(explorer.Current())
+        explorer.Next()
+    if occurrence is None:
+        raise ValueError("the edge is not an edge of the face")
+    curve = BRepAdaptor_Curve(occurrence)
+    point, tangent = gp_Pnt(), gp_Vec()
+    curve.D1((curve.FirstParameter() + curve.LastParameter()) / 2, point, tangent)
+    if occurrence.Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
+        tangent.Reverse()
+    return _topods_face_normal_at(face, point).cross(Vector(tangent).normalized())
 
 
 def _extrude_topods_shape(obj: TopoDS_Shape, direction: VectorLike) -> TopoDS_Shape:
@@ -209,7 +309,7 @@ def _straighten_linear_bezier_edges(shape: TopoDS_Shape) -> TopoDS_Shape:
     """
     reshape = BRepTools_ReShape()
     replaced = False
-    edge_map = TopTools_IndexedMapOfShape()
+    edge_map = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
     TopExp.MapShapes_s(shape, TopAbs_ShapeEnum.TopAbs_EDGE, edge_map)
     for i in range(1, edge_map.Extent() + 1):
         edge = TopoDS.Edge(edge_map.FindKey(i))
@@ -356,13 +456,13 @@ def new_edges(*objects: Shape, combined: Shape) -> ShapeList[Edge]:
         ShapeList[Edge]: new edges
     """
     # Create a list of combined object edges
-    combined_topo_edges = TopTools_ListOfShape()
+    combined_topo_edges = List_TopoDS_Shape()
     for edge in combined.edges():
         if edge.wrapped is not None:
             combined_topo_edges.Append(edge.wrapped)
 
     # Create a list of original object edges
-    original_topo_edges = TopTools_ListOfShape()
+    original_topo_edges = List_TopoDS_Shape()
     for edge in [e for obj in objects for e in obj.edges()]:
         if edge.wrapped is not None:
             original_topo_edges.Append(edge.wrapped)

@@ -566,5 +566,22 @@ class TestJointPropagation(DirectApiTestCase):
         )
 
 
+class TestJointValidation(DirectApiTestCase):
+    """Guards on the joint classes."""
+
+    def test_ball_joint_angle_types(self):
+        ball = BallJoint("ball", Solid.make_box(1, 1, 1), Location())
+        rigid = RigidJoint("rigid", Solid.make_box(1, 1, 1), Location())
+        for angles in (Rotation(0, 0, 0), (0, 0, 0), None):
+            with self.subTest(angles=angles):
+                self.assertEqual(ball.relative_to(rigid, angles=angles), Location())
+
+    def test_ball_joint_invalid_angles(self):
+        ball = BallJoint("ball", Solid.make_box(1, 1, 1), Location())
+        rigid = RigidJoint("rigid", Solid.make_box(1, 1, 1), Location())
+        with self.assertRaisesRegex(TypeError, "angles is of an unknown type"):
+            ball.relative_to(rigid, angles="bogus")
+
+
 if __name__ == "__main__":
     unittest.main()
