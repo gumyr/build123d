@@ -4084,6 +4084,16 @@ class Wire(Mixin1D[TopoDS_Wire]):
             next_edge._extracted_from(self)
             edge_list.append(next_edge)
             explorer.Next()
+
+        # The WireExplorer skips edges at the branch vertices of non-manifold wires
+        all_edges = TopExp_Explorer(self.wrapped, ta.TopAbs_EDGE)
+        while all_edges.More():
+            topods_edge = all_edges.Current()
+            if not any(topods_edge.IsSame(edge.wrapped) for edge in edge_list):
+                missing_edge = Edge(TopoDS.Edge(topods_edge))
+                missing_edge._extracted_from(self)
+                edge_list.append(missing_edge)
+            all_edges.Next()
         return self._select(edge_list, select)
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Wire:
