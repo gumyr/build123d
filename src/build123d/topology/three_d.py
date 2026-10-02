@@ -63,7 +63,7 @@ from bd_materials import FinishedMaterial
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Builder
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
+from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_MakeSolid
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepFeat import BRepFeat_MakeDPrism
@@ -85,7 +85,7 @@ from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakeWedge,
 )
 from OCP.GeomAbs import GeomAbs_Intersection, GeomAbs_JoinType
-from OCP.gp import gp_Ax2, gp_Pnt, gp_Vec
+from OCP.gp import gp_Ax2, gp_Pln, gp_Pnt, gp_Vec
 from OCP.GProp import GProp_GProps
 from OCP.LocOpe import LocOpe_DPrism
 from OCP.ShapeFix import ShapeFix_Solid
@@ -1199,8 +1199,19 @@ class Solid(Mixin3D[TopoDS_Solid]):
             and taper > 0
             and not profile.inner_wires()
         ):
+            # LocOpe_DPrism extrudes along the axis of the underlying plane and
+            # ignores a REVERSED face, so give it a FORWARD face on a plane
+            # whose axis is the extrusion direction
+            spine = profile.wrapped
+            if spine.Orientation() != ta.TopAbs_FORWARD:
+                spine_plane = gp_Pln(
+                    profile.center().to_pnt(), direction.normalized().to_dir()
+                )
+                spine = BRepBuilderAPI_MakeFace(
+                    spine_plane, profile.outer_wire().wrapped, True
+                ).Face()
             prism_builder = LocOpe_DPrism(
-                profile.wrapped,
+                spine,
                 direction.length / cos(radians(taper)),
                 radians(taper),
             )
