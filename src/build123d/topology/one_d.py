@@ -175,6 +175,7 @@ from OCP.collections import (
     IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
     IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher,
     List_TopoDS_Shape,
+    Map_TopoDS_Shape_TopTools_ShapeMapHasher,
 )
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp, TopExp_Explorer
@@ -4082,12 +4083,27 @@ class Wire(Mixin1D[TopoDS_Wire]):
         explorer = BRepTools_WireExplorer(self.wrapped)
 
         edge_list: ShapeList[Edge] = ShapeList()
+        explored = Map_TopoDS_Shape_TopTools_ShapeMapHasher()
         while explorer.More():
-            next_edge = Edge(explorer.Current())
+            explored_edge = explorer.Current()
+            explored.Add(explored_edge)
+            next_edge = Edge(explored_edge)
             # pylint: disable=attribute-defined-outside-init
             next_edge._extracted_from(self)
             edge_list.append(next_edge)
             explorer.Next()
+
+        # The WireExplorer skips edges at the branch vertices of non-manifold
+        # wires; those are appended after the edges it found, whose order is
+        # left as the explorer gave it
+        all_edges = TopExp_Explorer(self.wrapped, ta.TopAbs_EDGE)
+        while all_edges.More():
+            topods_edge = all_edges.Current()
+            if explored.Add(topods_edge):
+                missing_edge = Edge(TopoDS.Edge(topods_edge))
+                missing_edge._extracted_from(self)
+                edge_list.append(missing_edge)
+            all_edges.Next()
         return self._select(edge_list, select)
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Wire:

@@ -37,7 +37,7 @@ import build123d.topology.one_d as one_d
 
 from build123d.build_enums import GeomType, PositionMode, Side
 from build123d.build_line import BuildLine
-from build123d.geometry import Axis, Color, Location, Plane, Pos, Vector
+from build123d.geometry import Axis, Color, Location, Plane, Pos, Rot, Vector
 from build123d.objects_curve import Curve, Line, JernArc, PolarLine, Polyline, Spline
 from build123d.objects_sketch import Circle, Rectangle, RectangleRounded, RegularPolygon
 from build123d.operations_generic import fillet
@@ -302,6 +302,22 @@ class TestWire(unittest.TestCase):
         self.assertAlmostEqual(ordered_edges[0] @ 0, (0, 0, 0), 5)
         self.assertAlmostEqual(ordered_edges[1] @ 0, (1, 0, 0), 5)
         self.assertAlmostEqual(ordered_edges[2] @ 0, (1, 1, 0), 5)
+
+    def test_edges_of_branching_wire(self):
+        line = Line((0, 0), (30, 0))
+        star = line + Rot(Z=-120) * line + Rot(Z=120) * line
+        self.assertIsInstance(star, Wire)
+        self.assertEqual(len(star.edges()), 3)
+        self.assertAlmostEqual(star.length, 90, 5)
+        both = star + Rot(Z=60) * star
+        self.assertEqual(len(both.edges()), 6)
+        self.assertAlmostEqual(both.length, 180, 5)
+
+    def test_edges_connection_order(self):
+        edges = Wire.make_polygon([(0, 0), (1, 0), (1, 1), (0, 1)]).edges()
+        self.assertEqual(len(edges), 4)
+        for first, second in zip(edges, edges[1:]):
+            self.assertAlmostEqual(first.end_point(), second.start_point(), 5)
 
     @staticmethod
     def _reversed_wires() -> dict[str, Wire]:
