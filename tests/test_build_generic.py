@@ -1050,6 +1050,16 @@ class TestSweep(unittest.TestCase):
 
         self.assertTrue(p.part.is_valid)
 
+    def test_edge_sweep_keeps_shell(self):
+        # Issue #777: the faces an edge sweeps out stay in their shell
+        swept = sweep(Line((0, 0), (0, 10)), Polyline((0, 0), (10, 0), (10, 0, 10)))
+        self.assertIsInstance(swept, Sketch)
+        self.assertEqual(len(swept.faces()), 2)
+        self.assertAlmostEqual(swept.area, 200, 5)
+        shell = swept.shell()
+        self.assertTrue(shell.is_valid)
+        self.assertEqual(len(shell.faces()), 2)
+
     def test_path_error(self):
         e1 = Edge.make_line((0, 0), (1, 0))
         e2 = Edge.make_line((2, 0), (3, 0))

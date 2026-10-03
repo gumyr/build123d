@@ -1168,7 +1168,8 @@ def sweep(
 ) -> Part | Sketch:
     """Generic Operation: sweep
 
-    Sweep pending 1D or 2D objects along path.
+    Sweep pending 1D or 2D objects along path. The faces swept out by a 1D
+    section are returned in a Sketch that holds them as a Shell.
 
     Args:
         sections (Compound |  Edge |  Wire |  Face |  Solid): cross sections to sweep into object
@@ -1260,19 +1261,19 @@ def sweep(
                 for face in face_list
             ]
 
-    # sweep to create faces
-    new_faces: list[Face] = []
+    # sweep to create faces, kept together in the shell each section sweeps out
+    new_shells: list[Shell] = []
     if edge_list:
         for sec in section_list:
-            swept = Shell.sweep(sec, path_wire, transition)
-            new_faces.extend(swept.faces())
+            new_shells.append(Shell.sweep(sec, path_wire, transition))
+    new_faces = [face for shell in new_shells for face in shell.faces()]
 
     if context is not None:
         context._add_to_context(*(new_solids + new_faces), clean=clean, mode=mode)
     elif clean:
         new_solids = [solid.clean() for solid in new_solids]
-        new_faces = [face.clean() for face in new_faces]
+        new_shells = [shell.clean() for shell in new_shells]
 
     if new_solids:
         return Part(Compound(new_solids).wrapped)
-    return Sketch(Compound(new_faces).wrapped)
+    return Sketch(Compound(new_shells).wrapped)
