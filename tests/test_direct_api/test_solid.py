@@ -32,6 +32,8 @@ import unittest
 # Mocks for testing failure cases
 from unittest.mock import MagicMock, patch
 
+import OCP.TopAbs as ta
+
 from build123d.build_enums import GeomType, Kind, Until
 from build123d.geometry import Axis, Location, Plane, Pos, Vector
 from build123d.objects_curve import Spline
@@ -117,6 +119,18 @@ class TestSolid(unittest.TestCase):
                         else:
                             self.assertAlmostEqual(bbox.min, (-size, -size, -h), 1)
                             self.assertAlmostEqual(bbox.max, (size, size, 0), 1)
+
+    def test_extrude_taper_reversed_face(self):
+        # a REVERSED face whose normal still points along the extrusion
+        face = (-Face.make_rect(1, 1)).rotate(Axis.X, 180)
+        self.assertAlmostEqual(face.normal_at(), (0, 0, 1), 5)
+        self.assertEqual(face.wrapped.Orientation(), ta.TopAbs_REVERSED)
+        taper_solid = Solid.extrude_taper(face, (0, 0, 2), 10)
+        bbox = taper_solid.bounding_box()
+        self.assertAlmostEqual(bbox.min.Z, 0, 5)
+        self.assertAlmostEqual(bbox.max.Z, 2, 5)
+        b = 1 - 2 * 2 * math.tan(math.radians(10))
+        self.assertAlmostEqual(taper_solid.volume, 2 * (1 + b**2 + b) / 3, 5)
 
     def test_extrude_taper_with_hole(self):
         rect_hole = Face.make_rect(1, 1).make_holes([Wire.make_circle(0.25)])
