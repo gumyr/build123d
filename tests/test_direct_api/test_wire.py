@@ -48,6 +48,7 @@ from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_NonManifoldWire,
 )
 from OCP.gp import gp_Pnt
+from OCP.TopoDS import TopoDS
 
 
 class TestWire(unittest.TestCase):
@@ -317,6 +318,74 @@ class TestWire(unittest.TestCase):
         self.assertEqual(len(edges), 4)
         for first, second in zip(edges, edges[1:]):
             self.assertAlmostEqual(first.end_point(), second.start_point(), 5)
+
+    @staticmethod
+    def _reversed_wires() -> dict[str, Wire]:
+        """Wires the kernel marks as reversed, as those of a mirrored sketch are"""
+
+        def flipped(wire: Wire) -> Wire:
+            return Wire(TopoDS.Wire(wire.wrapped.Reversed()))
+
+        mixed = Wire(
+            [
+                Edge.make_line((0, 0), (4, 0)),
+                Edge.make_line((4, 3), (4, 0)),
+                Edge.make_three_point_arc((4, 3), (3, 5), (1, 5)),
+            ]
+        )
+        wires = {
+            "open": flipped(Polyline((0, 0), (4, 0), (4, 3), (1, 5)).wire()),
+            "open, edges in both directions": flipped(mixed),
+            "single edge": flipped(Wire([Edge.make_line((0, 0), (4, 0))])),
+            "mirrored rectangle": Rectangle(2, 2).mirror().wire(),
+            "mirrored rounded rectangle": RectangleRounded(4, 3, 0.5)
+            .mirror(Plane.YZ)
+            .wire(),
+            "outer wire of a flipped face": (-Rectangle(2, 2).face()).outer_wire(),
+        }
+        assert not any(wire.is_forward for wire in wires.values())
+        return wires
+
+    def test_param_at_point_reversed_wire(self):
+        # Issue #1149: the parameter of a point is the one position_at takes
+        for name, wire in self._reversed_wires().items():
+            for u_value in (0.1, 0.3, 0.45, 0.625, 0.8, 0.95):
+                with self.subTest(wire=name, u_value=u_value):
+                    point = wire.position_at(u_value)
+                    self.assertAlmostEqual(wire.param_at_point(point), u_value, 5)
+
+        mirrored = Rectangle(2, 2).mirror().wire()
+        self.assertAlmostEqual(
+            mirrored @ mirrored.param_at_point((1, 0, 0)), (1, 0, 0), 5
+        )
+
+    def test_sort_by_reversed_wire(self):
+        for name, wire in self._reversed_wires().items():
+            with self.subTest(wire=name):
+                sorted_edges = wire.edges().sort_by(wire)
+                self.assertLess(sorted_edges[0].distance_to(wire @ 0.01), 1e-5)
+                self.assertLess(sorted_edges[-1].distance_to(wire @ 0.99), 1e-5)
+
+    def test_trim_reversed_wire(self):
+        for name, wire in self._reversed_wires().items():
+            for by_point in (False, True):
+                with self.subTest(wire=name, by_point=by_point):
+                    start, end = wire @ 0.2, wire @ 0.7
+                    trimmed = wire.trim(start, end) if by_point else wire.trim(0.2, 0.7)
+                    self.assertAlmostEqual(trimmed.length, wire.length / 2, 5)
+                    self.assertAlmostEqual(trimmed @ 0, start, 5)
+                    self.assertAlmostEqual(trimmed @ 1, end, 5)
+
+    def test_order_edges_reversed_wire(self):
+        # The edges stay in the kernel's order, each joined to the next
+        for name, wire in self._reversed_wires().items():
+            with self.subTest(wire=name):
+                ordered_edges = wire.order_edges()
+                for edge, kernel_edge in zip(ordered_edges, wire.edges()):
+                    self.assertAlmostEqual(edge @ 0, kernel_edge @ 0, 5)
+                    self.assertAlmostEqual(edge @ 1, kernel_edge @ 1, 5)
+                for edge, next_edge in zip(ordered_edges, ordered_edges[1:]):
+                    self.assertAlmostEqual(edge @ 1, next_edge @ 0, 5)
 
     def test_geom_adaptor(self):
         w = Polyline((0, 0), (1, 0), (1, 1))

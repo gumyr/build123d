@@ -428,6 +428,23 @@ class TestEdge(unittest.TestCase):
             u_back = curve.param_at_point(p)
             self.assertAlmostEqual(u, u_back, delta=1e-6, msg=f"u={u}, u_back={u_back}")
 
+    def test_param_at_point_reversed_edge(self):
+        # Issue #726: the parameter of a point is the one position_at takes,
+        # at the vertices and, without the rounding of the search, between them
+        edges = {
+            "line": Edge.make_line((0, 0), (10, 20)),
+            "arc": Edge.make_three_point_arc((4, 3), (3, 5), (1, 5)),
+            "spline": Edge.make_spline([(0, 0), (2, 3), (5, 1), (7, 4)]),
+            "ellipse arc": Edge.make_ellipse(5, 2, start_angle=20, end_angle=200),
+        }
+        for name, forward_edge in edges.items():
+            edge = forward_edge.reversed()
+            self.assertFalse(edge.is_forward)
+            for u_value in (0, 0.123456789, 0.5, 0.8, 1):
+                with self.subTest(edge=name, u_value=u_value):
+                    point = edge.position_at(u_value)
+                    self.assertAlmostEqual(edge.param_at_point(point), u_value, 9)
+
     def test_conical_helix(self):
         helix = Edge.make_helix(1, 4, 1, normal=(-1, 0, 0), angle=10, lefthand=True)
         self.assertAlmostEqual(helix.bounding_box().min.X, -4, 5)
