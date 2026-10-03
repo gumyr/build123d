@@ -35,7 +35,7 @@ from unittest.mock import PropertyMock, patch
 import numpy as np
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
 from anytree import PreOrderIter
-from build123d.build_enums import CenterOf, GeomType, Keep
+from build123d.build_enums import CenterOf, GeomType, Keep, Transition
 from build123d.geometry import (
     Axis,
     Color,
@@ -512,6 +512,32 @@ class TestShape(unittest.TestCase):
                 children=[Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)]
             ).is_manifold
         )
+
+    def test_manifold_degenerate_edges(self):
+        # The poles of a sphere and the apex of a cone are edges of one face
+        box = Solid.make_box(4, 4, 4)
+        self.assertTrue(Solid.make_sphere(1).is_manifold)
+        self.assertTrue(Solid.make_cone(2, 0, 3).is_manifold)
+        self.assertTrue(box.fillet(0.5, box.edges()).is_manifold)
+        self.assertAlmostEqual(
+            Solid.make_sphere(1).shell().volume, Solid.make_sphere(1).volume, 5
+        )
+
+    def test_manifold_inconsistent_orientation(self):
+        # Issue #855: a sweep that folds over itself has two faces on every
+        # edge, but they are not consistently oriented
+        path = Wire.make_polygon([(0, 20), (20, 20), (20, 0)], close=False)
+        start = Plane(origin=(0, 20, 0), z_dir=(1, 0, 0))
+        folded = Solid.sweep(
+            start * Face.make_rect(40, 40), path, transition=Transition.ROUND
+        )
+        self.assertFalse(folded.is_valid)
+        self.assertFalse(folded.is_manifold)
+        unfolded = Solid.sweep(
+            start * Face.make_rect(30, 30), path, transition=Transition.ROUND
+        )
+        self.assertTrue(unfolded.is_valid)
+        self.assertTrue(unfolded.is_manifold)
 
     def test_inherit_color(self):
         # Create some objects and assign colors to them

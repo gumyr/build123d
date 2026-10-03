@@ -112,7 +112,7 @@ from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
 from OCP.GeomLib import GeomLib_IsPlanarSurface
 from OCP.gp import gp_Ax1, gp_Ax2, gp_Dir, gp_Pnt, gp_Trsf, gp_TrsfForm, gp_Vec, gp_XYZ
 from OCP.GProp import GProp_GProps
-from OCP.ShapeAnalysis import ShapeAnalysis_Curve
+from OCP.ShapeAnalysis import ShapeAnalysis_Curve, ShapeAnalysis_Shell
 from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
 from OCP.ShapeFix import ShapeFix_Shape
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
@@ -513,7 +513,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """is_manifold
 
         Check if each edge in the given Shape has exactly two faces associated with it
-        (skipping degenerate edges). If so, the shape is manifold.
+        (skipping degenerate edges) and those faces are consistently oriented. If so,
+        the shape is manifold.
+
+        This tests how the faces are connected. It does not detect faces that
+        overlap or cross each other in space; use is_valid for that.
 
         Returns:
             bool: is the shape manifold or water tight
@@ -547,15 +551,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 # Access each edge in the map sequentially
                 edge = TopoDS.Edge(shape_map.FindKey(i + 1))
 
-                vertex0 = TopoDS_Vertex()
-                vertex1 = TopoDS_Vertex()
-
-                # Extract the two vertices of the current edge and stores them in vertex0/1.
-                TopExp.Vertices_s(edge, vertex0, vertex1)
-
-                # Check if both vertices are null and if they are the same vertex. If so, the
-                # edge is considered degenerate (i.e., has zero length), and it is skipped.
-                if vertex0.IsNull() and vertex1.IsNull() and vertex0.IsSame(vertex1):
+                # A degenerate edge, such as the pole of a sphere or the apex of a
+                # cone, has no length and belongs to one face only, so it is skipped.
+                if BRep_Tool.Degenerated_s(edge):
                     continue
 
                 # Check if the current edge has exactly two faces associated with it. If not,
@@ -563,6 +561,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 # shape is not manifold.
                 if shape_map.FindFromIndex(i + 1).Extent() != 2:
                     return False
+
+            # In a closed shell each edge is used once in each direction; faces
+            # joined with the same direction on both sides are not manifold.
+            orientation = ShapeAnalysis_Shell()
+            orientation.LoadShells(shape)
+            orientation.CheckOrientedShells(shape, True, True)
+            if orientation.HasBadEdges():
+                return False
 
         return True
 
