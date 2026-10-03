@@ -17,8 +17,11 @@ from build123d.objects_part import Box, Cylinder
 from build123d.objects_sketch import Rectangle
 from build123d.operations_part import extrude
 from build123d.topology import Compound, Part, Solid
-from build123d.geometry import Axis, Color, Location, Vector, VectorLike
+from build123d.geometry import Axis, Color, Location, Plane, Vector, VectorLike
+from build123d.joints import RigidJoint
 from build123d.mesher import Mesher
+from OCP.BRep import BRep_Tool
+from OCP.TopLoc import TopLoc_Location
 
 
 def temp_3mf_file():
@@ -199,6 +202,23 @@ class TestAddShape(DirectApiTestCase):
         importer = Mesher()
         shapes = importer.read(filename)
         self.assertEqual(importer.mesh_count, 2)
+
+    def test_add_assembly_with_joint_chain(self):
+        """An assembly of chained parts meshes, and the parts stay unmeshed."""
+        boxes = [Solid.make_box(1, 1, 1, Plane((2 * i, 0, 0))) for i in range(200)]
+        for box in boxes:
+            RigidJoint("out", box, Location((2, 0, 0)))
+            RigidJoint("in", box, Location())
+        for box, following in zip(boxes, boxes[1:]):
+            box.joints["out"].connect_to(following.joints["in"])
+        exporter = Mesher()
+        exporter.add_shape(Compound(children=boxes))
+        self.assertEqual(exporter.mesh_count, 200)
+        for box in boxes:
+            for face in box.faces():
+                self.assertIsNone(
+                    BRep_Tool.Triangulation_s(face.wrapped, TopLoc_Location())
+                )
 
     def test_add_labeled_compounds(self):
         labels = ["A", "B", "C"]
