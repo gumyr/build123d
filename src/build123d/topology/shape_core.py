@@ -1196,6 +1196,15 @@ class Shape(NodeMixin, Generic[TOPODS]):
                     joint.parent = result
         return result
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Return the state to pickle, without the history record"""
+        # The record refers to the kernel shapes of the operation that made
+        # self. Unpickling rebuilds self from new kernel shapes, so the record
+        # would describe nothing in the restored shape and it is left behind.
+        state = self.__dict__.copy()
+        state["_history"] = None
+        return state
+
     def __eq__(self, other) -> bool:
         """Check if two shapes are the same.
 

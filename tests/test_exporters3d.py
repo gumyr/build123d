@@ -419,8 +419,36 @@ class TestExportGltf(DirectApiTestCase):
     #     with self.assertRaises(RuntimeError):
     #         export_gltf(box, "box.gltf")
     #     os.chmod("box.gltf", 0o777)  # Make the file read/write
-    #     os.remove("box.gltf")
-    #     os.remove("box.bin")
+    #         os.remove("box.gltf")
+    #         os.remove("box.bin")
+
+
+def test_export_unicode_labels(tmp_path):
+    """Non-ASCII labels must survive as proper UTF-8 in glTF and STEP exports.
+
+    Regression test: without ``isMultiByte=True`` in ``TCollection_ExtendedString``,
+    UTF-8 bytes were stored one character per byte and re-encoded by the
+    writers, producing mojibake (e.g. "浮筒" -> "æµ®ç...") in glTF node/mesh
+    names and STEP PRODUCT names.
+    """
+    text = "测试浮筒"
+    box = Box(1, 1, 1)
+    box.label = text
+
+    glb_path = tmp_path / "unicode.glb"
+    assert export_gltf(box, glb_path, binary=True)
+    raw = glb_path.read_bytes()
+    json_len = int.from_bytes(raw[12:16], "little")
+    gltf = json.loads(raw[20 : 20 + json_len].decode("utf-8"))
+    assert gltf["nodes"][0]["name"] == text
+    assert gltf["meshes"][0]["name"] == text
+
+    step_path = tmp_path / "unicode.step"
+    assert export_step(box, step_path)
+    step_raw = step_path.read_bytes()
+    assert text.encode("utf-8") in step_raw
+    mojibake = text.encode("utf-8").decode("latin-1").encode("utf-8")
+    assert mojibake not in step_raw
 
 
 @pytest.mark.parametrize(
