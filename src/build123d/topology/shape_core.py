@@ -1830,7 +1830,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self._wrapped is None:
             raise ValueError("Cannot locate an empty shape")
         shape_copy = copy.deepcopy(self, None)
-        shape_copy.wrapped = tcast(TOPODS, downcast(self.wrapped.Located(loc.wrapped)))
+        if isinstance(self.wrapped, TopoDS_Vertex):
+            # Copying a Vertex folds its location into its point, so the copy
+            # is rebuilt from the vertex without its location
+            unplaced = self.wrapped.Located(TopLoc_Location())
+            shape_copy.wrapped = tcast(
+                TOPODS, downcast(BRepBuilderAPI_Copy(unplaced).Shape())
+            )
+        shape_copy.wrapped.Location(loc.wrapped)
         return shape_copy
 
     def mesh(self, tolerance: float, angular_tolerance: float = 0.1):
