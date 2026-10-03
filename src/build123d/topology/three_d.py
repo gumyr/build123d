@@ -55,7 +55,7 @@ license:
 from __future__ import annotations
 
 from collections.abc import Iterable
-from math import cos, radians, tan
+from math import cos, isclose, radians, tan
 from typing import TYPE_CHECKING, ClassVar, cast
 
 from bd_materials import FinishedMaterial
@@ -692,6 +692,13 @@ class Mixin3D(Shape[TOPODS]):
         # The Solid can be inverted, if so reverse
         if offset_solid.volume < 0:
             offset_solid.wrapped.Reverse()
+
+        # MakeThickSolid may silently return the input when it fails
+        if openings and isclose(offset_solid.volume, self.volume, rel_tol=1e-9):
+            raise RuntimeError(
+                "offset Error, the solid was not hollowed, an alternative kind may "
+                "resolve this error"
+            )
 
         return offset_solid
 
