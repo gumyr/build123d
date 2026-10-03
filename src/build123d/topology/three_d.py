@@ -54,6 +54,7 @@ license:
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Iterable
 from math import cos, radians, tan
 from typing import TYPE_CHECKING, ClassVar, cast
@@ -1704,8 +1705,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
         if inner_shapes:
             hollow_outer_shape = outer_shape.cut(*inner_shapes)
             assert isinstance(hollow_outer_shape, Solid)
-            return hollow_outer_shape
+            outer_shape = hollow_outer_shape
 
+        # The kernel reports success for a sweep that folds over itself
+        if make_solid and not outer_shape.is_valid:
+            warnings.warn(
+                "sweep created an invalid solid. A path with a sharp corner needs "
+                "transition=Transition.RIGHT or Transition.ROUND, or a filleted "
+                "path, and the section must be small enough to turn each corner.",
+                stacklevel=2,
+            )
         return outer_shape
 
     @classmethod
@@ -1772,7 +1781,15 @@ class Solid(Mixin3D[TopoDS_Solid]):
         if make_solid:
             builder.MakeSolid()
 
-        return cls(TopoDS.Solid(builder.Shape()))
+        swept = cls(TopoDS.Solid(builder.Shape()))
+        # The kernel reports success for a sweep that folds over itself
+        if make_solid and not swept.is_valid:
+            warnings.warn(
+                "sweep_multi created an invalid solid. The profiles may be too "
+                "large for the curvature of the path or cross each other along it.",
+                stacklevel=2,
+            )
+        return swept
 
     @classmethod
     def thicken(

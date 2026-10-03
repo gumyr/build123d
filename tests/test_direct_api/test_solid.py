@@ -244,6 +244,22 @@ class TestSolid(unittest.TestCase):
         )
         self.assertAlmostEqual(swept.volume, 20.75, 2)
 
+    def test_sweep_warns_when_invalid(self):
+        # The kernel reports success for a sweep that folds over itself
+        path = Wire.make_polygon([(0, 20), (20, 20), (20, 0)], close=False)
+        section = Plane(origin=(0, 20, 0), z_dir=(1, 0, 0)) * Face.make_rect(10, 10)
+        with self.assertWarnsRegex(UserWarning, "sweep created an invalid solid"):
+            folded = Solid.sweep(section, path)
+        self.assertFalse(folded.is_valid)
+
+        arc = Edge.make_circle(5, start_angle=0, end_angle=180)
+        profiles = [
+            Plane(origin=arc @ u, z_dir=arc % u) * Face.make_rect(30, 30)
+            for u in (0, 1)
+        ]
+        with self.assertWarnsRegex(UserWarning, "sweep_multi created an invalid"):
+            Solid.sweep_multi(profiles, arc)
+
     def test_constructor(self):
         with self.assertRaises(TypeError):
             Solid(foo="bar")

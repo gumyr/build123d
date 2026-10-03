@@ -528,9 +528,10 @@ class TestShape(unittest.TestCase):
         # edge, but they are not consistently oriented
         path = Wire.make_polygon([(0, 20), (20, 20), (20, 0)], close=False)
         start = Plane(origin=(0, 20, 0), z_dir=(1, 0, 0))
-        folded = Solid.sweep(
-            start * Face.make_rect(40, 40), path, transition=Transition.ROUND
-        )
+        with self.assertWarnsRegex(UserWarning, "invalid solid"):
+            folded = Solid.sweep(
+                start * Face.make_rect(40, 40), path, transition=Transition.ROUND
+            )
         self.assertFalse(folded.is_valid)
         self.assertFalse(folded.is_manifold)
         unfolded = Solid.sweep(
