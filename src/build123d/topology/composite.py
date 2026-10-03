@@ -762,8 +762,11 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         elements: list[Shape] = []
         for child in self.children:
-            placed = child.moved(base)
-            placed.parent = None
+            # Copy the child and its own children but not the assembly above
+            # it: a copy that followed the parent link would duplicate every
+            # sibling for each child placed.
+            placed = copy.deepcopy(child, {id(self): None})
+            placed.wrapped = downcast(child.wrapped.Moved(base.wrapped))
             elements.append(placed)
         return elements
 
