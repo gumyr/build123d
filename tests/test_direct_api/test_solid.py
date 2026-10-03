@@ -118,6 +118,14 @@ class TestSolid(unittest.TestCase):
                             self.assertAlmostEqual(bbox.min, (-size, -size, -h), 1)
                             self.assertAlmostEqual(bbox.max, (size, size, 0), 1)
 
+    def test_extrude_taper_collapsing_profile(self):
+        cross = (Rectangle(10, 1) + Rectangle(1, 10)).face()
+        self.assertTrue(Solid.extrude_taper(cross, (0, 0, 2), 10).is_valid)
+        # a 15 degree taper over 2 collapses the 1 wide arms
+        with self.assertRaises(ValueError) as context:
+            Solid.extrude_taper(cross, (0, 0, 2), 15)
+        self.assertIn("collapses", str(context.exception))
+
     def test_extrude_taper_with_hole(self):
         rect_hole = Face.make_rect(1, 1).make_holes([Wire.make_circle(0.25)])
         direction = Vector(0, 0, 0.5)

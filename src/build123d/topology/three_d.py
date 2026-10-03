@@ -1204,7 +1204,15 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 direction.length / cos(radians(taper)),
                 radians(taper),
             )
-            new_solid = Solid(TopoDS.Solid(prism_builder.Shape()))
+            prism_shape = prism_builder.Shape()
+            if prism_shape.ShapeType() != ta.TopAbs_SOLID:
+                # an open shell is returned when the taper collapses the profile
+                raise ValueError(
+                    f"Tapered extrusion of {taper} degrees over "
+                    f"{direction.length} collapses the profile - reduce the "
+                    "taper or the extrusion distance"
+                )
+            new_solid = Solid(TopoDS.Solid(prism_shape))
         else:
             # Determine the offset to get the taper
             offset_amt = -direction.length * tan(radians(taper))
