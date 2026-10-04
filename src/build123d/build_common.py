@@ -679,7 +679,7 @@ class Builder(ABC, Generic[ShapeT]):
                 vertex_list.extend(obj_edge.vertices())
         else:
             return self._selected(Vertex, select)
-        return ShapeList(set(vertex_list))
+        return ShapeList(dict.fromkeys(vertex_list))
 
     def vertex(self, select: Select = Select.ALL) -> Vertex:
         """Return Vertex

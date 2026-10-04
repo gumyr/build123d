@@ -1556,9 +1556,9 @@ class FilletPolyline(BaseLineObject):
                 fillets.append(None)
 
             else:
-                other_vertices = {
+                other_vertices = dict.fromkeys(
                     ve for e in edges for ve in e.vertices() if ve != vertex
-                }
+                )
                 third_edge = Edge.make_line(*other_vertices)
                 fillet_face = Face(Wire(edges + [third_edge])).fillet_2d(
                     current_radius, [vertex]
