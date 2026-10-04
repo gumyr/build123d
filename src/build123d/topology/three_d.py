@@ -1184,12 +1184,13 @@ class Solid(Mixin3D[TopoDS_Solid]):
         offset set at the appropriate direction.
 
         Args:
-            section (Face]): cross section
-            normal (VectorLike): a vector along which to extrude the wires. The length
-                of the vector controls the length of the extrusion.
-            taper (float): taper angle in degrees.
+            profile (Face): cross section
+            direction (VectorLike): a vector along which to extrude the profile. The
+                length of the vector controls the length of the extrusion.
+            taper (float): taper angle in degrees. A positive angle narrows the
+                extrusion as it moves away from the profile.
             flip_inner (bool, optional): outer and inner geometry have opposite tapers to
-                allow for part extraction when injection molding.
+                allow for part extraction when injection molding. Defaults to True.
 
         Raises:
             RuntimeError: the tapered solid could not be built, as when the taper
