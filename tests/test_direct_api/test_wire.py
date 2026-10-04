@@ -27,7 +27,9 @@ license:
 """
 
 import math
+import os
 import random
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -41,7 +43,9 @@ from build123d.geometry import Axis, Color, Location, Plane, Pos, Rot, Vector
 from build123d.objects_curve import Curve, Line, JernArc, PolarLine, Polyline, Spline
 from build123d.objects_sketch import Circle, Rectangle, RectangleRounded, RegularPolygon
 from build123d.operations_generic import fillet
-from build123d.topology import Edge, Face, Vertex, Wire
+from build123d.exporters3d import export_step
+from build123d.importers import import_step
+from build123d.topology import Edge, Face, Solid, Vertex, Wire
 from OCP.BRepAdaptor import BRepAdaptor_CompCurve
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_EmptyWire,
@@ -386,6 +390,35 @@ class TestWire(unittest.TestCase):
                     self.assertAlmostEqual(edge @ 1, kernel_edge @ 1, 5)
                 for edge, next_edge in zip(ordered_edges, ordered_edges[1:]):
                     self.assertAlmostEqual(edge @ 1, next_edge @ 0, 5)
+
+    def test_offset_2d_fits_splines_to_offset_curves(self):
+        # Issue #1073: the kernel's own offset curves cannot be written to STEP
+        ellipse = Wire([Edge.make_ellipse(50, 100)])
+        for placement in (Location(), Location((5, 6, 7), (30, 0, 0))):
+            with self.subTest(placement=placement):
+                placed = placement * ellipse
+                grown = placed.offset_2d(50)
+                self.assertTrue(grown.is_valid)
+                self.assertTrue(grown.is_closed)
+                kinds = {edge.geom_type for edge in grown.edges()}
+                self.assertNotIn(GeomType.OFFSET, kinds)
+                self.assertIn(GeomType.BSPLINE, kinds)
+                for edge in grown.edges():
+                    for u_value in (0, 0.5, 1):
+                        self.assertAlmostEqual(
+                            placed.distance_to(edge @ u_value), 50, 5
+                        )
+
+        ring = Solid.extrude(Face(ellipse.offset_2d(50), [ellipse]), Vector(0, 0, 10))
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            step_file = os.path.join(tmp_dir, "ring.step")
+            export_step(ring, step_file)
+            self.assertAlmostEqual(import_step(step_file).volume, ring.volume, 3)
+
+    def test_offset_2d_without_curves_is_unchanged(self):
+        grown = Wire.make_rect(10, 5).offset_2d(1)
+        kinds = {edge.geom_type for edge in grown.edges()}
+        self.assertEqual(kinds, {GeomType.LINE, GeomType.CIRCLE})
 
     def test_geom_adaptor(self):
         w = Polyline((0, 0), (1, 0), (1, 1))

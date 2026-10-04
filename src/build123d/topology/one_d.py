@@ -136,7 +136,10 @@ from OCP.GeomAPI import (
     GeomAPI_PointsToBSpline,
     GeomAPI_ProjectPointOnCurve,
 )
-from OCP.GeomConvert import GeomConvert_CompCurveToBSplineCurve
+from OCP.GeomConvert import (
+    GeomConvert_ApproxCurve,
+    GeomConvert_CompCurveToBSplineCurve,
+)
 from OCP.GeomFill import (
     GeomFill_CorrectedFrenet,
     GeomFill_Frenet,
@@ -466,6 +469,50 @@ def _splice_wire_fillet_corner(
     history.wrapped.Remove(corner_vertex)
     wire_builder.Build()
     return Wire(wire_builder.Wire())._made_by(history)
+
+
+def _offset_curves_to_bsplines(wire: Wire) -> Wire:
+    """Replace the offset curves in an offset wire with B-splines fitted to them
+
+    The offset of anything but a line or a circle is not a curve of the same
+    kind, and the kernel returns it as a curve defined by the offset itself.
+    STEP export, among others, cannot handle those, so each is replaced by a
+    B-spline within a tenth of TOLERANCE of it. A wire without offset curves
+    is returned as it is.
+    """
+    edges = wire.edges()
+    if all(edge.geom_type != GeomType.OFFSET for edge in edges):
+        return wire
+
+    fitted_edges: list[Edge] = []
+    for edge in edges:
+        if edge.geom_type != GeomType.OFFSET:
+            fitted_edges.append(edge)
+            continue
+        adaptor = edge.geom_adaptor()
+        # Fit only the part of the offset curve that the edge uses
+        approximation = GeomConvert_ApproxCurve(
+            Geom_TrimmedCurve(
+                adaptor.Curve().Curve(),
+                adaptor.FirstParameter(),
+                adaptor.LastParameter(),
+            ),
+            TOLERANCE / 10,
+            GeomAbs_C2,
+            100,  # maximum number of segments
+            9,  # maximum degree
+        )
+        if not approximation.HasResult():  # pragma: no cover
+            raise RuntimeError("2D offset curve could not be converted to a spline")
+        fitted = BRepBuilderAPI_MakeEdge(approximation.Curve()).Edge()
+        # The curve is stored without the placement or direction of its edge
+        fitted.Location(edge.wrapped.Location())
+        fitted.Orientation(edge.wrapped.Orientation())
+        fitted_edges.append(Edge(fitted))
+
+    fitted_wire = Wire(fitted_edges)
+    fitted_wire.wrapped.Orientation(wire.wrapped.Orientation())
+    return fitted_wire
 
 
 def _joined_wire(
@@ -1286,7 +1333,7 @@ class Mixin1D(Shape[TOPODS]):
         if isinstance(obj, TopoDS_Compound):
             obj = unwrap_topods_compound(obj, fully=True)
         if isinstance(obj, TopoDS_Wire):
-            offset_wire = Wire(obj)
+            offset_wire = _offset_curves_to_bsplines(Wire(obj))
         else:  # Likely multiple Wires were generated
             raise RuntimeError("Unexpected result type")
 
