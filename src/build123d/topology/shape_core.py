@@ -2311,7 +2311,17 @@ class Shape(NodeMixin, Generic[TOPODS]):
         for part in get_top_level_topods_shapes(split_result):
             sub_shape = self.__class__.cast(part)
             if isinstance(tool, Plane):
-                is_up = tool.to_local_coords(sub_shape).center().Z >= 0
+                # A piece lies wholly on one side of the plane and so does its
+                # centre of mass. The geometric centre need not: that of a curved
+                # face is the middle of its surface, whether trimmed away or not.
+                calc_function = Shape.shape_properties_LUT[shapetype(part)]
+                if calc_function is None:  # pragma: no cover
+                    piece_center = sub_shape.center()
+                else:
+                    piece_properties = GProp_GProps()
+                    calc_function(part, piece_properties)
+                    piece_center = Vector(piece_properties.CentreOfMass())
+                is_up = tool.to_local_coords(piece_center).Z >= 0
             else:
                 # Intersect self and the thickened tool
                 is_up_obj = _topods_bool_op(

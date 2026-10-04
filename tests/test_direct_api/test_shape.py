@@ -192,6 +192,40 @@ class TestShape(unittest.TestCase):
         self.assertLess(s2.volume, s.volume)
         self.assertGreater(s2.volume, 0.0)
 
+    def test_split_curved_faces_by_plane(self):
+        # Issue #1035: a small piece of a curved face lies on one side of the
+        # plane while the middle of its surface lies on the other
+        spine = Edge.make_line((0, -2, 0), (0, 2, 0))
+        sections = [
+            Plane(spine ^ position) * Rotation(0, 0, twist) * Wire.make_rect(size, size)
+            for size, twist, position in zip(
+                (1, 2, 2, 1), (10, 0, 0, -10), (0, 0.33, 0.66, 1)
+            )
+        ]
+        solid = Solid.make_loft(sections)
+        edge = (
+            solid.edges()
+            .group_by(Edge.length)[-1]
+            .sort_by(Axis.X)[-2:]
+            .sort_by(Axis.Z)[-1]
+        )
+        faces = [f for f in solid.faces() if any(edge == e for e in f.edges())]
+        self.assertEqual(len(faces), 2)
+
+        for u_value in (0.0, 0.4):
+            plane = Plane(edge ^ u_value)
+            for face in faces:
+                with self.subTest(u_value=u_value, area=round(face.area, 2)):
+                    top, bottom = face.split(plane, keep=Keep.BOTH)
+                    self.assertIsInstance(top, Face)
+                    self.assertIsInstance(bottom, Face)
+                    self.assertAlmostEqual(top.area + bottom.area, face.area, 5)
+                    heights = lambda piece: [
+                        plane.to_local_coords(Vector(v)).Z for v in piece.vertices()
+                    ]
+                    self.assertGreater(min(heights(top)), -1e-6)
+                    self.assertLess(max(heights(bottom)), 1e-6)
+
     def test_split_by_non_planar_face(self):
         box = Solid.make_box(1, 1, 1)
         tool = Circle(1).wire()
