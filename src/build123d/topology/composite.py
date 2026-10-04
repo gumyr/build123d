@@ -424,7 +424,14 @@ class Compound(Mixin3D[TopoDS_Compound]):
         if system_font.IsSingleStrokeFont() and single_line_width > 0:
             outline = [e.offset_2d(single_line_width / 2) for e in text_flat.edges()]
             outline = [_make_face(o.edges()) for o in outline]
-            text_flat = Compound([]) + outline
+            # The outlines of neighbouring strokes overlap. They are fused without
+            # the fuzzy tolerance that Compound's + applies, as with it the kernel
+            # leaves some of them overlapping instead of merging them.
+            if len(outline) > 1:
+                merged = outline[0].fuse(*outline[1:])
+                text_flat = Compound(merged.get_top_level_shapes())
+            else:
+                text_flat = Compound(outline)
             if any([not f.is_valid for f in text_flat.get_top_level_shapes()]):
                 raise ValueError(
                     "single_line_width "

@@ -525,6 +525,13 @@ class TestBuildSketchObjects(unittest.TestCase):
         singlelinewidth = Text("test", font_size, "singleline", single_line_width=1)
         self.assertEqual(singlelinewidth.single_line_width, 1)
 
+        # Issue #1238: the outlines of the strokes merge into one face per glyph
+        for width in (0.4, 1.0, 1.2):
+            with self.subTest(width=width):
+                digits = Text("123", font_size, "singleline", single_line_width=width)
+                self.assertEqual(len(digits.faces()), 3)
+                self.assertTrue(digits.is_valid)
+
         with self.assertRaises(ValueError):
             Text("test", font_size, "singleline", single_line_width=0)
 
