@@ -38,6 +38,7 @@ from build123d.objects_curve import Spline
 from build123d.objects_part import Box, Torus
 from build123d.objects_sketch import Circle, Rectangle
 from build123d.topology import (
+    ShapeList,
     Compound,
     DraftAngleError,
     Edge,
@@ -144,6 +145,59 @@ class TestSolid(unittest.TestCase):
         taper0 = Solid.extrude_taper(rect_hole, (0, 0, 1), 5)
         taper1 = Solid.extrude_taper(o_rect_hole, o_rect_hole.normal_at(), 5)
         self.assertAlmostEqual(taper0.volume, taper1.volume, 5)
+
+    def test_extrude_taper_follows_direction(self):
+        # Issues #553, #987: the winding of the profile must not set the direction
+        points = [(0, 0), (0, -20), (-10, -21), (-11, 0)]
+        for outline in (points, points[::-1]):
+            profile = Face(Wire.make_polygon(outline))
+            for direction in ((0, 0, 5), (0, 0, -5)):
+                with self.subTest(normal=profile.normal_at().Z, direction=direction):
+                    box = Solid.extrude_taper(profile, direction, 1).bounding_box()
+                    self.assertAlmostEqual(box.max.Z - box.min.Z, 5, 5)
+                    self.assertAlmostEqual(box.center().Z, direction[2] / 2, 5)
+
+    def test_extrude_taper_keeps_planar_sides(self):
+        tapered = Solid.extrude_taper(Face.make_rect(10, 10), (0, 0, 5), -10)
+        self.assertTrue(all(f.geom_type == GeomType.PLANE for f in tapered.faces()))
+
+    def test_extrude_taper_star(self):
+        # Issue #568: three thin bars crossing at the origin, widening taper
+        bar = Rectangle(100, 1)
+        star = (bar + bar.rotate(Axis.Z, 60) + bar.rotate(Axis.Z, 120)).face()
+        tapered = Solid.extrude_taper(star, (0, 0, -2), -15)
+        self.assertTrue(tapered.is_valid)
+        self.assertGreater(tapered.volume, star.area * 2)
+
+    def test_extrude_taper_curved_profile(self):
+        # The sides of an ellipse cannot be drafted, so it is lofted
+        ellipse = Face(Wire(Edge.make_ellipse(8, 4)))
+        tapered = Solid.extrude_taper(ellipse, (0, 0, 5), 10)
+        self.assertTrue(tapered.is_valid)
+        self.assertLess(tapered.volume, ellipse.area * 5)
+        self.assertAlmostEqual(tapered.bounding_box().max.Z, 5, 5)
+
+        holed = ellipse.make_holes([Wire.make_circle(1)])
+        tapered_holed = Solid.extrude_taper(holed, (0, 0, 5), 10)
+        self.assertTrue(tapered_holed.is_valid)
+        self.assertLess(tapered_holed.volume, tapered.volume)
+
+    def test_extrude_taper_draft_falls_back_to_loft(self):
+        # A cross with rounded inner corners, as cut for a Phillips recess,
+        # cannot be drafted at this angle but can be lofted
+        cross = (Rectangle(5.3, 5.3 / 6) + Rectangle(5.3 / 6, 5.3)).face()
+        inner = ShapeList(cross.vertices()).sort_by_distance((0, 0, 0))[:4]
+        recess = cross.fillet_2d(5.3 / 3, inner)
+        tapered = Solid.extrude_taper(recess, (0, 0, -3.27), 20)
+        self.assertTrue(tapered.is_valid)
+        self.assertAlmostEqual(tapered.bounding_box().min.Z, -3.27, 5)
+
+    def test_extrude_taper_collapsing_profile(self):
+        # Issue #567: a 15 degree taper over 2 closes up the 1 wide arms
+        cross = (Rectangle(10, 1) + Rectangle(1, 10)).face()
+        self.assertTrue(Solid.extrude_taper(cross, (0, 0, 2), 10).is_valid)
+        with self.assertRaisesRegex(RuntimeError, "may collapse the profile"):
+            Solid.extrude_taper(cross, (0, 0, 2), 15)
 
     def test_extrude_linear_with_rotation(self):
         # Face

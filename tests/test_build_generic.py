@@ -725,7 +725,9 @@ class OffsetTests(unittest.TestCase):
         with BuildPart() as cup:
             with BuildSketch():
                 Circle(35)
-            extrude(amount=50, taper=-3)
+            with BuildSketch(Plane.XY.offset(50)):
+                Circle(37.62)
+            loft()
             topf = cup.faces().sort_by(Axis.Z)[-1]
             with self.assertRaises(RuntimeError):
                 offset(amount=-2, openings=topf)
