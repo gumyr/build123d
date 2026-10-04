@@ -27,7 +27,7 @@ license:
 """
 
 import unittest
-from math import sqrt, pi
+from math import cos, pi, radians, sin, sqrt
 from build123d import *
 
 
@@ -246,6 +246,34 @@ class BuildLineTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             EllipticalCenterArc((0, 0), 2, 1, 0, arc_size=(0, 5))
+
+    def test_elliptical_center_arc_limit_from_start(self):
+        # The arc to a limit begins at the start angle, not at the x radius
+        limit = Edge.make_line((1, -2), (1, 2))
+        for start_angle, start, end_y in (
+            (0, (2, 0, 0), None),
+            (90, (0, 1, 0), 0.75**0.5),
+            (200, (2 * cos(radians(200)), sin(radians(200)), 0), -(0.75**0.5)),
+        ):
+            with self.subTest(start_angle=start_angle):
+                arc = EllipticalCenterArc((0, 0), 2, 1, start_angle, arc_size=limit)
+                self.assertAlmostEqual(arc @ 0, start, 5)
+                self.assertAlmostEqual((arc @ 1).X, 1, 5)
+                if end_y is not None:
+                    self.assertAlmostEqual((arc @ 1).Y, end_y, 5)
+
+        # y radius larger than x radius, and a moved and rotated ellipse
+        tall = EllipticalCenterArc(
+            (0, 0), 1, 2, 0, arc_size=Edge.make_line((-5, 1), (0, 1))
+        )
+        self.assertAlmostEqual(tall @ 0, (1, 0, 0), 5)
+        self.assertAlmostEqual(tall @ 1, (-(0.75**0.5), 1, 0), 5)
+
+        turned = EllipticalCenterArc(
+            (10, 5), 2, 1, 45, arc_size=Axis((0, 6, 0), (1, 0, 0)), rotation=90
+        )
+        self.assertAlmostEqual(turned @ 0, (10 - 0.5**0.5, 5 + 2**0.5, 0), 5)
+        self.assertAlmostEqual((turned @ 1).Y, 6, 5)
 
     def test_parabolic_center_arc(self):
         # General conic section equation: (1+K)x^2-2Rx+y^2=0

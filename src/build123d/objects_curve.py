@@ -1200,9 +1200,12 @@ class EllipticalCenterArc(BaseEdgeObject):
             ).rotate(Axis.Z, rotation).translate(center_pnt)
 
         else:
+            # The whole ellipse, beginning and ending at the start of the arc
             curve = Edge.make_ellipse(
                 x_radius=x_radius,
                 y_radius=y_radius,
+                start_angle=start_angle,
+                end_angle=start_angle + 360.0,
             ).rotate(Axis.Z, rotation).translate(center_pnt)
 
             trimmed_curve = curve.trim_to_other(arc_factor)
