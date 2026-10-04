@@ -528,8 +528,10 @@ class TestBuildSketchObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             Text("test", font_size, "singleline", single_line_width=0)
 
-        with self.assertRaises(ValueError):
-            Text("the quick brown fox", font_size, "singleline", single_line_width=6)
+        # Strokes wide enough to run into each other fuse into one outline
+        wide = Text("the quick brown fox", font_size, "singleline", single_line_width=6)
+        self.assertEqual(len(wide.faces()), 1)
+        self.assertTrue(wide.is_valid)
 
     def test_text_exceptions(self):
         with self.assertRaises(ValueError):
