@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
 from itertools import product
-from math import atan2, copysign, cos, degrees, radians, sin, sqrt
+from math import asinh, atan2, copysign, cos, degrees, radians, sin, sqrt
 from typing import overload
 
 import numpy as np
@@ -70,6 +70,80 @@ def _localize(*points: VectorLike):
     """Convert input points to vectors in curve construction coordinates."""
     localized = [Vector(point) for point in points]
     return localized[0] if len(localized) == 1 else localized
+
+
+def _open_conic_to_limit(
+    make_arc: Callable[[float, float], Edge],
+    angle_range: Callable[[float], tuple[float, float]],
+    origin: Vector,
+    size: float,
+    start_angle: float,
+    limit: Shape | Axis | Location | Plane | Vector,
+) -> Edge | None:
+    """Trim a parabola or hyperbola where it first meets a limit
+
+    Both curves are open, so the arc may leave the start in either direction
+    and has no natural end. The curve is followed each way from the start as
+    far as the limit extends, and the shorter of the arcs that reach the limit
+    is returned.
+
+    Args:
+        make_arc: builds the positioned curve between two angles
+        angle_range: the angles between which the curve stays within a given
+            distance of origin
+        origin: vertex of the parabola or center of the hyperbola
+        size: a length typical of the curve, used as a margin
+        start_angle: where the arc starts
+        limit: object to trim to
+
+    Returns:
+        Edge | None: arc from the start to the limit, None if they do not meet
+    """
+    if isinstance(limit, (Axis, Plane)):
+        # Neither has an extent, so stand-ins of growing size are searched
+        anchor = limit.position if isinstance(limit, Axis) else limit.origin
+        base_extent = 10 * ((anchor - origin).length + size)
+        for extent in (base_extent, 100 * base_extent):
+            stand_in: Shape
+            if isinstance(limit, Axis):
+                stand_in = Edge.make_line(
+                    anchor - limit.direction * extent,
+                    anchor + limit.direction * extent,
+                )
+            else:
+                stand_in = Face.make_rect(2 * extent, 2 * extent, limit)
+            trimmed = _open_conic_to_limit(
+                make_arc, angle_range, origin, size, start_angle, stand_in
+            )
+            if trimmed is not None:
+                return trimmed
+        return None
+
+    if isinstance(limit, Shape):
+        box = limit.bounding_box()
+        limit_points = [
+            Vector(*corner)
+            for corner in product(
+                (box.min.X, box.max.X), (box.min.Y, box.max.Y), (box.min.Z, box.max.Z)
+            )
+        ]
+    else:
+        limit_points = [limit.position if isinstance(limit, Location) else limit]
+
+    # No part of the limit is further than this from the origin of the curve
+    reach = max((point - origin).length for point in limit_points) + size
+    low_angle, high_angle = angle_range(reach)
+
+    candidates: list[Edge] = []
+    if high_angle > start_angle:
+        candidates.append(make_arc(start_angle, high_angle))
+    if low_angle < start_angle:
+        # An arc built towards a smaller angle ends at the start
+        candidates.append(make_arc(start_angle, low_angle).reversed(reconstruct=True))
+
+    trimmed_arcs = [arc.trim_to_other(limit) for arc in candidates]
+    reaching = ShapeList(arc for arc in trimmed_arcs if arc is not None)
+    return reaching.sort_by(Edge.length)[0] if reaching else None
 
 
 class BaseCurveObject(Curve, BaseObject):
@@ -1126,9 +1200,12 @@ class EllipticalCenterArc(BaseEdgeObject):
             ).rotate(Axis.Z, rotation).translate(center_pnt)
 
         else:
+            # The whole ellipse, beginning and ending at the start of the arc
             curve = Edge.make_ellipse(
                 x_radius=x_radius,
                 y_radius=y_radius,
+                start_angle=start_angle,
+                end_angle=start_angle + 360.0,
             ).rotate(Axis.Z, rotation).translate(center_pnt)
 
             trimmed_curve = curve.trim_to_other(arc_factor)
@@ -1310,24 +1387,38 @@ class ParabolicCenterArc(BaseEdgeObject):
             ).rotate(Axis.Z, rotation).translate(vertex_pnt)
 
         else:
-            curve = Edge.make_parabola(
-                focal_length=focal_length,
-                start_angle=start_angle,
-                end_angle=start_angle + 180.0,
-                angular_direction=AngularDirection.COUNTER_CLOCKWISE,
-            ).rotate(Axis.Z, rotation).translate(vertex_pnt)
 
-            trimmed_curve = curve.trim_to_other(arc_factor)
-            trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
+            def parabola(from_angle: float, to_angle: float) -> Edge:
+                return (
+                    Edge.make_parabola(
+                        focal_length=focal_length,
+                        start_angle=from_angle,
+                        end_angle=to_angle,
+                        angular_direction=(
+                            AngularDirection.COUNTER_CLOCKWISE
+                            if to_angle >= from_angle
+                            else AngularDirection.CLOCKWISE
+                        ),
+                    )
+                    .rotate(Axis.Z, rotation)
+                    .translate(vertex_pnt)
+                )
 
-            if trimmed_curve is None and trimmed_curve2 is None:
+            # The angle is the distance along the directrix, so a point of the
+            # parabola is at least that far from the vertex
+            limited_curve = _open_conic_to_limit(
+                parabola,
+                lambda reach: (-degrees(reach), degrees(reach)),
+                vertex_pnt,
+                focal_length,
+                start_angle,
+                arc_factor,
+            )
+            if limited_curve is None:
                 raise ValueError(
                     f"ParabolicCenterArc doesn't intersect arc limit {arc_size}"
                 )
-
-            curve = ShapeList(
-                [a for a in [trimmed_curve, trimmed_curve2] if a is not None]
-            ).sort_by(Edge.length)[0]
+            curve = limited_curve
 
         super().__init__(curve, mode=mode)
 
@@ -1390,25 +1481,46 @@ class HyperbolicCenterArc(BaseEdgeObject):
             ).rotate(Axis.Z, rotation).translate(center_pnt)
 
         else:
-            curve = Edge.make_hyperbola(
-                x_radius=x_radius,
-                y_radius=y_radius,
-                start_angle=start_angle,
-                end_angle=start_angle + 180.0,
-                angular_direction=AngularDirection.COUNTER_CLOCKWISE,
-            ).rotate(Axis.Z, rotation).translate(center_pnt)
 
-            trimmed_curve = curve.trim_to_other(arc_factor)
-            trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
+            def hyperbola(from_angle: float, to_angle: float) -> Edge:
+                return (
+                    Edge.make_hyperbola(
+                        x_radius=x_radius,
+                        y_radius=y_radius,
+                        start_angle=from_angle,
+                        end_angle=to_angle,
+                        angular_direction=(
+                            AngularDirection.COUNTER_CLOCKWISE
+                            if to_angle >= from_angle
+                            else AngularDirection.CLOCKWISE
+                        ),
+                    )
+                    .rotate(Axis.Z, rotation)
+                    .translate(center_pnt)
+                )
 
-            if trimmed_curve is None and trimmed_curve2 is None:
+            # A point of the hyperbola is minor radius * sinh(angle) from its
+            # major axis, measured from where the curve crosses that axis
+            minor_radius = min(x_radius, y_radius)
+            axis_angle = 90.0 if y_radius > x_radius else 0.0
+
+            def within(reach: float) -> tuple[float, float]:
+                half_range = degrees(asinh(reach / minor_radius))
+                return axis_angle - half_range, axis_angle + half_range
+
+            limited_curve = _open_conic_to_limit(
+                hyperbola,
+                within,
+                center_pnt,
+                x_radius + y_radius,
+                start_angle,
+                arc_factor,
+            )
+            if limited_curve is None:
                 raise ValueError(
                     f"HyperbolicCenterArc doesn't intersect arc limit {arc_size}"
                 )
-
-            curve = ShapeList(
-                [a for a in [trimmed_curve, trimmed_curve2] if a is not None]
-            ).sort_by(Edge.length)[0]
+            curve = limited_curve
 
         super().__init__(curve, mode=mode)
 

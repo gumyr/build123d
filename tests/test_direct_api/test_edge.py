@@ -356,6 +356,28 @@ class TestEdge(unittest.TestCase):
         self.assertAlmostEqual(mid.position_at(0), (0.25, 0, 0), 5)
         self.assertAlmostEqual(mid.position_at(1), (0.25, 1, 0), 5)
 
+    def test_mid_way_reversed_edges(self):
+        # Issue #1038: the ends are paired by the way each edge runs, whether
+        # that comes from how it was built or from a reversed orientation
+        first = Edge.make_line((0, 0), (10, 0))
+        second = Edge.make_line((1, 5), (9, 5))
+        opposite = Edge.make_line((9, 5), (1, 5))
+        for name, edges in {
+            "same direction": (first, second),
+            "built in opposite directions": (first, opposite),
+            "second reversed": (first, second.reversed()),
+            "second built opposite and reversed": (first, opposite.reversed()),
+            "first reversed": (first.reversed(), second),
+            "both reversed": (first.reversed(), second.reversed()),
+        }.items():
+            with self.subTest(name):
+                mid = Edge.make_mid_way(*edges)
+                self.assertAlmostEqual(mid.length, 9, 5)
+                self.assertAlmostEqual(mid.position_at(0.5), (5, 2.5, 0), 5)
+                ends = sorted((mid.position_at(0).X, mid.position_at(1).X))
+                self.assertAlmostEqual(ends[0], 0.5, 5)
+                self.assertAlmostEqual(ends[1], 9.5, 5)
+
     def test_distribute_locations2(self):
         with self.assertRaises(ValueError):
             Edge.make_circle(1).distribute_locations(1)

@@ -2492,8 +2492,8 @@ class Edge(Mixin1D[TopoDS_Edge]):
     def make_mid_way(cls, first: Edge, second: Edge, middle: float = 0.5) -> Edge:
         """make line between edges
 
-        Create a new linear Edge between the two provided Edges. If the Edges are parallel
-        but in the opposite directions one Edge is flipped such that the mid way Edge isn't
+        Create a new linear Edge between the two provided Edges. If the Edges run in
+        opposite directions one Edge is flipped such that the mid way Edge isn't
         truncated.
 
         Args:
@@ -2504,7 +2504,12 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Edge: linear Edge between two Edges
         """
-        flip = Axis(first).is_opposite(Axis(second))
+        # The ends are paired by the way each Edge runs, which position_at follows.
+        # An Axis made from an Edge ignores a reversed orientation, so it can't be
+        # used to decide this.
+        first_run = first.position_at(1) - first.position_at(0)
+        second_run = second.position_at(1) - second.position_at(0)
+        flip = first_run.dot(second_run) < 0
         pnts = [
             Edge.make_line(
                 first.position_at(i), second.position_at(1 - i if flip else i)
