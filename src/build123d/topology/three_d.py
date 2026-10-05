@@ -1236,7 +1236,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
             except (StdFail_NotDone, Standard_Failure):
                 # The draft cannot build every taper that a loft can
                 new_solid = None
-            else:
+            if new_solid is not None and not new_solid.is_valid:
+                # The draft builds sides that run into each other, as when a
+                # hole widens through a wall, without noticing that they do
+                new_solid = None
+            if new_solid is not None:
                 new_solid._made_by(
                     ShapeHistory.from_algorithm(
                         prism_builder, [profile.wrapped], prism
