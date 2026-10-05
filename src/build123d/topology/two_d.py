@@ -287,7 +287,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
 
     def __neg__(self) -> Self:
         """Reverse normal operator -"""
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Invalid Shape")
         new_surface = copy.deepcopy(self)
         new_surface.wrapped = tcast(TOPODS, downcast(self.wrapped.Complemented()))
@@ -464,7 +464,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
         Returns:
             list[tuple[Vector, Vector]]: Point and normal of intersection
         """
-        if self._wrapped is None:
+        if self.is_empty:
             return []
 
         intersection_line = gce_MakeLin(other.wrapped).Value()
@@ -912,7 +912,7 @@ class Face(Mixin2D[TopoDS_Face]):
             float: The total surface area, including the area of holes. Returns 0.0 if
             the face is empty.
         """
-        if self._wrapped is None:
+        if self.is_empty:
             return 0.0
 
         return self.without_holes().area
@@ -987,7 +987,7 @@ class Face(Mixin2D[TopoDS_Face]):
             ValueError: If the face or its underlying representation is empty.
             ValueError: If the face is not planar.
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't determine axes_of_symmetry of empty face")
 
         if not self.is_planar:
@@ -1131,7 +1131,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Raises:
             ValueError: the surface is degenerate everywhere it was sampled
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("an empty face has no convexity")
         surface = BRepAdaptor_Surface(self.wrapped)
         outward = BRepGProp_Face(self.wrapped)
@@ -1989,6 +1989,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Vector: center
         """
+        self._needs_geometry("center")
         center_point: Vector | gp_Pnt
         if (center_of == CenterOf.MASS) or (
             center_of == CenterOf.GEOMETRY and self.is_planar
@@ -2029,7 +2030,7 @@ class Face(Mixin2D[TopoDS_Face]):
         """
         # MakeFillet2d merges the wires of a face with holes, so chamfer each
         # wire separately and rebuild the face, as fillet_2d does
-        vertices = [vertex for vertex in vertices if vertex.wrapped is not None]
+        vertices = [vertex for vertex in vertices if not vertex.is_empty]
         if not vertices:
             return self
 
@@ -2095,7 +2096,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Vector: the derivative
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't find derivative on empty face")
         if u_order < 0 or v_order < 0 or u_order + v_order == 0:
             raise ValueError("orders must not be negative and must not both be zero")
@@ -2120,7 +2121,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
 
         """
-        vertices = [vertex for vertex in vertices if vertex.wrapped is not None]
+        vertices = [vertex for vertex in vertices if not vertex.is_empty]
         if not vertices:
             return self
 
@@ -2198,7 +2199,7 @@ class Face(Mixin2D[TopoDS_Face]):
     def _sheet_selected_from(self) -> Shape:
         """The shell this face was taken from, for questions about its neighbours."""
         parent = self.topo_parent
-        if parent is None or parent.wrapped is None or len(parent.faces()) < 2:
+        if parent is None or parent.is_empty or len(parent.faces()) < 2:
             raise ValueError(
                 "this face was not selected from a sheet, so its neighbours are "
                 "unknown - take it from the sheet, as in sheet.flats()[0]"
@@ -2515,7 +2516,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             tuple[float, float]: u, v
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't find param on empty face")
 
         pnt = Vector(point)
@@ -2627,7 +2628,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Face: A new Face instance identical to the original but without any holes.
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Cannot remove holes from an empty face")
 
         if not (inner_wires := self.inner_wires()):
@@ -2736,7 +2737,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Edge | Wire | Face | Shell: the shape on the surface
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't wrap around an empty face")
         frame = self.uv_frame(surface_loc, tolerance)
         if isinstance(planar_shape, Edge):
@@ -3234,6 +3235,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
 
     def center(self) -> Vector:
         """Center of mass of the shell"""
+        self._needs_geometry("center")
         properties = GProp_GProps()
         BRepGProp.LinearProperties_s(self.wrapped, properties)
         return Vector(properties.CentreOfMass())

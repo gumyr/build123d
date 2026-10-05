@@ -84,7 +84,7 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(box_bb.max.Z, 0, 5)
 
     def test_compute_mass(self):
-        self.assertAlmostEqual(Vertex().compute_mass(), 0, 5)
+        self.assertAlmostEqual(Vertex(0, 0, 0).compute_mass(), 0, 5)
 
     def test_combined_center(self):
         objs = [Solid.make_box(1, 1, 1, Plane((x, 0, 0))) for x in [-2, 1]]
@@ -321,7 +321,7 @@ class TestShape(unittest.TestCase):
 
     def test_located_vertex(self):
         """located() replaces a vertex's location rather than adding to it."""
-        moved = Vertex().moved(Pos(-2.5, 0, 0))
+        moved = Vertex(0, 0, 0).moved(Pos(-2.5, 0, 0))
         self.assertAlmostEqual(moved.located(Pos(1, 0, 0)).X, 1, 5)
 
         extracted = Compound([moved]).vertices()[0]
@@ -682,7 +682,7 @@ class TestShape(unittest.TestCase):
         with self.assertRaises(ValueError):
             empty.geom_type
         self.assertIs(empty, empty.fix())
-        self.assertEqual(hash(empty), 0)
+        self.assertEqual(hash(empty), hash(Solid()))
         self.assertFalse(empty.is_same(Solid()))
         self.assertFalse(empty.is_equal(Solid()))
         self.assertTrue(empty.is_valid)
@@ -702,15 +702,11 @@ class TestShape(unittest.TestCase):
         ]
         self.assertIs(empty, empty.transform_shape(Matrix(translate_matrix)))
         self.assertIs(empty, empty.transform_geometry(Matrix(translate_matrix)))
-        with self.assertRaises(ValueError):
-            empty.locate(Location())
-
-        with self.assertRaises(ValueError):
-            empty.located(Location())
-        with self.assertRaises(ValueError):
-            empty.move(Location())
-        with self.assertRaises(ValueError):
-            empty.moved(Location())
+        # nothing is nothing wherever it is put
+        self.assertIs(empty, empty.locate(Location((1, 2, 3))))
+        self.assertTrue(empty.located(Location((1, 2, 3))).is_empty)
+        self.assertIs(empty, empty.move(Location((1, 2, 3))))
+        self.assertTrue(empty.moved(Location((1, 2, 3))).is_empty)
         # with self.assertRaises(ValueError):
         #     empty.relocate(Location())
         # with self.assertRaises(ValueError):
@@ -774,9 +770,8 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(rotated_line @ 1, (1, 0))
         self.assertFalse(line.wrapped.IsPartner(rotated_line.wrapped))
 
-        line._wrapped = None
-        rotated_line = line.rotate(Axis((1, 0, 0), (0, 0, 1)), 45)
-        self.assertIsNone(rotated_line._wrapped)
+        rotated_empty = Edge().rotate(Axis((1, 0, 0), (0, 0, 1)), 45)
+        self.assertTrue(rotated_empty.is_empty)
 
     def test_translate(self):
         line = Edge.make_line((0, 0), (1, 0))
@@ -790,9 +785,8 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(translated_line @ 1, (1, 1, 0))
         self.assertFalse(line.wrapped.IsPartner(translated_line.wrapped))
 
-        line._wrapped = None
-        translated_line = line.translate((0, 1, 0))
-        self.assertIsNone(translated_line._wrapped)
+        translated_empty = Edge().translate((0, 1, 0))
+        self.assertTrue(translated_empty.is_empty)
 
     def test_rmul_iterable_non_location(self):
         line = Edge.make_line((0, 0), (1, 0))

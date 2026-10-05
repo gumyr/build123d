@@ -158,8 +158,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """
         topods_compound: TopoDS_Compound | None
         if isinstance(obj, Iterable):
+            # empty shapes add nothing, so a compound of only those is empty
             topods_compound = _make_topods_compound_from_shapes(
-                [s.wrapped for s in obj]
+                [s.wrapped for s in obj if not s.is_empty]
             )
         else:
             topods_compound = obj
@@ -501,7 +502,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         will be a Wire, otherwise a Shape.
         """
         if self._dim == 1:
-            curve = Curve() if self._wrapped is None else Curve(self.wrapped)
+            curve = Curve() if self.is_empty else Curve(self.wrapped)
             sum1d = curve + other
             if isinstance(sum1d, Edge):
                 result1d = Curve([sum1d])._made_by(ShapeHistory.of(sum1d))
@@ -556,7 +557,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         Check if empty.
         """
 
-        return self._wrapped is not None and TopoDS_Iterator(self.wrapped).More()
+        return not self.is_empty and TopoDS_Iterator(self.wrapped).More()
 
     def __iter__(self) -> Iterator[Shape]:
         """
@@ -573,7 +574,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
     def __len__(self) -> int:
         """Return the number of subshapes"""
         count = 0
-        if self._wrapped is not None:
+        if not self.is_empty:
             for _ in self:
                 count += 1
         return count
@@ -613,6 +614,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         Returns:
             Vector: center
         """
+        self._needs_geometry("center")
         if center_of == CenterOf.GEOMETRY:
             raise ValueError("Center of GEOMETRY is not supported for this object")
         if center_of == CenterOf.MASS:
@@ -637,7 +639,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
-        if self._wrapped is None:
+        if self.is_empty:
             return ShapeList()
         if isinstance(self.wrapped, TopoDS_Compound):
             # pylint: disable=not-an-iterable

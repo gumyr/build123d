@@ -1150,6 +1150,15 @@ class BoundBox:
         return prod([x for x in self.size if x > TOLERANCE])
 
     @property
+    def is_empty(self) -> bool:
+        """True for the bounding box of nothing
+
+        An empty box has zero size at the origin, adds nothing to another box,
+        and contains, covers, touches and intersects nothing.
+        """
+        return self.wrapped is None
+
+    @property
     def diagonal(self) -> float:
         """body diagonal length (i.e. object maximum size)"""
         if self.wrapped is None:
@@ -3300,6 +3309,9 @@ class Plane(metaclass=PlaneMeta):
             return Location(self) * other
         if isinstance(other, Plane):
             return Location(self) * other.location
+        if callable(getattr(other, "moved", None)):
+            # a shape, iterable or not, is moved as a whole by its own __rmul__
+            return NotImplemented
         try:
             others = list(other)
             if all(isinstance(other, Location | Plane) for other in others):

@@ -229,7 +229,7 @@ def _create_xde(
     # Single preorder pass: parent labels are created before children, so we can
     # build label_map and assign metadata without a second traversal.
     for node in PreOrderIter(to_export):
-        if node.wrapped is None:
+        if node.is_empty:
             continue
 
         # Don't set parent if node is the one getting exported.
@@ -337,7 +337,7 @@ def export_gltf(
     # Tessellate the object(s)
     node: Shape
     for node in PreOrderIter(to_export):
-        if node.wrapped is not None:
+        if not node.is_empty:
             node.mesh(linear_deflection, angular_deflection)
 
     # Create the XCAF document

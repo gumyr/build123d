@@ -210,6 +210,7 @@ class Mixin3D(Shape[TOPODS]):
         Returns:
             Vector: center
         """
+        self._needs_geometry("center")
         if center_of == CenterOf.GEOMETRY:
             raise ValueError("Center of GEOMETRY is not supported for this object")
         if center_of == CenterOf.MASS:
@@ -688,7 +689,7 @@ class Mixin3D(Shape[TOPODS]):
         if offset_occt_solid.ShapeType() == ta.TopAbs_SOLID:
             offset_occt_solid = _forward_solid(TopoDS.Solid(offset_occt_solid))
         offset_solid = self.__class__.cast(offset_occt_solid)
-        assert offset_solid.wrapped is not None
+        assert not offset_solid.is_empty
 
         # The Solid can be inverted, if so reverse
         if offset_solid.volume < 0:

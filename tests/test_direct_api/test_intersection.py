@@ -488,7 +488,7 @@ def test_shape_3d(obj, target, expected, include_touched):
 
 
 # Compound Shapes
-cp1 = Compound(GridLocations(5, 0, 2, 1) * Vertex())
+cp1 = Compound(GridLocations(5, 0, 2, 1) * Vertex(0, 0, 0))
 cp2 = Compound(GridLocations(5, 0, 2, 1) * Line((0, -1), (0, 1)))
 cp3 = Compound(GridLocations(5, 0, 2, 1) * Rectangle(2, 2))
 cp4 = Compound(GridLocations(5, 0, 2, 1) * Box(2, 2, 2))
@@ -564,7 +564,7 @@ def test_shape_compound(obj, target, expected, include_touched):
 
 def test_compound_intersection_with_located_vertex_children():
     """Intersection must not apply an extracted vertex's location twice."""
-    vertex = Vertex()
+    vertex = Vertex(0, 0, 0)
     located_vertices = GridLocations(5, 0, 2, 1) * vertex
     extracted_vertex = Compound(located_vertices).get_type(Vertex)[0]
 

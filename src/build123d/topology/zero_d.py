@@ -102,7 +102,7 @@ class Vertex(Shape[TopoDS_Vertex]):
 
     @overload
     def __init__(self):  # pragma: no cover
-        """Default Vertext at the origin"""
+        """The empty Vertex; Vertex(0, 0, 0) is the origin"""
 
     @overload
     def __init__(self, ocp_vx: TopoDS_Vertex):  # pragma: no cover
@@ -117,6 +117,9 @@ class Vertex(Shape[TopoDS_Vertex]):
         """Vertex from Vector or other iterators"""
 
     def __init__(self, *args, **kwargs):
+        if not args and not kwargs:
+            super().__init__(None)  # the empty Vertex
+            return
         ocp_vx = kwargs.pop("ocp_vx", None)
         v = kwargs.pop("v", None)
         x = kwargs.pop("X", 0)
@@ -200,7 +203,7 @@ class Vertex(Shape[TopoDS_Vertex]):
     def _owning_face(self) -> TopoDS_Face | None:
         """The innermost face this vertex was selected through, if any."""
         for step in reversed(self.topo_path):
-            if step.wrapped is not None and step.wrapped.ShapeType() == ta.TopAbs_FACE:
+            if not step.is_empty and step.wrapped.ShapeType() == ta.TopAbs_FACE:
                 return TopoDS.Face(step.wrapped)
         return None
 
@@ -215,12 +218,7 @@ class Vertex(Shape[TopoDS_Vertex]):
             ValueError: the vertex is a corner of more than one face
         """
         parent = self.topo_parent
-        if (
-            parent is None
-            or parent.wrapped is None
-            or parent.solids()
-            or parent.shells()
-        ):
+        if parent is None or parent.is_empty or parent.solids() or parent.shells():
             return None
         holding = []
         explorer = TopExp_Explorer(parent.wrapped, ta.TopAbs_FACE)
@@ -304,7 +302,7 @@ class Vertex(Shape[TopoDS_Vertex]):
     def _crease_convexity(self) -> Convexity:
         """Classify by the creases meeting at this vertex of a solid or shell."""
         parent = self.topo_parent
-        if parent is None or parent.wrapped is None:
+        if parent is None or parent.is_empty:
             raise ValueError(
                 "this vertex was not selected from a shape, so there is nothing "
                 "to classify it against - take it from a face or solid"
@@ -480,6 +478,7 @@ class Vertex(Shape[TopoDS_Vertex]):
 
     def center(self) -> Vector:
         """The center of a vertex is itself!"""
+        self._needs_geometry("center")
         return Vector(self)
 
     def split(self, tool: TrimmingTool, keep: Keep = Keep.TOP):
@@ -507,7 +506,8 @@ class Vertex(Shape[TopoDS_Vertex]):
 
     def vertices(self, select: Select = Select.ALL) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
-        return self._select(ShapeList((self,)), select)  # Vertex is an iterable
+        found = ShapeList() if self.is_empty else ShapeList((self,))
+        return self._select(found, select)  # Vertex is an iterable
 
 
 def topo_explore_common_vertex(

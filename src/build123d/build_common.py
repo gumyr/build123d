@@ -1654,7 +1654,7 @@ class _PublicationService:
         result_type: Type[Shape] | None = None,
     ) -> Shape | None:
         """Apply every publication/output placement combination exactly once."""
-        if build_product is None or getattr(build_product, "_wrapped", None) is None:
+        if build_product is None:
             return None
         if scope.publication_locations == (Location(),) and scope.output_placements == (
             Location(),

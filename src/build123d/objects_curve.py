@@ -158,8 +158,7 @@ class BaseCurveObject(Curve, BaseObject):
 
     def __init__(self, curve: Curve, mode: Mode = Mode.ADD):
         self.mode = mode
-        if curve.wrapped is not None:
-            super().__init__(curve.wrapped)
+        super().__init__(curve.wrapped)
 
 class BaseLineObject(Wire, BaseObject):
     """BaseLineObject specialized for Wire.
@@ -173,8 +172,7 @@ class BaseLineObject(Wire, BaseObject):
 
     def __init__(self, curve: Wire, mode: Mode = Mode.ADD):
         self.mode = mode
-        if curve.wrapped is not None:
-            super().__init__(curve.wrapped)
+        super().__init__(curve.wrapped)
 
 class BaseEdgeObject(Edge, BaseObject):
     """BaseEdgeObject specialized for Edge.

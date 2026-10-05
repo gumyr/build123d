@@ -1,0 +1,234 @@
+"""
+Empty shapes
+
+The zero of each shape class: what it is, and the laws it follows.
+
+name: test_empty_shapes.py
+by:   Gumyr
+date: October 5, 2026
+
+license:
+
+    Copyright 2026 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+"""
+
+import copy
+import pickle
+import unittest
+
+from OCP.TopoDS import TopoDS_Compound
+
+from build123d.geometry import Axis, Location, Plane, Pos, Vector
+from build123d.topology import (
+    Compound,
+    Curve,
+    Edge,
+    Face,
+    Part,
+    Shape,
+    Shell,
+    Sketch,
+    Solid,
+    Vertex,
+    Wire,
+)
+
+CLASSES = [Vertex, Edge, Wire, Face, Shell, Solid, Compound, Part, Sketch, Curve]
+DIMENSIONS = {
+    Vertex: 0,
+    Edge: 1,
+    Wire: 1,
+    Curve: 1,
+    Face: 2,
+    Shell: 2,
+    Sketch: 2,
+    Solid: 3,
+    Part: 3,
+    Compound: None,
+}
+
+
+class TestEmptyShapeDefinition(unittest.TestCase):
+    """The no-argument constructor of every class is its zero"""
+
+    def test_what_a_zero_is(self):
+        for cls in CLASSES:
+            with self.subTest(cls=cls.__name__):
+                zero = cls()
+                self.assertIsInstance(zero, cls)
+                self.assertTrue(zero.is_empty)
+                self.assertFalse(zero)
+                self.assertIsInstance(zero.wrapped, TopoDS_Compound)
+                self.assertEqual(zero._dim, DIMENSIONS[cls])
+
+    def test_shape_type_is_the_class(self):
+        self.assertEqual(Solid().shape_type, "Solid")
+        self.assertEqual(Face().shape_type, "Face")
+        self.assertEqual(Vertex().shape_type, "Vertex")
+        self.assertEqual(Part().shape_type, "Compound")
+
+    def test_vertex_zero_is_not_the_origin(self):
+        self.assertTrue(Vertex().is_empty)
+        self.assertFalse(Vertex(0, 0, 0).is_empty)
+        self.assertEqual(Vertex(0, 0, 0).X, 0)
+
+    def test_a_kernel_empty_is_the_zero_of_any_class(self):
+        empty = (Solid.make_box(1, 1, 1) - Solid.make_box(1, 1, 1)).wrapped
+        self.assertTrue(Face(empty).is_empty)
+        self.assertTrue(Solid.cast(empty).is_empty)
+        self.assertIsInstance(Solid.cast(empty), Solid)
+        self.assertIsInstance(Shape.cast(empty), Compound)
+
+    def test_setting_wrapped_to_none_empties(self):
+        box = Solid.make_box(1, 1, 1)
+        box.wrapped = None
+        self.assertTrue(box.is_empty)
+
+    def test_is_null_is_deprecated(self):
+        with self.assertWarns(DeprecationWarning):
+            self.assertTrue(Solid().is_null)
+
+
+class TestEmptyShapeEquality(unittest.TestCase):
+    def test_zeros_of_one_class_are_equal(self):
+        for cls in CLASSES:
+            with self.subTest(cls=cls.__name__):
+                self.assertEqual(cls(), cls())
+                self.assertEqual(hash(cls()), hash(cls()))
+
+    def test_zeros_of_different_classes_are_not(self):
+        self.assertNotEqual(Solid(), Face())
+        self.assertNotEqual(Part(), Compound())
+
+    def test_a_zero_is_not_a_shape(self):
+        box = Solid.make_box(1, 1, 1)
+        self.assertNotEqual(Solid(), box)
+        self.assertNotEqual(box, Solid())
+
+
+class TestEmptyShapeCopying(unittest.TestCase):
+    def test_copies_are_the_zero(self):
+        for cls in CLASSES:
+            with self.subTest(cls=cls.__name__):
+                zero = cls()
+                self.assertEqual(copy.copy(zero), zero)
+                self.assertEqual(copy.deepcopy(zero), zero)
+                self.assertEqual(pickle.loads(pickle.dumps(zero)), zero)
+                self.assertIsInstance(copy.copy(zero), cls)
+
+
+class TestEmptyShapePlacement(unittest.TestCase):
+    """Nothing is nothing wherever it is put"""
+
+    def test_moving_keeps_the_zero(self):
+        loc = Location((1, 2, 3), (10, 20, 30))
+        for cls in CLASSES:
+            with self.subTest(cls=cls.__name__):
+                zero = cls()
+                for placed in (
+                    zero.moved(loc),
+                    zero.located(loc),
+                    loc * zero,
+                    Plane.XZ * zero,
+                    zero.rotate(Axis.Z, 30),
+                    zero.translate((1, 2, 3)),
+                    zero.mirror(Plane.XY),
+                    zero.scale(2),
+                ):
+                    self.assertTrue(placed.is_empty)
+                    self.assertIsInstance(placed, cls)
+                self.assertIs(zero.move(loc), zero)
+                self.assertIs(zero.locate(loc), zero)
+
+    def test_a_zero_has_no_place(self):
+        for cls in CLASSES:
+            with self.subTest(cls=cls.__name__):
+                with self.assertRaisesRegex(ValueError, "no location"):
+                    cls().location
+                with self.assertRaisesRegex(ValueError, "no position"):
+                    cls().position
+                with self.assertRaisesRegex(ValueError, "no orientation"):
+                    cls().orientation
+                with self.assertRaisesRegex(ValueError, "no center"):
+                    cls().center()
+
+
+class TestEmptyShapeQueries(unittest.TestCase):
+    def test_selectors_find_nothing(self):
+        for cls in CLASSES:
+            with self.subTest(cls=cls.__name__):
+                zero = cls()
+                for found in (
+                    zero.vertices(),
+                    zero.edges(),
+                    zero.wires(),
+                    zero.faces(),
+                    zero.shells(),
+                    zero.solids(),
+                    zero.get_top_level_shapes(),
+                ):
+                    self.assertEqual(len(found), 0)
+
+    def test_amounts_are_zero(self):
+        for cls in CLASSES:
+            with self.subTest(cls=cls.__name__):
+                zero = cls()
+                self.assertEqual(zero.volume, 0)
+                self.assertEqual(zero.area, 0)
+                self.assertEqual(zero.static_moments, (0.0, 0.0, 0.0))
+                self.assertEqual(zero.matrix_of_inertia, [[0.0] * 3] * 3)
+
+    def test_directions_raise(self):
+        with self.assertRaisesRegex(ValueError, "no principal axes"):
+            Solid().principal_properties
+        with self.assertRaisesRegex(ValueError, "no radius of gyration"):
+            Solid().radius_of_gyration(Axis.Z)
+
+    def test_bounding_box_is_empty(self):
+        box = Solid.make_box(1, 1, 1).bounding_box()
+        for cls in CLASSES:
+            with self.subTest(cls=cls.__name__):
+                empty = cls().bounding_box()
+                self.assertTrue(empty.is_empty)
+                self.assertEqual(tuple(empty.size), (0, 0, 0))
+                # the bounding box of nothing adds nothing
+                self.assertEqual(tuple(box.add(empty).size), (1, 1, 1))
+                self.assertEqual(tuple(empty.add(box).size), (1, 1, 1))
+        self.assertFalse(box.is_empty)
+
+    def test_validity(self):
+        for cls in CLASSES:
+            with self.subTest(cls=cls.__name__):
+                self.assertTrue(cls().is_valid)
+                self.assertTrue(cls().clean().is_empty)
+                self.assertTrue(cls().fix().is_empty)
+
+
+class TestEmptyShapeContainers(unittest.TestCase):
+    def test_a_compound_of_nothing_is_nothing(self):
+        self.assertTrue(Compound([]).is_empty)
+        self.assertTrue(Compound([Solid(), Face()]).is_empty)
+        self.assertTrue(Compound(children=[]).is_empty)
+
+    def test_zeros_add_nothing_to_a_compound(self):
+        box = Solid.make_box(1, 1, 1)
+        mixed = Compound([Solid(), box, Face()])
+        self.assertFalse(mixed.is_empty)
+        self.assertEqual(len(mixed.solids()), 1)
+        self.assertAlmostEqual(mixed.volume, 1, 5)
+
+
+if __name__ == "__main__":
+    unittest.main()
