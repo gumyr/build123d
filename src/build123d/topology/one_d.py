@@ -510,9 +510,9 @@ def _offset_curves_to_bsplines(wire: Wire) -> Wire:
         fitted.Orientation(edge.wrapped.Orientation())
         fitted_edges.append(Edge(fitted))
 
-    fitted_wire = Wire(fitted_edges)
-    fitted_wire.wrapped.Orientation(wire.wrapped.Orientation())
-    return fitted_wire
+    # The edges were taken from the wire with its direction already applied to
+    # them, so the wire made from them winds the way the original does
+    return Wire(fitted_edges)
 
 
 def _joined_wire(
@@ -1285,10 +1285,18 @@ class Mixin1D(Shape[TOPODS]):
         kind: Kind = Kind.ARC,
         side: Side = Side.BOTH,
         closed: bool = True,
+        as_bspline: bool = True,
     ) -> Edge | Wire:
         """2d Offset
 
         Offsets a planar edge/wire
+
+        The offset of a line is a line and that of a circle is a circle, but
+        the offset of any other curve is not a curve of the same kind. The
+        kernel describes it as an offset curve: the original curve and a
+        distance. By default each of these is replaced by a B-spline within a
+        tenth of TOLERANCE of it, as some operations - STEP export among them -
+        cannot handle offset curves.
 
         Args:
             distance (float): distance from edge/wire to offset
@@ -1296,6 +1304,9 @@ class Mixin1D(Shape[TOPODS]):
             side (Side, optional): side to place offset. Defaults to Side.BOTH.
             closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
                 offset. Defaults to True.
+            as_bspline (bool, optional): replace the kernel's offset curves with
+                B-splines; when False they are returned as they are, with a
+                geom_type of GeomType.OFFSET. Defaults to True.
         Raises:
             RuntimeError: 2D offset calculation failed
             RuntimeError: Multiple Wires generated
@@ -1333,7 +1344,9 @@ class Mixin1D(Shape[TOPODS]):
         if isinstance(obj, TopoDS_Compound):
             obj = unwrap_topods_compound(obj, fully=True)
         if isinstance(obj, TopoDS_Wire):
-            offset_wire = _offset_curves_to_bsplines(Wire(obj))
+            offset_wire = Wire(obj)
+            if as_bspline:
+                offset_wire = _offset_curves_to_bsplines(offset_wire)
         else:  # Likely multiple Wires were generated
             raise RuntimeError("Unexpected result type")
 
