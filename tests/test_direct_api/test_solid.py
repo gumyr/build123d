@@ -138,6 +138,14 @@ class TestSolid(unittest.TestCase):
         hole_f = taper_solid_f.edges().filter_by(GeomType.CIRCLE).sort_by(Axis.Z)[-1]
         self.assertGreater(hole_t.radius, hole_f.radius)
 
+    def test_extrude_taper_hole_through_wall(self):
+        # The hole widens as the walls close in and breaks through them part
+        # way up, which the draft builds as an invalid solid
+        rect_hole = Face.make_rect(20, 12).make_holes([Wire.make_circle(3)])
+        taper_solid = Solid.extrude_taper(rect_hole, (0, 0, 5), 20)
+        self.assertTrue(taper_solid.is_valid)
+        self.assertAlmostEqual(taper_solid.volume, 687.89, 1)
+
     def test_extrude_taper_oblique(self):
         rect = Face.make_rect(2, 1)
         rect_hole = rect.make_holes([Wire.make_circle(0.25)])
