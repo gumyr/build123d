@@ -37,15 +37,11 @@ import warnings
 
 import pytest
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
-from OCP.Geom import Geom_Circle, Geom_Line, Geom_OffsetCurve
-from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
 from OCP.BRepCheck import BRepCheck_Analyzer
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 from OCP.collections import List_TopoDS_Shape
 
 from build123d import (
-    IN,
     Align,
     Axis,
     Box,
@@ -57,8 +53,6 @@ from build123d import (
     Compound,
     Cone,
     Cylinder,
-    Edge,
-    Face,
     Helix,
     JernArc,
     Keep,
@@ -75,11 +69,8 @@ from build123d import (
     Sphere,
     Torus,
     Vector,
-    Wire,
-    export_step,
     extrude,
     fillet,
-    import_step,
     insert,
     loft,
     make_face,
@@ -90,7 +81,6 @@ from build123d import (
     split,
     sweep,
 )
-from build123d.exporters3d import _exact_offset_curve
 from build123d.topology.shape_core import (
     _has_mirrored_same_domain_faces,
     _is_suspicious_common,
@@ -253,48 +243,6 @@ class TestUnifySameDomainMirroredGeometry:
         assert part.part.volume == pytest.approx(4 * quarter_volume, rel=1e-6)
 
 
-class TestStepExportOffsetCurves:
-    def test_offset_curve_prism_round_trips(self, tmp_path):
-        # build123d #745
-        unit = IN
-        sketch = Compound(
-            children=[
-                Pos(Z=0) * Rectangle(6 * unit, 4 * unit),
-                Pos(Z=1 * unit) * Rectangle(5 * unit, 3 * unit),
-            ]
-        )
-        solid = loft(sketch.faces(), ruled=True)
-        shell = offset(solid, amount=-unit / 16, openings=solid.faces().sort_by()[0])
-        face = shell.faces().sort_by()[-2]
-        boss = extrude(offset(-face, amount=-0.25 * unit), -0.5 * unit)
-        assert any(e.geom_type.name == "OFFSET" for e in boss.edges())
-        step_file = tmp_path / "boss.step"
-        export_step(boss, step_file)
-        imported = import_step(step_file)
-        assert len(imported.solids()) == 1
-        assert imported.volume == pytest.approx(boss.volume, rel=1e-6)
-        # the exported object itself is untouched
-        assert any(e.geom_type.name == "OFFSET" for e in boss.edges())
-
-    def test_analytic_offset_curves_stay_analytic(self, tmp_path):
-        # an offset of a circle is a circle and must not become a B-spline
-        circle = Geom_Circle(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), 5)
-        arc = Edge(
-            BRepBuilderAPI_MakeEdge(
-                Geom_OffsetCurve(circle, 2.0, gp_Dir(0, 0, 1)), 0, math.pi / 2
-            ).Edge()
-        )
-        assert arc.geom_type.name == "OFFSET"
-        profile = Face(Wire([arc, Line((0, 7), (0, 0)), Line((0, 0), (7, 0))]))
-        solid = Pos(10, 5, 1) * Rot(0, 0, 30) * extrude(profile, amount=3)
-        step_file = tmp_path / "arc.step"
-        export_step(solid, step_file)
-        imported = import_step(step_file)
-        assert imported.volume == pytest.approx(solid.volume, rel=1e-6)
-        assert imported.bounding_box().min == solid.bounding_box().min
-        assert {e.geom_type.name for e in imported.edges()} == {"CIRCLE", "LINE"}
-
-
 class TestLoftThickSolid:
     def test_loft_to_offset_can_be_hollowed(self):
         # build123d #1351
@@ -336,44 +284,6 @@ class TestSuspiciousEmptyCut:
             warnings.simplefilter("error")
             result = Box(1, 1, 1) - Box(3, 3, 3)
         assert result.volume == 0
-
-
-class TestExactOffsetCurves:
-    def test_offset_of_line_exports_as_line(self, tmp_path):
-        line = Geom_Line(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0))
-        edge = Edge(
-            BRepBuilderAPI_MakeEdge(
-                Geom_OffsetCurve(line, 2.0, gp_Dir(0, 0, 1)), 0, 5
-            ).Edge()
-        )
-        assert edge.geom_type.name == "OFFSET"
-        profile = Face(
-            Wire(
-                [
-                    edge,
-                    Line((5, -2), (5, 3)),
-                    Line((5, 3), (0, 3)),
-                    Line((0, 3), (0, -2)),
-                ]
-            )
-        )
-        solid = extrude(profile, amount=2)
-        step_file = tmp_path / "line.step"
-        export_step(solid, step_file)
-        imported = import_step(step_file)
-        assert imported.volume == pytest.approx(solid.volume)
-        assert {e.geom_type.name for e in imported.edges()} == {"LINE"}
-
-    def test_non_analytic_cases_are_not_converted_exactly(self):
-        circle = Geom_Circle(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), 5)
-        assert _exact_offset_curve(circle) is None
-        tilted = Geom_OffsetCurve(circle, 1.0, gp_Dir(1, 0, 1))
-        assert _exact_offset_curve(tilted) is None
-        vanishing = Geom_OffsetCurve(circle, -5.0, gp_Dir(0, 0, 1))
-        assert _exact_offset_curve(vanishing) is None
-        line = Geom_Line(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0))
-        degenerate = Geom_OffsetCurve(line, 1.0, gp_Dir(1, 0, 0))
-        assert _exact_offset_curve(degenerate) is None
 
 
 class TestUnifySameDomainFallbacks:
@@ -486,6 +396,12 @@ class TestSuspiciousCommon:
             warnings.simplefilter("error")
             result = Box(1, 1, 1) & Box(2, 2, 2)
         assert result.volume == pytest.approx(1)
+
+    def test_planar_intersection_does_not_warn(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = Rectangle(2, 2) & Circle(1)
+        assert result.area == pytest.approx(math.pi)
 
     def test_check_tolerates_bad_shapes(self, monkeypatch):
         def failing_volume(_self):

@@ -4294,6 +4294,8 @@ def _is_suspicious_common(
         operands = [s for s in args + tools if s._wrapped is not None]
         for operand in operands:
             volume = operand.volume
+            if volume <= TOLERANCE:  # not a solid, nothing to compare
+                continue
             if result_volume > volume * (1 + 1e-6) + TOLERANCE:
                 return True
             if isclose(result_volume, volume, rel_tol=1e-6, abs_tol=TOLERANCE):
