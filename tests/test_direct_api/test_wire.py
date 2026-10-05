@@ -420,6 +420,25 @@ class TestWire(unittest.TestCase):
         kinds = {edge.geom_type for edge in grown.edges()}
         self.assertEqual(kinds, {GeomType.LINE, GeomType.CIRCLE})
 
+    def test_offset_2d_as_bspline(self):
+        spline = Spline((0, 0), (2, 1), (4, 0))
+        ellipse = Wire([Edge.make_ellipse(3, 2)])
+
+        # The kernel's offset curves are kept on request
+        for curve in (spline, ellipse):
+            kept = curve.offset_2d(0.3, as_bspline=False)
+            kinds = {edge.geom_type for edge in kept.edges()}
+            self.assertIn(GeomType.OFFSET, kinds)
+            self.assertNotIn(GeomType.BSPLINE, kinds)
+
+        # Either way it is the same outline, wound the same way
+        for curve in (spline, ellipse):
+            fitted = Face(Wire(curve.offset_2d(0.3).edges()))
+            kept = Face(Wire(curve.offset_2d(0.3, as_bspline=False).edges()))
+            self.assertAlmostEqual(fitted.area, kept.area, 5)
+            self.assertAlmostEqual(fitted.normal_at(), kept.normal_at(), 5)
+            self.assertAlmostEqual(fitted.normal_at(), Vector(0, 0, 1), 5)
+
     def test_geom_adaptor(self):
         w = Polyline((0, 0), (1, 0), (1, 1))
         self.assertTrue(isinstance(w.geom_adaptor(), BRepAdaptor_CompCurve))
