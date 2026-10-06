@@ -408,7 +408,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
             seam_vertices: list[Vertex] = []
             for seam in seams:
                 seam_intersection = perimeter_edge.intersect(seam)
-                if seam_intersection is None:
+                if not seam_intersection:
                     continue
                 for vertex in seam_intersection.vertices():
                     if all(
@@ -1055,7 +1055,7 @@ class Face(Mixin2D[TopoDS_Face]):
             bottom_area = sum(f.area for f in bottom_list)
             for flipped_face, bottom_face in zip(top_flipped_list, bottom_list):
                 intersection = flipped_face.intersect(bottom_face)
-                if intersection is None:
+                if not intersection:
                     intersect_area = -1.0
                     break
                 intersect_area = sum(f.area for f in intersection.faces())

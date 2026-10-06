@@ -642,7 +642,7 @@ def section(
     new_objects: list[Face | Shell] = []
     for plane in planes:
         intersection = to_section.intersect(plane)
-        if intersection is not None:
+        if intersection:
             new_objects.extend(intersection)
 
     if context is not None:

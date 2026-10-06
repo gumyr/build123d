@@ -299,9 +299,9 @@ class TestVector(unittest.TestCase):
         self.assertAlmostEqual(
             Vector((v1 & Solid.make_box(2, 4, 5)).vertex()), (1, 2, 3), 5
         )
-        self.assertIsNone(v1.intersect(Solid.make_box(0.5, 0.5, 0.5)))
-        self.assertIsNone(
-            Vertex(-10, -10, -10).intersect(Solid.make_box(0.5, 0.5, 0.5))
+        self.assertEqual(v1.intersect(Solid.make_box(0.5, 0.5, 0.5)), [])
+        self.assertEqual(
+            Vertex(-10, -10, -10).intersect(Solid.make_box(0.5, 0.5, 0.5)), []
         )
 
 

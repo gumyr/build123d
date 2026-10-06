@@ -545,8 +545,6 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # Shape.__and__ resolves any ShapeList to a single shape before
         # returning, so this only ever sees a Shape or None.
         intersection = Shape.__and__(self, other)
-        if intersection is None:
-            return Compound()
         if not isinstance(intersection, Compound):
             intersection = Shape.make_composite([intersection])
         self.copy_attributes_to(intersection, ["wrapped", "_NodeMixin__children"])
@@ -697,7 +695,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 obj_intersection = placed[child_index_pair[0]].intersect(
                     placed[child_index_pair[1]]
                 )
-                if obj_intersection is not None:
+                if obj_intersection:
                     common_volume = sum(s.volume for s in obj_intersection.solids())
                     if common_volume > tolerance:
                         return (

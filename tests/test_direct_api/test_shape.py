@@ -400,8 +400,8 @@ class TestShape(unittest.TestCase):
         box = Solid.make_box(1, 2, 3)
         zero = Solid()
 
-        self.assertIsNone(box.intersect(zero))
-        self.assertIsNone(zero.intersect(box))
+        self.assertEqual(box.intersect(zero), [])
+        self.assertEqual(zero.intersect(box), [])
 
     def test_boolean_zero_cut_multi_args(self):
         box1 = Solid.make_box(1, 1, 1)
@@ -938,7 +938,7 @@ class TestShapeAlgebraEdges(unittest.TestCase):
         self.assertIs(solid + None, solid)
 
     def test_intersect_with_no_arguments(self):
-        self.assertIsNone(Box(1, 1, 1).intersect())
+        self.assertEqual(Box(1, 1, 1).intersect(), [])
 
     def test_intersect_yielding_disjoint_pieces(self):
         """A bar crossing two separated blocks intersects in two solids, which

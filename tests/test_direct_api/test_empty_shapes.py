@@ -31,6 +31,8 @@ import unittest
 from OCP.TopoDS import TopoDS_Compound
 
 from build123d.geometry import Axis, Location, Plane, Pos, Vector
+from build123d.objects_part import Box
+from build123d.objects_sketch import Rectangle
 from build123d.topology import (
     Compound,
     Curve,
@@ -214,6 +216,94 @@ class TestEmptyShapeQueries(unittest.TestCase):
                 self.assertTrue(cls().is_valid)
                 self.assertTrue(cls().clean().is_empty)
                 self.assertTrue(cls().fix().is_empty)
+
+
+class TestEmptyShapeAlgebra(unittest.TestCase):
+    """The zero is the identity for + and absorbs - and &"""
+
+    def others(self):
+        return [
+            (Vertex, Vertex(1, 2, 3)),
+            (Edge, Edge.make_line((0, 0, 0), (1, 0, 0))),
+            (Wire, Wire.make_rect(1, 1)),
+            (Face, Face.make_rect(1, 1)),
+            (Solid, Solid.make_box(1, 1, 1)),
+            (Part, Box(1, 1, 1)),
+            (Sketch, Rectangle(1, 1)),
+            (Curve, Curve() + Edge.make_line((0, 0, 0), (1, 0, 0))),
+        ]
+
+    @staticmethod
+    def size(shape):
+        return (shape.volume, shape.area, sum(e.length for e in shape.edges()))
+
+    def test_identity_for_addition(self):
+        for cls, other in self.others():
+            if cls is Vertex:
+                continue  # Vertex + is vector arithmetic
+            with self.subTest(cls=cls.__name__):
+                # adding nothing gives the shape itself back
+                self.assertIs(other + cls(), other)
+                self.assertIs(other - cls(), other)
+                # nothing plus the shape is the shape's geometry, in a shape
+                # of the same dimension
+                total = cls() + other
+                self.assertEqual(total._dim, cls()._dim)
+                self.assertEqual(self.size(total), self.size(other))
+                self.assertTrue((cls() + cls()).is_empty)
+
+    def test_absorption(self):
+        for cls, other in self.others():
+            if cls is Vertex:
+                continue  # Vertex - and & are not boolean operations
+            with self.subTest(cls=cls.__name__):
+                for result in (cls() - other, cls() & other, other & cls()):
+                    self.assertTrue(result.is_empty)
+                    self.assertIsInstance(result, cls)
+
+    def test_an_untyped_empty_compound_is_the_identity_for_anything(self):
+        box = Box(1, 1, 1)
+        self.assertEqual(self.size(Compound() + box), self.size(box))
+        self.assertEqual(
+            self.size(Compound() + Rectangle(1, 1)), self.size(Rectangle(1, 1))
+        )
+        self.assertTrue((Compound() - box).is_empty)
+        self.assertTrue((Compound() & box).is_empty)
+
+    def test_a_boolean_that_leaves_nothing_returns_a_typed_zero(self):
+        box = Box(1, 1, 1)
+        apart = Pos(5, 0, 0) * Box(1, 1, 1)
+        for result, cls in (
+            (box - box, Part),
+            (box & apart, Part),
+            (Solid.make_box(1, 1, 1) - Solid.make_box(1, 1, 1), Part),
+            (Rectangle(1, 1) - Rectangle(1, 1), Sketch),
+            (Face.make_rect(1, 1) & Pos(5, 0, 0) * Face.make_rect(1, 1), Face),
+        ):
+            with self.subTest(cls=cls.__name__):
+                self.assertTrue(result.is_empty)
+                self.assertIsInstance(result, cls)
+                self.assertEqual(result._dim, cls()._dim)
+        # and the zero carries on through the next operation
+        self.assertTrue(((box - box) - apart).is_empty)
+        self.assertTrue(((box - box) & apart).is_empty)
+        self.assertAlmostEqual(((box - box) + apart).volume, 1, 5)
+
+    def test_intersect_finds_nothing_as_an_empty_list(self):
+        box = Solid.make_box(1, 1, 1)
+        apart = Pos(5, 0, 0) * Solid.make_box(1, 1, 1)
+        self.assertEqual(box.intersect(apart), [])
+        self.assertEqual(box.intersect(Solid()), [])
+        self.assertEqual(Solid().intersect(box), [])
+        self.assertEqual(box.intersect(), [])
+        self.assertEqual(len(box.intersect(box)), 1)
+
+    def test_fuse_cut_and_intersect_methods(self):
+        box = Solid.make_box(1, 1, 1)
+        self.assertEqual(box.fuse(Solid()), box)
+        self.assertEqual(box.cut(Solid()), box)
+        self.assertEqual(Solid().fuse(box), box)
+        self.assertTrue(Solid().cut(box).is_empty)
 
 
 class TestEmptyShapeContainers(unittest.TestCase):

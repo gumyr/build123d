@@ -61,7 +61,6 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
-    Optional,
     Protocol,
     SupportsIndex,
     TypeVar,
@@ -409,6 +408,33 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def __bool__(self):
         return not self.is_empty
+
+    @classmethod
+    def _zero_class(cls) -> type[Shape]:
+        """The class whose zero stands for nothing of this class
+
+        Objects such as Box are built from their dimensions, not from a shape,
+        so nothing of a Box is a Part: the first shape class in the class's
+        ancestry that can be made from nothing.
+        """
+        for base in cls.__mro__:
+            if base.__name__ in Shape.inverse_shape_LUT or base.__name__ in (
+                "Part",
+                "Sketch",
+                "Curve",
+            ):
+                return tcast(type[Shape], base)
+        return Shape  # pragma: no cover - every class descends from one above
+
+    @staticmethod
+    def _zero_of(*shapes: Shape) -> Shape:
+        """The zero of the class an operation on these shapes would return
+
+        The composite classes outrank the single ones, as they do for the
+        result of a boolean: nothing of a Part and a Solid is a Part.
+        """
+        classes = [shape._zero_class() for shape in shapes]
+        return max(classes, key=lambda c: getattr(c, "order", 0.0))()
 
     def _needs_geometry(self, asked_for: str) -> None:
         """Raise the one error for asking an empty shape for something it has not got
@@ -857,7 +883,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             and isinstance(obj, TopoDS_Compound)
             and not TopoDS_Iterator(obj).More()
         ):
-            return cls()
+            return cls._zero_class()()
 
         try:
             constructor = cls.shape_constructors[shapetype(obj)]
@@ -1177,8 +1203,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if not summands:
             return self
 
-        # Check that all dimensions are the same
-        addend_dim = self._dim
+        # Check that all dimensions are the same; an empty shape with no
+        # dimension of its own, Compound(), adds nothing to anything
+        addend_dim = summands[0]._dim if self.is_empty else self._dim
         if addend_dim is None:
             raise ValueError("Dimensions of objects to add to are inconsistent")
 
@@ -1195,20 +1222,22 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         return sum_shape
 
-    def __and__(self, other: Shape | Iterable[Shape]) -> None | Self | Compound:
+    def __and__(self, other: Shape | Iterable[Shape]) -> Self | Compound:
         """intersect shape with self operator &"""
         others = other if isinstance(other, (list, tuple)) else [other]
+        # the shapes that decide the class of an empty result, as for a cut
+        shapes = [o for o in others if isinstance(o, Shape) and o.is_empty]
+        shapes += Shape._operands([o for o in others if isinstance(o, Shape)])
 
-        if not self or (isinstance(other, Shape) and not other):
-            raise ValueError("Cannot intersect shape with empty compound")
-        new_shape = self.intersect(*others)
-        if isinstance(new_shape, list):
-            if len(new_shape) == 1:
-                new_shape = new_shape[0]
-            else:
-                new_shape = Shape.make_composite(new_shape)
+        # Nothing has nothing in common with anything
+        if self.is_empty or any(o.is_empty for o in shapes):
+            return Shape._zero_of(self, *shapes)
+        found = self.intersect(*others)
+        if not found:
+            return Shape._zero_of(self, *shapes)
+        new_shape = found[0] if len(found) == 1 else Shape.make_composite(found)
 
-        if new_shape is not None and not new_shape.is_empty and SkipClean.clean:
+        if SkipClean.clean:
             new_shape = new_shape.clean()
 
         return new_shape
@@ -1300,13 +1329,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def __sub__(self, other):
         """cut shape from self operator -"""
 
-        if self.is_empty:
-            raise ValueError("Cannot subtract shape from empty compound")
-
         subtrahends = Shape._operands(other)
         # If there is nothing to subtract return the original object
         if not subtrahends:
             return self
+        if self.is_empty:  # nothing less anything is still nothing
+            return Shape._zero_of(self, *subtrahends)
 
         # Check that all dimensions are the same
         minuend_dim = self._dim
@@ -1746,7 +1774,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         *to_intersect: Shape | Vector | Location | Axis | Plane,
         tolerance: float = 1e-6,
         include_touched: bool = False,
-    ) -> ShapeList | None:
+    ) -> ShapeList:
         """Find where bodies/interiors meet (overlap or crossing geometry).
 
         This is the main entry point for intersection operations. Handles
@@ -1764,11 +1792,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 overlap (only relevant when Solids are involved)
 
         Returns:
-            ShapeList of intersection results, or None if no intersection
+            ShapeList of intersection results, empty if there is no intersection
         """
 
         if not to_intersect:
-            return None
+            return ShapeList()
 
         # Validate input types
         for obj in to_intersect:
@@ -1785,9 +1813,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 if result:
                     next_set.extend(result.expand())
             if not next_set:
-                return None  # AND semantics: if any step fails, no intersection
+                return ShapeList()  # AND semantics: if any step fails, nothing
             common_set = ShapeList(set(next_set))  # deduplicate
-        return common_set if common_set else None
+        return common_set
 
     # pylint: disable=unused-argument
     def _intersect(
@@ -2886,6 +2914,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # Handle operations with "zero" shapes
         topo_result = None
         if isinstance(operation, BRepAlgoAPI_Cut):
+            if arg.IsEmpty():  # nothing less anything is still nothing
+                return Shape._zero_of(
+                    self, *Shape._operands(args), *Shape._operands(tools)
+                )
             if tool.IsEmpty():
                 if arg.Extent() == 1:
                     topo_result = arg.First()
@@ -2904,7 +2936,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
                     topo_result = _make_topods_compound_from_shapes(tool)
         elif isinstance(operation, BRepAlgoAPI_Common):
             if tool.IsEmpty() or arg.IsEmpty():
-                return self.__class__()
+                return Shape._zero_of(
+                    self, *Shape._operands(args), *Shape._operands(tools)
+                )
 
         # The arguments were there before and the tools are brought in. An
         # empty record means every input sub-shape came through untouched,

@@ -597,7 +597,7 @@ class Builder(ABC, Generic[ShapeT]):
                     history = ShapeHistory.of(*objects)
                     combined = self._sub_class(list(typed[self._shape]))
 
-                if combined is None:  # empty intersection result
+                if not combined:  # empty intersection result
                     self._obj = self._sub_class()
                 elif isinstance(
                     combined, list

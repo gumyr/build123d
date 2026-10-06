@@ -463,7 +463,7 @@ class DimensionLine(BaseSketchObject):
             self_intersection = cast(
                 Sketch | None, Sketch.intersect(d_line, placed_label)
             )
-            if self_intersection is None:
+            if not self_intersection:
                 self_intersection_area = 0.0
             else:
                 self_intersection_area = sum(f.area for f in self_intersection.faces())
@@ -477,7 +477,7 @@ class DimensionLine(BaseSketchObject):
                 line_intersection = cast(
                     Sketch | None, Sketch.intersect(d_line, sketch)
                 )
-                if line_intersection is None:
+                if not line_intersection:
                     common_area = 0.0
                 else:
                     common_area = sum(f.area for f in line_intersection.faces())

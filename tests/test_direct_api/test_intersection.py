@@ -32,7 +32,14 @@ def run_test(obj, target, expected, include_touched=False):
     if INTERSECT_DEBUG:
         show([obj, target, result])
     if expected is None:
-        assert result == expected, f"Expected None, but got {result}"
+        targets = target if isinstance(target, list) else [target]
+        if isinstance(obj, Shape) or any(isinstance(t, Shape) for t in targets):
+            # a shape finds nothing as an empty list; geometry finds None
+            assert (
+                isinstance(result, ShapeList) and not result
+            ), f"Expected an empty ShapeList, but got {result}"
+        else:
+            assert result is None, f"Expected None, but got {result}"
     else:
         e_type = ShapeList if isinstance(expected, list) else expected
         assert isinstance(result, e_type), f"Expected {e_type}, but got {result}"
@@ -591,7 +598,7 @@ def test_compound_intersection_after_moving_parent():
     probe = Solid.make_box(1, 1, 1).moved(Location((10, 0, 0)))
 
     assert moved_assembly.intersect(probe) is not None
-    assert moved_assembly.intersect(Solid.make_box(1, 1, 1)) is None
+    assert moved_assembly.intersect(Solid.make_box(1, 1, 1)) == []
 
 
 def test_compound_intersection_with_rotated_parent():
@@ -611,8 +618,8 @@ def test_compound_intersection_with_rotated_parent():
     assert sum(solid.volume for solid in common.solids()) == pytest.approx(8)
 
     elsewhere = Pos(-10, 20, 0) * Box(2, 2, 2)
-    assert assembly.intersect(elsewhere) is None
-    assert elsewhere.intersect(assembly) is None
+    assert assembly.intersect(elsewhere) == []
+    assert elsewhere.intersect(assembly) == []
 
 
 def test_compound_elements_copy_each_child_once(monkeypatch):
@@ -647,8 +654,8 @@ def test_nested_compound_intersection_applies_each_location_once():
     assert sum(solid.volume for solid in common.solids()) == pytest.approx(8)
 
     elsewhere = Pos(-10, 20, 0) * Box(2, 2, 2)
-    assert assembly.intersect(elsewhere) is None
-    assert elsewhere.intersect(assembly) is None
+    assert assembly.intersect(elsewhere) == []
+    assert elsewhere.intersect(assembly) == []
 
 
 # FreeCAD issue example
@@ -1116,7 +1123,7 @@ class TestEmptyCompoundIntersect:
 
         box = Box(2, 2, 2)
         result = empty.intersect(box)
-        assert result is None
+        assert result == []
 
     def test_empty_compound_intersect_with_face(self):
         """Empty Compound.intersect(Face) returns None."""
@@ -1131,4 +1138,4 @@ class TestEmptyCompoundIntersect:
 
         face = Rectangle(2, 2).face()
         result = empty.intersect(face)
-        assert result is None
+        assert result == []
