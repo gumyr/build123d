@@ -797,13 +797,10 @@ def offset(
             new_faces.append(new_face)
     if edges:
         if len(edges) == 1 and edges[0].geom_type == GeomType.LINE:
+            # The line itself is offset, not a copy made from its ends: its
+            # location says which plane it was drawn on
             new_wires = [
-                Wire(
-                    [
-                        Edge.make_line(edges[0] @ 0.0, edges[0] @ 0.5),
-                        Edge.make_line(edges[0] @ 0.5, edges[0] @ 1.0),
-                    ]
-                ).offset_2d(amount, kind=kind, side=side, closed=closed)
+                edges[0].offset_2d(amount, kind=kind, side=side, closed=closed)
             ]
         else:
             new_wires = [
