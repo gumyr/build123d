@@ -136,7 +136,10 @@ from OCP.GeomAPI import (
     GeomAPI_PointsToBSpline,
     GeomAPI_ProjectPointOnCurve,
 )
-from OCP.GeomConvert import GeomConvert_CompCurveToBSplineCurve
+from OCP.GeomConvert import (
+    GeomConvert_ApproxCurve,
+    GeomConvert_CompCurveToBSplineCurve,
+)
 from OCP.GeomFill import (
     GeomFill_CorrectedFrenet,
     GeomFill_Frenet,
@@ -466,6 +469,50 @@ def _splice_wire_fillet_corner(
     history.wrapped.Remove(corner_vertex)
     wire_builder.Build()
     return Wire(wire_builder.Wire())._made_by(history)
+
+
+def _offset_curves_to_bsplines(wire: Wire) -> Wire:
+    """Replace the offset curves in an offset wire with B-splines fitted to them
+
+    The offset of anything but a line or a circle is not a curve of the same
+    kind, and the kernel returns it as a curve defined by the offset itself.
+    STEP export, among others, cannot handle those, so each is replaced by a
+    B-spline within a tenth of TOLERANCE of it. A wire without offset curves
+    is returned as it is.
+    """
+    edges = wire.edges()
+    if all(edge.geom_type != GeomType.OFFSET for edge in edges):
+        return wire
+
+    fitted_edges: list[Edge] = []
+    for edge in edges:
+        if edge.geom_type != GeomType.OFFSET:
+            fitted_edges.append(edge)
+            continue
+        adaptor = edge.geom_adaptor()
+        # Fit only the part of the offset curve that the edge uses
+        approximation = GeomConvert_ApproxCurve(
+            Geom_TrimmedCurve(
+                adaptor.Curve().Curve(),
+                adaptor.FirstParameter(),
+                adaptor.LastParameter(),
+            ),
+            TOLERANCE / 10,
+            GeomAbs_C2,
+            100,  # maximum number of segments
+            9,  # maximum degree
+        )
+        if not approximation.HasResult():  # pragma: no cover
+            raise RuntimeError("2D offset curve could not be converted to a spline")
+        fitted = BRepBuilderAPI_MakeEdge(approximation.Curve()).Edge()
+        # The curve is stored without the placement or direction of its edge
+        fitted.Location(edge.wrapped.Location())
+        fitted.Orientation(edge.wrapped.Orientation())
+        fitted_edges.append(Edge(fitted))
+
+    # The edges were taken from the wire with its direction already applied to
+    # them, so the wire made from them winds the way the original does
+    return Wire(fitted_edges)
 
 
 def _joined_wire(
@@ -1238,10 +1285,18 @@ class Mixin1D(Shape[TOPODS]):
         kind: Kind = Kind.ARC,
         side: Side = Side.BOTH,
         closed: bool = True,
+        as_bspline: bool = True,
     ) -> Edge | Wire:
         """2d Offset
 
         Offsets a planar edge/wire
+
+        The offset of a line is a line and that of a circle is a circle, but
+        the offset of any other curve is not a curve of the same kind. The
+        kernel describes it as an offset curve: the original curve and a
+        distance. By default each of these is replaced by a B-spline within a
+        tenth of TOLERANCE of it, as some operations - STEP export among them -
+        cannot handle offset curves.
 
         Args:
             distance (float): distance from edge/wire to offset
@@ -1249,6 +1304,9 @@ class Mixin1D(Shape[TOPODS]):
             side (Side, optional): side to place offset. Defaults to Side.BOTH.
             closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
                 offset. Defaults to True.
+            as_bspline (bool, optional): replace the kernel's offset curves with
+                B-splines; when False they are returned as they are, with a
+                geom_type of GeomType.OFFSET. Defaults to True.
         Raises:
             RuntimeError: 2D offset calculation failed
             RuntimeError: Multiple Wires generated
@@ -1287,6 +1345,8 @@ class Mixin1D(Shape[TOPODS]):
             obj = unwrap_topods_compound(obj, fully=True)
         if isinstance(obj, TopoDS_Wire):
             offset_wire = Wire(obj)
+            if as_bspline:
+                offset_wire = _offset_curves_to_bsplines(offset_wire)
         else:  # Likely multiple Wires were generated
             raise RuntimeError("Unexpected result type")
 
