@@ -136,7 +136,10 @@ from OCP.GeomAPI import (
     GeomAPI_PointsToBSpline,
     GeomAPI_ProjectPointOnCurve,
 )
-from OCP.GeomConvert import GeomConvert_CompCurveToBSplineCurve
+from OCP.GeomConvert import (
+    GeomConvert_ApproxCurve,
+    GeomConvert_CompCurveToBSplineCurve,
+)
 from OCP.GeomFill import (
     GeomFill_CorrectedFrenet,
     GeomFill_Frenet,
@@ -466,6 +469,50 @@ def _splice_wire_fillet_corner(
     history.wrapped.Remove(corner_vertex)
     wire_builder.Build()
     return Wire(wire_builder.Wire())._made_by(history)
+
+
+def _offset_curves_to_bsplines(wire: Wire) -> Wire:
+    """Replace the offset curves in an offset wire with B-splines fitted to them
+
+    The offset of anything but a line or a circle is not a curve of the same
+    kind, and the kernel returns it as a curve defined by the offset itself.
+    STEP export, among others, cannot handle those, so each is replaced by a
+    B-spline within a tenth of TOLERANCE of it. A wire without offset curves
+    is returned as it is.
+    """
+    edges = wire.edges()
+    if all(edge.geom_type != GeomType.OFFSET for edge in edges):
+        return wire
+
+    fitted_edges: list[Edge] = []
+    for edge in edges:
+        if edge.geom_type != GeomType.OFFSET:
+            fitted_edges.append(edge)
+            continue
+        adaptor = edge.geom_adaptor()
+        # Fit only the part of the offset curve that the edge uses
+        approximation = GeomConvert_ApproxCurve(
+            Geom_TrimmedCurve(
+                adaptor.Curve().Curve(),
+                adaptor.FirstParameter(),
+                adaptor.LastParameter(),
+            ),
+            TOLERANCE / 10,
+            GeomAbs_C2,
+            100,  # maximum number of segments
+            9,  # maximum degree
+        )
+        if not approximation.HasResult():  # pragma: no cover
+            raise RuntimeError("2D offset curve could not be converted to a spline")
+        fitted = BRepBuilderAPI_MakeEdge(approximation.Curve()).Edge()
+        # The curve is stored without the placement or direction of its edge
+        fitted.Location(edge.wrapped.Location())
+        fitted.Orientation(edge.wrapped.Orientation())
+        fitted_edges.append(Edge(fitted))
+
+    # The edges were taken from the wire with its direction already applied to
+    # them, so the wire made from them winds the way the original does
+    return Wire(fitted_edges)
 
 
 def _joined_wire(
@@ -1238,35 +1285,109 @@ class Mixin1D(Shape[TOPODS]):
         kind: Kind = Kind.ARC,
         side: Side = Side.BOTH,
         closed: bool = True,
+        plane: Plane | None = None,
+        as_bspline: bool = True,
     ) -> Edge | Wire:
         """2d Offset
 
-        Offsets a planar edge/wire
+        Offsets a planar edge/wire within its plane.
+
+        Left and right are those of someone travelling along the edge/wire from
+        its start with the normal of the plane pointing up. The plane is
+        ``plane`` if given, otherwise the one the edge/wire lies in, with its
+        normal taken from the location of the edge/wire or from Plane.XY where
+        one of them matches. A straight edge/wire lies in many planes: that of
+        its location is used if the line is in it, then Plane.XY.
+
+        The offset of a line is a line and that of a circle is a circle, but
+        the offset of any other curve is not a curve of the same kind. The
+        kernel describes it as an offset curve: the original curve and a
+        distance. By default each of these is replaced by a B-spline within a
+        tenth of TOLERANCE of it, as some operations - STEP export among them -
+        cannot handle offset curves.
 
         Args:
             distance (float): distance from edge/wire to offset
             kind (Kind, optional): offset corner transition. Defaults to Kind.ARC.
             side (Side, optional): side to place offset. Defaults to Side.BOTH.
             closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
-                offset. Defaults to True.
+                offset of an open edge/wire. Defaults to True.
+            plane (Plane, optional): plane of the offset. Needed for a straight
+                edge/wire that is in neither the plane of its location nor
+                Plane.XY, and to set which side is left where the normal can't
+                be found. Defaults to None.
+            as_bspline (bool, optional): replace the kernel's offset curves with
+                B-splines; when False they are returned as they are, with a
+                geom_type of GeomType.OFFSET. Defaults to True.
         Raises:
             RuntimeError: 2D offset calculation failed
             RuntimeError: Multiple Wires generated
             RuntimeError: Unexpected result type
+            ValueError: Nothing is left of the offset on the requested side
 
         Returns:
             Wire: offset wire
         """
+        # pylint: disable=too-many-locals, too-many-branches, too-many-statements
         kind_dict = {
             Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
             Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
             Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
         }
         line = self if isinstance(self, Wire) else Wire([self])
+        line_edges = line.edges()
+        start = line.position_at(0)
+        tangent = line.tangent_at(0)
+        start_axis = Axis(start, tangent)
+        is_straight = all(
+            edge.geom_type == GeomType.LINE
+            and Axis(edge @ 0, edge % 0).is_coaxial(start_axis)
+            for edge in line_edges
+        )
+
+        # The normal of the plane of the offset. The edge/wire fixes the plane
+        # but not which way its normal points, and a straight one doesn't fix
+        # the plane either, so both are settled by the location the edge/wire
+        # carries from the plane it was made on, or failing that by Plane.XY.
+        references = [
+            self.location.z_axis.direction,
+            line_edges[0].location.z_axis.direction,
+            Vector(0, 0, 1),
+        ]
+        normal: Vector | None = None
+        if plane is not None:
+            normal = plane.z_dir
+        elif is_straight:
+            for reference in references:
+                if abs(reference.dot(tangent)) < TOLERANCE:
+                    normal = reference
+                    break
+        else:
+            own_plane = line.common_plane()
+            if own_plane is not None:
+                normal = own_plane.z_dir
+                for reference in references:
+                    if abs(normal.dot(reference)) > 1 - TOLERANCE:
+                        normal = reference
+                        break
+
+        signed_distance = distance
+        if side != Side.BOTH and line.is_closed and normal is not None:
+            # The kernel offsets a closed wire outwards for a positive distance.
+            # Which side is the outside depends on the way round the wire runs.
+            steps = max(16, 8 * len(line_edges))
+            points = [line.position_at(i / steps) for i in range(steps)]
+            twice_area = sum(
+                (points[i] - points[0]).cross(points[i + 1] - points[0]).dot(normal)
+                for i in range(1, steps - 1)
+            )
+            left_is_outside = twice_area < 0
+            outwards = left_is_outside == (side == Side.LEFT)
+            signed_distance = abs(distance) if outwards else -abs(distance)
 
         # Avoiding a bug when the wire contains a single Edge
-        if len(line.edges()) == 1:
-            edge = line.edges()[0]
+        if len(line_edges) == 1:
+            edge = line_edges[0]
             # pylint: disable=[no-member]
             edges = [edge.trim(0.0, 0.5), edge.trim(0.5, 1.0)]
             topods_wire = Wire(edges).wrapped
@@ -1275,10 +1396,15 @@ class Mixin1D(Shape[TOPODS]):
         assert topods_wire is not None
 
         offset_builder = BRepOffsetAPI_MakeOffset()
-        offset_builder.Init(kind_dict[kind])
+        if is_straight and normal is not None:
+            # A straight line has no plane of its own to offset within
+            spine = BRepBuilderAPI_MakeFace(Plane(start, z_dir=normal).wrapped).Face()
+            offset_builder.Init(spine, kind_dict[kind])
+        else:
+            offset_builder.Init(kind_dict[kind])
         # offset_builder.SetApprox(True)
         offset_builder.AddWire(topods_wire)
-        offset_builder.Perform(distance)
+        offset_builder.Perform(signed_distance)
         if not offset_builder.IsDone():
             raise RuntimeError(f"2D offset failed with distance {distance}")
 
@@ -1287,10 +1413,12 @@ class Mixin1D(Shape[TOPODS]):
             obj = unwrap_topods_compound(obj, fully=True)
         if isinstance(obj, TopoDS_Wire):
             offset_wire = Wire(obj)
+            if as_bspline:
+                offset_wire = _offset_curves_to_bsplines(offset_wire)
         else:  # Likely multiple Wires were generated
             raise RuntimeError("Unexpected result type")
 
-        if side != Side.BOTH:
+        if side != Side.BOTH and not line.is_closed:
             # Find and remove the end arcs
             endpoints = (line.position_at(0), line.position_at(1))
             offset_edges = offset_wire.edges().filter_by(
@@ -1301,15 +1429,37 @@ class Mixin1D(Shape[TOPODS]):
                 reverse=True,
             )
             wires = edges_to_wires(offset_edges)
-            centers = [w.position_at(0.5) for w in wires]
-            angles = [
-                line.tangent_at(0).get_signed_angle(c - line.position_at(0))
-                for c in centers
-            ]
-            if side == Side.LEFT:
-                offset_wire = wires[int(angles[0] > angles[1])]
+            if normal is None:
+                centers = [w.position_at(0.5) for w in wires]
+                angles = [
+                    line.tangent_at(0).get_signed_angle(c - line.position_at(0))
+                    for c in centers
+                ]
+                if side == Side.LEFT:
+                    offset_wire = wires[int(angles[0] > angles[1])]
+                else:
+                    offset_wire = wires[int(angles[0] <= angles[1])]
             else:
-                offset_wire = wires[int(angles[0] <= angles[1])]
+                # Each side starts beside the start of the line, to its left or
+                # right. A side can be missing: offsetting an arc by more than
+                # its radius leaves nothing on the inside.
+                to_the_left = normal.cross(tangent)
+                on_side = []
+                for wire in wires:
+                    beside_start = min(
+                        (wire.position_at(0), wire.position_at(1)),
+                        key=lambda end: (end - start).length,
+                    )
+                    is_left = (beside_start - start).dot(to_the_left) > 0
+                    if is_left == (side == Side.LEFT):
+                        on_side.append(wire)
+                if not on_side:
+                    raise ValueError(
+                        f"Nothing is left of an offset of {distance} on the "
+                        f"{side.name} side - reduce the distance or use the "
+                        "other side"
+                    )
+                offset_wire = on_side[0]
 
             if closed:
                 self0 = line.position_at(0)

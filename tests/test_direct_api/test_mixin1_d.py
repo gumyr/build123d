@@ -402,6 +402,78 @@ class TestMixin1D(unittest.TestCase):
         # self.assertTrue(offset_edge.geom_type == GeomType.LINE)
         # self.assertAlmostEqual(offset_edge.position_at(0).X, 3)
 
+    def test_offset_2d_sides_on_any_plane(self):
+        # Left and right are those of the plane the wire was made on: the
+        # inside of a left turn is on the left
+        corner = Polyline((0, 0), (10, 0), (10, 8))
+        tilted = Plane.XY.rotated((30, 20, 0)).offset(5)
+        for plane in (Plane.XY, Plane.XZ, Plane.YZ, tilted):
+            with self.subTest(plane=plane):
+                placed = plane * corner
+                left = placed.offset_2d(1, side=Side.LEFT, closed=False)
+                right = placed.offset_2d(1, side=Side.RIGHT, closed=False)
+                self.assertAlmostEqual(left.length, 16, 5)
+                self.assertAlmostEqual(right.length, 16 + 2 + math.pi / 2, 5)
+                for offset_wire in (left, right):
+                    for vertex in offset_wire.vertices():
+                        self.assertAlmostEqual(
+                            plane.to_local_coords(Vector(vertex)).Z, 0, 5
+                        )
+
+    def test_offset_2d_closed_wire_sides(self):
+        # Issue #739: a closed wire has an inside and an outside, which are its
+        # left and right according to the way round it runs
+        counter_clockwise = Polyline((0, 0), (10, 0), (10, 8), (0, 8), (0, 0))
+        clockwise = Polyline((0, 0), (0, 8), (10, 8), (10, 0), (0, 0))
+        inside, outside = 2 * (9.5 + 7.5), 2 * (10 + 8) + 0.5 * math.pi
+        for plane in (Plane.XY, Plane.XZ):
+            for wire, left, right in (
+                (counter_clockwise, inside, outside),
+                (clockwise, outside, inside),
+            ):
+                with self.subTest(plane=plane, left=left):
+                    placed = plane * wire
+                    self.assertAlmostEqual(
+                        placed.offset_2d(0.25, side=Side.LEFT).length, left, 5
+                    )
+                    self.assertAlmostEqual(
+                        placed.offset_2d(0.25, side=Side.RIGHT).length, right, 5
+                    )
+
+    def test_offset_2d_collapsed_side(self):
+        # Issue #1091: beyond its radius an arc has no offset on the inside
+        arc = CenterArc((0, 0), 5, 0, 90)
+        outside = arc.offset_2d(8, side=Side.RIGHT, closed=False)
+        self.assertAlmostEqual(outside.length, 13 * math.pi / 2, 5)
+        with self.assertRaisesRegex(ValueError, "LEFT side"):
+            arc.offset_2d(8, side=Side.LEFT, closed=False)
+
+    def test_offset_2d_straight_line(self):
+        # Issue #604: a straight line is offset in the plane it was made on
+        on_xz = Plane.XZ * Line((0, 0), (10, 10))
+        around = on_xz.offset_2d(1)
+        self.assertAlmostEqual(around.length, 2 * 200**0.5 + 2 * math.pi, 5)
+        self.assertAlmostEqual(around.bounding_box().size.Y, 0, 5)
+
+        left = (Plane.XZ * Line((0, 0), (10, 0))).offset_2d(
+            1, side=Side.LEFT, closed=False
+        )
+        self.assertAlmostEqual(left @ 0.5, (5, 0, 1), 5)
+
+        # a line with nothing to say which plane it is in takes one
+        in_space = Edge.make_line((0, 0, 0), (10, 0, 10))
+        given = in_space.offset_2d(1, plane=Plane.XZ)
+        self.assertAlmostEqual(given.bounding_box().size.Y, 0, 5)
+        # without one the kernel picks the plane, as it always has
+        either_side = [
+            in_space.offset_2d(1, side=side, closed=False)
+            for side in (Side.LEFT, Side.RIGHT)
+        ]
+        for side_line in either_side:
+            self.assertAlmostEqual(side_line.length, in_space.length, 5)
+        apart = (either_side[0] @ 0.5 - either_side[1] @ 0.5).length
+        self.assertAlmostEqual(apart, 2, 5)
+
     def test_offset_2d_builder_failure(self):
         """Verify that OCCT offset failures are reported before reading Shape()."""
         with patch("build123d.topology.one_d.BRepOffsetAPI_MakeOffset") as builder:

@@ -575,6 +575,15 @@ class OffsetTests(unittest.TestCase):
             offset(amount=1)
         self.assertAlmostEqual(test.wires()[0].length, 2 + 2 * pi, 5)
 
+    def test_single_line_offset_stays_in_plane(self):
+        # Issue #604
+        around = offset(Plane.XZ * Line((0, 0), (10, 10)), 1)
+        self.assertAlmostEqual(around.bounding_box().size.Y, 0, 5)
+        with BuildLine(Plane.XZ) as test:
+            Line((0, 0), (10, 10))
+            offset(amount=1)
+        self.assertAlmostEqual(test.line.bounding_box().size.Y, 0, 5)
+
     def test_line_offset(self):
         with BuildSketch() as test:
             with BuildLine():
@@ -725,7 +734,9 @@ class OffsetTests(unittest.TestCase):
         with BuildPart() as cup:
             with BuildSketch():
                 Circle(35)
-            extrude(amount=50, taper=-3)
+            with BuildSketch(Plane.XY.offset(50)):
+                Circle(37.62)
+            loft()
             topf = cup.faces().sort_by(Axis.Z)[-1]
             with self.assertRaises(RuntimeError):
                 offset(amount=-2, openings=topf)

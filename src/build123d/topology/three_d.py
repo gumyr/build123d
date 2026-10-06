@@ -56,7 +56,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Iterable
-from math import cos, radians, tan
+from math import radians, tan
 from typing import TYPE_CHECKING, ClassVar, cast
 
 from bd_materials import FinishedMaterial
@@ -80,15 +80,15 @@ from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakeBox,
     BRepPrimAPI_MakeCone,
     BRepPrimAPI_MakeCylinder,
+    BRepPrimAPI_MakePrism,
     BRepPrimAPI_MakeRevol,
     BRepPrimAPI_MakeSphere,
     BRepPrimAPI_MakeTorus,
     BRepPrimAPI_MakeWedge,
 )
 from OCP.GeomAbs import GeomAbs_Intersection, GeomAbs_JoinType
-from OCP.gp import gp_Ax2, gp_Pnt, gp_Vec
+from OCP.gp import gp_Ax2, gp_Pln, gp_Pnt, gp_Vec
 from OCP.GProp import GProp_GProps
-from OCP.LocOpe import LocOpe_DPrism
 from OCP.ShapeFix import ShapeFix_Solid
 from OCP.Standard import Standard_Failure, Standard_TypeMismatch
 from OCP.StdFail import StdFail_NotDone
@@ -119,6 +119,7 @@ from build123d.build_enums import (
 )
 from build123d.geometry import (
     DEG2RAD,
+    TOLERANCE,
     Axis,
     BoundBox,
     Color,
@@ -1176,63 +1177,106 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         Extrude a cross section into a prismatic solid in the provided direction.
 
-        Note that two difference algorithms are used. If direction aligns with
-        the profile normal (which must be positive), the taper is positive and the profile
-        contains no holes the OCP LocOpe_DPrism algorithm is used as it generates the most
-        accurate results. Otherwise, a loft is created between the profile and the profile
-        with a 2D offset set at the appropriate direction.
+        Note that two different algorithms are used. If direction is along the
+        profile normal and the sides of the extrusion are planes, cylinders or
+        cones, the profile is extruded and a draft angle applied to its sides,
+        which keeps them planes and cones. Otherwise, or if the draft cannot be
+        built, a loft is created between the profile and the profile with a 2D
+        offset set at the appropriate direction.
 
         Args:
-            section (Face]): cross section
-            normal (VectorLike): a vector along which to extrude the wires. The length
-                of the vector controls the length of the extrusion.
-            taper (float): taper angle in degrees.
+            profile (Face): cross section
+            direction (VectorLike): a vector along which to extrude the profile. The
+                length of the vector controls the length of the extrusion.
+            taper (float): taper angle in degrees. A positive angle narrows the
+                extrusion as it moves away from the profile.
             flip_inner (bool, optional): outer and inner geometry have opposite tapers to
-                allow for part extraction when injection molding.
+                allow for part extraction when injection molding. Defaults to True.
+
+        Raises:
+            RuntimeError: the tapered solid could not be built, as when the taper
+                collapses the profile over the extrusion distance
 
         Returns:
             Solid: extruded cross section
         """
         direction = Vector(direction)
+        pull = direction.normalized()
+        profile_wires = [profile.outer_wire()] + profile.inner_wires()
 
-        if (
-            direction.normalized() == profile.normal_at()
-            and Plane(profile).z_dir.Z > 0
-            and taper > 0
-            and not profile.inner_wires()
+        # Extrude the profile; its sides are the faces generated from its edges
+        prism_builder = BRepPrimAPI_MakePrism(profile.wrapped, direction.wrapped)
+        prism = prism_builder.Shape()
+        side_faces: list[tuple[TopoDS_Face, float]] = []
+        for i, wire in enumerate(profile_wires):
+            angle = -taper if i > 0 and not flip_inner else taper
+            for edge in wire.edges():
+                for side in prism_builder.Generated(edge.wrapped):
+                    side_faces.append((TopoDS.Face(side), angle))
+
+        along_normal = abs(pull.dot(profile.normal_at())) > 1 - TOLERANCE
+        draftable = {GeomType.PLANE, GeomType.CYLINDER, GeomType.CONE}
+        new_solid: Solid | None = None
+        if along_normal and all(
+            Face(side).geom_type in draftable for side, _ in side_faces
         ):
-            prism_builder = LocOpe_DPrism(
-                profile.wrapped,
-                direction.length / cos(radians(taper)),
-                radians(taper),
-            )
-            new_solid = Solid(TopoDS.Solid(prism_builder.Shape()))
-        else:
+            # Draft the sides about the plane of the profile, which keeps its size
+            neutral_plane = gp_Pln(profile.center().to_pnt(), pull.to_dir())
+            draft_builder = BRepOffsetAPI_DraftAngle(prism)
+            try:
+                for side, angle in side_faces:
+                    draft_builder.Add(
+                        side, pull.to_dir(), radians(angle), neutral_plane, True
+                    )
+                    if not draft_builder.AddDone():
+                        raise Standard_Failure
+                draft_builder.Build()
+                if not draft_builder.IsDone():
+                    raise Standard_Failure
+                new_solid = Solid(TopoDS.Solid(draft_builder.Shape()))
+            except (StdFail_NotDone, Standard_Failure):
+                # The draft cannot build every taper that a loft can
+                new_solid = None
+            if new_solid is not None and not new_solid.is_valid:
+                # The draft builds sides that run into each other, as when a
+                # hole widens through a wall, without noticing that they do
+                new_solid = None
+            if new_solid is not None:
+                new_solid._made_by(
+                    ShapeHistory.from_algorithm(
+                        prism_builder, [profile.wrapped], prism
+                    ).merge(
+                        ShapeHistory.from_algorithm(
+                            draft_builder, [prism], new_solid.wrapped
+                        )
+                    )
+                )
+
+        if new_solid is None:
             # Determine the offset to get the taper
             offset_amt = -direction.length * tan(radians(taper))
 
-            outer = profile.outer_wire()
-            local_outer: Wire = Plane(profile).to_local_coords(outer)
-            local_taper_outer = local_outer.offset_2d(
-                offset_amt, kind=Kind.INTERSECTION
-            )
-            taper_outer = Plane(profile).from_local_coords(local_taper_outer)
-            taper_outer.move(Location(direction))
+            try:
+                taper_wires = []
+                for i, wire in enumerate(profile_wires):
+                    flip = -1 if i > 0 and flip_inner else 1
+                    local: Wire = Plane(profile).to_local_coords(wire)
+                    local_taper = local.offset_2d(
+                        flip * offset_amt, kind=Kind.INTERSECTION
+                    )
+                    taper_wire: Wire = Plane(profile).from_local_coords(local_taper)
+                    taper_wire.move(Location(direction))
+                    taper_wires.append(taper_wire)
 
-            profile_wires = [profile.outer_wire()] + profile.inner_wires()
-
-            taper_wires = []
-            for i, wire in enumerate(profile_wires):
-                flip = -1 if i > 0 and flip_inner else 1
-                local: Wire = Plane(profile).to_local_coords(wire)
-                local_taper = local.offset_2d(flip * offset_amt, kind=Kind.INTERSECTION)
-                taper_wire: Wire = Plane(profile).from_local_coords(local_taper)
-                taper_wire.move(Location(direction))
-                taper_wires.append(taper_wire)
-
-            solids = [
-                Solid.make_loft([p, t]) for p, t in zip(profile_wires, taper_wires)
-            ]
+                solids = [
+                    Solid.make_loft([p, t]) for p, t in zip(profile_wires, taper_wires)
+                ]
+            except (RuntimeError, Standard_Failure) as err:
+                raise RuntimeError(
+                    f"Tapered extrusion of {taper} degrees over {direction.length} "
+                    "could not be built. The taper may collapse the profile - "
+                    "reduce the taper or the extrusion distance"
+                ) from err
             if len(solids) > 1:
                 complex_solid = solids[0].cut(*solids[1:])
                 assert isinstance(complex_solid, Solid)  # Can't be a list
