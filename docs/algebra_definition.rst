@@ -16,11 +16,16 @@ Objects and arithmetic
 
 **Neutral elements:**
 
-:math:`c^3_0` is the empty ``Part`` object ``p0 = Part()`` with ``p0._dim = 3`` and ``p0.wrapped = None``
+:math:`c^3_0` is the empty ``Part`` object ``p0 = Part()`` with ``p0._dim = 3`` and ``p0.is_empty``
 
-:math:`c^2_0` is the empty ``Sketch`` object ``s0 = Sketch()`` with ``s0._dim = 2`` and ``s0.wrapped = None``
+:math:`c^2_0` is the empty ``Sketch`` object ``s0 = Sketch()`` with ``s0._dim = 2`` and ``s0.is_empty``
 
-:math:`c^1_0` is the empty ``Curve`` object ``c0 = Curve()`` with ``c0._dim = 1`` and ``c0.wrapped = None``
+:math:`c^1_0` is the empty ``Curve`` object ``c0 = Curve()`` with ``c0._dim = 1`` and ``c0.is_empty``
+
+The empty objects are the zeros of the algebra: :math:`a + c_0 = a`,
+:math:`c_0 + a = a`, :math:`c_0 - a = c_0` and :math:`a \; \& \; c_0 = c_0`.
+An operation that leaves nothing, such as ``a - a``, returns the empty object
+of its set rather than failing. See :ref:`empty_shapes`.
 
 
 **Sets of predefined basic shapes:**

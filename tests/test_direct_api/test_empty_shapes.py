@@ -25,7 +25,9 @@ license:
 """
 
 import copy
+import os
 import pickle
+import tempfile
 import unittest
 
 from OCP.TopoDS import TopoDS_Compound
@@ -50,6 +52,9 @@ from build123d.operations_generic import (
 )
 from build123d.operations_part import extrude, loft, revolve, section, thicken
 from build123d.operations_sketch import make_face, make_hull, trace
+from build123d.exporters import ExportDXF, ExportSVG
+from build123d.exporters3d import export_brep, export_gltf, export_step, export_stl
+from build123d.mesher import Mesher
 from build123d.topology import (
     Compound,
     Curve,
@@ -478,6 +483,25 @@ class TestEmptyShapeOperations(unittest.TestCase):
         self.assertTrue(line.trim_to_other(apart).is_empty)
         self.assertTrue(Edge().trim_to_other(line).is_empty)
         self.assertTrue(topo_explore_common_vertex(line, apart).is_empty)
+
+
+class TestEmptyShapeExport(unittest.TestCase):
+    """There is nothing to write for an empty shape"""
+
+    def test_exporters_refuse_a_zero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for name, export in (
+                ("step", lambda: export_step(Solid(), os.path.join(tmp, "z.step"))),
+                ("stl", lambda: export_stl(Solid(), os.path.join(tmp, "z.stl"))),
+                ("brep", lambda: export_brep(Solid(), os.path.join(tmp, "z.brep"))),
+                ("gltf", lambda: export_gltf(Solid(), os.path.join(tmp, "z.gltf"))),
+                ("3mf", lambda: Mesher().add_shape(Solid())),
+                ("svg", lambda: ExportSVG().add_shape(Sketch())),
+                ("dxf", lambda: ExportDXF().add_shape(Sketch())),
+            ):
+                with self.subTest(format=name):
+                    with self.assertRaisesRegex(ValueError, "nothing to export"):
+                        export()
 
 
 class TestEmptyShapeContainers(unittest.TestCase):

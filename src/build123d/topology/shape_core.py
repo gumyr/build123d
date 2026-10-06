@@ -2307,7 +2307,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             Shape: result of split
         Returns:
             Self | list[Self],
-            Tuple[Self | list[Self]]: The result of the split operation.
+            tuple[Self | list[Self]]: The result of the split operation.
 
             - **Keep.TOP**: Returns the top as a `Self` or `list[Self]`, or the
               empty shape if no top is found.

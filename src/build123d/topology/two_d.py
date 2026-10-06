@@ -336,7 +336,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
 
         Returns:
             Union[Face | Shell | ShapeList[Face],
-            Tuple[Face | Shell | ShapeList[Face]]: The result of the split operation.
+            tuple[Face | Shell | ShapeList[Face]]: The result of the split operation.
 
             - **Keep.INSIDE**: Returns the inside part as a `Shell` or `Face`, or the empty Face
               if no inside part is found.
