@@ -942,6 +942,22 @@ class SplitReturnTypeTests(unittest.TestCase):
 
 
 class TestSweep(unittest.TestCase):
+    def test_return_is_cleaned_inside_a_builder(self):
+        # Issue #451: a path of two collinear lines sweeps seams between the
+        # side faces; clean removes them from the returned shape in both modes
+        path = Wire(
+            [
+                Edge.make_line((0, 0, 0), (0, 0, 1)),
+                Edge.make_line((0, 0, 1), (0, 0, 2)),
+            ]
+        )
+        section = Face.make_rect(2, 1)
+        with BuildPart():
+            inside = sweep(section, path)
+        self.assertEqual(len(inside.faces()), 6)
+        self.assertEqual(len(sweep(section, path).faces()), 6)
+        self.assertEqual(len(sweep(section, path, clean=False).faces()), 10)
+
     def test_fixed_normal(self):
         """normal= holds the section's orientation instead of letting it follow
         the path's own framing, which gives a different solid."""
