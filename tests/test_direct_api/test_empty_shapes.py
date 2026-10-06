@@ -306,6 +306,49 @@ class TestEmptyShapeAlgebra(unittest.TestCase):
         self.assertTrue(Solid().cut(box).is_empty)
 
 
+class TestEmptyShapeGeometryQueries(unittest.TestCase):
+    """What needs real geometry says so; what asks about its kind says None"""
+
+    def test_vertex_has_no_coordinates(self):
+        for coordinate in ("X", "Y", "Z"):
+            with self.assertRaisesRegex(ValueError, "empty Vertex has no position"):
+                getattr(Vertex(), coordinate)
+        with self.assertRaisesRegex(ValueError, "empty Vertex has no position"):
+            Vertex() + (1, 2, 3)
+
+    def test_face_without_a_surface(self):
+        for asked in ("geom_adaptor", "outer_wire", "normal_at"):
+            with self.assertRaisesRegex(ValueError, "An empty Face has no"):
+                getattr(Face(), asked)()
+        with self.assertRaisesRegex(ValueError, "An empty Face has no surface"):
+            Face().uv_face
+        with self.assertRaisesRegex(ValueError, "An empty Face has no center"):
+            Face().center_location
+        self.assertEqual(len(Face().inner_wires()), 0)
+
+    def test_probes_of_a_kind_answer_none(self):
+        empty = Face()
+        for probe in ("geometry", "is_planar", "length", "width", "radius"):
+            self.assertIsNone(getattr(empty, probe))
+        self.assertIsNone(empty.axis_of_rotation)
+        self.assertIsNone(Edge().common_plane())
+        self.assertIsNone(Wire().common_plane())
+
+    def test_nothing_meets_nothing(self):
+        line = Edge.make_line((0, 0, 0), (1, 0, 0))
+        for cls in (Edge, Wire, Face, Shell):
+            with self.subTest(cls=cls.__name__):
+                self.assertEqual(cls().intersect(line), [])
+                self.assertEqual(line.intersect(cls()), [])
+
+    def test_oriented_bounding_box_of_nothing(self):
+        box = Solid().oriented_bounding_box()
+        self.assertTrue(box.is_empty)
+        self.assertEqual(tuple(box.size), (0, 0, 0))
+        self.assertEqual(box.plane, Plane.XY)
+        self.assertFalse(Solid.make_box(1, 1, 1).oriented_bounding_box().is_empty)
+
+
 class TestEmptyShapeContainers(unittest.TestCase):
     def test_a_compound_of_nothing_is_nothing(self):
         self.assertTrue(Compound([]).is_empty)

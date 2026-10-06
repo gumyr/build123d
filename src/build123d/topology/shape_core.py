@@ -1795,7 +1795,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
             ShapeList of intersection results, empty if there is no intersection
         """
 
-        if not to_intersect:
+        if not to_intersect or self.is_empty:
+            return ShapeList()
+        if any(isinstance(obj, Shape) and obj.is_empty for obj in to_intersect):
             return ShapeList()
 
         # Validate input types

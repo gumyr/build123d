@@ -2262,6 +2262,11 @@ class OrientedBoundBox:
         return self._wrapped
 
     @property
+    def is_empty(self) -> bool:
+        """True for the oriented bounding box of nothing, which has no size or axes"""
+        return self.wrapped.IsVoid()
+
+    @property
     def corners(self) -> list[Vector]:
         """
         Compute and return the unique corner points of the oriented bounding box
@@ -2327,6 +2332,8 @@ class OrientedBoundBox:
             Plane: The coordinate system defined by the center and primary
                    (X) and tertiary (Z) directions of the bounding box.
         """
+        if self.is_empty:
+            return Plane.XY  # nothing has no axes of its own
         return Plane(
             origin=self.center(), x_dir=self.x_direction, z_dir=self.z_direction
         )
@@ -2339,6 +2346,8 @@ class OrientedBoundBox:
         Returns:
             Vector: The oriented size (full dimensions) of the box.
         """
+        if self.is_empty:
+            return Vector(0, 0, 0)
         return (
             Vector(self.wrapped.XHSize(), self.wrapped.YHSize(), self.wrapped.ZHSize())
             * 2.0

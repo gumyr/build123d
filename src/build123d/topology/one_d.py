@@ -794,6 +794,8 @@ class Mixin1D(Shape[TOPODS]):
         ]
         if any(not isinstance(line, (Edge, Wire)) for line in all_lines):
             raise ValueError("Only Edges or Wires are valid")
+        if any(line.is_empty for line in all_lines):
+            return None  # nothing lies in no plane
 
         result = None
         # Are they all co-axial - if so, select one of the infinite planes

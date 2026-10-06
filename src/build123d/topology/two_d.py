@@ -920,16 +920,20 @@ class Face(Mixin2D[TopoDS_Face]):
     @property
     def axis_of_rotation(self) -> None | Axis:
         """Get the rotational axis of a cylinder or torus"""
+        if self.is_empty:
+            geom_type = GeomType.OTHER  # nothing has no axis
+        else:
+            # Get the underlying geometric surface
+            surf: Geom_Surface = self.geom_adaptor()
 
-        # Get the underlying geometric surface
-        surf: Geom_Surface = self.geom_adaptor()
+            # Unwrap trimmed and offset surfaces to get at the basis surface
+            while isinstance(
+                surf, (Geom_RectangularTrimmedSurface, Geom_OffsetSurface)
+            ):
+                surf = surf.BasisSurface()
 
-        # Unwrap trimmed and offset surfaces to get at the basis surface
-        while isinstance(surf, (Geom_RectangularTrimmedSurface, Geom_OffsetSurface)):
-            surf = surf.BasisSurface()
-
-        # Get the geometry type from the geometric surface
-        geom_type = Shape.geom_LUT_FACE[GeomAdaptor_Surface(surf).GetType()]
+            # Get the geometry type from the geometric surface
+            geom_type = Shape.geom_LUT_FACE[GeomAdaptor_Surface(surf).GetType()]
 
         # Determine the axis of rotation if there is one
         match geom_type:
@@ -1080,12 +1084,15 @@ class Face(Mixin2D[TopoDS_Face]):
     @property
     def center_location(self) -> Location:
         """Location at the center of face"""
+        self._needs_geometry("center")
         origin = self.position_at(0.5, 0.5)
         return Plane(origin, z_dir=self.normal_at(origin)).location
 
     @property
     def geometry(self) -> None | str:
         """geometry of planar face"""
+        if self.is_empty:
+            return None
         result = None
         if self.is_planar:
             flat_face: Face = Plane(self).to_local_coords(self)
@@ -1194,6 +1201,8 @@ class Face(Mixin2D[TopoDS_Face]):
     @property
     def is_planar(self) -> Plane | None:
         """Is the face planar even though its geom_type may not be PLANE - if so return Plane"""
+        if self.is_empty:
+            return None
         surface = BRep_Tool.Surface_s(self.wrapped)
         planar_searcher = GeomLib_IsPlanarSurface(surface, TOLERANCE)
         if not planar_searcher.IsPlanar():
@@ -1212,6 +1221,8 @@ class Face(Mixin2D[TopoDS_Face]):
         Taken from the face's own parameters rather than from a bounding box,
         so it does not depend on how the face is oriented in space.
         """
+        if self.is_empty:
+            return None
         if self.is_planar:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
@@ -1241,6 +1252,8 @@ class Face(Mixin2D[TopoDS_Face]):
         Read through the same adaptor as ``geom_type``, so a cylinder or
         sphere that arrived as a trimmed surface has its radius all the same.
         """
+        if self.is_empty:
+            return None
         adaptor = BRepAdaptor_Surface(self.wrapped)
         if self.geom_type == GeomType.CYLINDER:
             return adaptor.Cylinder().Radius()
@@ -1300,6 +1313,7 @@ class Face(Mixin2D[TopoDS_Face]):
             ValueError: If an initially generated UV edge cannot be associated
                 uniquely with an edge in the completed UV face.
         """
+        self._needs_geometry("surface")
 
         uv_face, edge_map = _uv_topods_face_with_map(self.wrapped)
         return Face(uv_face), {
@@ -1322,6 +1336,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             A planar ``Face`` in UV parameter space.
         """
+        self._needs_geometry("surface")
         return self.uv_face_with_map[0]
 
     @property
@@ -1343,6 +1358,8 @@ class Face(Mixin2D[TopoDS_Face]):
         face wraps through - the width of the strip it would flatten into.
         Length times width is the area for both.
         """
+        if self.is_empty:
+            return None
         if self.is_planar:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
@@ -2155,6 +2172,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     def geom_adaptor(self) -> Geom_Surface:
         """Return the Geom Surface for this Face"""
+        self._needs_geometry("surface")
         return BRep_Tool.Surface_s(self.wrapped)
 
     def fold_lines(self) -> ShapeList[Edge]:
@@ -2208,6 +2226,8 @@ class Face(Mixin2D[TopoDS_Face]):
 
     def inner_wires(self) -> ShapeList[Wire]:
         """Extract the inner or hole wires from this Face"""
+        if self.is_empty:
+            return ShapeList()
         outer = self.outer_wire()
         inners = [w for w in self.wires() if not w.is_same(outer)]
         for w in inners:
@@ -2294,6 +2314,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Raises:
             ValueError: If only one of `u` or `v` is provided or invalid keyword args are passed.
         """
+        self._needs_geometry("location")
         surface_point, u, v = None, -1.0, -1.0
 
         if args:
@@ -2437,6 +2458,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Vector: surface normal direction
         """
+        self._needs_geometry("normal")
         surface_point, u, v = None, -1.0, -1.0
 
         if args:
@@ -2484,6 +2506,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     def outer_wire(self) -> Wire:
         """Extract the perimeter wire from this Face"""
+        self._needs_geometry("outer wire")
         outer = Wire(BRepTools.OuterWire_s(self.wrapped))
         outer._extracted_from(self)  # pylint: disable=protected-access
         return outer
@@ -2810,6 +2833,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     def _uv_bounds(self) -> tuple[float, float, float, float]:
         """Return the u min, u max, v min, v max values"""
+        self._needs_geometry("surface")
         return BRepTools.UVBounds_s(self.wrapped)
 
 

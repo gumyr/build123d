@@ -333,19 +333,25 @@ class Vertex(Shape[TopoDS_Vertex]):
         return Convexity.SADDLE
 
     @property
+    def _point(self) -> gp_Pnt:
+        """The kernel point, including the current Location"""
+        self._needs_geometry("position")
+        return BRep_Tool.Pnt_s(self.wrapped)
+
+    @property
     def X(self) -> float:
         """The X coordinate of this Vertex, including its current Location."""
-        return BRep_Tool.Pnt_s(self.wrapped).X()
+        return self._point.X()
 
     @property
     def Y(self) -> float:
         """The Y coordinate of this Vertex, including its current Location."""
-        return BRep_Tool.Pnt_s(self.wrapped).Y()
+        return self._point.Y()
 
     @property
     def Z(self) -> float:
         """The Z coordinate of this Vertex, including its current Location."""
-        return BRep_Tool.Pnt_s(self.wrapped).Z()
+        return self._point.Z()
 
     # ---- Class Methods ----
 
