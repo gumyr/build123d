@@ -219,7 +219,7 @@ def extrude(
                     target_object = context.part_local
                 else:
                     target_object = target
-                if target_object is None:
+                if not target_object:
                     raise ValueError("No target object provided")
 
                 new_solids.append(

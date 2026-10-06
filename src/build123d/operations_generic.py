@@ -126,10 +126,10 @@ def insert(
         (
             obj.unwrap(fully=False)
             if isinstance(obj, Compound)
-            else obj._obj if isinstance(obj, Builder) and obj._obj is not None else obj
+            else obj._obj if isinstance(obj, Builder) and obj._obj else obj
         )
         for obj in object_list
-        if not (isinstance(obj, Builder) and obj._obj is None)
+        if not (isinstance(obj, Builder) and not obj._obj)
     ]
     validate_inputs(context, "insert", object_iter)
 
@@ -277,7 +277,7 @@ def bounding_box(
     context: Builder | None = Builder._get_context("bounding_box")
 
     if objects is None:
-        if context is None or context is not None and context._obj is None:
+        if context is None or not context._obj:
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
@@ -366,7 +366,7 @@ def chamfer(
     length2 = length if length2 is None else length2
 
     if (objects is None and context is None) or (
-        objects is None and context is not None and context._obj is None
+        objects is None and context is not None and not context._obj
     ):
         raise ValueError("No objects provided")
 
@@ -508,7 +508,7 @@ def fillet(
     """
     context: Builder | None = Builder._get_context("fillet")
     if (objects is None and context is None) or (
-        objects is None and context is not None and context._obj is None
+        objects is None and context is not None and not context._obj
     ):
         raise ValueError("No objects provided")
 
@@ -645,7 +645,7 @@ def mirror(
         object_list = [objects]
 
     if objects is None:
-        if context is None or context is not None and context._obj is None:
+        if context is None or not context._obj:
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
@@ -729,7 +729,7 @@ def offset(
     context: Builder | None = Builder._get_context("offset")
 
     if objects is None:
-        if context is None or context is not None and context._obj is None:
+        if context is None or not context._obj:
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
@@ -938,7 +938,7 @@ def project(
     else:
         target = Face.make_rect(3 * object_size, 3 * object_size, plane=working_plane)
 
-    if target is None:
+    if not target:
         raise ValueError("A target object could not be determined")
 
     validate_inputs(context, "project")
@@ -1015,7 +1015,7 @@ def scale(
     context: Builder | None = Builder._get_context("scale")
 
     if objects is None:
-        if context is None or context is not None and context._obj is None:
+        if context is None or not context._obj:
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
@@ -1071,7 +1071,7 @@ def split(
     context: Builder | None = Builder._get_context("split")
 
     if objects is None:
-        if context is None or context is not None and context._obj is None:
+        if context is None or not context._obj:
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:

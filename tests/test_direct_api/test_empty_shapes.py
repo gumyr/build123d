@@ -30,6 +30,10 @@ import unittest
 
 from OCP.TopoDS import TopoDS_Compound
 
+from build123d.build_enums import Mode
+from build123d.build_line import BuildLine
+from build123d.build_part import BuildPart
+from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Location, Plane, Pos, Vector
 from build123d.objects_part import Box
 from build123d.objects_sketch import Rectangle
@@ -347,6 +351,48 @@ class TestEmptyShapeGeometryQueries(unittest.TestCase):
         self.assertEqual(tuple(box.size), (0, 0, 0))
         self.assertEqual(box.plane, Plane.XY)
         self.assertFalse(Solid.make_box(1, 1, 1).oriented_bounding_box().is_empty)
+
+
+class TestEmptyShapeBuilders(unittest.TestCase):
+    """A builder starts from the zero of what it builds"""
+
+    def test_an_empty_builder_gives_the_zero(self):
+        with BuildPart() as part_builder:
+            self.assertTrue(part_builder.part.is_empty)
+            self.assertIsInstance(part_builder.part, Part)
+            self.assertEqual(len(part_builder.faces()), 0)
+        self.assertTrue(part_builder.part.is_empty)
+        with BuildSketch() as sketch_builder:
+            pass
+        self.assertIsInstance(sketch_builder.sketch, Sketch)
+        self.assertTrue(sketch_builder.sketch.is_empty)
+        with BuildLine() as line_builder:
+            pass
+        self.assertIsInstance(line_builder.line, Curve)
+        self.assertTrue(line_builder.line.is_empty)
+
+    def test_subtracting_everything_leaves_the_zero(self):
+        with BuildPart() as builder:
+            Box(1, 1, 1)
+            Box(2, 2, 2, mode=Mode.SUBTRACT)
+        self.assertTrue(builder.part.is_empty)
+        self.assertIsInstance(builder.part, Part)
+
+    def test_a_first_removal_is_still_an_error(self):
+        with self.assertRaisesRegex(RuntimeError, "Nothing to subtract from"):
+            with BuildPart():
+                Box(1, 1, 1, mode=Mode.SUBTRACT)
+        with self.assertRaisesRegex(RuntimeError, "Nothing to intersect with"):
+            with BuildPart():
+                Box(1, 1, 1, mode=Mode.INTERSECT)
+
+    def test_a_nested_builder_that_made_nothing_warns_and_adds_nothing(self):
+        with BuildPart() as outer:
+            Box(1, 1, 1)
+            with self.assertWarnsRegex(UserWarning, "BuildSketch created nothing"):
+                with BuildSketch():
+                    pass
+        self.assertAlmostEqual(outer.part.volume, 1, 5)
 
 
 class TestEmptyShapeContainers(unittest.TestCase):

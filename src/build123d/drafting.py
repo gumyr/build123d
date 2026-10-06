@@ -383,7 +383,7 @@ class DimensionLine(BaseSketchObject):
     ):
 
         context = BuildSketch._get_context(self)
-        if sketch is None and not (context is None or context.sketch is None):
+        if sketch is None and not (context is None or not context.sketch):
             sketch = context.sketch
 
         # Create a wire modelling the path of the dimension lines from a variety of input types
@@ -562,7 +562,7 @@ class ExtensionLine(BaseSketchObject):
     ):
 
         context = BuildSketch._get_context(self)
-        if sketch is None and not (context is None or context.sketch is None):
+        if sketch is None and not (context is None or not context.sketch):
             sketch = context.sketch
 
         # offset is either a signed scalar (legacy) or an explicit displacement vector.

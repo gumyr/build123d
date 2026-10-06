@@ -28,7 +28,7 @@ license:
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from build123d.build_common import Builder
 from build123d.build_enums import Mode
@@ -72,15 +72,15 @@ class BuildLine(Builder[Curve]):
         placement: Face | Plane | Location = Plane.XY,
         mode: Mode = Mode.ADD,
     ):
-        self._line: Curve | None = None
+        self._line: Curve = Curve()  # nothing yet
         super().__init__(placement, mode=mode)
         if len(self.output_placements) > 1:
             raise ValueError("BuildLine only accepts one placement")
 
     @property
-    def line(self) -> Curve | None:
+    def line(self) -> Curve:
         """Get the placed line."""
-        return self._output_obj()
+        return cast(Curve, self._output_obj())
 
     @line.setter
     def line(self, value: Curve) -> None:
@@ -88,12 +88,12 @@ class BuildLine(Builder[Curve]):
         self._line = value
 
     @property
-    def line_local(self) -> Curve | None:
+    def line_local(self) -> Curve:
         """Get the line in the Builder's local construction coordinates."""
         return self._line
 
     @property
-    def _obj(self) -> Curve | None:
+    def _obj(self) -> Curve:
         """Alias _obj to line"""
         return self._line
 
