@@ -285,6 +285,9 @@ def bounding_box(
 
     validate_inputs(context, "bounding_box", object_list)
 
+    if object_list and all(not obj for obj in object_list):
+        return Shape.make_composite([], object_list[0]._dim)
+
     if all([obj._dim == 2 for obj in object_list]):
         new_faces = []
         for obj in object_list:
@@ -376,9 +379,11 @@ def chamfer(
 
     if context is not None:
         target = context._obj
-    else:
+    elif object_list:
         target = object_list[0].topo_parent  # pylint: disable=no-member
-    if target is None:
+    else:
+        target = None
+    if not target:
         raise ValueError("Nothing to chamfer")
 
     if isinstance(context, BuildSheet) or isinstance(target, Shell):
@@ -517,9 +522,11 @@ def fillet(
     validate_inputs(context, "fillet", object_list)
     if context is not None:
         target = context._obj
-    else:
+    elif object_list:
         target = object_list[0].topo_parent  # pylint: disable=no-member
-    if target is None:
+    else:
+        target = None
+    if not target:
         raise ValueError("Nothing to fillet")
 
     if isinstance(context, BuildSheet) or isinstance(target, Shell):
@@ -883,9 +890,9 @@ def project(
     if isinstance(objects, GroupBy):
         raise ValueError("project doesn't accept group_by, did you miss [n]?")
 
-    if not objects and context is None:
+    if objects is None and context is None:
         raise ValueError("No object to project")
-    if not objects and context is not None and isinstance(context, BuildPart):
+    if objects is None and context is not None and isinstance(context, BuildPart):
         object_list = context.pending_edges + context.pending_faces
         context.pending_edges = []
         context.pending_faces = []
@@ -896,6 +903,12 @@ def project(
             workplane = Plane.XY
     else:
         object_list = flatten_sequence(objects)
+        if object_list and all(not obj for obj in object_list):
+            # nothing projects to nothing, of the same dimension
+            first = object_list[0]
+            return Shape.make_composite(
+                [], first._dim if isinstance(first, Shape) else None
+            )
 
     # The size of the object determines the size of the target projection screen
     # as the screen is normal to the direction of parallel projection
@@ -1110,7 +1123,8 @@ def split(
                 pieces = [face.split(bisect_by, keep)]
             for piece in pieces:
                 if isinstance(piece, Face):
-                    split_faces.append(piece)
+                    if piece:  # a side with nothing on it adds no face
+                        split_faces.append(piece)
                 elif isinstance(piece, list):
                     split_faces.extend(piece)
                 elif isinstance(piece, Shape):
@@ -1133,10 +1147,11 @@ def split(
         else:
             top = obj.split(bisect_by, keep)
         for subpart in [top, bottom]:
-            if isinstance(subpart, Iterable):
+            if isinstance(subpart, Shape):
+                if subpart:  # a side with nothing on it adds nothing
+                    new_objects.append(subpart)
+            elif isinstance(subpart, Iterable):
                 new_objects.extend(subpart)
-            elif subpart is not None:
-                new_objects.append(subpart)
 
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)
@@ -1188,6 +1203,8 @@ def sweep(
 
     if sections is None:
         section_list = []
+    elif isinstance(sections, Shape) and sections.is_empty:
+        section_list = [sections]  # one empty section, not an iterable of none
     elif isinstance(sections, Iterable):
         section_list = [sec for sec in sections if sec is not None]
     else:
@@ -1205,6 +1222,8 @@ def sweep(
         path_wire = Wire(context.pending_edges)
         context.pending_edges = []
     else:
+        if isinstance(path, Shape) and path.is_empty:
+            raise ValueError("Cannot sweep along an empty path")
         if isinstance(path, Iterable):
             try:
                 path_wire = Wire(path)
@@ -1213,6 +1232,11 @@ def sweep(
         else:
             path_wire = Wire(path.edges()) if not isinstance(path, Wire) else path
 
+    if section_list and all(not sec for sec in section_list):
+        # nothing swept along anything is nothing, one dimension up
+        return cast(
+            Part | Sketch, Shape.make_composite([], (section_list[0]._dim or 0) + 1)
+        )
     if not section_list:
         if (
             context is not None

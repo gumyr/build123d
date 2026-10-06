@@ -142,7 +142,7 @@ def _open_conic_to_limit(
         candidates.append(make_arc(start_angle, low_angle).reversed(reconstruct=True))
 
     trimmed_arcs = [arc.trim_to_other(limit) for arc in candidates]
-    reaching = ShapeList(arc for arc in trimmed_arcs if arc is not None)
+    reaching = ShapeList(arc for arc in trimmed_arcs if arc)
     return reaching.sort_by(Edge.length)[0] if reaching else None
 
 
@@ -622,11 +622,11 @@ class CenterArc(BaseEdgeObject):
             trimmed_arc = arc.trim_to_other(arc_factor)
             trimmed_arc2 = arc2.trim_to_other(arc_factor)
 
-            if trimmed_arc is None and trimmed_arc2 is None:
+            if not trimmed_arc and not trimmed_arc2:
                 raise ValueError(f"CenterArc doesn't intersect arc limit {arc_size}")
 
             arc = ShapeList(
-                [a for a in [trimmed_arc, trimmed_arc2] if a is not None]
+                [a for a in [trimmed_arc, trimmed_arc2] if a]
             ).sort_by(Edge.length)[0]
 
         super().__init__(arc, mode=mode)
@@ -1209,13 +1209,13 @@ class EllipticalCenterArc(BaseEdgeObject):
             trimmed_curve = curve.trim_to_other(arc_factor)
             trimmed_curve2 = curve.reversed(reconstruct=True).trim_to_other(arc_factor)
 
-            if trimmed_curve is None and trimmed_curve2 is None:
+            if not trimmed_curve and not trimmed_curve2:
                 raise ValueError(
                     f"EllipticalCenterArc doesn't intersect arc limit {arc_size}"
                 )
 
             curve = ShapeList(
-                [a for a in (trimmed_curve, trimmed_curve2) if a is not None]
+                [a for a in (trimmed_curve, trimmed_curve2) if a]
             ).sort_by(Edge.length)[0]
 
         super().__init__(curve, mode=mode)
@@ -1825,11 +1825,11 @@ class JernArc(BaseEdgeObject):
             trimmed_arc = arc.trim_to_other(arc_factor)
             trimmed_arc2 = arc2.trim_to_other(arc_factor)
 
-            if trimmed_arc is None and trimmed_arc2 is None:
+            if not trimmed_arc and not trimmed_arc2:
                 raise ValueError(f"JernArc doesn't intersect arc limit {arc_size}")
 
             arcs = ShapeList(
-                [a for a in [trimmed_arc, trimmed_arc2] if a is not None]
+                [a for a in [trimmed_arc, trimmed_arc2] if a]
             ).sort_by(Edge.length)
             arc = arcs[0]  # pylint: disable=no-member
         self.center_point = arc.arc_center
@@ -1979,7 +1979,7 @@ class PolarLine(BaseEdgeObject):
                     start, start + direction_localized * max_length
                 )
                 trimmed_edge = long_edge.trim_to_other(length_factor)
-                if trimmed_edge is None:
+                if not trimmed_edge:
                     raise ValueError(
                         f"Polar line doesn't intersect length limit {length}"
                     )

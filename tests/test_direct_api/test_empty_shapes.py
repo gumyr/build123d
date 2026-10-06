@@ -30,13 +30,26 @@ import unittest
 
 from OCP.TopoDS import TopoDS_Compound
 
-from build123d.build_enums import Mode
+from build123d.build_enums import Keep, Mode
 from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Location, Plane, Pos, Vector
 from build123d.objects_part import Box
 from build123d.objects_sketch import Rectangle
+from build123d.operations_generic import (
+    bounding_box,
+    chamfer,
+    fillet,
+    mirror,
+    offset,
+    project,
+    scale,
+    split,
+    sweep,
+)
+from build123d.operations_part import extrude, loft, revolve, section, thicken
+from build123d.operations_sketch import make_face, make_hull, trace
 from build123d.topology import (
     Compound,
     Curve,
@@ -47,8 +60,10 @@ from build123d.topology import (
     Shell,
     Sketch,
     Solid,
+    ShapeList,
     Vertex,
     Wire,
+    topo_explore_common_vertex,
 )
 
 CLASSES = [Vertex, Edge, Wire, Face, Shell, Solid, Compound, Part, Sketch, Curve]
@@ -393,6 +408,76 @@ class TestEmptyShapeBuilders(unittest.TestCase):
                 with BuildSketch():
                     pass
         self.assertAlmostEqual(outer.part.volume, 1, 5)
+
+
+class TestEmptyShapeOperations(unittest.TestCase):
+    """An operation on nothing gives nothing, of the dimension it would make"""
+
+    def test_operations_on_a_zero(self):
+        line = Edge.make_line((0, 0, 0), (1, 0, 0))
+        cases = [
+            ("extrude", lambda: extrude(Sketch(), 1), Part),
+            ("revolve", lambda: revolve(Sketch(), Axis.X), Part),
+            ("offset part", lambda: offset(Part(), 1), Part),
+            ("offset sketch", lambda: offset(Sketch(), 1), Sketch),
+            ("mirror", lambda: mirror(Part(), Plane.XY), Part),
+            ("scale", lambda: scale(Part(), 2), Part),
+            ("split", lambda: split(Part(), Plane.XY), Part),
+            ("project", lambda: project(Face(), Plane.XY), Sketch),
+            ("section", lambda: section(Part(), Plane.XY), Sketch),
+            ("thicken", lambda: thicken(Sketch(), 1), Part),
+            ("sweep", lambda: sweep(Sketch(), line), Part),
+            ("loft", lambda: loft([Face(), Face()]), Part),
+            ("make_face", lambda: make_face(Curve()), Sketch),
+            ("make_hull", lambda: make_hull(Curve().edges()), Sketch),
+            ("trace", lambda: trace(Curve(), 1), Sketch),
+            ("bounding_box", lambda: bounding_box(Part()), Part),
+        ]
+        for name, operation, cls in cases:
+            with self.subTest(operation=name):
+                result = operation()
+                self.assertIsInstance(result, cls)
+                self.assertTrue(result.is_empty)
+
+    def test_operations_that_need_something(self):
+        with self.assertRaisesRegex(ValueError, "Nothing to fillet"):
+            fillet(ShapeList(), 1)
+        with self.assertRaisesRegex(ValueError, "Nothing to chamfer"):
+            chamfer(ShapeList(), 1)
+        with self.assertRaisesRegex(ValueError, "empty path"):
+            sweep(Rectangle(1, 1), Curve())
+        with self.assertRaisesRegex(ValueError, "empty tool"):
+            Solid.make_box(1, 1, 1).split(Face())
+
+    def test_an_empty_section_is_no_section(self):
+        # a loft through one real section and one empty one has one section
+        with self.assertRaisesRegex(ValueError, "More than one"):
+            loft([Rectangle(1, 1), Face()])
+
+    def test_split_sides_that_have_nothing(self):
+        box = Solid.make_box(1, 1, 1)
+        beyond = Plane.XY.offset(5)
+        self.assertTrue(box.split(beyond).is_empty)
+        top, bottom = box.split(beyond, keep=Keep.BOTH)
+        self.assertTrue(top.is_empty)
+        self.assertAlmostEqual(bottom.volume, 1, 5)
+        self.assertTrue(Solid().split(beyond).is_empty)
+        self.assertEqual(Solid().split(beyond, keep=Keep.ALL), [])
+        # the pieces of an object are typed as the result of a boolean would be
+        self.assertIsInstance(Box(1, 1, 1).split(beyond), Part)
+
+    def test_split_by_perimeter_outside_the_face(self):
+        face = Face.make_rect(4, 4)
+        elsewhere = Pos(10, 0, 0) * Wire.make_rect(1, 1)
+        self.assertTrue(face.split_by_perimeter(elsewhere).is_empty)
+        self.assertTrue(Face().split_by_perimeter(Wire.make_rect(1, 1)).is_empty)
+
+    def test_trim_and_common_vertex_find_nothing(self):
+        line = Edge.make_line((0, 0, 0), (1, 0, 0))
+        apart = Edge.make_line((0, 5, 0), (1, 5, 0))
+        self.assertTrue(line.trim_to_other(apart).is_empty)
+        self.assertTrue(Edge().trim_to_other(line).is_empty)
+        self.assertTrue(topo_explore_common_vertex(line, apart).is_empty)
 
 
 class TestEmptyShapeContainers(unittest.TestCase):

@@ -518,8 +518,8 @@ class Vertex(Shape[TopoDS_Vertex]):
 
 def topo_explore_common_vertex(
     edge1: Edge | TopoDS_Edge, edge2: Edge | TopoDS_Edge
-) -> Vertex | None:
-    """Given two edges, find the common vertex"""
+) -> Vertex:
+    """Given two edges, find the common vertex; the empty Vertex if there is none"""
     topods_edge1 = edge1 if isinstance(edge1, TopoDS_Edge) else edge1.wrapped
     topods_edge2 = edge2 if isinstance(edge2, TopoDS_Edge) else edge2.wrapped
 
@@ -540,7 +540,7 @@ def topo_explore_common_vertex(
             explorer2.Next()
         vert_exp.Next()
 
-    return None  # No common vertex found
+    return Vertex()  # No common vertex found
 
 
 Shape.register_shape_constructor(ta.TopAbs_VERTEX, Vertex)

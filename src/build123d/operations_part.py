@@ -284,7 +284,10 @@ def loft(
         context.pending_faces = []
         context.pending_face_planes = []
     else:
-        input_sections = section_list
+        # an empty section is no section; a loft through nothing is nothing
+        input_sections = [s for s in section_list if s]
+        if not input_sections:
+            return Part()
 
     # Validate Vertex placement
     if any(isinstance(s, Vertex) for s in input_sections):

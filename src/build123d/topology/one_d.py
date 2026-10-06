@@ -3434,8 +3434,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
     def trim_to_other(
         self: Edge,
         other: Shape | Axis | Location | Plane | VectorLike,
-    ) -> Edge | None:
-        """Return the shortest Edge of self trimmed by other or None if they don't intersect"""
+    ) -> Edge:
+        """Return the shortest Edge of self trimmed by other, or the empty Edge if
+        they don't intersect"""
 
         other_obj = Vector(other) if isinstance(other, Sequence) else other
 
@@ -3443,7 +3444,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         intersections = self.intersect(other_obj)
 
         if not intersections:
-            return None
+            return Edge()
 
         # Get the vertices from any edges and all of the other vertices
         intersection_pnts = intersections.vertices()
@@ -4805,10 +4806,10 @@ def topo_explore_connected_edges(
         if given_topods_edge.IsSame(topods_edge):
             continue
         # If the edge shares a vertex with the given edge they are connected
-        common_topods_vertex: Vertex | None = topo_explore_common_vertex(
+        common_topods_vertex = topo_explore_common_vertex(
             given_topods_edge, topods_edge
         )
-        if common_topods_vertex is not None and not common_topods_vertex.is_empty:
+        if not common_topods_vertex.is_empty:
             # shared_vertex is the TopoDS_Vertex common to edge1 and edge2
             u1 = BRep_Tool.Parameter_s(common_topods_vertex.wrapped, given_topods_edge)
             u2 = BRep_Tool.Parameter_s(common_topods_vertex.wrapped, topods_edge)

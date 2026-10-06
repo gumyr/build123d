@@ -153,7 +153,7 @@ def full_round(
     trimmed_connected_edges = [e.split(split_pln) for e in connected_edges]
     typed_trimmed_connected_edges = []
     for trimmed_edge in trimmed_connected_edges:
-        if trimmed_edge is None:
+        if not trimmed_edge:
             raise ValueError("Invalid geometry to create the end arc")
         assert isinstance(trimmed_edge, Edge)
         typed_trimmed_connected_edges.append(trimmed_edge)  # Make mypy happy
@@ -221,7 +221,9 @@ def make_face(
     else:
         raise ValueError("No objects to create a face")
     if not outer_edges:
-        raise ValueError("No objects to create a hull")
+        if edges is not None:
+            return Sketch()  # a face of no edges is nothing
+        raise ValueError("No objects to create a face")
     validate_inputs(context, "make_face", outer_edges)
 
     pending_face = Face(Wire.combine(outer_edges)[0])
@@ -258,6 +260,8 @@ def make_hull(
     else:
         raise ValueError("No objects to create a hull")
     if not hull_edges:
+        if edges is not None:
+            return Sketch()  # a hull of no edges is nothing
         raise ValueError("No objects to create a hull")
 
     validate_inputs(context, "make_hull", hull_edges)
@@ -303,6 +307,8 @@ def trace(
         trace_edges = context.pending_edges
     else:
         raise ValueError("No objects to trace")
+    if not trace_edges and lines is not None:
+        return Sketch()  # tracing nothing is nothing
 
     # Group the edges into wires to allow for nice transitions
     trace_wires = Wire.combine(trace_edges)

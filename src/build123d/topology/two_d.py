@@ -300,22 +300,22 @@ class Mixin2D(ABC, Shape[TOPODS]):
     @overload
     def split_by_perimeter(
         self, perimeter: Edge | Wire, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
-    ) -> Face | Shell | ShapeList[Face] | None:
+    ) -> Face | Shell | ShapeList[Face]:
         """split_by_perimeter and keep inside or outside"""
 
     @overload
     def split_by_perimeter(
         self, perimeter: Edge | Wire, keep: Literal[Keep.BOTH]
     ) -> tuple[
-        Face | Shell | ShapeList[Face] | None,
-        Face | Shell | ShapeList[Face] | None,
+        Face | Shell | ShapeList[Face],
+        Face | Shell | ShapeList[Face],
     ]:
         """split_by_perimeter and keep inside and outside"""
 
     @overload
     def split_by_perimeter(
         self, perimeter: Edge | Wire, keep: Literal[Keep.INSIDE] = Keep.INSIDE
-    ) -> Face | Shell | ShapeList[Face] | None:
+    ) -> Face | Shell | ShapeList[Face]:
         """split_by_perimeter and keep inside (default)"""
 
     def split_by_perimeter(self, perimeter: Edge | Wire, keep: Keep = Keep.INSIDE):
@@ -335,15 +335,15 @@ class Mixin2D(ABC, Shape[TOPODS]):
             ValueError: keep must be one of Keep.INSIDE|OUTSIDE|BOTH
 
         Returns:
-            Union[Face | Shell | ShapeList[Face] | None,
-            Tuple[Face | Shell | ShapeList[Face] | None]: The result of the split operation.
+            Union[Face | Shell | ShapeList[Face],
+            Tuple[Face | Shell | ShapeList[Face]]: The result of the split operation.
 
-            - **Keep.INSIDE**: Returns the inside part as a `Shell` or `Face`, or `None`
+            - **Keep.INSIDE**: Returns the inside part as a `Shell` or `Face`, or the empty Face
               if no inside part is found.
-            - **Keep.OUTSIDE**: Returns the outside part as a `Shell` or `Face`, or `None`
+            - **Keep.OUTSIDE**: Returns the outside part as a `Shell` or `Face`, or the empty Face
               if no outside part is found.
             - **Keep.BOTH**: Returns a tuple `(inside, outside)` where each element is
-              either a `Shell`, `Face`, or `None` if no corresponding part is found.
+              either a `Shell`, `Face`, or the empty Face if no corresponding part is found.
 
         """
 
@@ -358,10 +358,10 @@ class Mixin2D(ABC, Shape[TOPODS]):
             return shapes
 
         def process_sides(sides):
-            """Process sides to determine if it should be None, a single element,
-            a Shell, or a ShapeList."""
+            """Process sides to determine if it should be the empty Face, a
+            single element, a Shell, or a ShapeList."""
             if not sides:
-                return None
+                return Face()
             if len(sides) == 1:
                 return sides[0]
             # Attempt to create a shell
@@ -1042,7 +1042,7 @@ class Face(Mixin2D[TopoDS_Face]):
             if type(top) != type(bottom):  # exit early if not same
                 continue
 
-            if top is None or bottom is None:  # Impossible to actually happen?
+            if not top or not bottom:  # nothing on one side of the plane
                 continue
 
             top_list = ShapeList(top if isinstance(top, list) else [top])

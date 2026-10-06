@@ -331,7 +331,7 @@ class TestEdge(unittest.TestCase):
         for base, other in product(base_edges, others):
             result = base.trim_to_other(other)
             if other == others[-1]:
-                self.assertIsNone(result)
+                self.assertTrue(result.is_empty)  # they don't intersect
             else:
                 self.assertAlmostEqual(result.length, math.pi / 4, 5)
 
