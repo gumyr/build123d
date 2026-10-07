@@ -373,10 +373,11 @@ def loft(
         except Exception as e:
             raise RuntimeError("Failed to create valid loft") from e
 
+    if clean:
+        new_solid = new_solid.clean()
+
     if context is not None:
         context._add_to_context(new_solid, clean=clean, mode=mode)
-    elif clean:
-        new_solid = new_solid.clean()
 
     return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
 
@@ -591,14 +592,13 @@ def revolve(
         profile_faces = profile_list.faces()
 
     new_solids = [Solid.revolve(profile, angle, axis) for profile in profile_faces]
+    if clean:
+        new_solids = [solid.clean() for solid in new_solids]
 
-    new_solid = Compound(new_solids)
     if context is not None:
         context._add_to_context(*new_solids, clean=clean, mode=mode)
-    elif clean:
-        new_solid = new_solid.clean()
 
-    return Part(new_solid.wrapped)
+    return Part(Compound(new_solids).wrapped)
 
 
 def section(

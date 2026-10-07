@@ -1289,11 +1289,13 @@ def sweep(
             new_shells.append(Shell.sweep(sec, path_wire, transition))
     new_faces = [face for shell in new_shells for face in shell.faces()]
 
-    if context is not None:
-        context._add_to_context(*(new_solids + new_faces), clean=clean, mode=mode)
-    elif clean:
+    if clean:
         new_solids = [solid.clean() for solid in new_solids]
         new_shells = [shell.clean() for shell in new_shells]
+        new_faces = [face for shell in new_shells for face in shell.faces()]
+
+    if context is not None:
+        context._add_to_context(*(new_solids + new_faces), clean=clean, mode=mode)
 
     if new_solids:
         return Part(Compound(new_solids).wrapped)

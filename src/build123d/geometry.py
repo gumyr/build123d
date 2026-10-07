@@ -3474,17 +3474,22 @@ class Plane(metaclass=PlaneMeta):
         rotation: VectorLike = (0, 0, 0),
         ordering: Extrinsic | Intrinsic | None = None,
     ) -> Plane:
-        """Returns a copy of this plane, rotated about the specified axes
+        """Returns a copy of this plane, rotated about its own axes
 
-        The origin of the workplane is unaffected by the rotation.
+        The angles are about the plane's own x, y and z directions, not the
+        world axes: ``Plane.XZ.rotated((0, 0, 90))`` turns the plane about its
+        normal and leaves it in the XZ plane, with its x direction now along
+        world Z. For a plane whose axes coincide with the world's, such as
+        ``Plane.XY``, the two readings are the same. The origin of the plane is
+        unaffected by the rotation.
 
         Rotations are done in order x, y, z. If you need a different order,
         specify ordering. e.g. Intrinsic.ZYX changes rotation to
         (z angle, y angle, x angle) and rotates in that order.
 
         Args:
-            rotation (VectorLike, optional): (x angle, y angle, z angle).
-                Defaults to (0, 0, 0)
+            rotation (VectorLike, optional): (x angle, y angle, z angle), each
+                about the plane's own direction of that name. Defaults to (0, 0, 0)
             ordering (Intrinsic |  Extrinsic, optional): order of rotations in
                 Intrinsic or Extrinsic rotation mode. Defaults to Intrinsic.XYZ
 
@@ -3495,16 +3500,10 @@ class Plane(metaclass=PlaneMeta):
         if ordering is None:
             ordering = Intrinsic.XYZ
 
-        # Note: this is not a geometric Vector
-        a1, a2, a3 = map(radians, Vector(rotation))
-        quaternion = gp_Quaternion()
-        quaternion.SetEulerAngles(Location._rot_order_dict[ordering], a1, a2, a3)
-        trsf_rotation = gp_Trsf()
-        trsf_rotation.SetRotation(quaternion)
-
-        ax = self.to_gp_ax2().Transformed(trsf_rotation)
-        ax.SetLocation(self.wrapped.Location())
-        return Plane(gp_Pln(gp_Ax3(ax)))
+        # A rotation applied after the plane's own location acts in the
+        # plane's frame, about its origin
+        x_angle, y_angle, z_angle = Vector(rotation)  # not a geometric vector
+        return Plane(self.location * Rotation((x_angle, y_angle, z_angle), ordering))
 
     def moved(self, loc: Location | Plane) -> Plane:
         """Change the position & orientation of a copy of self by applying a relative location
