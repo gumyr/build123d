@@ -46,7 +46,6 @@ dependencies = [
     "trianglesolver",
     "sympy",
     "scipy",
-    "scikit-learn >= 1.5, < 2",
     "webcolors ~= 24.8.0",
     "requests >= 2.32, < 3",
 
