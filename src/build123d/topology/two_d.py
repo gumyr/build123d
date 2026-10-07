@@ -56,7 +56,6 @@ license:
 from __future__ import annotations
 
 import copy
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from math import degrees
@@ -2665,15 +2664,6 @@ class Face(Mixin2D[TopoDS_Face]):
         # pylint: disable=attribute-defined-outside-init
         holeless.wrapped = TopoDS.Face(modified_shape)
         return holeless
-
-    def wire(self) -> Wire:
-        """Return the outerwire, generate a warning if inner_wires present"""
-        if self.inner_wires():
-            warnings.warn(
-                "Found holes, returning outer_wire",
-                stacklevel=2,
-            )
-        return self.outer_wire()
 
     def uv_frame(self, location: Location, tolerance: float = 1e-4) -> UVFrame:
         """uv_frame

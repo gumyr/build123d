@@ -147,7 +147,11 @@ that removes - ``Mode.SUBTRACT`` or ``Mode.INTERSECT`` on nothing - still
 raises, as it can only be a mistake.
 
 To test whether a result has anything in it, use its truth value or
-``is_empty``; a result is never ``None``.
+``is_empty``; a shape result is never ``None``. Geometry is different: a
+``Vector``, ``Axis`` or ``Plane`` is a value rather than a set of points, so it
+has no empty form, and an intersection of geometry that finds nothing, such as
+two parallel axes, returns ``None``. Either kind of "nothing" reads as false, so
+``if not a & b:`` works for shapes and geometry alike.
 
 Location
 ========
