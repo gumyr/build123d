@@ -180,6 +180,20 @@ class TestBuildOnPlanes(unittest.TestCase):
             insert([Face.make_rect(1, 1, Plane.XZ)])
         self.assertTrue(coplanar.sketch.faces()[0].is_coplanar(Plane.XY))
 
+    def test_axis_location_preserves_cutout_position(self):
+        """Realigning an Axis-located sketch must preserve its XY position."""
+        with BuildSketch() as sketch_builder:
+            Rectangle(20, 20)
+            with Locations(Axis((5, 5), (1, 1))):
+                Rectangle(1, 1, mode=Mode.SUBTRACT)
+
+        face = sketch_builder.face()
+        self.assertTupleAlmostEquals(
+            face.inner_wires()[0].center(CenterOf.MASS), (5, 5, 0), 5
+        )
+        self.assertAlmostEqual(face.area, 399)
+        self.assertTrue(face.is_coplanar(Plane.XY))
+
     def test_changing_geometry(self):
         with BuildSketch() as s:
             Rectangle(1, 2)
