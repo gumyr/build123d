@@ -115,10 +115,16 @@ class Box(BasePartObject):
 
     Create a box defined by length, width, and height.
 
+    The names follow the 3D CAD convention: ``length`` is the size along the X
+    axis, ``width`` along Y and ``height`` along Z. Note that this differs from
+    :class:`~objects_sketch.Rectangle`, where ``height`` is the Y size:
+    ``Box(length=l, width=w, height=h)`` has the footprint of
+    ``Rectangle(width=l, height=w)``.
+
     Args:
-        length (float): box length
-        width (float): box width
-        height (float): box height
+        length (float): box length, the size along the X axis
+        width (float): box width, the size along the Y axis
+        height (float): box height, the size along the Z axis
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
         align (Align | tuple[Align, Align, Align] | None, optional): align MIN, CENTER,
             or MAX of object. Defaults to (Align.CENTER, Align.CENTER, Align.CENTER)
