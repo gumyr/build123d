@@ -518,18 +518,20 @@ class Builder(ABC, Generic[ShapeT]):
                 new_face: Face
                 for new_face in typed[Face]:
                     if not new_face.is_coplanar(Plane.XY):
+                        center = new_face.center()
                         # Try to keep the x direction, if not allow it to be assigned automatically
                         try:
                             plane = Plane(
-                                origin=(0, 0, 0),
+                                origin=center,
                                 x_dir=(1, 0, 0),
                                 z_dir=new_face.normal_at(),
                             )
                         except (TypeError, ValueError, Standard_ConstructionError):
-                            plane = Plane(origin=(0, 0, 0), z_dir=new_face.normal_at())
+                            plane = Plane(origin=center, z_dir=new_face.normal_at())
 
+                        # Reorient about the face center, preserving its XY position.
                         new_face = plane.to_local_coords(new_face)
-                        new_face.move(Location((0, 0, -new_face.center().Z)))
+                        new_face.move(Location((center.X, center.Y, 0)))
                     if new_face.normal_at().Z > 0:  # Flip the face if up-side-down
                         aligned.append(new_face)
                     else:
@@ -1198,6 +1200,10 @@ class Locations(LocationList):
     """Location Context: Push Points
 
     Creates a context of locations for Part or Sketch
+
+    An Axis places objects at its position with their local Z direction aligned to
+    the axis direction. In BuildSketch, tilted faces are realigned to Plane.XY
+    while preserving their center's X and Y coordinates.
 
     Args:
         pts (Union[VectorLike, Vertex, Location, Face, Plane, Axis] or iterable of same):
