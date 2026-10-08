@@ -32,6 +32,8 @@ from unittest.mock import patch, PropertyMock
 from build123d.build_enums import CenterOf, Kind
 from build123d.geometry import Axis, Plane
 from build123d.objects_part import Box, Cylinder
+from build123d.objects_sketch import RectangleRounded
+from build123d.operations_part import extrude
 from build123d.topology import Compound, Face, Part, Shape, Solid
 
 
@@ -72,6 +74,45 @@ class TestMixin3D(unittest.TestCase):
         self.assertTrue(fillet_box.is_valid)
         self.assertIsInstance(fillet_cylinder, Solid)
         self.assertTrue(fillet_cylinder.is_valid)
+
+    def test_fillet_failure_names_faulty_edges(self):
+        # A 2mm thick plate: the 8 edges running along the thin faces
+        # can't take a 3mm fillet, the 4 vertical ones can.
+        plate = Box(20, 20, 2)
+        edges = list(plate.edges())
+        with self.assertRaises(ValueError) as ctx:
+            plate.fillet(3, edges)
+        message = str(ctx.exception)
+        self.assertIn("radius of 3 on 8 of 12 edges", message)
+        self.assertIn("no starting solution", message)
+        self.assertIn("max_fillet()", message)
+        reported = [i for i in range(len(edges)) if f"[{i}] at (" in message]
+        self.assertEqual(len(reported), 8)
+        for i in reported:
+            self.assertGreater(edges[i].length, 2)  # never a vertical edge
+
+    def test_fillet_failure_without_kernel_diagnostics(self):
+        # Every edge fillets on its own but the combination fails; the
+        # kernel reports no faulty contour so the message stays generic.
+        cube = Box(10, 10, 10)
+        with self.assertRaises(ValueError) as ctx:
+            cube.fillet(6, cube.edges())
+        message = str(ctx.exception)
+        self.assertIn("radius of 6, try a smaller value", message)
+        self.assertNotIn(" of 12 edges", message)
+
+    def test_fillet_failure_counts_requested_edges_in_tangent_chain(self):
+        plate = extrude(RectangleRounded(20, 20, 4), amount=2)
+        edge = plate.faces().sort_by(Axis.Z)[-1].edges()[0]
+        for count in (1, 2):
+            with self.subTest(count=count):
+                with self.assertRaises(ValueError) as ctx:
+                    plate.fillet(3, (edge for _ in range(count)))
+                message = str(ctx.exception)
+                self.assertIn(f"on {count} of {count} edges", message)
+                self.assertIn("[tangent chain]", message)
+                for index in range(count):
+                    self.assertIn(f"[{index}]", message)
 
     def test_max_fillet_object_instance(self):
         box = Box(1, 1, 1)

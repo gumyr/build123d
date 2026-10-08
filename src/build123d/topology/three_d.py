@@ -86,6 +86,7 @@ from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakeTorus,
     BRepPrimAPI_MakeWedge,
 )
+from OCP.ChFiDS import ChFiDS_ErrorStatus
 from OCP.GeomAbs import GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.gp import gp_Ax2, gp_Pln, gp_Pnt, gp_Vec
 from OCP.GProp import GProp_GProps
@@ -362,6 +363,7 @@ class Mixin3D(Shape[TOPODS]):
         Returns:
             Solid | Part: Filleted solid or 3D composite
         """
+        edge_list = list(edge_list)
         native_edges = [e.wrapped for e in edge_list]
 
         fillet_builder = BRepFilletAPI_MakeFillet(self.wrapped)
@@ -375,8 +377,10 @@ class Mixin3D(Shape[TOPODS]):
                 raise Standard_Failure
         except (StdFail_NotDone, Standard_Failure) as err:
             raise ValueError(
-                f"Failed creating a fillet with radius of {radius}, try a smaller value"
-                f" or use max_fillet() to find the largest valid fillet radius"
+                f"Failed creating a fillet with radius of {radius}"
+                f"{_fillet_failure_details(fillet_builder, edge_list)}, try a"
+                f" smaller value or use max_fillet() to find the largest valid"
+                f" fillet radius"
             ) from err
 
         return new_shape._made_by(
@@ -723,6 +727,82 @@ class Mixin3D(Shape[TOPODS]):
         return Mixin1D.project_to_viewport(
             self, viewport_origin, viewport_up, look_at, focus
         )
+
+
+def _fillet_failure_details(
+    fillet_builder: BRepFilletAPI_MakeFillet, edge_list: list[Edge]
+) -> str:
+    """Describe which of the requested edges the fillet algorithm rejected.
+
+    ``BRepFilletAPI_MakeFillet`` records the contours (chains of tangent edges)
+    it could not build, but ``Shape()`` only raises ``StdFail_NotDone``. This
+    reads those records back and names the offending edges by their index in
+    ``edge_list`` and their midpoint, so the caller can narrow the selection
+    instead of guessing.
+
+    Args:
+        fillet_builder (BRepFilletAPI_MakeFillet): the builder after ``Build``
+        edge_list (list[Edge]): the edges that were passed to the builder
+
+    Returns:
+        str: "" when the kernel reports no faulty contour or vertex, otherwise
+        a clause such as " on 2 of 12 edges (no starting solution: [3] at
+        (0, 5, 10), [7] at (0, -5, 10))"
+    """
+    status_names = {
+        ChFiDS_ErrorStatus.ChFiDS_Error: "error",
+        ChFiDS_ErrorStatus.ChFiDS_WalkingFailure: "walking failure",
+        ChFiDS_ErrorStatus.ChFiDS_StartsolFailure: "no starting solution",
+        ChFiDS_ErrorStatus.ChFiDS_TwistedSurface: "twisted surface",
+    }
+    faulty_edges: list[tuple[Edge, str]] = []
+    try:
+        for i in range(1, fillet_builder.NbFaultyContours() + 1):
+            contour = fillet_builder.FaultyContour(i)
+            status = status_names.get(fillet_builder.StripeStatus(contour), "error")
+            for j in range(1, fillet_builder.NbEdges(contour) + 1):
+                faulty_edges.append((Edge(fillet_builder.Edge(contour, j)), status))
+        faulty_vertices = [
+            Vertex(fillet_builder.FaultyVertex(i))
+            for i in range(1, fillet_builder.NbFaultyVertices() + 1)
+        ]
+    except (Standard_Failure, RuntimeError):  # pragma: no cover
+        # diagnostics must never mask the original failure
+        return ""
+
+    if not faulty_edges and not faulty_vertices:
+        return ""
+
+    by_status: dict[str, list[str]] = {}
+    rejected_indices: set[int] = set()
+    for faulty, status in faulty_edges:
+        indices = [
+            k
+            for k, requested in enumerate(edge_list)
+            if requested.wrapped.IsSame(faulty.wrapped)
+        ]
+        rejected_indices.update(indices)
+        label = (
+            ", ".join(f"[{index}]" for index in indices)
+            if indices
+            else "[tangent chain]"
+        )
+        mid = faulty.position_at(0.5)
+        by_status.setdefault(status, []).append(
+            f"{label} at ({mid.X:.3g}, {mid.Y:.3g}, {mid.Z:.3g})"
+        )
+    groups = [f"{status}: {', '.join(where)}" for status, where in by_status.items()]
+    if faulty_vertices:
+        groups.append(
+            "at vertices "
+            + ", ".join(f"({v.X:.3g}, {v.Y:.3g}, {v.Z:.3g})" for v in faulty_vertices)
+        )
+
+    requested = len(edge_list)
+    # Contours can include tangent edges the caller did not select.
+    rejected = len(rejected_indices)
+    summary = f" on {rejected} of {requested} edges" if rejected else ""
+    return f"{summary} ({'; '.join(groups)})"
 
 
 def _forward_solid(solid: TopoDS_Solid) -> TopoDS_Solid:
