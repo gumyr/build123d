@@ -150,8 +150,10 @@ Place text along an ``Edge`` or ``Wire`` with ``path`` and ``position_on_path``:
 Single Line Fonts
 ^^^^^^^^^^^^^^^^^
 
-``"singleline"`` is a special font referencing ``Relief SingleLine CAD``.
-Glyphs are represented as single lines rather than filled faces.
+``"singleline"`` is a special font referencing ``Relief SingleLine Clean``, a
+build123d rebuild of the open-source Relief SingleLine font in which every
+glyph is a few clean curves. Glyphs are represented as single lines rather
+than filled faces.
 
 ``Text`` creates an outlined face by default. The outline width is controlled
 by ``single_line_width``. This operation is slow with many glyphs.
@@ -320,7 +322,7 @@ working directory*.
 .. Single Line Fonts
 .. #################
 
-.. ``"singleline"`` is a special font referencing ``Relief SingleLine CAD``.
+.. ``"singleline"`` is a special font referencing ``Relief SingleLine Clean``.
 .. Glyphs are represented as single lines rather than filled faces.
 
 .. ``Text`` creates an outlined face by default.

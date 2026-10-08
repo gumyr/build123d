@@ -535,10 +535,6 @@ class TestBuildSketchObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             Text("test", font_size, "singleline", single_line_width=0)
 
-    @unittest.skip(
-        "The outlines of the single line font's many pieces do not fuse into one "
-        "face at this width"
-    )
     def test_text_singleline_wide(self):
         # Strokes wide enough to run into each other fuse into one outline
         wide = Text("the quick brown fox", 10, "singleline", single_line_width=6)

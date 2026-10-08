@@ -66,10 +66,15 @@ class FontManager:
     """Wrap OCP Font_FontMgr"""
 
     bundled_path = "data/fonts"
+    # Relief SingleLine, by the Relief SingleLine Project Authors (OFL 1.1),
+    # rebuilt from its source without the conventions its TrueType export
+    # needs: every stroke is one open or closed path of cubic curves with
+    # true corners and exactly smooth joints, which the kernel offsets and
+    # fuses cleanly. tools/clean_singleline_font.py makes it.
     bundled_fonts = [
         (
-            "Relief SingleLine CAD",
-            "reliefsingleline/ReliefSingleLineCAD-Regular.ttf",
+            "Relief SingleLine Clean",
+            "reliefsinglelineclean/ReliefSingleLineClean-Regular.otf",
             True,
         )
     ]
@@ -105,7 +110,7 @@ class FontManager:
 
             self.manager.AddFontAlias(
                 TCollection_AsciiString("singleline"),
-                TCollection_AsciiString("Relief SingleLine CAD"),
+                TCollection_AsciiString("Relief SingleLine Clean"),
             )
 
     def available_fonts(self) -> list[FontInfo]:

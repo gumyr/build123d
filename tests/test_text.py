@@ -239,7 +239,7 @@ class TestFontManager(unittest.TestCase):
         def reset_fonts():
             manager.manager.RemoveFontAlias(
                 TCollection_AsciiString("singleline"),
-                TCollection_AsciiString("Relief SingleLine CAD"),
+                TCollection_AsciiString("Relief SingleLine Clean"),
             )
             manager.manager.ClearFontDataBase()
             manager.register_system_fonts()
