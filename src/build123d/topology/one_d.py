@@ -58,6 +58,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from math import atan2, ceil, copysign, cos, floor, inf, isclose, pi, radians
+from struct import pack
 from typing import TYPE_CHECKING, ClassVar
 from typing import cast as tcast
 from typing import overload
@@ -90,7 +91,7 @@ from OCP.BRepLProp import BRepLProp
 from OCP.BRepOffset import BRepOffset_MakeOffset
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffset
 from OCP.BRepProj import BRepProj_Projection
-from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
+from OCP.BRepTools import BRepTools, BRepTools_ReShape, BRepTools_WireExplorer
 from OCP.Extrema import Extrema_ExtPC
 from OCP.GC import (
     GC_MakeArcOfCircle,
@@ -188,6 +189,7 @@ from OCP.TopoDS import (
     TopoDS_Compound,
     TopoDS_Edge,
     TopoDS_Face,
+    TopoDS_Iterator,
     TopoDS_Shape,
     TopoDS_Vertex,
     TopoDS_Wire,
@@ -240,6 +242,7 @@ from .shape_core import (
     Shape,
     ShapeList,
     SkipClean,
+    _make_topods_compound_from_shapes,
     downcast,
     find_same_topods,
     get_top_level_topods_shapes,
@@ -3852,11 +3855,13 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
             edges = placed_edges
 
+        topods_edges = [edge.wrapped for edge in edges if edge.wrapped is not None]
+        # Keep the list overload as the connectivity reference: it accepts
+        # unsorted edges and merges vertices within their *summed* tolerances.
         wire_builder = BRepBuilderAPI_MakeWire()
         combined_edges = List_TopoDS_Shape()
-        for edge in edges:
-            if edge.wrapped is not None:
-                combined_edges.Append(edge.wrapped)
+        for topods_edge in topods_edges:
+            combined_edges.Append(topods_edge)
         wire_builder.Add(combined_edges)
 
         wire_builder.Build()
@@ -3870,8 +3875,63 @@ class Wire(Mixin1D[TopoDS_Wire]):
                 raise RuntimeError("Wire is empty")
             elif wire_builder.Error() == BRepBuilderAPI_DisconnectedWire:
                 raise ValueError("Edges are disconnected")
+            return wire_builder.Wire()
 
-        return wire_builder.Wire()
+        reference = wire_builder.Wire()
+        compound = _make_topods_compound_from_shapes(topods_edges)
+        input_vertices = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+        reference_vertices = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+        TopExp.MapShapes_s(compound, ta.TopAbs_VERTEX, input_vertices)
+        TopExp.MapShapes_s(reference, ta.TopAbs_VERTEX, reference_vertices)
+        if (
+            input_vertices.Extent() == reference_vertices.Extent()
+            or len(
+                {
+                    pack(
+                        "ddd",
+                        *BRep_Tool.Pnt_s(TopoDS.Vertex(input_vertices(i))).Coord(),
+                    )
+                    for i in range(1, input_vertices.Extent() + 1)
+                }
+            )
+            == reference_vertices.Extent()
+        ):
+            # Equal points always share a coincidence group. Equal counts mean
+            # no vertices or only bit-identical coordinates merged: keep the result.
+            # Packed floats distinguish signed zero as well as tiny differences.
+            return reference
+
+        reference_signature = _simple_wire_signature(reference)
+        if reference_signature is None:
+            return reference
+
+        # The list overload can choose a merged vertex by memory address (#1492).
+        # Single-edge Add is deterministic for simple chains, but mutates vertices
+        # it already holds. Replace every input vertex with a private copy in one
+        # reshaper to retain sharing. Unlike BRepBuilderAPI_Copy on bare edges,
+        # ReShape keeps their curve-on-surface representations as well as 3D curves.
+        copier = BRepTools_ReShape()
+        for i in range(1, input_vertices.Extent() + 1):
+            vertex = input_vertices(i).Oriented(ta.TopAbs_FORWARD)
+            copier.Replace(vertex, vertex.EmptyCopied())
+        copier.Apply(compound)
+        sequential = BRepBuilderAPI_MakeWire()
+        for topods_edge in topods_edges:
+            copied_edge = copier.Apply(topods_edge)
+            sequential.Add(TopoDS.Edge(copied_edge))
+            if not sequential.IsDone():
+                return reference
+
+        candidate = sequential.Wire()
+        # Sequential Add has stricter proximity rules. It may connect the last
+        # edge at one end without closing the wire, or produce a branch. Accept
+        # only simple chains with the same connectivity counts and closure.
+        if _simple_wire_signature(candidate) != reference_signature:
+            return reference
+
+        return _restore_wire_identities(
+            candidate, reference, tracked_subshapes([compound]), copier
+        )
 
     @classmethod
     def combine(
@@ -4866,6 +4926,79 @@ class Wire(Mixin1D[TopoDS_Wire]):
                     trimmed_edges.append(edge.trim(u0, u1))
 
         return Wire(trimmed_edges)
+
+
+def _simple_wire_signature(wire: TopoDS_Wire) -> tuple[int, int, bool] | None:
+    """Edge/vertex counts and closure for a simple chain, or None for other topology."""
+    vertices = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+    edges = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+    degree: dict[int, int] = {}
+    edge_count = 0
+    edge_iterator = TopoDS_Iterator(wire)
+    while edge_iterator.More():
+        edge = edge_iterator.Value()
+        edge_count += 1
+        if edge.ShapeType() != ta.TopAbs_EDGE or edges.Add(edge) != edge_count:
+            return None
+        vertex_iterator = TopoDS_Iterator(edge)
+        endpoint_count = 0
+        while vertex_iterator.More():
+            vertex = vertex_iterator.Value()
+            if vertex.ShapeType() != ta.TopAbs_VERTEX or vertex.Orientation() not in (
+                ta.TopAbs_FORWARD,
+                ta.TopAbs_REVERSED,
+            ):
+                return None
+            index = vertices.Add(vertex)
+            degree[index] = degree.get(index, 0) + 1
+            endpoint_count += 1
+            vertex_iterator.Next()
+        if endpoint_count != 2:
+            return None
+        edge_iterator.Next()
+    if not degree or max(degree.values()) > 2:
+        return None
+    ends = sum(count == 1 for count in degree.values())
+    closed = BRep_Tool.IsClosed_s(wire)
+    if ends != (0 if closed else 2):
+        return None
+    return edge_count, vertices.Extent(), closed
+
+
+def _restore_wire_identities(
+    candidate: TopoDS_Wire,
+    reference: TopoDS_Wire,
+    originals: Iterable[TopoDS_Shape],
+    copier: BRepTools_ReShape,
+) -> TopoDS_Wire:
+    """Restore unchanged input identities without leaking trial vertex mutations."""
+    # Callers may still hold unmerged corner vertices (e.g. for fillet_2d).
+    # Restore only identities the list builder retained, after checking that
+    # the trial left their geometry unchanged. Original edges can survive the
+    # list builder only if all their original vertices survive as well.
+    reference_shapes = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+    candidate_shapes = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+    TopExp.MapShapes_s(reference, reference_shapes)
+    TopExp.MapShapes_s(candidate, candidate_shapes)
+    reshaper = BRepTools_ReShape()
+    for original in originals:
+        if not reference_shapes.Contains(original):
+            continue
+        copied = copier.Apply(original)
+        if not candidate_shapes.Contains(copied):
+            return reference
+        if original.ShapeType() == ta.TopAbs_VERTEX:
+            old_vertex, new_vertex = TopoDS.Vertex(original), TopoDS.Vertex(copied)
+            if BRep_Tool.Pnt_s(old_vertex).Distance(
+                BRep_Tool.Pnt_s(new_vertex)
+            ) != 0 or BRep_Tool.Tolerance_s(old_vertex) != BRep_Tool.Tolerance_s(
+                new_vertex
+            ):
+                return reference
+        reshaper.Replace(
+            copied.Oriented(ta.TopAbs_FORWARD), original.Oriented(ta.TopAbs_FORWARD)
+        )
+    return TopoDS.Wire(reshaper.Apply(candidate))
 
 
 def edges_to_wires(edges: Iterable[Edge], tol: float = 1e-6) -> ShapeList[Wire]:

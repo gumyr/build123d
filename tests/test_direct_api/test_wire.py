@@ -26,6 +26,7 @@ license:
 
 """
 
+import io
 import math
 import os
 import random
@@ -43,9 +44,10 @@ from build123d.geometry import Axis, Color, Location, Plane, Pos, Rot, Vector
 from build123d.objects_curve import Curve, Line, JernArc, PolarLine, Polyline, Spline
 from build123d.objects_sketch import Circle, Rectangle, RectangleRounded, RegularPolygon
 from build123d.operations_generic import fillet
-from build123d.exporters3d import export_step
+from build123d.exporters3d import export_brep, export_step
 from build123d.importers import import_step
-from build123d.topology import Edge, Face, Solid, Vertex, Wire
+from build123d.topology import Compound, Edge, Face, Solid, Vertex, Wire
+from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_CompCurve
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_EmptyWire,
@@ -728,6 +730,120 @@ class TestWireValidation(unittest.TestCase):
                 Edge.make_line((0, 10), (0, 0)),
             ]
         )
+
+    def test_make_wire_merges_coincident_vertices_deterministically(self):
+        """#1492: neighbours whose ends coincide within tolerance but are not
+        bit-identical must share the same vertex whatever the run or order"""
+        for reverse in (False, True):
+            edges = [
+                Edge.make_line((0, 0, 0), (1e-20, 0, 10)),
+                Edge.make_three_point_arc((0, 0, 10), (5, 0, 15), (10, 0, 10)),
+                Edge.make_line((10, 0, 10), (10, 0, 0)),
+                Edge.make_line((10, 0, 0), (0, 0, 0)),
+            ]
+            wire = Wire(edges[::-1] if reverse else edges)
+            self.assertTrue(wire.is_closed)
+            shared = [v for v in wire.vertices() if v.Z > 5 and v.X < 1]
+            self.assertEqual(len(shared), 1)
+            # the wire's vertex is the merge of the two, not either one picked
+            # by memory address
+            self.assertGreater(shared[0].X, 0)
+            self.assertLess(shared[0].X, 1e-20)
+
+    def test_make_wire_preserves_input_geometry(self):
+        for order in ((0, 1, 2, 3), (0, 1, 3, 2), (0, 1, 3)):
+            with self.subTest(order=order):
+                edges = [
+                    Edge.make_line((0, 0), (1, 0)),
+                    Edge.make_line((1, 5e-8), (2, 0)),
+                    Edge.make_line((2, 0), (3, 0)),
+                    Edge.make_line((3, 0), (4, 0)),
+                ]
+                source = Compound(edges)
+                before = io.BytesIO()
+                export_brep(source, before)
+                if len(order) == 3:
+                    with self.assertRaisesRegex(ValueError, "disconnected"):
+                        Wire(edges[i] for i in order)
+                else:
+                    wire = Wire(edges[i] for i in order)
+                    self.assertEqual(len(wire.edges()), 4)
+                after = io.BytesIO()
+                export_brep(source, after)
+                # BREP includes vertex coordinates, tolerances and parent topology.
+                self.assertEqual(after.getvalue(), before.getvalue())
+
+    def test_make_wire_exact_joins_with_different_tolerances(self):
+        for located in (False, True):
+            with self.subTest(located=located):
+                first = Edge.make_line((0, 0), (1, 0))
+                second = (
+                    Edge.make_line((0, 0), (1, 0)).moved(Pos(X=1))
+                    if located
+                    else Edge.make_line((1, 0), (2, 0))
+                )
+                BRep_Builder().UpdateVertex(second.vertices()[0].wrapped, 5e-7)
+                source = Compound([first, second])
+                before = io.BytesIO()
+                export_brep(source, before)
+                wire = Wire([first, second])
+                self.assertEqual(len(wire.vertices()), 3)
+                joint = wire.vertices().sort_by(Axis.X)[1]
+                self.assertEqual(tuple(joint), (1, 0, 0))
+                self.assertAlmostEqual(BRep_Tool.Tolerance_s(joint.wrapped), 5e-7, 12)
+                after = io.BytesIO()
+                export_brep(source, after)
+                self.assertEqual(after.getvalue(), before.getvalue())
+
+    def test_make_wire_preserves_closure_tolerance(self):
+        for gap in (1e-7, 1.5e-7, 2e-7, 2.1e-7):
+            with self.subTest(gap=gap):
+                wire = Wire(
+                    [
+                        Edge.make_line((0, 0), (1, 0)),
+                        Edge.make_line((1, 0), (1, 1)),
+                        Edge.make_line((1, 1), (0, gap)),
+                    ]
+                )
+                self.assertEqual(wire.is_closed, gap <= 2e-7)
+                if gap <= 2e-7:
+                    self.assertEqual(len(wire.vertices()), 3)
+                    self.assertTrue(Face(wire).is_valid)
+
+    def test_make_wire_preserves_shared_topology(self):
+        for original in (Wire.make_rect(1, 1), Wire.make_circle(1)):
+            edges = original.edges()
+            rebuilt = Wire(edges)
+            self.assertTrue(rebuilt.is_closed)
+            self.assertTrue(rebuilt.is_valid)
+            self.assertEqual(len(rebuilt.vertices()), len(original.vertices()))
+            for edge in edges:
+                self.assertTrue(any(edge.is_same(other) for other in rebuilt.edges()))
+
+    def test_make_wire_preserves_branching_input(self):
+        edges = [
+            Edge.make_line((0, 0), (1, 0)),
+            Edge.make_line((1, 5e-8), (2, 0)),
+            Edge.make_line((1, 0), (1, 1)),
+        ]
+        wire = Wire(edges)
+        self.assertEqual(len(wire.edges()), 3)
+        self.assertEqual(len(wire.vertices()), 4)
+
+    def test_make_wire_sorts_out_of_order_edges(self):
+        edges = [
+            Edge.make_line((0, 0), (10, 0)),
+            Edge.make_line((10, 10), (0, 10)),
+            Edge.make_line((10, 0), (10, 10)),
+            Edge.make_line((0, 10), (0, 0)),
+        ]
+        wire = Wire(edges)
+        self.assertTrue(wire.is_closed)
+        self.assertEqual(len(wire.edges()), 4)
+
+    def test_make_wire_disconnected(self):
+        with self.assertRaisesRegex(ValueError, "disconnected"):
+            Wire([Edge.make_line((0, 0), (1, 0)), Edge.make_line((5, 5), (6, 5))])
 
     def test_make_wire_empty(self):
         builder = MagicMock()
