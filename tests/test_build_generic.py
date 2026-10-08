@@ -27,7 +27,7 @@ license:
 """
 
 import unittest
-from math import pi, sqrt
+from math import cos, pi, radians, sqrt
 from unittest.mock import patch
 
 from build123d import *
@@ -730,16 +730,35 @@ class OffsetTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             offset(Vertex(), amount=1)
 
-    def test_offset_failure(self):
+    def test_offset_tapered_cup(self):
+        with BuildPart() as cup:
+            with BuildSketch():
+                Circle(35)
+            extrude(amount=50, taper=-3)
+            solid_volume = cup.part.volume
+            topf = cup.faces().sort_by(Axis.Z)[-1]
+            offset(amount=-2, openings=topf)
+        self.assertTrue(cup.part.is_valid)
+        self.assertLess(cup.part.volume, solid_volume / 5)
+        top_radii = sorted(
+            e.radius
+            for e in cup.edges().filter_by(GeomType.CIRCLE).group_by(Axis.Z)[-1]
+        )
+        self.assertAlmostEqual(top_radii[1] - top_radii[0], 2 / cos(radians(3)), 3)
+
+    def test_offset_lofted_cup(self):
+        # used to fail in OpenCascade; lofts now have line edges which offset fine
         with BuildPart() as cup:
             with BuildSketch():
                 Circle(35)
             with BuildSketch(Plane.XY.offset(50)):
                 Circle(37.62)
             loft()
+            solid_volume = cup.part.volume
             topf = cup.faces().sort_by(Axis.Z)[-1]
-            with self.assertRaises(RuntimeError):
-                offset(amount=-2, openings=topf)
+            offset(amount=-2, openings=topf)
+        self.assertTrue(cup.part.is_valid)
+        self.assertLess(cup.part.volume, solid_volume / 5)
 
     def test_flipped_faces(self):
         box = Box(10, 10, 10)
