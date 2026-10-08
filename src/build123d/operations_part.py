@@ -47,6 +47,7 @@ from build123d.topology import (
     Wire,
     Part,
     Sketch,
+    Shape,
     ShapeList,
     Vertex,
 )
@@ -262,6 +263,7 @@ def loft(
 
     Loft the pending sketches/faces, across all workplanes, into a solid.
 
+    Sections must not contain solids; select their faces explicitly instead.
     Faces may contain inner wires, which are lofted as holes and subtracted from
     the outer loft. When a face has more than one inner wire, the wires in each
     subsequent section are matched to the preceding section by choosing the
@@ -284,6 +286,9 @@ def loft(
 
     section_list = flatten_sequence(sections)
     validate_inputs(context, "loft", section_list)
+
+    if any(isinstance(section, Shape) and section.solids() for section in section_list):
+        raise ValueError("Loft sections must not contain solids; use faces or sketches")
 
     # If no explicit sections provided, use pending_faces from context
     if all(s is None for s in section_list):

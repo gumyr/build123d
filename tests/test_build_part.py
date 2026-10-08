@@ -655,6 +655,47 @@ class TestHole(unittest.TestCase):
 
 
 class TestLoft(unittest.TestCase):
+    def test_loft_rejects_solid_sections(self):
+        solid = Solid.make_box(1, 1, 1)
+        face = Face.make_rect(1, 1)
+        for sections in (
+            solid,
+            Part(solid.wrapped),
+            Compound([solid]),
+            Compound([face, solid]),
+            [face, solid],
+            (section for section in [face, solid]),
+        ):
+            with self.subTest(sections=sections):
+                with self.assertRaisesRegex(
+                    ValueError, "sections must not contain solids"
+                ):
+                    loft(sections)
+
+    def test_loft_rejects_fused_spheres(self):
+        sections = Sphere(1) + Pos(1, 1, 1) * Sphere(1)
+        with self.assertRaisesRegex(ValueError, "sections must not contain solids"):
+            loft(sections)
+
+    def test_invalid_loft_preserves_pending_faces(self):
+        solid = Solid.make_box(1, 1, 1)
+        with BuildPart() as part:
+            with BuildSketch(Plane.XY, Plane.XY.offset(2)):
+                Rectangle(1, 1)
+            faces = part.pending_faces.copy()
+            planes = part.pending_face_planes.copy()
+            with self.assertRaisesRegex(ValueError, "sections must not contain solids"):
+                loft(solid)
+            self.assertEqual(part.pending_faces, faces)
+            self.assertEqual(part.pending_face_planes, planes)
+            loft()
+        self.assertAlmostEqual(part.part.volume, 2)
+
+    def test_loft_accepts_face_compounds(self):
+        face = Face.make_rect(1, 1)
+        sections = Compound([face, Pos(Z=2) * face])
+        self.assertAlmostEqual(loft(sections).volume, 2)
+
     def test_return_is_cleaned_inside_a_builder(self):
         # Issue #451: a section edge drawn as two collinear lines lofts into
         # two coplanar faces that clean merges, in a builder or not
