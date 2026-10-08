@@ -356,6 +356,28 @@ class TestEdge(unittest.TestCase):
         self.assertAlmostEqual(mid.position_at(0), (0.25, 0, 0), 5)
         self.assertAlmostEqual(mid.position_at(1), (0.25, 1, 0), 5)
 
+    def test_mid_way_reversed_edges(self):
+        # Issue #1038: the ends are paired by the way each edge runs, whether
+        # that comes from how it was built or from a reversed orientation
+        first = Edge.make_line((0, 0), (10, 0))
+        second = Edge.make_line((1, 5), (9, 5))
+        opposite = Edge.make_line((9, 5), (1, 5))
+        for name, edges in {
+            "same direction": (first, second),
+            "built in opposite directions": (first, opposite),
+            "second reversed": (first, second.reversed()),
+            "second built opposite and reversed": (first, opposite.reversed()),
+            "first reversed": (first.reversed(), second),
+            "both reversed": (first.reversed(), second.reversed()),
+        }.items():
+            with self.subTest(name):
+                mid = Edge.make_mid_way(*edges)
+                self.assertAlmostEqual(mid.length, 9, 5)
+                self.assertAlmostEqual(mid.position_at(0.5), (5, 2.5, 0), 5)
+                ends = sorted((mid.position_at(0).X, mid.position_at(1).X))
+                self.assertAlmostEqual(ends[0], 0.5, 5)
+                self.assertAlmostEqual(ends[1], 9.5, 5)
+
     def test_distribute_locations2(self):
         with self.assertRaises(ValueError):
             Edge.make_circle(1).distribute_locations(1)
@@ -427,6 +449,23 @@ class TestEdge(unittest.TestCase):
             p = curve.position_at(u)
             u_back = curve.param_at_point(p)
             self.assertAlmostEqual(u, u_back, delta=1e-6, msg=f"u={u}, u_back={u_back}")
+
+    def test_param_at_point_reversed_edge(self):
+        # Issue #726: the parameter of a point is the one position_at takes,
+        # at the vertices and, without the rounding of the search, between them
+        edges = {
+            "line": Edge.make_line((0, 0), (10, 20)),
+            "arc": Edge.make_three_point_arc((4, 3), (3, 5), (1, 5)),
+            "spline": Edge.make_spline([(0, 0), (2, 3), (5, 1), (7, 4)]),
+            "ellipse arc": Edge.make_ellipse(5, 2, start_angle=20, end_angle=200),
+        }
+        for name, forward_edge in edges.items():
+            edge = forward_edge.reversed()
+            self.assertFalse(edge.is_forward)
+            for u_value in (0, 0.123456789, 0.5, 0.8, 1):
+                with self.subTest(edge=name, u_value=u_value):
+                    point = edge.position_at(u_value)
+                    self.assertAlmostEqual(edge.param_at_point(point), u_value, 9)
 
     def test_conical_helix(self):
         helix = Edge.make_helix(1, 4, 1, normal=(-1, 0, 0), angle=10, lefthand=True)

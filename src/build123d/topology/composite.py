@@ -424,7 +424,14 @@ class Compound(Mixin3D[TopoDS_Compound]):
         if system_font.IsSingleStrokeFont() and single_line_width > 0:
             outline = [e.offset_2d(single_line_width / 2) for e in text_flat.edges()]
             outline = [_make_face(o.edges()) for o in outline]
-            text_flat = Compound([]) + outline
+            # The outlines of neighbouring strokes overlap. They are fused without
+            # the fuzzy tolerance that Compound's + applies, as with it the kernel
+            # leaves some of them overlapping instead of merging them.
+            if len(outline) > 1:
+                merged = outline[0].fuse(*outline[1:])
+                text_flat = Compound(merged.get_top_level_shapes())
+            else:
+                text_flat = Compound(outline)
             if any([not f.is_valid for f in text_flat.get_top_level_shapes()]):
                 raise ValueError(
                     "single_line_width "
@@ -647,7 +654,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         Determine if any of the child objects within a Compound/assembly intersect by
         intersecting each of the shapes with each other and checking for
-        a common volume.
+        a common volume. The parts of an assembly, the nodes with their own
+        geometry, are compared at their global locations.
 
         Args:
             include_parent (bool, optional): check parent for intersections. Defaults to False.
@@ -657,12 +665,21 @@ class Compound(Mixin3D[TopoDS_Compound]):
             tuple[bool, tuple[Shape, Shape], float]:
                 do the object intersect, intersecting objects, volume of intersection
         """
-        children: list[Shape] = list(PreOrderIter(self))
-        if not include_parent:
-            children.pop(0)  # remove parent
+        # A sub-assembly always contains its own parts, so only the parts are
+        # compared, each at its global location; the reported pair holds the
+        # original objects. The placed shapes share the parts' geometry, as
+        # moved() would deep-copy the whole assembly for every part.
+        children: list[Shape] = self._parts()
+        placed: list[Shape] = [
+            Shape.cast(part.wrapped.Located(part.global_location.wrapped))
+            for part in children
+        ]
+        if include_parent:
+            children.insert(0, self)
+            placed.insert(0, Compound(placed) if placed else self)
         # children_bbox = [child.bounding_box().to_solid() for child in children]
         children_bbox = [
-            Solid.from_bounding_box(child.bounding_box()) for child in children
+            Solid.from_bounding_box(child.bounding_box()) for child in placed
         ]
         child_index_pairs = [
             tuple(map(int, comb))
@@ -675,8 +692,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 children_bbox[child_index_pair[1]]
             )
             if bbox_intersection is not None:
-                obj_intersection = children[child_index_pair[0]].intersect(
-                    children[child_index_pair[1]]
+                obj_intersection = placed[child_index_pair[0]].intersect(
+                    placed[child_index_pair[1]]
                 )
                 if obj_intersection is not None:
                     common_volume = sum(s.volume for s in obj_intersection.solids())
@@ -762,10 +779,29 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         elements: list[Shape] = []
         for child in self.children:
-            placed = child.moved(base)
-            placed.parent = None
+            # Copy the child and its own children but not the assembly above
+            # it: a copy that followed the parent link would duplicate every
+            # sibling for each child placed.
+            placed = copy.deepcopy(child, {id(self): None})
+            placed.wrapped = downcast(child.wrapped.Moved(base.wrapped))
             elements.append(placed)
         return elements
+
+    def _parts(self) -> list[Shape]:
+        """The parts of this assembly, the nodes with their own geometry.
+
+        A Compound with children is only the sum of its children, so it is
+        represented by them. Any other node is a part, including a Solid that
+        has child parts of its own.
+
+        Returns:
+            list[Shape]: parts in pre-order, at their local locations
+        """
+        return [
+            node
+            for node in PreOrderIter(self)
+            if node is not self and not (isinstance(node, Compound) and node.children)
+        ]
 
     def _intersect(
         self,

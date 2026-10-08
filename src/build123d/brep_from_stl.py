@@ -51,7 +51,9 @@ from math import acos, ceil, log10, sqrt
 from typing import Any, Literal, TypeAlias, TypeVar, overload
 
 import numpy as np
-from sklearn.cluster import DBSCAN  # type: ignore[import-untyped]
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import connected_components
+from scipy.spatial import cKDTree
 
 from build123d.build_enums import Align, GeomType
 from build123d.geometry import TOL_DIGITS, Axis, Location, Plane, Pos, Vector
@@ -239,15 +241,53 @@ def _evenly_spaced_subset(values: Sequence[T], max_count: int) -> list[T]:
 
 
 # Clustering and low-level geometry helpers
+def _dbscan(rows: np.ndarray, eps: float, min_samples: int) -> list[np.ndarray]:
+    """Density clustering of row vectors by Euclidean distance; one boolean mask
+    per cluster, in order of each cluster's first row.
+
+    A row with at least ``min_samples`` rows within ``eps`` of it, itself
+    included, is a core row; the clusters are the connected groups of core rows,
+    and a row within ``eps`` of a core row joins its cluster. Every other row is
+    noise and belongs to no cluster."""
+
+    size = len(rows)
+    pairs = cKDTree(rows).query_pairs(eps, output_type="ndarray")
+    is_core = np.bincount(pairs.ravel(), minlength=size) + 1 >= min_samples
+    if not is_core.any():
+        return []
+
+    # clusters: connected components of the core rows, numbered by first row
+    core_pairs = pairs[is_core[pairs[:, 0]] & is_core[pairs[:, 1]]]
+    adjacency = coo_matrix(
+        (np.ones(len(core_pairs)), (core_pairs[:, 0], core_pairs[:, 1])),
+        shape=(size, size),
+    )
+    _, component = connected_components(adjacency, directed=False)
+    labels = np.full(size, -1)
+    labels[is_core] = np.unique(component[is_core], return_inverse=True)[1]
+
+    # a border row joins the cluster of its neighbouring core rows; where two
+    # clusters reach it, the one numbered first
+    border_pairs = pairs[is_core[pairs[:, 0]] != is_core[pairs[:, 1]]]
+    border = np.where(
+        is_core[border_pairs[:, 0]], border_pairs[:, 1], border_pairs[:, 0]
+    )
+    core = np.where(is_core[border_pairs[:, 0]], border_pairs[:, 0], border_pairs[:, 1])
+    count = int(labels.max()) + 1
+    border_labels = np.full(size, count)
+    np.minimum.at(border_labels, border, labels[core])
+    labels[border_labels < count] = border_labels[border_labels < count]
+    return [labels == label for label in range(count)]
+
+
 def _cluster_points(
     points: Sequence[Sequence[float]], eps: float, min_samples: int
 ) -> list[np.ndarray]:
-    """Cluster points with DBSCAN and return one mask per cluster."""
+    """Cluster points that lie within eps of each other; one mask per cluster"""
 
     if len(points) < min_samples:
         return []
-    labels = DBSCAN(eps=eps, min_samples=min_samples).fit(_point_rows(points)).labels_
-    return [np.asarray(labels == label) for label in sorted(set(labels)) if label != -1]
+    return _dbscan(_point_rows(points), eps, min_samples)
 
 
 def _edge_key(edge) -> EdgeKey:
@@ -314,16 +354,15 @@ def _pick_non_collinear_triplet(
 def _cluster_unit_vectors(
     vectors: Sequence[Vector], eps: float, min_samples: int
 ) -> list[np.ndarray]:
-    """Cluster unit vectors with cosine-distance DBSCAN."""
+    """Cluster unit vectors whose cosine distance, 1 - cos(angle), is within eps;
+    one mask per cluster"""
 
     if len(vectors) < min_samples:
         return []
-    labels = (
-        DBSCAN(eps=eps, min_samples=min_samples, metric="cosine")
-        .fit(_vector_rows(vectors))
-        .labels_
-    )
-    return [np.asarray(labels == label) for label in sorted(set(labels)) if label != -1]
+    # for unit vectors the chord between two tips is sqrt(2 * cosine distance)
+    rows = _vector_rows(vectors)
+    rows /= np.linalg.norm(rows, axis=1, keepdims=True)
+    return _dbscan(rows, sqrt(2 * eps), min_samples)
 
 
 def _circumradius_from_points(

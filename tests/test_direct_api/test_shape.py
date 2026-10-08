@@ -35,7 +35,7 @@ from unittest.mock import PropertyMock, patch
 import numpy as np
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
 from anytree import PreOrderIter
-from build123d.build_enums import CenterOf, GeomType, Keep
+from build123d.build_enums import CenterOf, GeomType, Keep, Transition
 from build123d.geometry import (
     Axis,
     Color,
@@ -192,6 +192,40 @@ class TestShape(unittest.TestCase):
         self.assertLess(s2.volume, s.volume)
         self.assertGreater(s2.volume, 0.0)
 
+    def test_split_curved_faces_by_plane(self):
+        # Issue #1035: a small piece of a curved face lies on one side of the
+        # plane while the middle of its surface lies on the other
+        spine = Edge.make_line((0, -2, 0), (0, 2, 0))
+        sections = [
+            Plane(spine ^ position) * Rotation(0, 0, twist) * Wire.make_rect(size, size)
+            for size, twist, position in zip(
+                (1, 2, 2, 1), (10, 0, 0, -10), (0, 0.33, 0.66, 1)
+            )
+        ]
+        solid = Solid.make_loft(sections)
+        edge = (
+            solid.edges()
+            .group_by(Edge.length)[-1]
+            .sort_by(Axis.X)[-2:]
+            .sort_by(Axis.Z)[-1]
+        )
+        faces = [f for f in solid.faces() if any(edge == e for e in f.edges())]
+        self.assertEqual(len(faces), 2)
+
+        for u_value in (0.0, 0.4):
+            plane = Plane(edge ^ u_value)
+            for face in faces:
+                with self.subTest(u_value=u_value, area=round(face.area, 2)):
+                    top, bottom = face.split(plane, keep=Keep.BOTH)
+                    self.assertIsInstance(top, Face)
+                    self.assertIsInstance(bottom, Face)
+                    self.assertAlmostEqual(top.area + bottom.area, face.area, 5)
+                    heights = lambda piece: [
+                        plane.to_local_coords(Vector(v)).Z for v in piece.vertices()
+                    ]
+                    self.assertGreater(min(heights(top)), -1e-6)
+                    self.assertLess(max(heights(bottom)), 1e-6)
+
     def test_split_by_non_planar_face(self):
         box = Solid.make_box(1, 1, 1)
         tool = Circle(1).wire()
@@ -284,6 +318,17 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(relocated_bounding_box.max.Y, -1, 5)
         self.assertAlmostEqual(relocated_bounding_box.min.Z, -2, 5)
         self.assertAlmostEqual(relocated_bounding_box.max.Z, 2, 5)
+
+    def test_located_vertex(self):
+        """located() replaces a vertex's location rather than adding to it."""
+        moved = Vertex().moved(Pos(-2.5, 0, 0))
+        self.assertAlmostEqual(moved.located(Pos(1, 0, 0)).X, 1, 5)
+
+        extracted = Compound([moved]).vertices()[0]
+        self.assertAlmostEqual(extracted.located(Pos(1, 0, 0)).X, 1, 5)
+
+        box = Solid.make_box(1, 1, 1).moved(Pos(-2.5, 0, 0))
+        self.assertAlmostEqual(box.located(Pos(1, 0, 0)).bounding_box().min.X, 1, 5)
 
     def test_is_equal(self):
         box = Solid.make_box(1, 1, 1)
@@ -501,6 +546,33 @@ class TestShape(unittest.TestCase):
                 children=[Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)]
             ).is_manifold
         )
+
+    def test_manifold_degenerate_edges(self):
+        # The poles of a sphere and the apex of a cone are edges of one face
+        box = Solid.make_box(4, 4, 4)
+        self.assertTrue(Solid.make_sphere(1).is_manifold)
+        self.assertTrue(Solid.make_cone(2, 0, 3).is_manifold)
+        self.assertTrue(box.fillet(0.5, box.edges()).is_manifold)
+        self.assertAlmostEqual(
+            Solid.make_sphere(1).shell().volume, Solid.make_sphere(1).volume, 5
+        )
+
+    def test_manifold_inconsistent_orientation(self):
+        # Issue #855: a sweep that folds over itself has two faces on every
+        # edge, but they are not consistently oriented
+        path = Wire.make_polygon([(0, 20), (20, 20), (20, 0)], close=False)
+        start = Plane(origin=(0, 20, 0), z_dir=(1, 0, 0))
+        with self.assertWarnsRegex(UserWarning, "invalid solid"):
+            folded = Solid.sweep(
+                start * Face.make_rect(40, 40), path, transition=Transition.ROUND
+            )
+        self.assertFalse(folded.is_valid)
+        self.assertFalse(folded.is_manifold)
+        unfolded = Solid.sweep(
+            start * Face.make_rect(30, 30), path, transition=Transition.ROUND
+        )
+        self.assertTrue(unfolded.is_valid)
+        self.assertTrue(unfolded.is_manifold)
 
     def test_inherit_color(self):
         # Create some objects and assign colors to them

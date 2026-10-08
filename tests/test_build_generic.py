@@ -290,6 +290,16 @@ class ChamferTests(unittest.TestCase):
             )
         self.assertAlmostEqual(test.sketch.area, 200 - 4 * 0.5, 5)
 
+    def test_sketch_chamfer_with_hole(self):
+        with BuildSketch() as test:
+            Rectangle(20, 20)
+            Rectangle(5, 5, mode=Mode.SUBTRACT)
+            chamfer(test.vertices().group_by(Axis.Y)[-1], length=2)
+        face = test.sketch.face()
+        self.assertTrue(face.is_valid)
+        self.assertEqual(len(face.inner_wires()), 1)
+        self.assertAlmostEqual(face.area, 375 - 2 * 2, 5)
+
     def test_sketch_chamfer_asym_length(self):
         with BuildSketch() as test:
             Rectangle(10, 10)
@@ -565,6 +575,15 @@ class OffsetTests(unittest.TestCase):
             offset(amount=1)
         self.assertAlmostEqual(test.wires()[0].length, 2 + 2 * pi, 5)
 
+    def test_single_line_offset_stays_in_plane(self):
+        # Issue #604
+        around = offset(Plane.XZ * Line((0, 0), (10, 10)), 1)
+        self.assertAlmostEqual(around.bounding_box().size.Y, 0, 5)
+        with BuildLine(Plane.XZ) as test:
+            Line((0, 0), (10, 10))
+            offset(amount=1)
+        self.assertAlmostEqual(test.line.bounding_box().size.Y, 0, 5)
+
     def test_line_offset(self):
         with BuildSketch() as test:
             with BuildLine():
@@ -712,7 +731,6 @@ class OffsetTests(unittest.TestCase):
             offset(Vertex(), amount=1)
 
     def test_offset_tapered_cup(self):
-        # used to fail in OpenCascade; lofts now have line edges which offset fine
         with BuildPart() as cup:
             with BuildSketch():
                 Circle(35)
@@ -727,6 +745,20 @@ class OffsetTests(unittest.TestCase):
             for e in cup.edges().filter_by(GeomType.CIRCLE).group_by(Axis.Z)[-1]
         )
         self.assertAlmostEqual(top_radii[1] - top_radii[0], 2 / cos(radians(3)), 3)
+
+    def test_offset_lofted_cup(self):
+        # used to fail in OpenCascade; lofts now have line edges which offset fine
+        with BuildPart() as cup:
+            with BuildSketch():
+                Circle(35)
+            with BuildSketch(Plane.XY.offset(50)):
+                Circle(37.62)
+            loft()
+            solid_volume = cup.part.volume
+            topf = cup.faces().sort_by(Axis.Z)[-1]
+            offset(amount=-2, openings=topf)
+        self.assertTrue(cup.part.is_valid)
+        self.assertLess(cup.part.volume, solid_volume / 5)
 
     def test_flipped_faces(self):
         box = Box(10, 10, 10)
@@ -929,6 +961,22 @@ class SplitReturnTypeTests(unittest.TestCase):
 
 
 class TestSweep(unittest.TestCase):
+    def test_return_is_cleaned_inside_a_builder(self):
+        # Issue #451: a path of two collinear lines sweeps seams between the
+        # side faces; clean removes them from the returned shape in both modes
+        path = Wire(
+            [
+                Edge.make_line((0, 0, 0), (0, 0, 1)),
+                Edge.make_line((0, 0, 1), (0, 0, 2)),
+            ]
+        )
+        section = Face.make_rect(2, 1)
+        with BuildPart():
+            inside = sweep(section, path)
+        self.assertEqual(len(inside.faces()), 6)
+        self.assertEqual(len(sweep(section, path).faces()), 6)
+        self.assertEqual(len(sweep(section, path, clean=False).faces()), 10)
+
     def test_fixed_normal(self):
         """normal= holds the section's orientation instead of letting it follow
         the path's own framing, which gives a different solid."""
@@ -1047,6 +1095,16 @@ class TestSweep(unittest.TestCase):
             sweep(sections=sk2.sketch, path=topedgs, mode=Mode.SUBTRACT)
 
         self.assertTrue(p.part.is_valid)
+
+    def test_edge_sweep_keeps_shell(self):
+        # Issue #777: the faces an edge sweeps out stay in their shell
+        swept = sweep(Line((0, 0), (0, 10)), Polyline((0, 0), (10, 0), (10, 0, 10)))
+        self.assertIsInstance(swept, Sketch)
+        self.assertEqual(len(swept.faces()), 2)
+        self.assertAlmostEqual(swept.area, 200, 5)
+        shell = swept.shell()
+        self.assertTrue(shell.is_valid)
+        self.assertEqual(len(shell.faces()), 2)
 
     def test_path_error(self):
         e1 = Edge.make_line((0, 0), (1, 0))

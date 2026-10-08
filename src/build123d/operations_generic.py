@@ -490,6 +490,12 @@ def fillet(
     Fillet the given sequence of edges or vertices. Note that vertices on
     either end of an open line will be automatically skipped.
 
+    Note:
+        3D fillets propagate along chains of tangent edges (e.g. around a rounded
+        slot, or the top of a box whose vertical edges were rounded earlier);
+        OpenCascade offers no way to disable this. Fillet the whole chain in one
+        call, with the radius that suits it.
+
     Args:
         objects (Edge | Vertex or Iterable of): edges or vertices to fillet
         radius (float): fillet size - must be less than 1/2 local width
@@ -791,13 +797,10 @@ def offset(
             new_faces.append(new_face)
     if edges:
         if len(edges) == 1 and edges[0].geom_type == GeomType.LINE:
+            # The line itself is offset, not a copy made from its ends: its
+            # location says which plane it was drawn on
             new_wires = [
-                Wire(
-                    [
-                        Edge.make_line(edges[0] @ 0.0, edges[0] @ 0.5),
-                        Edge.make_line(edges[0] @ 0.5, edges[0] @ 1.0),
-                    ]
-                ).offset_2d(amount, kind=kind, side=side, closed=closed)
+                edges[0].offset_2d(amount, kind=kind, side=side, closed=closed)
             ]
         else:
             new_wires = [
@@ -1162,7 +1165,8 @@ def sweep(
 ) -> Part | Sketch:
     """Generic Operation: sweep
 
-    Sweep pending 1D or 2D objects along path.
+    Sweep pending 1D or 2D objects along path. The faces swept out by a 1D
+    section are returned in a Sketch that holds them as a Shell.
 
     Args:
         sections (Compound |  Edge |  Wire |  Face |  Solid): cross sections to sweep into object
@@ -1254,19 +1258,21 @@ def sweep(
                 for face in face_list
             ]
 
-    # sweep to create faces
-    new_faces: list[Face] = []
+    # sweep to create faces, kept together in the shell each section sweeps out
+    new_shells: list[Shell] = []
     if edge_list:
         for sec in section_list:
-            swept = Shell.sweep(sec, path_wire, transition)
-            new_faces.extend(swept.faces())
+            new_shells.append(Shell.sweep(sec, path_wire, transition))
+    new_faces = [face for shell in new_shells for face in shell.faces()]
+
+    if clean:
+        new_solids = [solid.clean() for solid in new_solids]
+        new_shells = [shell.clean() for shell in new_shells]
+        new_faces = [face for shell in new_shells for face in shell.faces()]
 
     if context is not None:
         context._add_to_context(*(new_solids + new_faces), clean=clean, mode=mode)
-    elif clean:
-        new_solids = [solid.clean() for solid in new_solids]
-        new_faces = [face.clean() for face in new_faces]
 
     if new_solids:
         return Part(Compound(new_solids).wrapped)
-    return Sketch(Compound(new_faces).wrapped)
+    return Sketch(Compound(new_shells).wrapped)

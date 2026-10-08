@@ -255,6 +255,33 @@ class TestFace(unittest.TestCase):
                 distance=1, distance2=2, vertices=[vertex], edge=other_edge
             )
 
+    def test_chamfer_2d_with_hole(self):
+        hole_face = Face.make_rect(20, 20) - Face.make_rect(5, 5)
+        corner = hole_face.vertices().group_by(Axis.Y)[-1].sort_by(Axis.X)[0]
+        chamfered = hole_face.chamfer_2d(2, 2, [corner])
+        self.assertTrue(chamfered.is_valid)
+        self.assertEqual(len(chamfered.inner_wires()), 1)
+        self.assertAlmostEqual(chamfered.area, 375 - 2, 5)
+
+    def test_chamfer_2d_hole_vertices(self):
+        hole_face = Face.make_rect(20, 20) - Face.make_rect(5, 5)
+        hole_vertices = hole_face.inner_wires()[0].vertices()
+        chamfered = hole_face.chamfer_2d(1, 1, hole_vertices)
+        self.assertTrue(chamfered.is_valid)
+        self.assertEqual(len(chamfered.inner_wires()), 1)
+        self.assertAlmostEqual(chamfered.area, 375 + 4 * 0.5, 5)
+
+    def test_chamfer_2d_no_vertices(self):
+        face = Face.make_rect(20, 20)
+        self.assertIs(face.chamfer_2d(2, 2, []), face)
+
+    def test_chamfer_2d_reversed_face_keeps_normal(self):
+        hole_face = -(Face.make_rect(20, 20) - Face.make_rect(5, 5))
+        corner = hole_face.vertices().group_by(Axis.Y)[-1].sort_by(Axis.X)[0]
+        chamfered = hole_face.chamfer_2d(2, 2, [corner])
+        self.assertAlmostEqual(chamfered.normal_at(), hole_face.normal_at(), 5)
+        self.assertAlmostEqual(chamfered.area, 375 - 2, 5)
+
     def test_fillet_2d_mixed_profile_case(self):
         sketch = Sketch() + Rectangle(10, 20) + Ellipse(20, 5)
         vertex = sketch.vertices().group_by(Axis.X)[0].sort_by(Axis.Y)[0]

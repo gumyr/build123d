@@ -27,7 +27,9 @@ license:
 """
 
 import math
+import os
 import random
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -37,17 +39,20 @@ import build123d.topology.one_d as one_d
 
 from build123d.build_enums import GeomType, PositionMode, Side
 from build123d.build_line import BuildLine
-from build123d.geometry import Axis, Color, Location, Plane, Pos, Vector
+from build123d.geometry import Axis, Color, Location, Plane, Pos, Rot, Vector
 from build123d.objects_curve import Curve, Line, JernArc, PolarLine, Polyline, Spline
 from build123d.objects_sketch import Circle, Rectangle, RectangleRounded, RegularPolygon
 from build123d.operations_generic import fillet
-from build123d.topology import Edge, Face, Vertex, Wire
+from build123d.exporters3d import export_step
+from build123d.importers import import_step
+from build123d.topology import Edge, Face, Solid, Vertex, Wire
 from OCP.BRepAdaptor import BRepAdaptor_CompCurve
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_EmptyWire,
     BRepBuilderAPI_NonManifoldWire,
 )
 from OCP.gp import gp_Pnt
+from OCP.TopoDS import TopoDS
 
 
 class TestWire(unittest.TestCase):
@@ -301,6 +306,138 @@ class TestWire(unittest.TestCase):
         self.assertAlmostEqual(ordered_edges[0] @ 0, (0, 0, 0), 5)
         self.assertAlmostEqual(ordered_edges[1] @ 0, (1, 0, 0), 5)
         self.assertAlmostEqual(ordered_edges[2] @ 0, (1, 1, 0), 5)
+
+    def test_edges_of_branching_wire(self):
+        line = Line((0, 0), (30, 0))
+        star = line + Rot(Z=-120) * line + Rot(Z=120) * line
+        self.assertIsInstance(star, Wire)
+        self.assertEqual(len(star.edges()), 3)
+        self.assertAlmostEqual(star.length, 90, 5)
+        both = star + Rot(Z=60) * star
+        self.assertEqual(len(both.edges()), 6)
+        self.assertAlmostEqual(both.length, 180, 5)
+
+    def test_edges_connection_order(self):
+        edges = Wire.make_polygon([(0, 0), (1, 0), (1, 1), (0, 1)]).edges()
+        self.assertEqual(len(edges), 4)
+        for first, second in zip(edges, edges[1:]):
+            self.assertAlmostEqual(first.end_point(), second.start_point(), 5)
+
+    @staticmethod
+    def _reversed_wires() -> dict[str, Wire]:
+        """Wires the kernel marks as reversed, as those of a mirrored sketch are"""
+
+        def flipped(wire: Wire) -> Wire:
+            return Wire(TopoDS.Wire(wire.wrapped.Reversed()))
+
+        mixed = Wire(
+            [
+                Edge.make_line((0, 0), (4, 0)),
+                Edge.make_line((4, 3), (4, 0)),
+                Edge.make_three_point_arc((4, 3), (3, 5), (1, 5)),
+            ]
+        )
+        wires = {
+            "open": flipped(Polyline((0, 0), (4, 0), (4, 3), (1, 5)).wire()),
+            "open, edges in both directions": flipped(mixed),
+            "single edge": flipped(Wire([Edge.make_line((0, 0), (4, 0))])),
+            "mirrored rectangle": Rectangle(2, 2).mirror().wire(),
+            "mirrored rounded rectangle": RectangleRounded(4, 3, 0.5)
+            .mirror(Plane.YZ)
+            .wire(),
+            "outer wire of a flipped face": (-Rectangle(2, 2).face()).outer_wire(),
+        }
+        assert not any(wire.is_forward for wire in wires.values())
+        return wires
+
+    def test_param_at_point_reversed_wire(self):
+        # Issue #1149: the parameter of a point is the one position_at takes
+        for name, wire in self._reversed_wires().items():
+            for u_value in (0.1, 0.3, 0.45, 0.625, 0.8, 0.95):
+                with self.subTest(wire=name, u_value=u_value):
+                    point = wire.position_at(u_value)
+                    self.assertAlmostEqual(wire.param_at_point(point), u_value, 5)
+
+        mirrored = Rectangle(2, 2).mirror().wire()
+        self.assertAlmostEqual(
+            mirrored @ mirrored.param_at_point((1, 0, 0)), (1, 0, 0), 5
+        )
+
+    def test_sort_by_reversed_wire(self):
+        for name, wire in self._reversed_wires().items():
+            with self.subTest(wire=name):
+                sorted_edges = wire.edges().sort_by(wire)
+                self.assertLess(sorted_edges[0].distance_to(wire @ 0.01), 1e-5)
+                self.assertLess(sorted_edges[-1].distance_to(wire @ 0.99), 1e-5)
+
+    def test_trim_reversed_wire(self):
+        for name, wire in self._reversed_wires().items():
+            for by_point in (False, True):
+                with self.subTest(wire=name, by_point=by_point):
+                    start, end = wire @ 0.2, wire @ 0.7
+                    trimmed = wire.trim(start, end) if by_point else wire.trim(0.2, 0.7)
+                    self.assertAlmostEqual(trimmed.length, wire.length / 2, 5)
+                    self.assertAlmostEqual(trimmed @ 0, start, 5)
+                    self.assertAlmostEqual(trimmed @ 1, end, 5)
+
+    def test_order_edges_reversed_wire(self):
+        # The edges stay in the kernel's order, each joined to the next
+        for name, wire in self._reversed_wires().items():
+            with self.subTest(wire=name):
+                ordered_edges = wire.order_edges()
+                for edge, kernel_edge in zip(ordered_edges, wire.edges()):
+                    self.assertAlmostEqual(edge @ 0, kernel_edge @ 0, 5)
+                    self.assertAlmostEqual(edge @ 1, kernel_edge @ 1, 5)
+                for edge, next_edge in zip(ordered_edges, ordered_edges[1:]):
+                    self.assertAlmostEqual(edge @ 1, next_edge @ 0, 5)
+
+    def test_offset_2d_fits_splines_to_offset_curves(self):
+        # Issue #1073: the kernel's own offset curves cannot be written to STEP
+        ellipse = Wire([Edge.make_ellipse(50, 100)])
+        for placement in (Location(), Location((5, 6, 7), (30, 0, 0))):
+            with self.subTest(placement=placement):
+                placed = placement * ellipse
+                grown = placed.offset_2d(50)
+                self.assertTrue(grown.is_valid)
+                self.assertTrue(grown.is_closed)
+                kinds = {edge.geom_type for edge in grown.edges()}
+                self.assertNotIn(GeomType.OFFSET, kinds)
+                self.assertIn(GeomType.BSPLINE, kinds)
+                for edge in grown.edges():
+                    for u_value in (0, 0.5, 1):
+                        self.assertAlmostEqual(
+                            placed.distance_to(edge @ u_value), 50, 5
+                        )
+
+        ring = Solid.extrude(Face(ellipse.offset_2d(50), [ellipse]), Vector(0, 0, 10))
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            step_file = os.path.join(tmp_dir, "ring.step")
+            export_step(ring, step_file)
+            self.assertAlmostEqual(import_step(step_file).volume, ring.volume, 3)
+
+    def test_offset_2d_without_curves_is_unchanged(self):
+        grown = Wire.make_rect(10, 5).offset_2d(1)
+        kinds = {edge.geom_type for edge in grown.edges()}
+        self.assertEqual(kinds, {GeomType.LINE, GeomType.CIRCLE})
+
+    def test_offset_2d_as_bspline(self):
+        spline = Spline((0, 0), (2, 1), (4, 0))
+        ellipse = Wire([Edge.make_ellipse(3, 2)])
+
+        # The kernel's offset curves are kept on request
+        for curve in (spline, ellipse):
+            kept = curve.offset_2d(0.3, as_bspline=False)
+            kinds = {edge.geom_type for edge in kept.edges()}
+            self.assertIn(GeomType.OFFSET, kinds)
+            self.assertNotIn(GeomType.BSPLINE, kinds)
+
+        # Either way it is the same outline, wound the same way
+        for curve in (spline, ellipse):
+            fitted = Face(Wire(curve.offset_2d(0.3).edges()))
+            kept = Face(Wire(curve.offset_2d(0.3, as_bspline=False).edges()))
+            self.assertAlmostEqual(fitted.area, kept.area, 5)
+            self.assertAlmostEqual(fitted.normal_at(), kept.normal_at(), 5)
+            self.assertAlmostEqual(fitted.normal_at(), Vector(0, 0, 1), 5)
 
     def test_geom_adaptor(self):
         w = Polyline((0, 0), (1, 0), (1, 1))

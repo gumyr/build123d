@@ -615,6 +615,26 @@ def test_compound_intersection_with_rotated_parent():
     assert elsewhere.intersect(assembly) is None
 
 
+def test_compound_elements_copy_each_child_once(monkeypatch):
+    """Placing a child must not copy the rest of its assembly."""
+    children = [Pos(3 * i, 0, 0) * Box(1, 1, 1) for i in range(4)]
+    assembly = Compound(children=children)
+
+    copies = []
+    deepcopy = Shape.__deepcopy__
+
+    def counting_deepcopy(self, memo):
+        copies.append(self)
+        return deepcopy(self, memo)
+
+    monkeypatch.setattr(Shape, "__deepcopy__", counting_deepcopy)
+    elements = assembly._global_elements()
+
+    assert len(copies) == len(children)
+    assert all(element.parent is None for element in elements)
+    assert all(child.parent is assembly for child in children)
+
+
 def test_nested_compound_intersection_applies_each_location_once():
     """Nesting must not reapply the locations of an element's ancestors."""
     nested = Compound(children=[Pos(10, 0, 0) * Box(2, 2, 2)])
