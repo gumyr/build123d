@@ -279,6 +279,14 @@ class TestSolid(unittest.TestCase):
         extrusion = Solid.extrude_until(square, box, (0, 0, 1), Until.PREVIOUS)
         self.assertAlmostEqual(extrusion.volume, 2, 5)
 
+    def test_extrude_until_rejects_invalid_until(self):
+        profile = Face.make_rect(1, 1)
+        target = Solid.make_box(4, 4, 1, Plane((-2, -2, 3)))
+        for until in (profile, "LAST", 1, True, None):
+            with self.subTest(until=until):
+                with self.assertRaisesRegex(TypeError, "until must be an Until"):
+                    Solid.extrude_until(profile, target, (0, 0, 1), until)
+
     def test_sweep(self):
         path = Edge.make_spline([(0, 0), (3, 5), (7, -2)])
         section = Wire.make_circle(1, Plane(path @ 0, z_dir=path % 0))

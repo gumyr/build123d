@@ -1323,6 +1323,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 intersection to stop at. Defaults to ``Until.NEXT``.
 
         Raises:
+            TypeError: If until is not an Until enum member.
             ValueError: If the provided profile does not intersect the target,
                 or the surface reached does not cut the extrusion - the
                 profile lies in it, as a sketch drawn on a face of the target
@@ -1331,6 +1332,9 @@ class Solid(Mixin3D[TopoDS_Solid]):
         Returns:
             Solid: The extruded and limited solid.
         """
+        if not isinstance(until, Until):
+            raise TypeError("until must be an Until enum member")
+
         direction = Vector(direction)
         if until in [Until.PREVIOUS, Until.FIRST]:
             direction *= -1

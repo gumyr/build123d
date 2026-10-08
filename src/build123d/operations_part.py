@@ -142,6 +142,7 @@ def extrude(
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
+        TypeError: until must be an Until enum member or None
         ValueError: A face or sketch must be provided
         ValueError: dir must be provided when extruding non-planar faces
         ValueError: Either amount or until must be provided
@@ -155,6 +156,9 @@ def extrude(
     """
     context: BuildPart | None = BuildPart._get_context("extrude")
     validate_inputs(context, "extrude", to_extrude)
+
+    if until is not None and not isinstance(until, Until):
+        raise TypeError("until must be an Until enum member or None")
 
     to_extrude_faces: list[Face]
 

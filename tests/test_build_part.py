@@ -567,6 +567,28 @@ class TestExtrude(unittest.TestCase):
                 target=Pos(Z=-10) * Box(1, 1, 1),
             )
 
+    def test_extrude_rejects_invalid_until(self):
+        profile = Rectangle(1, 1)
+        target = Pos(Z=5) * Box(4, 4, 1)
+        for until in (profile.face(), "LAST", 1, True):
+            for amount in (None, 2):
+                with self.subTest(until=until, amount=amount):
+                    with self.assertRaisesRegex(TypeError, "until must be an Until"):
+                        extrude(profile, amount=amount, until=until, target=target)
+
+    def test_invalid_until_preserves_pending_faces(self):
+        with BuildPart() as part:
+            with BuildSketch():
+                Rectangle(1, 1)
+            faces = part.pending_faces.copy()
+            planes = part.pending_face_planes.copy()
+            with self.assertRaisesRegex(TypeError, "until must be an Until"):
+                extrude(until="NEXT")
+            self.assertEqual(part.pending_faces, faces)
+            self.assertEqual(part.pending_face_planes, planes)
+            extrude(amount=2)
+        self.assertAlmostEqual(part.part.volume, 2)
+
     def test_extrude_until_invalid_sewn_shape(self):
         profile = Face.make_rect(1, 1)
         target = Box(2, 2, 2)
