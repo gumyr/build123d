@@ -145,6 +145,7 @@ def extrude(
         ValueError: A face or sketch must be provided
         ValueError: dir must be provided when extruding non-planar faces
         ValueError: Either amount or until must be provided
+        ValueError: taper only applies when extruding by an amount
         ValueError: A target object must be provided
         ValueError: The extrusion does not reach the target
         RuntimeError: The tapered solid could not be built, as when the taper
@@ -155,6 +156,11 @@ def extrude(
     """
     context: BuildPart | None = BuildPart._get_context("extrude")
     validate_inputs(context, "extrude", to_extrude)
+
+    if taper != 0 and amount is None:
+        raise ValueError(
+            "taper only applies when extruding by an amount, not until a target"
+        )
 
     to_extrude_faces: list[Face]
 

@@ -567,6 +567,23 @@ class TestExtrude(unittest.TestCase):
                 target=Pos(Z=-10) * Box(1, 1, 1),
             )
 
+    def test_extrude_until_rejects_taper(self):
+        """#603: a taper was silently ignored when extruding until a target"""
+        with self.assertRaisesRegex(ValueError, "taper only applies"):
+            extrude(
+                Rectangle(1, 1),
+                until=Until.NEXT,
+                dir=(0, 0, 1),
+                target=Pos(Z=5) * Box(10, 10, 1),
+                taper=5,
+            )
+        with BuildPart() as test:
+            Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            with BuildSketch():
+                Rectangle(1, 1)
+            with self.assertRaisesRegex(ValueError, "taper only applies"):
+                extrude(until=Until.NEXT, taper=5)
+
     def test_extrude_until_invalid_sewn_shape(self):
         profile = Face.make_rect(1, 1)
         target = Box(2, 2, 2)
