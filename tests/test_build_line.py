@@ -142,6 +142,38 @@ class BuildLineTests(unittest.TestCase):
         self.assertAlmostEqual(bz.wires()[0].length, 225.98661946375782, 5)
         self.assertTrue(isinstance(b1, Edge))
 
+    def test_bezier_coordinate_lists(self):
+        curve = Bezier([0, -5], [0, 5])
+        self.assertEqual(curve @ 0, Vector(0, -5))
+        self.assertEqual(curve @ 1, Vector(0, 5))
+        self.assertAlmostEqual(curve.length, 10)
+
+    def test_bezier_nested_control_points(self):
+        points = [(0, 0, 0), (1, 2, 3), (4, 5, 6)]
+        weights = [1, 2, 1]
+        expected = Edge.make_bezier(*points, weights=weights)
+        forms = (
+            [list(point) for point in points],
+            ([list(point) for point in points],),
+            (tuple(list(point) for point in points),),
+            ((list(point) for point in points),),
+            (Vector(points[0]), [list(points[1]), Vertex(*points[2])]),
+            ([], points),
+        )
+        for control_points in forms:
+            with self.subTest(control_points=control_points):
+                curve = Bezier(*control_points, weights=weights)
+                for u in (0, 0.25, 0.5, 0.75, 1):
+                    self.assertAlmostEqual((curve @ u - expected @ u).length, 0)
+                self.assertAlmostEqual(curve.length, expected.length)
+
+    def test_bezier_coordinate_lists_on_workplane(self):
+        with BuildLine(Plane.YZ) as line:
+            Bezier([0, -5], [0, 5])
+        self.assertEqual(line.line @ 0, Vector(0, 0, -5))
+        self.assertEqual(line.line @ 1, Vector(0, 0, 5))
+        self.assertAlmostEqual(line.line.edge().length, 10)
+
     def test_bspline(self):
         control_points = [(0, 0), (1, 1), (2, 0)]
         knots = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0]

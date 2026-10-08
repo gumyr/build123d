@@ -28,7 +28,7 @@ license:
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from itertools import product
 from math import asinh, atan2, copysign, cos, degrees, radians, sin, sqrt
 from typing import overload
@@ -319,7 +319,8 @@ class Bezier(BaseEdgeObject):
     of control points.
 
     Args:
-        cntl_pnts (sequence[VectorLike]): points defining the curve
+        cntl_pnts (sequence[VectorLike]): points defining the curve. Coordinate
+            lists and tuples are both accepted, including in nested point collections.
         weights (list[float], optional): control point weights. Defaults to None
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
     """
@@ -333,7 +334,21 @@ class Bezier(BaseEdgeObject):
         mode: Mode = Mode.ADD,
     ):
 
-        cntl_pnt_list = flatten_sequence(*cntl_pnts)
+        def preserve_coordinate_lists(point):
+            """Keep numeric lists atomic while flattening point collections."""
+            if (
+                isinstance(point, list)
+                and point
+                and all(isinstance(value, (int, float)) for value in point)
+            ):
+                return tuple(point)
+            if isinstance(point, (list, tuple)):
+                return type(point)(map(preserve_coordinate_lists, point))
+            if isinstance(point, Iterator):
+                return map(preserve_coordinate_lists, point)
+            return point
+
+        cntl_pnt_list = flatten_sequence(*map(preserve_coordinate_lists, cntl_pnts))
         polls = _localize(*cntl_pnt_list)
         curve = Edge.make_bezier(*polls, weights=weights)
 
