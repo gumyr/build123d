@@ -848,7 +848,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
                     results.extend(intersection)
 
         # Remove duplicates using Shape's __hash__
-        unique = ShapeList(set(results))
+        unique = ShapeList(dict.fromkeys(results))
 
         return unique if unique else None
 
@@ -873,7 +873,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         for elem in self._global_elements():
             results.extend(elem.touch(other, tolerance))
 
-        return ShapeList(set(results))
+        return ShapeList(dict.fromkeys(results))
 
     def project_to_viewport(
         self,

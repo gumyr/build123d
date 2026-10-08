@@ -528,7 +528,7 @@ class Mixin3D(Shape[TOPODS]):
         # Add boundary contacts if requested (only Solid has touch method)
         if include_touched and isinstance(self, Solid):
             results.extend(self.touch(other, tolerance))
-            results = filter_redundant_touches(ShapeList(set(results)))
+            results = filter_redundant_touches(ShapeList(dict.fromkeys(results)))
 
         return results if results else None
 
@@ -1027,7 +1027,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             results.extend(other.touch(self, tolerance))
 
         # Remove duplicates using Shape's __hash__ and __eq__
-        return ShapeList(set(results))
+        return ShapeList(dict.fromkeys(results))
 
     # ---- Class Methods ----
 
