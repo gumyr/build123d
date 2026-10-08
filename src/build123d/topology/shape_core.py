@@ -138,7 +138,7 @@ from OCP.collections import (
 )
 from OCP.collections import List_TopoDS_Shape
 from OCP.TopTools import TopTools_ShapeMapHasher
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from bd_materials import FinishedMaterial, resolve as resolve_material
 
@@ -634,18 +634,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
         return True
 
     @property
+    @deprecated("is_null is deprecated; use is_empty instead.")
     def is_null(self) -> bool:
-        """Deprecated: use is_empty
+        """A shape always references a kernel object, so this is True only for
+        an empty shape.
 
-        A shape always references a kernel object, so this is True only for an
-        empty shape.
+        .. deprecated::
+            Use :attr:`is_empty` instead.
         """
-        warnings.warn(
-            "is_null is deprecated and will be removed in a future version, "
-            "use is_empty instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         return self.is_empty or self.wrapped.IsNull()
 
     @property

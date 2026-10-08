@@ -597,7 +597,7 @@ def test_compound_intersection_after_moving_parent():
 
     probe = Solid.make_box(1, 1, 1).moved(Location((10, 0, 0)))
 
-    assert moved_assembly.intersect(probe) is not None
+    assert moved_assembly.intersect(probe)
     assert moved_assembly.intersect(Solid.make_box(1, 1, 1)) == []
 
 

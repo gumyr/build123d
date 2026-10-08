@@ -450,6 +450,8 @@ class Vertex(Shape[TopoDS_Vertex]):
         Returns:
             Vertex as String
         """
+        if self.is_empty:
+            return "Vertex()"
         return f"Vertex({self.X}, {self.Y}, {self.Z})"
 
     def __sub__(self, other: Vertex | Vector | tuple) -> Vertex:  # type: ignore

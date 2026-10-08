@@ -30,6 +30,7 @@ import pickle
 import tempfile
 import unittest
 
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
 from OCP.TopoDS import TopoDS_Compound
 
 from build123d.build_enums import Keep, Mode
@@ -109,6 +110,12 @@ class TestEmptyShapeDefinition(unittest.TestCase):
         self.assertTrue(Vertex().is_empty)
         self.assertFalse(Vertex(0, 0, 0).is_empty)
         self.assertEqual(Vertex(0, 0, 0).X, 0)
+
+    def test_every_zero_has_a_repr(self):
+        self.assertEqual(repr(Vertex()), "Vertex()")
+        for cls in (Edge, Wire, Face, Shell, Solid, Compound, Part, Sketch, Curve):
+            with self.subTest(cls=cls.__name__):
+                self.assertIsInstance(repr(cls()), str)
 
     def test_a_kernel_empty_is_the_zero_of_any_class(self):
         empty = (Solid.make_box(1, 1, 1) - Solid.make_box(1, 1, 1)).wrapped
@@ -312,6 +319,15 @@ class TestEmptyShapeAlgebra(unittest.TestCase):
         self.assertTrue(((box - box) - apart).is_empty)
         self.assertTrue(((box - box) & apart).is_empty)
         self.assertAlmostEqual(((box - box) + apart).volume, 1, 5)
+        # intersect() never reaches the kernel with an empty operand, but the
+        # generic boolean does the same on its own
+        face = Face.make_rect(1, 1)
+        self.assertEqual(
+            face._bool_op_list((face,), (Face(),), BRepAlgoAPI_Common()), []
+        )
+        self.assertEqual(
+            face._bool_op_list((Face(),), (face,), BRepAlgoAPI_Common()), []
+        )
 
     def test_intersect_finds_nothing_as_an_empty_list(self):
         box = Solid.make_box(1, 1, 1)
