@@ -394,8 +394,13 @@ class Mesher:
             Warning: 3mf mesh is not manifold
         """
         shapes: list[Shape] = []
-        input_shapes = [shape] if isinstance(shape, Shape) else shape
+        input_shapes = [shape] if isinstance(shape, Shape) else list(shape)
         for input_shape in input_shapes:
+            if input_shape.is_empty:
+                raise ValueError(
+                    f"There is nothing to export: the {type(input_shape).__name__} "
+                    "is empty"
+                )
             if isinstance(input_shape, Compound):
                 if input_shape.children:
                     shapes.extend(input_shape.children)

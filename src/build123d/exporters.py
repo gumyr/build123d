@@ -675,6 +675,10 @@ class ExportDXF(Export2D):
         return self
 
     def _add_single_shape(self, shape: Shape, layer: str = ""):
+        if shape.is_empty:
+            raise ValueError(
+                f"There is nothing to export: the {type(shape).__name__} is empty"
+            )
         attributes = {}
         if layer:
             attributes["layer"] = layer
@@ -1148,6 +1152,10 @@ class ExportSVG(Export2D):
                 self._add_single_shape(s, _layer, reverse_wires)
 
     def _add_single_shape(self, shape: Shape, layer: _Layer, reverse_wires: bool):
+        if shape.is_empty:
+            raise ValueError(
+                f"There is nothing to export: the {type(shape).__name__} is empty"
+            )
         self._non_planar_point_count = 0
         bb = shape.bounding_box()
         self._bounds = self._bounds.add(bb) if self._bounds else bb

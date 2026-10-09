@@ -35,6 +35,7 @@ from build123d.build_enums import (
     CenterOf,
     FrameMethod,
     GeomType,
+    Keep,
     PositionMode,
     Side,
     SortBy,
@@ -626,10 +627,13 @@ class TestMixin1D(unittest.TestCase):
             line.project_to_viewport((0, 0, 0))
 
     def test_split(self):
-        line = Edge.make_line((0, 0), (1, 0))
-        line.wrapped = None
-        with self.assertRaises(ValueError):
-            line.split(Plane.XZ.offset(0.5))
+        # nothing to split leaves nothing on either side
+        self.assertTrue(Edge().split(Plane.XZ.offset(0.5)).is_empty)
+        top, bottom = Edge().split(Plane.XZ.offset(0.5), keep=Keep.BOTH)
+        self.assertTrue(top.is_empty and bottom.is_empty)
+        self.assertEqual(Edge().split(Plane.XZ.offset(0.5), keep=Keep.ALL), [])
+        with self.assertRaisesRegex(ValueError, "empty tool"):
+            Edge.make_line((0, 0), (1, 0)).split(Face())
 
     def test_extrude(self):
         pnt = Vertex(1, 0, 0)

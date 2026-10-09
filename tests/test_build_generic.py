@@ -728,7 +728,7 @@ class OffsetTests(unittest.TestCase):
 
     def test_offset_bad_type(self):
         with self.assertRaises(TypeError):
-            offset(Vertex(), amount=1)
+            offset(Vertex(0, 0, 0), amount=1)
 
     def test_offset_failure(self):
         with BuildPart() as cup:

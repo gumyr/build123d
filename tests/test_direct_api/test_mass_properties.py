@@ -128,26 +128,24 @@ class TestMassProperties(unittest.TestCase):
 
 
 class TestEmptyShapeMassProperties(unittest.TestCase):
-    """Mass properties are undefined for a shape with no geometry."""
+    """An empty shape has zero of every amount, but no place or direction."""
 
     def test_matrix_of_inertia(self):
-        with self.assertRaisesRegex(ValueError, "matrix for empty shape"):
-            Solid().matrix_of_inertia
+        self.assertEqual(Solid().matrix_of_inertia, [[0.0] * 3] * 3)
 
     def test_principal_properties(self):
-        with self.assertRaisesRegex(ValueError, "properties for empty shape"):
+        with self.assertRaisesRegex(ValueError, "empty Solid has no principal axes"):
             Solid().principal_properties
 
     def test_static_moments(self):
-        with self.assertRaisesRegex(ValueError, "moments for empty shape"):
-            Solid().static_moments
+        self.assertEqual(Solid().static_moments, (0.0, 0.0, 0.0))
 
     def test_radius_of_gyration(self):
-        with self.assertRaisesRegex(ValueError, "radius of gyration for empty"):
+        with self.assertRaisesRegex(ValueError, "empty Solid has no radius"):
             Solid().radius_of_gyration(Axis.Z)
 
     def test_orientation(self):
-        with self.assertRaisesRegex(ValueError, "orientation of an empty shape"):
+        with self.assertRaisesRegex(ValueError, "empty Solid has no orientation"):
             Solid().orientation
 
 

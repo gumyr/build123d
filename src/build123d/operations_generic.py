@@ -126,10 +126,10 @@ def insert(
         (
             obj.unwrap(fully=False)
             if isinstance(obj, Compound)
-            else obj._obj if isinstance(obj, Builder) and obj._obj is not None else obj
+            else obj._obj if isinstance(obj, Builder) and obj._obj else obj
         )
         for obj in object_list
-        if not (isinstance(obj, Builder) and obj._obj is None)
+        if not (isinstance(obj, Builder) and not obj._obj)
     ]
     validate_inputs(context, "insert", object_iter)
 
@@ -277,13 +277,16 @@ def bounding_box(
     context: Builder | None = Builder._get_context("bounding_box")
 
     if objects is None:
-        if context is None or context is not None and context._obj is None:
+        if context is None or not context._obj:
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
         object_list = flatten_sequence(objects)
 
     validate_inputs(context, "bounding_box", object_list)
+
+    if object_list and all(not obj for obj in object_list):
+        return Shape.make_composite([], object_list[0]._dim)
 
     if all([obj._dim == 2 for obj in object_list]):
         new_faces = []
@@ -366,7 +369,7 @@ def chamfer(
     length2 = length if length2 is None else length2
 
     if (objects is None and context is None) or (
-        objects is None and context is not None and context._obj is None
+        objects is None and context is not None and not context._obj
     ):
         raise ValueError("No objects provided")
 
@@ -376,9 +379,11 @@ def chamfer(
 
     if context is not None:
         target = context._obj
-    else:
+    elif object_list:
         target = object_list[0].topo_parent  # pylint: disable=no-member
-    if target is None:
+    else:
+        target = None
+    if not target:
         raise ValueError("Nothing to chamfer")
 
     if isinstance(context, BuildSheet) or isinstance(target, Shell):
@@ -508,7 +513,7 @@ def fillet(
     """
     context: Builder | None = Builder._get_context("fillet")
     if (objects is None and context is None) or (
-        objects is None and context is not None and context._obj is None
+        objects is None and context is not None and not context._obj
     ):
         raise ValueError("No objects provided")
 
@@ -517,9 +522,11 @@ def fillet(
     validate_inputs(context, "fillet", object_list)
     if context is not None:
         target = context._obj
-    else:
+    elif object_list:
         target = object_list[0].topo_parent  # pylint: disable=no-member
-    if target is None:
+    else:
+        target = None
+    if not target:
         raise ValueError("Nothing to fillet")
 
     if isinstance(context, BuildSheet) or isinstance(target, Shell):
@@ -645,7 +652,7 @@ def mirror(
         object_list = [objects]
 
     if objects is None:
-        if context is None or context is not None and context._obj is None:
+        if context is None or not context._obj:
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
@@ -729,7 +736,7 @@ def offset(
     context: Builder | None = Builder._get_context("offset")
 
     if objects is None:
-        if context is None or context is not None and context._obj is None:
+        if context is None or not context._obj:
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
@@ -880,9 +887,9 @@ def project(
     if isinstance(objects, GroupBy):
         raise ValueError("project doesn't accept group_by, did you miss [n]?")
 
-    if not objects and context is None:
+    if objects is None and context is None:
         raise ValueError("No object to project")
-    if not objects and context is not None and isinstance(context, BuildPart):
+    if objects is None and context is not None and isinstance(context, BuildPart):
         object_list = context.pending_edges + context.pending_faces
         context.pending_edges = []
         context.pending_faces = []
@@ -893,6 +900,12 @@ def project(
             workplane = Plane.XY
     else:
         object_list = flatten_sequence(objects)
+        if object_list and all(not obj for obj in object_list):
+            # nothing projects to nothing, of the same dimension
+            first = object_list[0]
+            return Shape.make_composite(
+                [], first._dim if isinstance(first, Shape) else None
+            )
 
     # The size of the object determines the size of the target projection screen
     # as the screen is normal to the direction of parallel projection
@@ -935,7 +948,7 @@ def project(
     else:
         target = Face.make_rect(3 * object_size, 3 * object_size, plane=working_plane)
 
-    if target is None:
+    if not target:
         raise ValueError("A target object could not be determined")
 
     validate_inputs(context, "project")
@@ -1012,7 +1025,7 @@ def scale(
     context: Builder | None = Builder._get_context("scale")
 
     if objects is None:
-        if context is None or context is not None and context._obj is None:
+        if context is None or not context._obj:
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
@@ -1068,7 +1081,7 @@ def split(
     context: Builder | None = Builder._get_context("split")
 
     if objects is None:
-        if context is None or context is not None and context._obj is None:
+        if context is None or not context._obj:
             raise ValueError("objects must be provided")
         object_list = [context._obj]
     else:
@@ -1107,7 +1120,8 @@ def split(
                 pieces = [face.split(bisect_by, keep)]
             for piece in pieces:
                 if isinstance(piece, Face):
-                    split_faces.append(piece)
+                    if piece:  # a side with nothing on it adds no face
+                        split_faces.append(piece)
                 elif isinstance(piece, list):
                     split_faces.extend(piece)
                 elif isinstance(piece, Shape):
@@ -1130,10 +1144,11 @@ def split(
         else:
             top = obj.split(bisect_by, keep)
         for subpart in [top, bottom]:
-            if isinstance(subpart, Iterable):
+            if isinstance(subpart, Shape):
+                if subpart:  # a side with nothing on it adds nothing
+                    new_objects.append(subpart)
+            elif isinstance(subpart, Iterable):
                 new_objects.extend(subpart)
-            elif subpart is not None:
-                new_objects.append(subpart)
 
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)
@@ -1185,6 +1200,8 @@ def sweep(
 
     if sections is None:
         section_list = []
+    elif isinstance(sections, Shape) and sections.is_empty:
+        section_list = [sections]  # one empty section, not an iterable of none
     elif isinstance(sections, Iterable):
         section_list = [sec for sec in sections if sec is not None]
     else:
@@ -1202,6 +1219,8 @@ def sweep(
         path_wire = Wire(context.pending_edges)
         context.pending_edges = []
     else:
+        if isinstance(path, Shape) and path.is_empty:
+            raise ValueError("Cannot sweep along an empty path")
         if isinstance(path, Iterable):
             try:
                 path_wire = Wire(path)
@@ -1210,6 +1229,11 @@ def sweep(
         else:
             path_wire = Wire(path.edges()) if not isinstance(path, Wire) else path
 
+    if section_list and all(not sec for sec in section_list):
+        # nothing swept along anything is nothing, one dimension up
+        return cast(
+            Part | Sketch, Shape.make_composite([], (section_list[0]._dim or 0) + 1)
+        )
     if not section_list:
         if (
             context is not None

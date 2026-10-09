@@ -1150,6 +1150,15 @@ class BoundBox:
         return prod([x for x in self.size if x > TOLERANCE])
 
     @property
+    def is_empty(self) -> bool:
+        """True for the bounding box of nothing
+
+        An empty box has zero size at the origin, adds nothing to another box,
+        and contains, covers, touches and intersects nothing.
+        """
+        return self.wrapped is None
+
+    @property
     def diagonal(self) -> float:
         """body diagonal length (i.e. object maximum size)"""
         if self.wrapped is None:
@@ -2253,6 +2262,11 @@ class OrientedBoundBox:
         return self._wrapped
 
     @property
+    def is_empty(self) -> bool:
+        """True for the oriented bounding box of nothing, which has no size or axes"""
+        return self.wrapped.IsVoid()
+
+    @property
     def corners(self) -> list[Vector]:
         """
         Compute and return the unique corner points of the oriented bounding box
@@ -2318,6 +2332,8 @@ class OrientedBoundBox:
             Plane: The coordinate system defined by the center and primary
                    (X) and tertiary (Z) directions of the bounding box.
         """
+        if self.is_empty:
+            return Plane.XY  # nothing has no axes of its own
         return Plane(
             origin=self.center(), x_dir=self.x_direction, z_dir=self.z_direction
         )
@@ -2330,6 +2346,8 @@ class OrientedBoundBox:
         Returns:
             Vector: The oriented size (full dimensions) of the box.
         """
+        if self.is_empty:
+            return Vector(0, 0, 0)
         return (
             Vector(self.wrapped.XHSize(), self.wrapped.YHSize(), self.wrapped.ZHSize())
             * 2.0
@@ -3300,6 +3318,9 @@ class Plane(metaclass=PlaneMeta):
             return Location(self) * other
         if isinstance(other, Plane):
             return Location(self) * other.location
+        if callable(getattr(other, "moved", None)):
+            # a shape, iterable or not, is moved as a whole by its own __rmul__
+            return NotImplemented
         try:
             others = list(other)
             if all(isinstance(other, Location | Plane) for other in others):

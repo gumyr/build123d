@@ -23,8 +23,8 @@ part.wires().group_by(SortBy.LENGTH)[0]
 
 part.vertices().sort_by(SortBy.DISTANCE)[-2:]
 
-part.vertices().sort_by_distance(Vertex())[-2:]
-part.vertices().group_by(Vertex().distance)[-1]
+part.vertices().sort_by_distance(Vertex(0, 0, 0))[-2:]
+part.vertices().group_by(Vertex(0, 0, 0).distance)[-1]
 
 
 show(part, part.wires().sort_by(SortBy.LENGTH)[:4])

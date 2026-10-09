@@ -229,7 +229,7 @@ def _create_xde(
     # Single preorder pass: parent labels are created before children, so we can
     # build label_map and assign metadata without a second traversal.
     for node in PreOrderIter(to_export):
-        if node.wrapped is None:
+        if node.is_empty:
             continue
 
         # Don't set parent if node is the one getting exported.
@@ -264,6 +264,14 @@ def _create_xde(
     return doc
 
 
+def _nothing_to_export(shape: Shape) -> None:
+    """An empty shape has nothing to write; say so instead of writing a bad file"""
+    if shape.is_empty:
+        raise ValueError(
+            f"There is nothing to export: the {type(shape).__name__} is empty"
+        )
+
+
 def export_brep(
     to_export: Shape,
     file_path: PathLike | str | bytes | BytesIO | BinaryIO,
@@ -277,6 +285,7 @@ def export_brep(
     Returns:
         bool: write status
     """
+    _nothing_to_export(to_export)
     if isinstance(file_path, (PathLike | str | bytes)):
         file_path = fsdecode(file_path)
     else:
@@ -327,6 +336,7 @@ def export_gltf(
     Returns:
         bool: write status
     """
+    _nothing_to_export(to_export)
 
     # Map from OCCT's right-handed +Z up coordinate system to glTF's right-handed +Y
     # up coordinate system
@@ -337,7 +347,7 @@ def export_gltf(
     # Tessellate the object(s)
     node: Shape
     for node in PreOrderIter(to_export):
-        if node.wrapped is not None:
+        if not node.is_empty:
             node.mesh(linear_deflection, angular_deflection)
 
     # Create the XCAF document
@@ -423,6 +433,7 @@ def export_step(
     Returns:
         bool: success
     """
+    _nothing_to_export(to_export)
 
     # Create the XCAF document
     doc = _create_xde(to_export, unit, auto_naming=True)
@@ -508,6 +519,7 @@ def export_stl(
     Raises:
         FileNotFoundError: The destination directory does not exist.
     """
+    _nothing_to_export(to_export)
     output_path = Path(fsdecode(file_path))
     if not output_path.parent.is_dir():
         raise FileNotFoundError(output_path.parent)
@@ -563,6 +575,7 @@ def export_obj(
     Returns:
         bool: success
     """
+    _nothing_to_export(to_export)
     if include_uvs:
         vertices, triangles, normals, uvs = to_export.tessellate_with_uvs(
             linear_deflection,

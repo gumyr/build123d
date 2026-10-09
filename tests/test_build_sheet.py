@@ -179,12 +179,12 @@ class TestBuildSheetBase(unittest.TestCase):
             builder._add_to_context(Solid.make_box(1, 1, 1))
 
     def test_an_empty_builder_publishes_nothing(self):
-        """Before anything is built the output is None, as it is for every
-        other Builder; the local shell is an empty Shell throughout."""
+        """Before anything is built the output is an empty Shell, as it is for
+        every other Builder; the local shell is an empty Shell throughout."""
         with BuildSheet(thickness=1) as builder:
-            self.assertIsNone(builder.sheet)
+            self.assertTrue(builder.sheet.is_empty)
             self.assertFalse(builder.sheet_local)
-        self.assertIsNone(builder.sheet)
+        self.assertTrue(builder.sheet.is_empty)
         self.assertFalse(builder.sheet_local)
 
     def test_merge_coplanar_faces_leaves_non_face_fuse_result(self):
@@ -307,7 +307,7 @@ class TestBuildSheetBase(unittest.TestCase):
             self.assertTrue(pending_shell.is_same(bs.sheet))
             self.assertEqual(pending_parameters, bs.sheet_parameters)
             self.assertFalse(parent.pending_faces)
-            self.assertIsNone(parent.part)
+            self.assertTrue(parent.part.is_empty)
             with self.assertRaisesRegex(ValueError, "amount isn't used"):
                 thicken(amount=1)
             self.assertEqual(len(parent.pending_sheets), 1)

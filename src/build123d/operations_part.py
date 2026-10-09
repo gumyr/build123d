@@ -228,7 +228,7 @@ def extrude(
                     target_object = context.part_local
                 else:
                     target_object = target
-                if target_object is None:
+                if not target_object:
                     raise ValueError("No target object provided")
 
                 new_solids.append(
@@ -293,7 +293,10 @@ def loft(
         context.pending_faces = []
         context.pending_face_planes = []
     else:
-        input_sections = section_list
+        # an empty section is no section; a loft through nothing is nothing
+        input_sections = [s for s in section_list if s]
+        if not input_sections:
+            return Part()
 
     # Validate Vertex placement
     if any(isinstance(s, Vertex) for s in input_sections):
@@ -651,7 +654,7 @@ def section(
     new_objects: list[Face | Shell] = []
     for plane in planes:
         intersection = to_section.intersect(plane)
-        if intersection is not None:
+        if intersection:
             new_objects.extend(intersection)
 
     if context is not None:

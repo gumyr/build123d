@@ -42,8 +42,9 @@ class TestVertex(unittest.TestCase):
     """Test the extensions to the cadquery Vertex class"""
 
     def test_basic_vertex(self):
-        v = Vertex()
+        v = Vertex(0, 0, 0)
         self.assertEqual(0, v.X)
+        self.assertTrue(Vertex().is_empty)
 
         v = Vertex(1, 1, 1)
         self.assertEqual(1, v.X)

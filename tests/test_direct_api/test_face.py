@@ -1077,10 +1077,12 @@ class TestFace(unittest.TestCase):
         self.assertAlmostEqual(face.outer_wire().length, 4, 5)
 
     def test_wire(self):
+        # a face with holes has more than one wire, so the singular accessor
+        # raises as it does on every other shape
         face = (Face.make_rect(1, 1) - Face.make_rect(0.5, 0.5)).face()
-        with self.assertWarns(UserWarning):
-            outer = face.wire()
-        self.assertAlmostEqual(outer.length, 4, 5)
+        with self.assertRaisesRegex(ValueError, "Expected exactly one wire, found 2"):
+            face.wire()
+        self.assertAlmostEqual(Face.make_rect(1, 1).wire().length, 4, 5)
 
     def test_constructor(self):
         with self.assertRaises(ValueError):
