@@ -642,6 +642,69 @@ def test_compound_elements_copy_each_child_once(monkeypatch):
     assert all(child.parent is assembly for child in children)
 
 
+def test_compound_intersection_keeps_joints_connected_to_the_assembly():
+    """A child's joint connected to its assembly's own joint keeps its partner."""
+    part = Solid.make_box(1, 1, 1)
+    RigidJoint("top", part, Location((0, 0, 1)))
+    assembly = Compound(label="assembly", children=[part])
+    RigidJoint("mount", assembly, Location((0, 0, 5)))
+    part.joints["top"].connect_to(assembly.joints["mount"])
+    assembly.location = Location((10, 0, 0))
+
+    common = assembly.intersect(Pos(10.5, 0.5, 0.5) * Box(1, 1, 1))
+    assert common is not None
+    partner = common[0].joints["top"].connected_to
+    assert partner.parent.label == "assembly"
+    assert tuple(partner.location.position) == pytest.approx((10, 0, 5))
+    assert assembly.joints["mount"].parent is assembly
+    assert part.joints["top"].parent is part
+
+
+def test_compound_intersection_leaves_shared_joints_alone():
+    """A child's joint that the assembly also lists stays with the child."""
+    part = Solid.make_box(1, 1, 1)
+    RigidJoint("top", part, Location((0, 0, 1)))
+    assembly = Compound(children=[part])
+    assembly.joints["top"] = part.joints["top"]
+    assembly.location = Location((10, 0, 0))
+
+    assembly.intersect(Pos(10.5, 0.5, 0.5) * Box(1, 1, 1))
+    assert part.joints["top"].parent is part
+    assert tuple(part.joints["top"].location.position) == pytest.approx((0, 0, 1))
+
+
+def test_compound_elements_reach_only_consistent_trees():
+    """Shapes reached from a placed child through its joints form valid trees."""
+    a1 = Solid.make_box(1, 1, 1)
+    b1 = Solid.make_box(1, 1, 1, Plane((3, 0, 0)))
+    RigidJoint("j", a1, Location((3, 0, 0)))
+    RigidJoint("k", b1, Location())
+    a1.joints["j"].connect_to(b1.joints["k"])
+    sub_a = Compound(label="a", children=[a1])
+    root = Compound(label="root", children=[sub_a, Compound(label="b", children=[b1])])
+    RigidJoint("mount", root, Location((0, 0, 5)))
+    RigidJoint("top", a1, Location((0, 0, 1)))
+    a1.joints["top"].connect_to(root.joints["mount"])
+
+    reached, pending = [], list(sub_a._global_elements())
+    while pending:
+        shape = pending.pop()
+        if shape is None or any(shape is seen for seen in reached):
+            continue
+        reached.append(shape)
+        pending.extend(shape.children)
+        pending.append(shape.parent)
+        for joint in shape.joints.values():
+            assert joint.parent is not None
+            if joint.connected_to is not None:
+                assert joint.connected_to.parent is not None
+                pending.append(joint.connected_to.parent)
+
+    for shape in reached:
+        assert None not in shape.children
+        assert shape.parent is None or any(c is shape for c in shape.parent.children)
+
+
 def test_nested_compound_intersection_applies_each_location_once():
     """Nesting must not reapply the locations of an element's ancestors."""
     nested = Compound(children=[Pos(10, 0, 0) * Box(2, 2, 2)])

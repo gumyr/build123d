@@ -777,12 +777,21 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # than in its Location.
         base = self.global_location
 
+        # Copy each child with its own subtree but none of its ancestors, which
+        # a copy would otherwise reach through the parent link and duplicate
+        # once per child. Joints owned by an ancestor are shared rather than
+        # copied without their owner, so a child's joint connected to one
+        # stays usable.
+        outside: dict[int, object] = {}
+        for node in self.path:
+            outside[id(node)] = None
+            for joint in node.joints.values():
+                if joint.parent is node:
+                    outside[id(joint)] = joint
+
         elements: list[Shape] = []
         for child in self.children:
-            # Copy the child and its own children but not the assembly above
-            # it: a copy that followed the parent link would duplicate every
-            # sibling for each child placed.
-            placed = copy.deepcopy(child, {id(self): None})
+            placed = copy.deepcopy(child, dict(outside))
             placed.wrapped = downcast(child.wrapped.Moved(base.wrapped))
             elements.append(placed)
         return elements
