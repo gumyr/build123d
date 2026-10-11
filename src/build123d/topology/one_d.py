@@ -192,8 +192,6 @@ from OCP.TopoDS import (
     TopoDS_Vertex,
     TopoDS_Wire,
 )
-from scipy.optimize import minimize_scalar
-from scipy.spatial import ConvexHull
 from typing_extensions import Self
 
 from build123d.build_enums import (
@@ -3397,6 +3395,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
         # is returned. If no such minimum is found after all subdivisions, a runtime error
         # is raised.
 
+        # pylint: disable=import-outside-toplevel
+        from scipy.optimize import minimize_scalar
+
         max_divisions = 10  # Logarithmic refinement depth
 
         for division in range(max_divisions):
@@ -3945,6 +3946,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
         Returns:
             Wire: convex hull perimeter
         """
+        from scipy.spatial import ConvexHull  # pylint: disable=import-outside-toplevel
+
         # Algorithm:
         # 1) create a cloud of points along all edges
         # 2) create a convex hull which returns facets/simplices as pairs of point indices

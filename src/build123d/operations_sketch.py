@@ -31,8 +31,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from scipy.spatial import Voronoi
-
 from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_enums import Mode, SortBy, Transition
 from build123d.build_sketch import BuildSketch
@@ -104,6 +102,8 @@ def full_round(
             [i / voronoi_point_count for i in range(voronoi_point_count + 1)]
         )
     ]
+    from scipy.spatial import Voronoi  # pylint: disable=import-outside-toplevel
+
     numpy_style_pnts = [[p.X, p.Y] for p in voronoi_edge_points]
     voronoi_vertices = [Vector(*v) for v in Voronoi(numpy_style_pnts).vertices]
 

@@ -36,7 +36,6 @@ from os import PathLike, fsdecode
 from pathlib import Path
 from typing import Literal, TextIO
 
-import svgpathtools
 from OCP.Bnd import Bnd_Box
 from OCP.BRep import BRep_Builder
 from OCP.BRepBndLib import BRepBndLib
@@ -69,8 +68,6 @@ from OCP.XCAFDoc import (
     XCAFDoc_ColorTool,
     XCAFDoc_DocumentTool,
 )
-from ocpsvg import ColorAndLabel, import_svg_document
-
 from build123d.build_constants import CM, FT, IN, MC, MM, M
 from build123d.build_enums import Align, Unit
 from build123d.geometry import (
@@ -355,6 +352,7 @@ def import_svg_as_buildline_code(
     Returns:
         tuple[str, str]: code, builder instance name
     """
+    import svgpathtools  # pylint: disable=import-outside-toplevel
 
     def fmt_value(value) -> str:
         if isinstance(value, complex):
@@ -442,6 +440,9 @@ def import_svg(
     Returns:
         ShapeList[Union[Wire, Face]]: objects contained in svg
     """
+    # pylint: disable=import-outside-toplevel
+    from ocpsvg import ColorAndLabel, import_svg_document
+
     shapes = []
     label_by = re.sub(
         r"^inkscape:(.+)", r"{http://www.inkscape.org/namespaces/inkscape}\1", label_by

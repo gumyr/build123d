@@ -76,8 +76,6 @@ from functools import cache
 from math import asin, atan2, ceil, cos, floor, hypot, pi, sin
 from typing import TypeVar
 
-from scipy.integrate import solve_ivp
-
 from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
@@ -843,6 +841,8 @@ def _geodesic_map(face: Face, location: Location, tolerance: float) -> PointMap:
     s_u0, s_v0 = (
         face.derivative_at(u0, v0, *order, normalize=False) for order in _ORDERS[:2]
     )
+    from scipy.integrate import solve_ivp  # pylint: disable=import-outside-toplevel
+
     # the tolerance is in 3D; the integrator's in parameters
     parameter_tolerance = tolerance / 10 / max(s_u0.length, s_v0.length)
 

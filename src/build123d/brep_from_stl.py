@@ -51,9 +51,6 @@ from math import acos, ceil, log10, sqrt
 from typing import Any, Literal, TypeAlias, TypeVar, overload
 
 import numpy as np
-from scipy.sparse import coo_matrix
-from scipy.sparse.csgraph import connected_components
-from scipy.spatial import cKDTree
 
 from build123d.build_enums import Align, GeomType
 from build123d.geometry import TOL_DIGITS, Axis, Location, Plane, Pos, Vector
@@ -249,6 +246,11 @@ def _dbscan(rows: np.ndarray, eps: float, min_samples: int) -> list[np.ndarray]:
     included, is a core row; the clusters are the connected groups of core rows,
     and a row within ``eps`` of a core row joins its cluster. Every other row is
     noise and belongs to no cluster."""
+
+    # pylint: disable=import-outside-toplevel
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    from scipy.spatial import cKDTree
 
     size = len(rows)
     pairs = cKDTree(rows).query_pairs(eps, output_type="ndarray")

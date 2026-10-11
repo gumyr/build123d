@@ -453,9 +453,7 @@ class ImportSVGValidation(unittest.TestCase):
             def __iter__(self):
                 yield (TopoDS_Edge(), MagicMock())
 
-        with patch(
-            "build123d.importers.import_svg_document", return_value=_FakeDocument()
-        ):
+        with patch("ocpsvg.import_svg_document", return_value=_FakeDocument()):
             with self.assertRaisesRegex(ValueError, "unexpected shape type"):
                 import_svg("unused.svg")
 

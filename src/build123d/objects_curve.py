@@ -34,7 +34,6 @@ from math import asinh, atan2, copysign, cos, degrees, radians, sin, sqrt
 from typing import overload
 
 import numpy as np
-from scipy.optimize import minimize
 
 from build123d.build_common import BaseObject, flatten_sequence
 from build123d.build_enums import (
@@ -1094,6 +1093,8 @@ class DoubleTangentArc(BaseEdgeObject):
             return abs(separation - radius)
 
         # Minimize the function using bounds and the tolerance value
+        from scipy.optimize import minimize  # pylint: disable=import-outside-toplevel
+
         arc_centers = []
         for angle in [90, -90]:
             perpendicular_bisector = arc_tangent.rotate(rotation_axis, angle)
