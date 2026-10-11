@@ -115,7 +115,7 @@ Build123d - CadQuery Integration
 
 As both `CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_ and **build123d** use
 a common OpenCascade Python wrapper (`OCP <https://github.com/CadQuery/OCP>`_) it's possible to
-interchange objects both from CadQuery to build123d and vice-versa by transferring the ``wrapped`` 
+interchange objects both from CadQuery to build123d and vice-versa by transferring the ``wrapped``
 objects as follows (first from CadQuery to build123d):
 
 .. code-block:: build123d
@@ -172,11 +172,11 @@ padding (right):
   :align: right
 
 
-By default, the original Z value of all objects packed using the :meth:`pack.pack` function is preserved. 
-If you want to align all objects so that they are "placed" on the zero Z coordinate, the :meth:`pack` 
-function has an `align_z` argument. When set to `True`, this will align all objects. 
+By default, the original Z value of all objects packed using the :meth:`pack.pack` function is preserved.
+If you want to align all objects so that they are "placed" on the zero Z coordinate, the :meth:`pack`
+function has an `align_z` argument. When set to `True`, this will align all objects.
 
-This can be useful, for example, when preparing print setups for 3D printing, giving you full control 
+This can be useful, for example, when preparing print setups for 3D printing, giving you full control
 over this alignment so you don't have to leave it to the slicer.
 
 
@@ -188,7 +188,7 @@ Isn’t ``from build123d import *`` bad practice?
 
 Glob imports like ``from build123d import *`` are generally frowned upon when writing software, and for
 good reason. They pollute the global namespace, cause confusing collisions, and are not future-proof, as
-future changes to the library being imported could collide with other names. It would be much safer to do 
+future changes to the library being imported could collide with other names. It would be much safer to do
 something like ``import build123d as bd`` and then reference every item with, for example, ``bd.BuildPart()``.
 If your goal is to integrate build123d into a larger piece of software, which many people work on, or where
 long-term maintainability is a priority, using this approach is definitely a good idea! Why then, are
@@ -284,3 +284,12 @@ builder behave differently depending on which scope it is in. Inheriting
 placements isn't necessarily incorrect, it was considered for build123d but
 ultimately the explicit local-construction and publish-to-placement approach was
 taken.
+
+
+*********************************************************************
+Why is my moved object duplicated at the origin in builder mode?
+*********************************************************************
+
+This is what happens when you modify or copy an object after it has already been
+added to a builder. The full explanation and workaround are in the note in
+:ref:`moving_objects_direct`.

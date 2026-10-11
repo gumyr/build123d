@@ -1,3 +1,5 @@
+.. _key_concepts_builder:
+
 ###########################
 Key Concepts (builder mode)
 ###########################
@@ -15,26 +17,26 @@ The following key concepts will help new users understand build123d quickly.
 Understanding the Builder Paradigm
 ==================================
 
-The **Builder** paradigm in build123d provides a powerful and intuitive way to construct 
-complex geometric models. At its core, the Builder works like adding a column of numbers 
-on a piece of paper: a running "total" is maintained internally as each new object is 
-added or modified. This approach simplifies the process of constructing models by breaking 
+The **Builder** paradigm in build123d provides a powerful and intuitive way to construct
+complex geometric models. At its core, the Builder works like adding a column of numbers
+on a piece of paper: a running "total" is maintained internally as each new object is
+added or modified. This approach simplifies the process of constructing models by breaking
 it into smaller, incremental steps.
 
 How the Builder Works
 ----------------------
 
-When using a Builder (such as **BuildLine**, **BuildSketch**, or **BuildPart**), the 
+When using a Builder (such as **BuildLine**, **BuildSketch**, or **BuildPart**), the
 following principles apply:
 
 1. **Running Total**:
-   - The Builder maintains an internal "total," which represents the current state of 
-   the object being built. 
+   - The Builder maintains an internal "total," which represents the current state of
+   the object being built.
    - Each operation updates this total by combining the new object with the existing one.
 
 2. **Combination Modes**:
-   - Just as numbers in a column may have a `+` or `-` sign to indicate addition or 
-   subtraction, Builders use **modes** to control how each object is combined with 
+   - Just as numbers in a column may have a `+` or `-` sign to indicate addition or
+   subtraction, Builders use **modes** to control how each object is combined with
    the current total.
    - Common modes include:
 
@@ -42,16 +44,16 @@ following principles apply:
      - **SUBTRACT**: Removes the new object from the current total.
      - **INTERSECT**: Keeps only the overlapping regions of the new object and the current total.
      - **REPLACE**: Entirely replace the running total.
-     - **PRIVATE**: Don't change the running total at all. 
+     - **PRIVATE**: Don't change the running total at all.
 
    - The mode can be set dynamically for each operation, allowing for flexible and precise modeling.
 
 3. **Extracting the Result**:
-   - At the end of the building process, the final object is accessed through the 
-   Builder's attributes, such as ``.line``, ``.sketch``, or ``.part``, depending on 
+   - At the end of the building process, the final object is accessed through the
+   Builder's attributes, such as ``.line``, ``.sketch``, or ``.part``, depending on
    the Builder type.
    - For example:
-   
+
      - **BuildLine**: Use ``.line`` to retrieve a ``Curve`` containing the edges.
      - **BuildSketch**: Use ``.sketch`` to retrieve a ``Sketch`` containing the faces.
      - **BuildPart**: Use ``.part`` to retrieve a ``Part`` containing the solids.
@@ -117,13 +119,13 @@ Key Concepts
 
 - **Incremental Construction**:
   Builders allow you to build objects step-by-step, maintaining clarity and modularity.
-  
+
 - **Dynamic Mode Switching**:
-  The **mode** parameter gives you precise control over how each operation modifies 
+  The **mode** parameter gives you precise control over how each operation modifies
   the current total.
 
 - **Seamless Extraction**:
-  The Builder paradigm simplifies the retrieval of the final object, ensuring that you 
+  The Builder paradigm simplifies the retrieval of the final object, ensuring that you
   always have access to the most up-to-date result.
 
 Analogy: Adding Numbers on Paper
@@ -133,61 +135,26 @@ Think of the Builder as a running tally when adding numbers on a piece of paper:
 
 - Each number represents an operation or object.
 - The ``+`` or ``-`` sign corresponds to the **ADD** or **SUBTRACT** mode.
-- At the end, the total is the sum of all operations, which you can retrieve by referencing 
+- At the end, the total is the sum of all operations, which you can retrieve by referencing
   the Builder’s output.
 
-By adopting this approach, build123d ensures a natural, intuitive workflow for constructing 
+By adopting this approach, build123d ensures a natural, intuitive workflow for constructing
 2D and 3D models.
 
 .. note::
     **Why modifying objects directly doesn't work in Builder mode**
 
-    A common mistake in Builder mode is attempting to modify an object after it is created:
+    A common mistake in Builder mode is attempting to modify an object after it
+    is created, for example ``Cylinder(1, 2).moved(Location((1, 2, 3)))``. In
+    builder mode an object adds itself to the active builder as soon as it is
+    created, so modifying or copying the returned Python object afterwards has
+    no effect on the model being built. Placement must be specified before the
+    object is created, which is why Builder mode provides the ``Locations``
+    context.
 
-    .. code-block:: build123d
-
-        with BuildPart() as invalid:
-            Cylinder(1, 2).moved(Location((1, 2, 3)))
-
-    Builder mode works by having objects add themselves to the active builder immediately when 
-    they are created. In the example above:
-
-    ``Cylinder(1, 2)`` creates the cylinder.
-
-    The cylinder immediately adds itself to the ``BuildPart`` builder.
-
-    ``.moved(...)`` is then applied to the temporary Python object returned by ``Cylinder``.
-
-    Because the cylinder was already added to the builder, the move operation has no effect on 
-    the model being built.
-
-    Placement must therefore be specified before the object is created, which is why Builder 
-    mode provides the ``Locations`` context (see below):
-
-    .. code-block:: build123d
-
-        with BuildPart() as valid:
-            with Locations((1, 2, 3)):
-                Cylinder(1, 2)
-
-    Here the builder knows the location before the cylinder is created, so the part is placed 
-    correctly.
-
-    A similar situation in normal Python
-
-    .. code-block:: python
-
-        with open("test.txt", "w") as f:
-            f.write("text").to_bytes(1, "big")
-
-    ``f.write("text")`` writes "text" to the file and returns 4.
-    ``.to_bytes(1, "big")`` is then called on that integer, producing b"\x04".
-
-    The file still contains only "text" because the additional operation happens after the 
-    write and its result is discarded.
-
-    Builder mode behaves similarly: once an object has been added to the builder, modifying 
-    the returned Python object does not change what was already added.
+    This is explained in full, including a discussion of the duplicate-at-origin
+    symptom and why ``Locations`` solves it, on the Moving Objects page:
+    :ref:`moving_objects_faq`.
 
 Builders
 ========
@@ -255,8 +222,11 @@ information - as follows:
 In this example, ``Box`` is in the scope of ``part_builder`` while ``Circle``
 is in the scope of ``sketch_builder``.
 
+Positioning and Orienting Objects
+=================================
+
 Placements
-==========
+----------
 
 As build123d is a 3D CAD package one must be able to position objects anywhere.
 The first parameter or parameters passed to a builder are ``placements``. A
@@ -318,7 +288,12 @@ This is the result:
 .. _location_context_link:
 
 Locations Context
-=================
+-----------------
+
+.. note::
+    The builder-mode location contexts are covered, alongside the ``rotation``
+    parameter and their algebra-mode equivalents, on the
+    :ref:`Moving Objects page <moving_objects_builder>`.
 
 When positioning objects or operations within a builder, Location Contexts are used.
 They create a context where one or more local ``Location`` objects are active within
@@ -392,6 +367,26 @@ nested. A user can retrieve the active local locations:
     Location(p=(0.50,0.00,-0.50), o=(90.00,-0.00,0.00))
     Location(p=(0.50,0.00,0.50), o=(90.00,-0.00,0.00))
 
+Using Locations & Rotating Objects
+----------------------------------
+
+In builder mode you must orient an object *before* it is created. Do this either
+with a built-in method - the ``rotation`` parameter on most primitives - or with
+a ``Locations`` context that activates one or more ``Location`` objects (see
+:ref:`moving_objects_builder` for the full discussion). If you need to position
+an object you already have, build it with ``mode=Mode.PRIVATE`` and add a
+repositioned copy with :func:`~operations_generic.insert` (see
+:ref:`moving_objects_direct`).
+
+For example, a single box can be created rotated, and two boxes created at two
+positions:
+
+.. code-block:: build123d
+
+    with BuildPart() as pipes:
+        Box(10, 10, 10, rotation=(10, 20, 30))
+        with Locations((-10, -10, -10), (10, 10, 10)):
+            Box(10, 10, 10, rotation=(10, 20, 30))
 
 Operation Inputs
 ================
@@ -451,49 +446,6 @@ a volume from the part under normal circumstances. However, the ``mode`` used in
 the ``Hole`` classes can be specified as ``Mode.ADD`` or ``Mode.INTERSECT`` to
 help in inspection or debugging.
 
-
-Using Locations & Rotating Objects
-==================================
-
-build123d stores points (to be specific ``Location`` (s)) internally to be used as
-positions for the placement of new objects.  By default, a single identity
-location will be active such that:
-
-.. code-block:: build123d
-
-    with BuildPart() as pipes:
-        Box(10, 10, 10, rotation=(10, 20, 30))
-
-will create a single 10x10x10 box centered at (0,0,0) - by default objects are
-centered. One can create multiple objects by pushing points prior to creating
-objects as follows:
-
-.. code-block:: build123d
-
-    with BuildPart() as pipes:
-        with Locations((-10, -10, -10), (10, 10, 10)):
-            Box(10, 10, 10, rotation=(10, 20, 30))
-
-which will create two boxes.
-
-To orient a part, a ``rotation`` parameter is available on ``BuildSketch`` and
-``BuildPart`` objects. When working in a sketch, the rotation is a single angle in
-degrees so the parameter is a float. When working on a part, the rotation is
-a three dimensional ``Rotation`` object of the form
-``Rotation(<about x>, <about y>, <about z>)`` although a simple three tuple of
-floats can be used as input.  As 3D rotations are not cumulative, one can
-combine rotations with the `*` operator like this:
-``Rotation(10, 20, 30) * Rotation(0, 90, 0)`` to generate any desired rotation.
-
-.. hint::
-    Experts Only
-
-    ``Locations`` will accept ``Location`` objects for input which allows one
-    to specify both the position and orientation.  However, the orientation
-    is often determined by the ``Plane`` that an object was created on.
-    ``Rotation`` is a subclass of ``Location`` and therefore will also accept
-    a position component.
-
 Builder's Pending Objects
 =========================
 
@@ -517,7 +469,7 @@ extrudes these pending faces into ``Solid`` objects. Likewise, ``loft`` would ta
 ``pending_faces`` and attempt to create a single ``Solid`` object from them.
 
 Normally the user will not need to interact directly with pending objects; however,
-one can see pending Edges and Faces with ``<builder_instance>.pending_edges`` and 
-``<builder_instance>.pending_faces`` attributes.  In the above example, by adding a 
+one can see pending Edges and Faces with ``<builder_instance>.pending_edges`` and
+``<builder_instance>.pending_faces`` attributes.  In the above example, by adding a
 ``print(pillow_block.pending_faces)`` prior to the ``extrude(amount=thickness)`` the
 pending ``Face`` from the ``BuildSketch`` will be displayed.
