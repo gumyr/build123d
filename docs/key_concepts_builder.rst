@@ -141,21 +141,6 @@ Think of the Builder as a running tally when adding numbers on a piece of paper:
 By adopting this approach, build123d ensures a natural, intuitive workflow for constructing
 2D and 3D models.
 
-.. note::
-    **Why modifying objects directly doesn't work in Builder mode**
-
-    A common mistake in Builder mode is attempting to modify an object after it
-    is created, for example ``Cylinder(1, 2).moved(Location((1, 2, 3)))``. In
-    builder mode an object adds itself to the active builder as soon as it is
-    created, so modifying or copying the returned Python object afterwards has
-    no effect on the model being built. Placement must be specified before the
-    object is created, which is why Builder mode provides the ``Locations``
-    context.
-
-    This is explained in full, including a discussion of the duplicate-at-origin
-    symptom and why ``Locations`` solves it, on the Moving Objects page:
-    :ref:`moving_objects_faq`.
-
 Builders
 ========
 
@@ -290,82 +275,8 @@ This is the result:
 Locations Context
 -----------------
 
-.. note::
-    The builder-mode location contexts are covered, alongside the ``rotation``
-    parameter and their algebra-mode equivalents, on the
-    :ref:`Moving Objects page <moving_objects_builder>`.
-
-When positioning objects or operations within a builder, Location Contexts are used.
-They create a context where one or more local ``Location`` objects are active within
-a scope. For example:
-
-.. code-block:: build123d
-
-    with BuildPart():
-        with Locations((0,10),(0,-10)):
-            Box(1,1,1)
-            with GridLocations(x_spacing=5, y_spacing=5, x_count=2, y_count=2):
-                Sphere(1)
-            Cylinder(1,1)
-
-In this example ``Locations`` creates two local positions at (0,10) and (0,-10).
-Since ``Box`` is within the scope of ``Locations``, two boxes are created at these
-locations in the builder's local coordinate system. The ``GridLocations`` context
-creates four positions which apply to the ``Sphere``. The ``Cylinder`` is out of
-the scope of ``GridLocations`` but in the scope of ``Locations`` so two cylinders
-are created.
-
-Note that these contexts are creating Location objects not just simple points. The difference
-isn't obvious until the ``PolarLocations`` context is used which can also rotate objects within
-its scope - much as the hour and minute indicator on an analogue clock.
-
-Locations can also be used around a builder to move the completed builder output.
-In this case the enclosed builder still constructs locally and the active
-locations are applied once when the builder publishes its completed result.
-
-.. code-block:: build123d
-
-    with BuildPart() as model:
-        with Locations((-20, 0), (20, 0)):
-            with BuildSketch() as holes:
-                Circle(3)
-            extrude(amount=5)
-
-Here ``holes.sketch_local`` contains one circle on local ``Plane.XY`` while
-``holes.sketch`` contains two placed circles because the enclosing ``Locations``
-context is active when the sketch is published to ``model``.
-
-The same rule applies to an entire ``BuildPart``:
-
-.. code-block:: build123d
-
-    with Locations((-10, 0), (10, 0)):
-        with BuildPart() as placed_parts:
-            Box(5, 5, 5)
-
-``placed_parts.part_local`` contains one local box, while ``placed_parts.part``
-contains the two placed boxes.
-
-Locations are local to the current location(s), so ``Locations`` contexts can be
-nested. A user can retrieve the active local locations:
-
-.. code-block:: build123d
-
-    with Locations(Plane.XY, Plane.XZ):
-        locs = GridLocations(1, 1, 2, 2)
-        for l in locs:
-            print(l)
-
-.. code-block::
-
-    Location(p=(-0.50,-0.50,0.00), o=(0.00,-0.00,0.00))
-    Location(p=(-0.50,0.50,0.00), o=(0.00,-0.00,0.00))
-    Location(p=(0.50,-0.50,0.00), o=(0.00,-0.00,0.00))
-    Location(p=(0.50,0.50,0.00), o=(0.00,-0.00,0.00))
-    Location(p=(-0.50,-0.00,-0.50), o=(90.00,-0.00,0.00))
-    Location(p=(-0.50,0.00,0.50), o=(90.00,-0.00,0.00))
-    Location(p=(0.50,0.00,-0.50), o=(90.00,-0.00,0.00))
-    Location(p=(0.50,0.00,0.50), o=(90.00,-0.00,0.00))
+Locations contexts are the primary way to position and orient objects in builder
+mode. They are covered in :ref:`Moving Objects <moving_objects_builder>`.
 
 Using Locations & Rotating Objects
 ----------------------------------

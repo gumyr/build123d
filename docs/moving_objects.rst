@@ -229,7 +229,7 @@ not where in space they sit:
     Pos(1, 2, 3) * Rot(45, 30, 20) * Box(1, 2, 3)     # position and rotation
     Plane.XZ * Pos(1, 2, 3) * Rot(0, 100, 45) * Box(1, 2, 3)  # on a plane
 
-The ``with Locations(...)`` context also works here. Outside a builder it
+The ``with Locations(...)`` context covered below also works here. Outside a builder it
 positions the objects created inside it, and with several locations the variable
 holds all the placed copies:
 
@@ -277,25 +277,88 @@ Builder mode
 
 In builder mode an object adds itself to the builder as soon as it is created,
 so its position and orientation must be decided *before* the object is made.
-Two builder-specific tools do this:
+Two builder-specific tools do this: a ``Locations`` context and the ``rotation``
+parameter.
 
-* a :class:`~build_common.Locations` context (or ``GridLocations``,
-  ``PolarLocations`` or ``HexLocations``) activates one or more ``Location``
-  objects for everything created inside it:
+Location contexts
+^^^^^^^^^^^^^^^^^
 
-  .. code-block:: build123d
+The :class:`~build_common.Locations` context (and ``GridLocations``,
+``PolarLocations`` and ``HexLocations``) makes one or more local ``Location``
+objects active within a scope, and every object created inside that scope is
+placed at each active location:
 
-      with BuildPart() as part:
-          with Locations((10, 20, 30)):
-              Box(5, 5, 5)
+.. code-block:: build123d
 
-* most primitives also accept a ``rotation`` parameter as a shorthand for the
-  same rotation at creation:
+    with BuildPart() as part:
+        with Locations((0, 10), (0, -10)):
+            Box(1, 1, 1)
+            with GridLocations(x_spacing=5, y_spacing=5, x_count=2, y_count=2):
+                Sphere(1)
+            Cylinder(1, 1)
 
-  .. code-block:: build123d
+Here ``Locations`` creates two local positions at (0, 10) and (0, -10): ``Box``
+is within its scope so two boxes are created, the ``GridLocations`` context
+creates four positions that apply to the ``Sphere``, and ``Cylinder`` is out of
+the ``GridLocations`` scope but still within ``Locations`` so two cylinders are
+created.
 
-      with BuildPart() as part:
-          Box(10, 10, 10, rotation=(10, 20, 30))
+These contexts create ``Location`` objects, not just points - ``PolarLocations``,
+for example, also rotates objects within its scope, much as the hour and minute
+hand on an analogue clock.
+
+``Locations`` can also be used around a builder to move the completed output; the
+enclosed builder still constructs locally and the active locations are applied
+once when it publishes:
+
+.. code-block:: build123d
+
+    with BuildPart() as model:
+        with Locations((-20, 0), (20, 0)):
+            with BuildSketch() as holes:
+                Circle(3)
+            extrude(amount=5)
+
+Here ``holes.sketch_local`` contains one circle on local ``Plane.XY`` while
+``holes.sketch`` contains two placed circles, because the enclosing ``Locations``
+context is active when the sketch is published to ``model``. The same rule
+applies to an entire ``BuildPart``.
+
+Locations contexts can be nested, and the active local locations can be read from
+the context object:
+
+.. code-block:: build123d
+
+    with Locations(Plane.XY, Plane.XZ):
+        locs = GridLocations(1, 1, 2, 2)
+        for l in locs:
+            print(l)
+
+.. code-block::
+
+    # Points at the four locations for each of the two planes
+    Location(p=(-0.50,-0.50,0.00), o=(0.00,-0.00,0.00))
+    Location(p=(-0.50,0.50,0.00), o=(0.00,-0.00,0.00))
+    Location(p=(0.50,-0.50,0.00), o=(0.00,-0.00,0.00))
+    Location(p=(0.50,0.50,0.00), o=(0.00,-0.00,0.00))
+    Location(p=(-0.50,-0.00,-0.50), o=(90.00,-0.00,0.00))
+    Location(p=(-0.50,0.00,0.50), o=(90.00,-0.00,0.00))
+    Location(p=(0.50,0.00,-0.50), o=(90.00,-0.00,0.00))
+    Location(p=(0.50,0.00,0.50), o=(90.00,-0.00,0.00))
+
+The ``rotation`` parameter
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Most primitives also accept a ``rotation`` parameter as a shorthand for the same
+rotation at creation:
+
+.. code-block:: build123d
+
+    with BuildPart() as part:
+        Box(10, 10, 10, rotation=(10, 20, 30))
+
+Everything else
+^^^^^^^^^^^^^^^
 
 Every method from :ref:`moving_objects_direct` and
 :ref:`moving_objects_algebra` works the same way here - on a *standalone*

@@ -84,6 +84,8 @@ so sketch objects can be added directly:
 Placement arithmetic
 =======================
 
+See :ref:`Moving Objects page <moving_objects_algebra>`.
+
 A ``Part``, ``Sketch`` or ``Curve`` does not have any location or rotation
 parameter. An object defines its topology - shape, size and center - but does
 not know where in space it will be located. Instead it is relocated with the
@@ -95,13 +97,7 @@ not know where in space it will be located. Instead it is relocated with the
     location * alg_compound           # at an absolute location
     plane * location * alg_compound   # on a plane, then at a location in the plane's frame
 
-``Pos``, ``Rot`` (a short alias for ``Rotation``) and ``Location`` are the
-building blocks of placement; ``Pos * Rot`` is the same as a ``Location`` with
-the same position and orientation. This is not the only way to achieve positioning and rotation in algebra mode.
-Further details - including how these expressions compare with the equivalent
-``Locations`` contexts, and the ordering of multi-axis rotations - is covered in
-full on the :ref:`Moving Objects page <moving_objects_algebra>`. Detailed,
-rendered examples can be found in :ref:`location_arithmetics`.
+Detailed, rendered examples can be found in :ref:`location_arithmetics`.
 
 
 .. _part_sketch_curve:
