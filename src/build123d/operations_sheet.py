@@ -34,7 +34,6 @@ from math import asin, atan, cos, degrees, radians, sin, sqrt, tan
 from statistics import median
 from typing import Callable, Literal, overload
 
-from scipy.optimize import brentq
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.Geom import Geom_CylindricalSurface
 from OCP.gp import gp_Ax3
@@ -1449,6 +1448,8 @@ def _hem_parameters(
             if opening >= radius:
                 raise ValueError("opening must be smaller than bend radius")
             return radius - opening, 270.0, radius
+
+        from scipy.optimize import brentq  # pylint: disable=import-outside-toplevel
 
         def equation(leg: float) -> float:
             return leg - width + bend_width + thickness * sin(2 * atan(radius / leg))

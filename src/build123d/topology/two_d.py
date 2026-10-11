@@ -130,7 +130,6 @@ from OCP.TopoDS import (
     TopoDS_Solid,
 )
 from OCP.TopLoc import TopLoc_Location
-from ocp_gordon import interpolate_curve_network
 from typing_extensions import Self
 
 from build123d.build_enums import (
@@ -1513,6 +1512,9 @@ class Face(Mixin2D[TopoDS_Face]):
 
         ocp_profiles = [to_geom_curve(shape) for shape in profiles]
         ocp_guides = [to_geom_curve(shape) for shape in guides]
+
+        # pylint: disable=import-outside-toplevel
+        from ocp_gordon import interpolate_curve_network
 
         gordon_bspline_surface = interpolate_curve_network(
             ocp_profiles, ocp_guides, tolerance=tolerance

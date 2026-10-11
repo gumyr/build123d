@@ -661,7 +661,7 @@ class TestEdgeParamAt(unittest.TestCase):
                 "build123d.topology.one_d.GeomAPI_ProjectPointOnCurve",
                 return_value=projector,
             ),
-            patch("build123d.topology.one_d.minimize_scalar", return_value=result),
+            patch("scipy.optimize.minimize_scalar", return_value=result),
         ):
             with self.assertRaisesRegex(RuntimeError, "Edge is too complex"):
                 edge.param_at_point((7, 0, 0))

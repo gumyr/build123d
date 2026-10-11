@@ -342,8 +342,8 @@ def test_process_hatch_edgepath_single_line(import_dxf_module, monkeypatch):
     class FakeEdgePath:
         pass
 
-    monkeypatch.setattr(import_dxf_module, "LineEdge", FakeLineEdge)
-    monkeypatch.setattr(import_dxf_module, "EdgePath", FakeEdgePath)
+    monkeypatch.setattr("ezdxf.entities.boundary_paths.LineEdge", FakeLineEdge)
+    monkeypatch.setattr("ezdxf.entities.boundary_paths.EdgePath", FakeEdgePath)
 
     line_edge = FakeLineEdge()
     line_edge.start = SimpleNamespace(x=0.0, y=0.0)
@@ -365,7 +365,7 @@ def test_process_hatch_polyline_path(import_dxf_module, monkeypatch):
             self.vertices = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (1.0, 1.0, 0.0)]
             self.is_closed = False
 
-    monkeypatch.setattr(import_dxf_module, "PolylinePath", FakePolylinePath)
+    monkeypatch.setattr("ezdxf.entities.boundary_paths.PolylinePath", FakePolylinePath)
 
     entity = SimpleNamespace(
         dxf=SimpleNamespace(elevation=0.0, hatch_style=0),
@@ -381,7 +381,7 @@ def test_process_hatch_edgepath_empty(import_dxf_module, monkeypatch):
         def __init__(self):
             self.edges = []
 
-    monkeypatch.setattr(import_dxf_module, "EdgePath", FakeEdgePath)
+    monkeypatch.setattr("ezdxf.entities.boundary_paths.EdgePath", FakeEdgePath)
 
     entity = SimpleNamespace(
         dxf=SimpleNamespace(elevation=0.0, hatch_style=0),
@@ -395,7 +395,7 @@ def test_convert_hatch_edge_arc(import_dxf_module, monkeypatch):
     class FakeArcEdge:
         pass
 
-    monkeypatch.setattr(import_dxf_module, "ArcEdge", FakeArcEdge)
+    monkeypatch.setattr("ezdxf.entities.boundary_paths.ArcEdge", FakeArcEdge)
 
     edge = FakeArcEdge()
     edge.center = SimpleNamespace(x=1.0, y=2.0)
@@ -413,7 +413,7 @@ def test_convert_hatch_edge_arc_clockwise(import_dxf_module, monkeypatch):
     class FakeArcEdge:
         pass
 
-    monkeypatch.setattr(import_dxf_module, "ArcEdge", FakeArcEdge)
+    monkeypatch.setattr("ezdxf.entities.boundary_paths.ArcEdge", FakeArcEdge)
 
     edge = FakeArcEdge()
     edge.center = SimpleNamespace(x=1.0, y=2.0)
@@ -432,7 +432,7 @@ def test_convert_hatch_edge_ellipse(import_dxf_module, monkeypatch):
     class FakeEllipseEdge:
         pass
 
-    monkeypatch.setattr(import_dxf_module, "EllipseEdge", FakeEllipseEdge)
+    monkeypatch.setattr("ezdxf.entities.boundary_paths.EllipseEdge", FakeEllipseEdge)
 
     edge = FakeEllipseEdge()
     edge.center = SimpleNamespace(x=1.0, y=2.0)
@@ -451,7 +451,7 @@ def test_convert_hatch_edge_ellipse_clockwise(import_dxf_module, monkeypatch):
     class FakeEllipseEdge:
         pass
 
-    monkeypatch.setattr(import_dxf_module, "EllipseEdge", FakeEllipseEdge)
+    monkeypatch.setattr("ezdxf.entities.boundary_paths.EllipseEdge", FakeEllipseEdge)
 
     edge = FakeEllipseEdge()
     edge.center = SimpleNamespace(x=1.0, y=2.0)
@@ -471,7 +471,7 @@ def test_convert_hatch_edge_spline(import_dxf_module, monkeypatch):
     class FakeSplineEdge:
         pass
 
-    monkeypatch.setattr(import_dxf_module, "SplineEdge", FakeSplineEdge)
+    monkeypatch.setattr("ezdxf.entities.boundary_paths.SplineEdge", FakeSplineEdge)
 
     edge = FakeSplineEdge()
     edge.control_points = [(0.0, 0.0), (1.0, 1.0), (2.0, 0.0)]

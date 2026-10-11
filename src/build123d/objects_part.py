@@ -30,7 +30,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from math import radians, tan
-from scipy.spatial import ConvexHull
 
 from build123d.build_common import BaseObject
 from build123d.build_enums import Align, Mode
@@ -235,6 +234,8 @@ class ConvexPolyhedron(BasePartObject):
         pnts: list[tuple] = [tuple(Vector(p)) for p in points]
 
         # Create a convex hull from the vertices
+        from scipy.spatial import ConvexHull  # pylint: disable=import-outside-toplevel
+
         convex_hull = ConvexHull(pnts).simplices.tolist()
 
         # Create faces from the vertex indices

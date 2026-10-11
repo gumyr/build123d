@@ -26,6 +26,8 @@ license:
 
 """
 
+from __future__ import annotations
+
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
 
@@ -36,17 +38,12 @@ from copy import copy
 from enum import Enum, auto
 from io import BytesIO
 from os import PathLike, fsdecode
-from typing import Any, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 from typing import cast as tcast
 from warnings import warn
 
 from collections.abc import Callable, Iterable
 
-import ezdxf
-import svgpathtools as PT
-from ezdxf import zoom
-from ezdxf.colors import RGB, aci2rgb
-from ezdxf.math import Vec2
 from OCP.BRepLib import BRepLib
 from OCP.BRepTools import BRepTools_WireExplorer
 from OCP.Geom import Geom_BezierCurve, Geom_BSplineCurve
@@ -71,11 +68,28 @@ from build123d.topology import (
 )
 from build123d.build_constants import UNITS_PER_METER
 
-PathSegment: TypeAlias = PT.Line | PT.Arc | PT.QuadraticBezier | PT.CubicBezier
-"""A type alias for the various path segment types in the svgpathtools library."""
+if TYPE_CHECKING:  # pragma: no cover
+    import svgpathtools as PT
+
+    PathSegment: TypeAlias = PT.Line | PT.Arc | PT.QuadraticBezier | PT.CubicBezier
+    """A type alias for the various path segment types in the svgpathtools library."""
+
+
+def __getattr__(name: str) -> Any:
+    """Build ``PathSegment`` on first use, so svgpathtools loads only when needed."""
+    if name == "PathSegment":
+        import svgpathtools as PT  # pylint: disable=import-outside-toplevel
+
+        return PT.Line | PT.Arc | PT.QuadraticBezier | PT.CubicBezier
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 _INHERIT_COLOR = sentinel("INHERIT_COLOR")
 """Use a shape's color, falling back to the SVG layer default."""
+
+if TYPE_CHECKING:  # pragma: no cover
+    from ezdxf.colors import RGB
+    from ezdxf.math import Vec2
 
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -491,14 +505,15 @@ class ExportDXF(Export2D):
     """
 
     # A dictionary that maps Unit enums to their corresponding DXF unit
-    # constants used by the ezdxf library for conversion.
+    # constants (the $INSUNITS codes, as ezdxf.units names them). Spelled out
+    # so that ezdxf itself only loads when a DXF is actually exported.
     _UNITS_LOOKUP = {
         Unit.MC: 13,
-        Unit.MM: ezdxf.units.MM,
-        Unit.CM: ezdxf.units.CM,
-        Unit.M: ezdxf.units.M,
-        Unit.IN: ezdxf.units.IN,
-        Unit.FT: ezdxf.units.FT,
+        Unit.MM: 4,  # ezdxf.units.MM
+        Unit.CM: 5,  # ezdxf.units.CM
+        Unit.M: 6,  # ezdxf.units.M
+        Unit.IN: 1,  # ezdxf.units.IN
+        Unit.FT: 2,  # ezdxf.units.FT
     }
 
     #  A set containing the Unit enums that represent metric units
@@ -513,7 +528,7 @@ class ExportDXF(Export2D):
 
     def __init__(
         self,
-        version: str = ezdxf.DXF2013,
+        version: str = "AC1027",  # ezdxf.DXF2013
         unit: Unit = Unit.MM,
         color: ColorLike | ColorIndex | None = None,
         line_weight: float | None = None,
@@ -526,6 +541,8 @@ class ExportDXF(Export2D):
             self._linetype_scale = Export2D.LTYPE_SCALE[Unit.MM]
         else:
             self._linetype_scale = 1
+        import ezdxf  # pylint: disable=import-outside-toplevel
+
         self._document = ezdxf.new(
             dxfversion=version,
             units=self._UNITS_LOOKUP[unit],
@@ -602,6 +619,8 @@ class ExportDXF(Export2D):
             )
             return {"color": color.value}
 
+        import ezdxf  # pylint: disable=import-outside-toplevel
+
         red, green, blue, _ = tuple(Color(color))
         rgb = (round(red * 255), round(green * 255), round(blue * 255))
         if self._document.dxfversion < ezdxf.DXF2004:
@@ -611,6 +630,7 @@ class ExportDXF(Export2D):
     @staticmethod
     def _nearest_aci(rgb: tuple[int, int, int]) -> int:
         """The AutoCAD Color Index whose palette entry is closest to ``rgb``."""
+        from ezdxf.colors import aci2rgb  # pylint: disable=import-outside-toplevel
 
         def distance(index: int) -> int:
             return sum((a - b) ** 2 for a, b in zip(rgb, aci2rgb(index)))
@@ -702,6 +722,8 @@ class ExportDXF(Export2D):
             ascii_format (bool, optional): Export the file as ASCII (True) or binary
                 (False) DXF format. Defaults to True.
         """
+        from ezdxf import zoom  # pylint: disable=import-outside-toplevel
+
         # Reset the main CAD viewport of the model space to the
         # extents of its entities.
         # https://github.com/gumyr/build123d/issues/382 tracks
@@ -731,6 +753,8 @@ class ExportDXF(Export2D):
     def _convert_point(self, pt: gp_XYZ | gp_Pnt | gp_Vec | Vector) -> Vec2:
         """Create a Vec2 from a gp_Pnt or Vector.
         This method also checks for points z != 0."""
+        from ezdxf.math import Vec2  # pylint: disable=import-outside-toplevel
+
         if isinstance(pt, (gp_XYZ, gp_Pnt, gp_Vec)):
             x, y, z = (pt.X(), pt.Y(), pt.Z())
         elif isinstance(pt, Vector):
@@ -850,6 +874,8 @@ class ExportDXF(Export2D):
             pad = spline.NbKnots() - spline.LastUKnotIndex()
             poles += poles[:pad]
 
+        import ezdxf.math  # pylint: disable=import-outside-toplevel
+
         dxf_spline = ezdxf.math.BSpline(poles, order, knots, weights)
 
         self._modelspace.add_spline(dxfattribs=attribs).apply_construction_tool(
@@ -953,6 +979,9 @@ class ExportSVG(Export2D):
             line_weight: float,
             line_type: LineType,
         ):
+            # pylint: disable=import-outside-toplevel
+            from ezdxf.colors import RGB, aci2rgb
+
             def convert_color(
                 input_color: ColorLike | ColorIndex | RGB | None,
             ) -> Color | None:
@@ -1152,6 +1181,8 @@ class ExportSVG(Export2D):
                 self._add_single_shape(s, _layer, reverse_wires)
 
     def _add_single_shape(self, shape: Shape, layer: _Layer, reverse_wires: bool):
+        import svgpathtools as PT  # pylint: disable=import-outside-toplevel
+
         if shape.is_empty:
             raise ValueError(
                 f"There is nothing to export: the {type(shape).__name__} is empty"
@@ -1268,6 +1299,8 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _wire_element(self, wire: Wire, reverse: bool) -> ET.Element:
+        import svgpathtools as PT  # pylint: disable=import-outside-toplevel
+
         edges = ExportSVG._wire_edges(wire, reverse)
         if len(edges) == 1:
             wire_element = self._edge_element(edges[0])
@@ -1302,6 +1335,8 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _line_segment(self, edge: Edge, reverse: bool) -> PT.Line:
+        import svgpathtools as PT  # pylint: disable=import-outside-toplevel
+
         curve = edge.geom_adaptor()
         fp = curve.FirstParameter()
         lp = curve.LastParameter()
@@ -1331,6 +1366,8 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _circle_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+        import svgpathtools as PT  # pylint: disable=import-outside-toplevel
+
         if edge.length < 1e-6:
             warn(
                 "Skipping arc that is too small to export safely (length < 1e-6).",
@@ -1364,6 +1401,8 @@ class ExportSVG(Export2D):
 
     def _circle_element(self, edge: Edge) -> ET.Element:
         """Converts a Circle object into an SVG circle element."""
+        import svgpathtools as PT  # pylint: disable=import-outside-toplevel
+
         if edge.is_closed:
             curve = edge.geom_adaptor()
             circle = curve.Circle()
@@ -1382,6 +1421,8 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _ellipse_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+        import svgpathtools as PT  # pylint: disable=import-outside-toplevel
+
         if edge.length < 1e-6:
             warn(
                 "Skipping ellipse that is too small to export safely (length < 1e-6).",
@@ -1416,6 +1457,8 @@ class ExportSVG(Export2D):
 
     def _ellipse_element(self, edge: Edge) -> ET.Element:
         """Converts an Ellipse object into an SVG ellipse element."""
+        import svgpathtools as PT  # pylint: disable=import-outside-toplevel
+
         arcs = self._ellipse_segments(edge, reverse=False)
         path = PT.Path(*arcs)
         result = ET.Element("path", {"d": path.d()})
@@ -1424,6 +1467,8 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _bspline_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
+        import svgpathtools as PT  # pylint: disable=import-outside-toplevel
+
         # This reduces the B-Spline to degree 3, generally adding
         # poles and knots to approximate the original.
         # This also will convert basically any edge into a B-Spline.
@@ -1476,6 +1521,8 @@ class ExportSVG(Export2D):
 
     def _bspline_element(self, edge: Edge) -> ET.Element:
         """Converts a BSpline object into an SVG path element representing a Bézier curve."""
+        import svgpathtools as PT  # pylint: disable=import-outside-toplevel
+
         segments = self._bspline_segments(edge, reverse=False)
         path = PT.Path(*segments)
         result = ET.Element("path", {"d": path.d()})

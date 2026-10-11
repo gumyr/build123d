@@ -26,22 +26,13 @@ license:
 
 """
 
+from __future__ import annotations
+
 import math
 import warnings
 from io import BytesIO, StringIO, TextIOBase
 from os import PathLike
-from typing import BinaryIO, Callable, TextIO, cast
-
-import ezdxf
-from ezdxf.entities import DXFGraphic
-from ezdxf.entities.boundary_paths import (
-    ArcEdge,
-    EdgePath,
-    EllipseEdge,
-    LineEdge,
-    PolylinePath,
-    SplineEdge,
-)
+from typing import TYPE_CHECKING, BinaryIO, Callable, TextIO, cast
 
 from build123d.build_enums import TextAlign
 from build123d.geometry import TOLERANCE, Axis, Pos, Vector, VectorLike
@@ -59,6 +50,10 @@ from build123d.topology import Edge, Shape, ShapeList, Vertex, Wire
 
 # Unfortunately exdxf is not fully typed
 # mypy: disable-error-code="attr-defined"
+
+
+if TYPE_CHECKING:  # pragma: no cover
+    from ezdxf.entities import DXFGraphic
 
 
 def process_arc(entity: DXFGraphic) -> CenterArc:
@@ -231,6 +226,14 @@ def _convert_bulge_polyline(
 
 def _convert_hatch_edge(edge, z_value: float) -> Edge:
     """Convert a hatch edge-path edge into build123d geometry."""
+    # pylint: disable=import-outside-toplevel
+    from ezdxf.entities.boundary_paths import (
+        ArcEdge,
+        EllipseEdge,
+        LineEdge,
+        SplineEdge,
+    )
+
     if isinstance(edge, LineEdge):
         return Line(
             (edge.start.x, edge.start.y, z_value), (edge.end.x, edge.end.y, z_value)
@@ -273,6 +276,12 @@ def _convert_hatch_edge(edge, z_value: float) -> Edge:
 
 def process_hatch(entity: DXFGraphic) -> ShapeList[Edge | Wire]:
     """Convert HATCH by importing only its perimeter boundary paths."""
+    # pylint: disable=import-outside-toplevel
+    from ezdxf.entities.boundary_paths import (
+        EdgePath,
+        PolylinePath,
+    )
+
     elevation = entity.dxf.elevation
     try:
         z_value = elevation.z
@@ -470,6 +479,8 @@ def import_dxf(dxf_file: str | PathLike | TextIO | BinaryIO) -> ShapeList:
     Returns:
         ShapeList: build123d objects
     """
+    import ezdxf  # pylint: disable=import-outside-toplevel
+
     try:
         if isinstance(dxf_file, (str, PathLike)):
             doc = ezdxf.readfile(dxf_file)
