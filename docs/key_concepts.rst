@@ -156,56 +156,45 @@ two parallel axes, returns ``None``. Either kind of "nothing" reads as false, so
 Location
 ========
 
-A :class:`~geometry.Location` represents a combination of translation and rotation
-applied to a topological or geometric object. It encapsulates information
-about the spatial orientation and position of a shape within its reference
-coordinate system. This allows for efficient manipulation of shapes within
-complex assemblies or transformations. The location is typically used to
-position shapes accurately within a 3D scene, enabling operations like
-assembly, and boolean operations. It's an essential component in build123d
-for managing the spatial relationships of geometric entities, providing a
-foundation for precise 3D modeling and engineering applications.
+A :class:`~geometry.Location` represents a combination of translation and
+rotation applied to a shape, wrapping a **position** and an **orientation**
+(Euler angles). It is the fundamental object used to position and orient
+geometry: every ``Shape`` (and ``Axis``, ``Plane`` and ``Location`` itself) has
+a ``location`` property, and the components can be read and written through
+``shape.position`` and ``shape.orientation``.
 
-The topological classes (sub-classes of :class:`~topology.Shape`) and the geometric classes 
-:class:`~geometry.Axis` and :class:`~geometry.Plane` all have a ``location`` property.
-The :class:`~geometry.Location` class itself has ``position`` and ``orientation`` properties
-that have setters and getters as shown below:
+The full treatment - how to build a ``Location`` with ``Pos``/``Rot``/
+``Location``, the direct movement methods, and how they are used in builder and
+algebra mode - is on the :ref:`Moving Objects page <moving_objects_location>`.
 
+As a quick reference, the four methods that change an object's location:
 
-.. doctest::
+.. list-table:: Direct location methods
+    :header-rows: 1
 
-    >>> from build123d import *
-    >>> # Create an object and extract its location
-    >>> b = Box(1, 1, 1)
-    >>> box_location = b.location
-    >>> box_location
-    (p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))
-    >>> # Set position and orientation independently
-    >>> box_location.position = (1, 2, 3)
-    >>> box_location.orientation = (30, 40, 50)
-    >>> box_location.position
-    Vector: (1.0, 2.0, 3.0)
-    >>> box_location.orientation
-    Vector: (29.999999999999993, 40.00000000000002, 50.000000000000036)
+    * - Method
+      - Positioning
+      - Changes
+      - Returns
+    * - :meth:`~topology.Shape.locate`
+      - absolute
+      - in place
+      - ``self``
+    * - :meth:`~topology.Shape.located`
+      - absolute
+      - copy
+      - new shape
+    * - :meth:`~topology.Shape.move`
+      - relative
+      - in place
+      - ``self``
+    * - :meth:`~topology.Shape.moved`
+      - relative
+      - copy
+      - new shape
 
-Combining the getter and setter enables relative changes as follows:
-
-.. doctest::
-
-    >>> # Relative change
-    >>> box_location.position += (3, 2, 1)
-    >>> box_location.position
-    Vector: (4.0, 4.0, 4.0)
-
-There are also four methods that are used to change the location of objects:
-
-* :meth:`~topology.Shape.locate` - absolute change of this object
-* :meth:`~topology.Shape.located` - absolute change of copy of this object
-* :meth:`~topology.Shape.move` - relative change of this object
-* :meth:`~topology.Shape.moved` - relative change of copy of this object
-
-Locations can be combined with the ``*`` operator and have their direction flipped with
-the ``-`` operator.
+Locations compose with the ``*`` operator and flip direction with the ``-``
+operator.
 
 Selectors
 =========

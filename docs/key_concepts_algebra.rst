@@ -84,85 +84,20 @@ so sketch objects can be added directly:
 Placement arithmetic
 =======================
 
-A ``Part``, ``Sketch`` or ``Curve`` does not have any location or rotation parameter.
-The rationale is that an object defines its topology (shape, sizes and its center), but does not know 
-where in space it will be located. Instead, it will be relocated with the ``*`` operator onto a plane 
-and to location relative to the plane (similar ``moved``). 
+See :ref:`Moving Objects page <moving_objects_algebra>`.
 
-The generic forms of object placement are:
+A ``Part``, ``Sketch`` or ``Curve`` does not have any location or rotation
+parameter. An object defines its topology - shape, size and center - but does
+not know where in space it will be located. Instead it is relocated with the
+``*`` operator onto a plane and to a location relative to that plane:
 
-1. Placement on ``plane`` or at ``location`` relative to XY plane:
+.. code-block:: build123d
 
-    .. code-block:: build123d
+    plane * alg_compound              # on a plane (e.g. Plane.XZ)
+    location * alg_compound           # at an absolute location
+    plane * location * alg_compound   # on a plane, then at a location in the plane's frame
 
-        plane * alg_compound
-        location * alg_compound
-
-2. Placement on the ``plane`` and then moved relative to the ``plane`` by ``location`` 
-(the location is relative to the local coordinate system of the plane).
-
-    .. code-block:: build123d
-
-        plane * location * alg_compound
-
-
-Details can be found in :ref:`location_arithmetics`.
-
-Examples:
-
--   Box on the ``XY`` plane, centered at `(0, 0, 0)` (both forms are equivalent):
-
-    .. code-block:: build123d
-
-        Plane.XY * Box(1, 2, 3)
-
-        Box(1, 2, 3)
-
-    Note: On the ``XY`` plane no placement is needed (mathematically ``Plane.XY *`` will not change the 
-    location of an object).
-
--   Box on the ``XY`` plane centered at `(0, 1, 0)` (all three are equivalent):
-
-    .. code-block:: build123d
-
-        Plane.XY * Pos(0, 1, 0) * Box(1, 2, 3)
-
-        Pos(0, 1, 0) * Box(1, 2, 3) 
-
-        Pos(Y=1) * Box(1, 2, 3)
-
-    Note: Again, ``Plane.XY`` can be omitted.
-
--   Box on plane ``Plane.XZ``:
-
-    .. code-block:: build123d
-
-        Plane.XZ * Box(1, 2, 3)
-
--   Box on plane ``Plane.XZ`` with a location ``(X=1, Y=2, Z=3)`` relative to the ``XZ`` plane, i.e., 
-    using the x-, y- and z-axis of the ``XZ`` plane:
-
-    .. code-block:: build123d
-
-        Plane.XZ * Pos(1, 2, 3) * Box(1, 2, 3)
-
--   Box on plane ``Plane.XZ`` moved to ``(X=1, Y=2, Z=3)`` relative to this plane and rotated there 
-    by the angles `(X=0, Y=100, Z=45)` around ``Plane.XZ`` axes:
-
-    .. code-block:: build123d
-
-        Plane.XZ * Pos(1, 2, 3) * Rot(0, 100, 45) * Box(1, 2, 3)
-
-        Location((1, 2, 3), (0, 100, 45)) * Box(1, 2, 3)
-
-    Note: ``Pos * Rot`` is the same as using ``Location`` directly
-
--   Box on plane ``Plane.XZ`` rotated on this plane by the angles ``(X=0, Y=100, Z=45)`` (using the 
-    x-, y- and z-axis of the ``XZ`` plane) and then moved to ``(X=1, Y=2, Z=3)`` relative to the ``XZ`` plane:
-
-    .. code-block:: build123d
-
-        Plane.XZ * Rot(0, 100, 45) * Pos(0,1,2) * Box(1, 2, 3)
+Detailed, rendered examples can be found in :ref:`location_arithmetics`.
 
 
 .. _part_sketch_curve:
@@ -262,7 +197,10 @@ See :ref:`when a feature came to be <when>` for the details.
 Combining both concepts
 =======================
 
-**Object arithmetic** and **Placement at locations** can be combined:
+**Object arithmetic** and **placement at locations** can be combined in a single
+expression, since ``*`` composes placement (see
+:ref:`Moving Objects <moving_objects_algebra>`) and the boolean operators combine
+the results:
 
  .. code-block:: build123d
 
