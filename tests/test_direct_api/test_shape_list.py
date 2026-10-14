@@ -639,6 +639,24 @@ class TestShapeListAddition(unittest.TestCase):
         with self.assertRaises(TypeError):
             sl += "not a shape"  # type: ignore
 
+    def test_set_operators_preserve_order(self):
+        # & and - keep the order of the left operand and stay reproducible,
+        # instead of following the memory-address order of a set (issue #1477).
+        edges = Box(10, 20, 30).edges()
+        self.assertEqual(len(edges), 12)
+
+        vertical = edges.filter_by(Axis.Z)
+        intersection = edges & vertical
+        expected_and = [e for e in edges if e in set(vertical)]
+        self.assertEqual(len(intersection), len(expected_and))
+        self.assertTrue(all(a is b for a, b in zip(intersection, expected_and)))
+
+        removed = ShapeList([edges[1], edges[4], edges[9]])
+        difference = edges - removed
+        expected_sub = [e for e in edges if e not in set(removed)]
+        self.assertEqual(len(difference), len(expected_sub))
+        self.assertTrue(all(a is b for a, b in zip(difference, expected_sub)))
+
 
 if __name__ == "__main__":
     unittest.main()

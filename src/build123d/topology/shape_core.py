@@ -1813,7 +1813,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
                     next_set.extend(result.expand())
             if not next_set:
                 return ShapeList()  # AND semantics: if any step fails, nothing
-            common_set = ShapeList(set(next_set))  # deduplicate
+            common_set = ShapeList(dict.fromkeys(next_set))  # deduplicate, keep order
         return common_set
 
     # pylint: disable=unused-argument
@@ -3073,7 +3073,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             edges.append(self.__class__.cast(downcast(explorer.Current())))
             explorer.Next()
 
-        return (ShapeList(set(vertices)), edges)
+        return (ShapeList(dict.fromkeys(vertices)), edges)
 
     def _repr_html_(self):
         """Jupyter 3D representation support"""
@@ -3483,7 +3483,8 @@ class ShapeList(list[T]):
 
     def __and__(self, other: ShapeList) -> ShapeList[T]:
         """Intersect two ShapeLists operator &"""
-        return ShapeList(set(self) & set(other))
+        other_set = set(other)
+        return ShapeList(dict.fromkeys(s for s in self if s in other_set))
 
     def __eq__(self, other: object) -> bool:
         """ShapeLists equality operator =="""
@@ -3535,7 +3536,8 @@ class ShapeList(list[T]):
 
     def __sub__(self, other: ShapeList) -> ShapeList[T]:
         """Differences between two ShapeLists operator -"""
-        return ShapeList(set(self) - set(other))
+        other_set = set(other)
+        return ShapeList(dict.fromkeys(s for s in self if s not in other_set))
 
     def expand(self) -> ShapeList:
         """Expand by dissolving compounds, wires, and shells, filtering nulls.
