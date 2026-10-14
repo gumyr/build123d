@@ -425,6 +425,7 @@ def chamfer(
         return Shell.make_sheet(new_faces)
 
     if target._dim == 3:
+        source = target
         # Convert BasePartObject into Part so casting into Part during construction works
         target = Part(target.wrapped) if isinstance(target, BasePartObject) else target
 
@@ -434,7 +435,9 @@ def chamfer(
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
-        return Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
+        result = Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
+        source.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return result
 
     if target._dim == 2:
         # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
@@ -564,6 +567,7 @@ def fillet(
         return Shell.make_sheet(new_faces)
 
     if target._dim == 3:
+        source = target
         # Convert BasePartObject in Part so casting into Part during construction works
         target = Part(target.wrapped) if isinstance(target, BasePartObject) else target
 
@@ -573,7 +577,9 @@ def fillet(
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
-        return Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
+        result = Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
+        source.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return result
 
     if target._dim == 2:
         # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
@@ -848,7 +854,9 @@ def offset(
 
     offset_compound = Compound(new_objects)
     if all([obj._dim == 3 for obj in object_list]):
-        return Part(offset_compound.wrapped)
+        result = Part(offset_compound.wrapped)
+        object_list[0].copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return result
     if all([obj._dim == 2 for obj in object_list]):
         return Sketch(offset_compound.wrapped)
     if all([obj._dim == 1 for obj in object_list]):
@@ -1060,6 +1068,11 @@ def scale(
         scale_compound = Sketch(scale_compound.wrapped)
     elif all([obj._dim == 1 for obj in object_list]):
         scale_compound = Curve(scale_compound.wrapped)
+    if new_objects:
+        # the scaled object's attributes, its joints scaled with it
+        new_objects[0].copy_attributes_to(
+            scale_compound, ["wrapped", "_NodeMixin__children"]
+        )
     return scale_compound.unwrap(fully=False)
 
 
@@ -1166,7 +1179,9 @@ def split(
 
     split_compound = Compound(new_objects)
     if all([obj._dim == 3 for obj in object_list]):
-        return Part(split_compound.wrapped)
+        result = Part(split_compound.wrapped)
+        object_list[0].copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return result
     if all([obj._dim == 2 for obj in object_list]):
         return Sketch(split_compound.wrapped)
     if all([obj._dim == 1 for obj in object_list]):

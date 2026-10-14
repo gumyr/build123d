@@ -341,6 +341,7 @@ class Mixin3D(Shape[TOPODS]):
                 "Failed creating a chamfer, try a smaller length value(s)"
             ) from err
 
+        self.copy_attributes_to(new_shape, ["wrapped", "_NodeMixin__children"])
         return new_shape._made_by(
             ShapeHistory.from_algorithm(
                 chamfer_builder, [self.wrapped], new_shape.wrapped
@@ -399,7 +400,9 @@ class Mixin3D(Shape[TOPODS]):
 
             shape = feat.Shape()
 
-        return self.__class__(shape)
+        result = self.__class__(shape)
+        self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return result
 
     def fillet(self, radius: float, edge_list: Iterable[Edge]) -> Solid | Part:
         """Fillet
@@ -430,6 +433,7 @@ class Mixin3D(Shape[TOPODS]):
                 f" or use max_fillet() to find the largest valid fillet radius"
             ) from err
 
+        self.copy_attributes_to(new_shape, ["wrapped", "_NodeMixin__children"])
         return new_shape._made_by(
             ShapeHistory.from_algorithm(
                 fillet_builder, [self.wrapped], new_shape.wrapped
@@ -509,6 +513,7 @@ class Mixin3D(Shape[TOPODS]):
             # fix needed for the orientations
             return_value = self.__class__.cast(sol.Shape()).fix()
 
+        self.copy_attributes_to(return_value, ["wrapped", "_NodeMixin__children"])
         return return_value
 
     def _intersect(
@@ -761,6 +766,7 @@ class Mixin3D(Shape[TOPODS]):
         if offset_solid.volume < 0:
             offset_solid.wrapped.Reverse()
 
+        self.copy_attributes_to(offset_solid, ["wrapped", "_NodeMixin__children"])
         return offset_solid
 
     def project_to_viewport(
@@ -2013,6 +2019,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 face=None,
                 problematic_shape=draft_angle_builder.ProblematicShape(),
             ) from err
+        self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
         return result._made_by(
             ShapeHistory.from_algorithm(
                 draft_angle_builder, [self.wrapped], result.wrapped

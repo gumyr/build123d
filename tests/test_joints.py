@@ -32,7 +32,7 @@ import unittest
 
 import pickle
 
-from build123d.build_enums import Align, CenterOf, GeomType
+from build123d.build_enums import Align, CenterOf, GeomType, Keep
 from build123d.build_common import GridLocations, Locations, Mode, PolarLocations
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
@@ -46,8 +46,8 @@ from build123d.joints import (
 )
 from build123d.objects_part import Box, Cone, Cylinder, Sphere
 from build123d.objects_sketch import Circle
-from build123d.operations_generic import mirror
-from build123d.operations_part import extrude
+from build123d.operations_generic import chamfer, fillet, mirror, offset, scale, split
+from build123d.operations_part import draft, extrude
 from build123d.topology import Edge, JointDict, Solid
 
 
@@ -941,6 +941,69 @@ class TestJointTransforms(DirectApiTestCase):
             Plane(regenerated.joints["hinge"].location).z_dir,
             Plane(moved.joints["hinge"].location).z_dir,
             5,
+        )
+
+
+class TestJointOperations(DirectApiTestCase):
+    """Algebra-mode operations that rebuild a part keep its joints, label and color."""
+
+    def jointed(self, as_solid: bool = False):
+        part = Solid.make_box(10, 10, 4) if as_solid else Box(10, 10, 4)
+        part = part.moved(Location((20, 0, 0)))
+        part.label = "body"
+        RigidJoint("top", part, Location((22, 3, 4), (0, 30, 0)))
+        return part
+
+    def check(self, result, where=(22, 3, 4)):
+        if isinstance(result, (list, tuple)):
+            result = result[0]
+        self.assertEqual(result.label, "body")
+        self.assertIs(result.joints["top"].parent, result)
+        self.assertVectorAlmostEquals(result.joints["top"].location.position, where, 5)
+        self.assertVectorAlmostEquals(
+            result.joints["top"].location.orientation, (0, 30, 0), 5
+        )
+
+    def test_operations(self):
+        cases = {
+            "fillet": lambda p: fillet(p.edges().filter_by(Axis.Z), 1),
+            "chamfer": lambda p: chamfer(p.edges().filter_by(Axis.Z), 1),
+            "offset": lambda p: offset(p, 1),
+            "offset opening": lambda p: offset(
+                p, -1, openings=p.faces().sort_by(Axis.Z)[-1]
+            ),
+            "split": lambda p: split(p, Plane.XY),
+            "split both": lambda p: split(p, Plane.XY, keep=Keep.BOTH),
+            "draft": lambda p: draft(
+                p.faces().filter_by(Axis.Z, reverse=True), Plane.XY, 5
+            ),
+        }
+        for name, operation in cases.items():
+            for as_solid in (False, True):
+                with self.subTest(operation=name, solid=as_solid):
+                    self.check(operation(self.jointed(as_solid)))
+
+    def test_scale_operation(self):
+        # scale is about the part's location, so the joint scales with the part
+        self.check(scale(self.jointed(), 2), (24, 6, 8))
+
+    def test_methods(self):
+        cases = {
+            "fillet": lambda p: p.fillet(1, p.edges().filter_by(Axis.Z)),
+            "chamfer": lambda p: p.chamfer(1, None, p.edges().filter_by(Axis.Z)),
+            "offset_3d": lambda p: p.offset_3d(None, 1),
+            "hollow": lambda p: p.hollow([p.faces().sort_by(Axis.Z)[-1]], 1),
+            "split": lambda p: p.split(Plane.XY),
+            "split both": lambda p: p.split(Plane.XY, keep=Keep.BOTH),
+            "split all": lambda p: p.split(Plane.XY, keep=Keep.ALL),
+            "intersect": lambda p: p & Box(8, 8, 8).moved(Location((20, 0, 0))),
+        }
+        for name, method in cases.items():
+            with self.subTest(method=name):
+                self.check(method(self.jointed(as_solid=True)))
+        solid = self.jointed(as_solid=True)
+        self.check(
+            solid.draft(solid.faces().filter_by(Axis.Z, reverse=True), Plane.XY, 5)
         )
 
 

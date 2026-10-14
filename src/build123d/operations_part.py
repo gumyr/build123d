@@ -90,7 +90,8 @@ def draft(
     topo_parents = set(f.topo_parent for f in face_list if f.topo_parent is not None)
     if len(topo_parents) != 1:
         raise ValueError("All faces must share the same topological parent (a Solid)")
-    parent_solids = next(iter(topo_parents)).solids()
+    topo_parent = next(iter(topo_parents))
+    parent_solids = topo_parent.solids()
     if len(parent_solids) != 1:
         raise ValueError("Topological parent must be a single Solid")
 
@@ -108,7 +109,9 @@ def draft(
     if context is not None:
         context._add_to_context(new_solid, clean=False, mode=Mode.REPLACE)
 
-    return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
+    result = Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
+    topo_parent.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+    return result
 
 
 def extrude(

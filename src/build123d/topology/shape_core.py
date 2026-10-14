@@ -1236,6 +1236,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         if SkipClean.clean:
             new_shape = new_shape.clean()
+        self.copy_attributes_to(new_shape, ["wrapped", "_NodeMixin__children"])
 
         return new_shape
 
@@ -2354,10 +2355,13 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # For speed the user may just want all the objects which they
         # can sort more efficiently then the generic algorithm below
         if keep == Keep.ALL:
-            return ShapeList(
+            pieces = ShapeList(
                 self.__class__.cast(part)
                 for part in get_top_level_topods_shapes(split_result)
             )
+            for piece in pieces:
+                self.copy_attributes_to(piece, ["wrapped", "_NodeMixin__children"])
+            return pieces
 
         if not isinstance(tool, Plane):
             # Get a TopoDS_Face to work with from the tool
@@ -2413,6 +2417,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 BRepGProp.LinearProperties_s(is_up_obj, properties)
                 # Mass represents the total length for linear properties
                 is_up = properties.Mass() >= TOLERANCE
+            self.copy_attributes_to(sub_shape, ["wrapped", "_NodeMixin__children"])
             (tops if is_up else bottoms).append(sub_shape)
 
         # a side with nothing on it is the empty shape of self's class
