@@ -39,6 +39,8 @@ from math import cos, radians, sin, tan
 from pathlib import Path
 
 import pytest
+from OCP.Standard import Standard_Failure
+from OCP.StdFail import StdFail_NotDone
 
 from build123d import (
     Align,
@@ -94,7 +96,15 @@ from build123d import (
 def occt_defect(issue: int, summary: str):
     """Mark a test as failing because of the OpenCascade defect behind an issue"""
     return pytest.mark.xfail(
-        reason=f"build123d #{issue}: {summary}", strict=True, raises=BaseException
+        reason=f"build123d #{issue}: {summary}",
+        strict=True,
+        raises=(
+            AssertionError,
+            RuntimeError,
+            ValueError,
+            Standard_Failure,
+            StdFail_NotDone,
+        ),
     )
 
 
@@ -138,7 +148,8 @@ class TestBooleanSeams(unittest.TestCase):
         tool = Location((50, 0, 25), (0, 90, 0)) * Cylinder(10, 100)
         holed = shell - tool
         self.assertTrue(holed.is_valid)
-        self.assertAlmostEqual(shell.volume - holed.volume, math.pi * 10**2 * 10, 0)
+        # the hole is longer than the 10 wall thickness where it crosses the arcs
+        self.assertAlmostEqual(shell.volume - holed.volume, 3154.85, 1)
 
     @occt_defect(1363, "a radial hole through a revolved body is invalid")
     def test_radial_hole_through_revolved_body(self):
@@ -310,6 +321,7 @@ class TestOffset2D(unittest.TestCase):
         outward = offset(face, 0.5359, kind=Kind.INTERSECTION)
         self.assertTrue(outward.is_valid)
         self.assertEqual(len(outward.faces()), 1)
+        self.assertGreater(outward.area, face.area)
 
 
 class TestFillet(unittest.TestCase):
@@ -451,4 +463,4 @@ class TestFixedUpstream(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    pytest.main([__file__])
