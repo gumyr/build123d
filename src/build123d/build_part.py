@@ -69,7 +69,7 @@ class BuildPart(Builder[Part]):
         *placements: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
-        self.joints: dict[str, Joint] = {}
+        self._joints: dict[str, Joint] = {}
         self._part: Part = Part()  # nothing yet; use a private attribute
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []
@@ -113,6 +113,22 @@ class BuildPart(Builder[Part]):
     def part_local(self) -> Part:
         """Get the part in the Builder's local construction coordinates."""
         return self._part
+
+    @property
+    def joints(self) -> dict[str, Joint]:
+        """The joints on the part: those being defined while the builder is open,
+        and the placed part's own once it has exited, so a joint read from the
+        builder is in the frame the part is in"""
+        if self._placed_obj is not None:
+            return self.part.joints
+        return self._joints
+
+    @joints.setter
+    def joints(self, value: dict[str, Joint]) -> None:
+        if self._placed_obj is not None:
+            self.part.joints = value
+        else:
+            self._joints = value
 
     @property
     def _obj(self) -> Part:
@@ -170,7 +186,7 @@ class BuildPart(Builder[Part]):
 
     def _exit_extras(self):
         """Transfer joints on exit"""
-        if self.joints:
-            self.part_local.joints = self.joints
+        if self._joints:
+            self.part_local.joints = self._joints
             for joint in self.part_local.joints.values():
                 joint.parent = self.part_local

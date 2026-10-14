@@ -597,6 +597,26 @@ class TestJointPlacement(DirectApiTestCase):
         with self.assertWarns(DeprecationWarning):
             self.assertEqual(builder.location, Location())
 
+    def test_builder_joints_are_the_placed_parts_joints(self):
+        # While open, the builder's joints are the ones being defined; once it
+        # has exited they are the placed part's, so both routes to a joint
+        # give the same object in the frame the part is in
+        plane = Plane.XZ.offset(10)
+        with BuildPart(plane) as builder:
+            Box(6, 6, 6)
+            RigidJoint("top", joint_location=Location((0, 0, 3)))
+            self.assertIs(builder.joints["top"].parent, builder)
+        self.assertIs(builder.joints["top"], builder.part.joints["top"])
+        self.assertIs(builder.joints["top"].parent, builder.part)
+        self.assertVectorAlmostEquals(
+            builder.joints["top"].location.position, (0, -13, 0), 5
+        )
+
+        peg = Box(1, 1, 2)
+        RigidJoint("base", peg, Location((0, 0, -1)))
+        builder.joints["top"].connect_to(peg.joints["base"])
+        self.assertVectorAlmostEquals(peg.center(), (0, -14, 0), 5)
+
     def test_rigid_joint_follows_the_workplane(self):
         plane = Plane.XZ.offset(10)
         with BuildPart(plane) as builder:
