@@ -371,6 +371,30 @@ The same rule applies to an entire ``BuildPart``:
 ``placed_parts.part_local`` contains one local box, while ``placed_parts.part``
 contains the two placed boxes.
 
+A builder created inside a function is not part of the build that called the
+function - it isn't added to that build on exit, and that build's active locations
+are not applied to it. Like an object, it constructs in its own frame and the
+caller places it, typically with ``insert``:
+
+.. code-block:: build123d
+
+    def knob(count: int) -> BuildPart:
+        with GridLocations(0, 20, 1, count):
+            with BuildPart() as builder:
+                Box(100, 10, 5)
+        return builder
+
+    with BuildPart() as knobs:
+        for count in range(1, 4):
+            with Locations((0, 0, 20 * count)):
+                insert(knob(count))
+
+``knob(count).part`` contains ``count`` boxes placed by the ``GridLocations`` in
+the function, and ``insert`` places that row at the active location, so
+``knobs`` holds three rows of 1, 2 and 3 boxes at Z = 20, 40 and 60. Writing
+``insert(knob(count).part)`` or wrapping the function in a ``BasePartObject``
+gives the same result.
+
 Locations are local to the current location(s), so ``Locations`` contexts can be
 nested. A user can retrieve the active local locations:
 

@@ -53,6 +53,7 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field as dataclass_field
 from itertools import product
 from math import cos, pi, sqrt
+from types import FrameType
 from typing import Any, Generic, Type, TypeVar, cast
 
 from OCP.Standard import Standard_ConstructionError
@@ -303,11 +304,18 @@ class Builder(ABC, Generic[ShapeT]):
 
         parent_scope = _get_build_scope()
         location_context = LocationList._get_context()
-        publication_locations = (
-            tuple(location_context.locations)
-            if location_context is not None
-            else _identity_locations()
-        )
+        if builder_context is not None and not same_scope:
+            # An enclosing builder's location context does not reach a builder
+            # it does not publish to: a builder made in a function builds in its
+            # own frame and is placed by its caller, as an object is. Only the
+            # location lists entered since the enclosing builder's frame apply.
+            publication_locations = _locations_entered_since(
+                builder_context, parent_scope
+            )
+        elif location_context is not None:
+            publication_locations = tuple(location_context.locations)
+        else:
+            publication_locations = _identity_locations()
         local_locations = LocationList([Location()])
         scope = BuildScope(
             parent=parent_scope,
@@ -977,12 +985,20 @@ class LocationList:
         """Current locations in local construction coordinates."""
         return self.local_locations
 
-    def __init__(self, locations: list[Location]):
+    def __init__(
+        self, locations: list[Location], own_locations: list[Location] | None = None
+    ):
         self._scope_context: AbstractContextManager[BuildScope] | None = None
         self.local_locations = locations
+        # The locations before composition with the enclosing context, for a
+        # builder entered in another frame that must not inherit that context
+        self._own_locations = locations if own_locations is None else own_locations
+        self._python_frame: FrameType | None = None
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
+        current_frame = inspect.currentframe()
+        self._python_frame = current_frame.f_back if current_frame else None
         active_scope = _get_build_scope()
         if active_scope is not None:
             location_scope = active_scope.derive(
@@ -1132,7 +1148,7 @@ class HexLocations(LocationList):
             local_locations
         )  #: values in local construction coordinates
 
-        super().__init__(self.local_locations)
+        super().__init__(self.local_locations, own_locations=local_locations)
 
 
 class PolarLocations(LocationList):
@@ -1187,7 +1203,7 @@ class PolarLocations(LocationList):
             local_locations
         )  #: values independent of workplanes
 
-        super().__init__(self.local_locations)
+        super().__init__(self.local_locations, own_locations=local_locations)
 
 
 class Locations(LocationList):
@@ -1242,7 +1258,7 @@ class Locations(LocationList):
         self.local_locations = Locations._move_to_existing(
             local_locations
         )  #: values independent of workplanes
-        super().__init__(self.local_locations)
+        super().__init__(self.local_locations, own_locations=local_locations)
 
     @staticmethod
     def _move_to_existing(local_locations: list[Location]) -> list[Location]:
@@ -1334,7 +1350,7 @@ class GridLocations(LocationList):
             local_locations
         )  #: values independent of workplanes
         self.planes: list[Plane] = []
-        super().__init__(self.local_locations)
+        super().__init__(self.local_locations, own_locations=local_locations)
 
 
 class _InheritedScopeValue:
@@ -1356,6 +1372,44 @@ def _scope_value(
 ) -> _ScopeValueT:
     """Resolve a derive argument while preserving the field's static type."""
     return inherited if value is _INHERITED_SCOPE_VALUE else cast(_ScopeValueT, value)
+
+
+def _called_from(frame: FrameType | None, ancestor: FrameType | None) -> bool:
+    """Whether ``frame`` is executing in a call made, directly or not, from
+    ``ancestor``; the frame itself does not count"""
+    caller = frame.f_back if frame is not None else None
+    while caller is not None:
+        if caller is ancestor:
+            return True
+        caller = caller.f_back
+    return False
+
+
+def _locations_entered_since(
+    builder: Builder, scope: BuildScope | None
+) -> tuple[Location, ...]:
+    """Compose the location lists entered in calls made from ``builder``'s frame.
+
+    Walks ``scope`` out to the scope ``builder`` owns. Location lists entered in
+    ``builder``'s own frame, or in its callers, belong to its build and are left
+    out; the rest are composed from their own locations, outermost first.
+    """
+    inner: list[LocationList] = []
+    while scope is not None and scope.owner is not builder:
+        owner = scope.owner
+        if isinstance(owner, LocationList) and _called_from(
+            owner._python_frame, builder._python_frame
+        ):
+            inner.append(owner)
+        scope = scope.parent
+    locations = [Location()]
+    for location_list in reversed(inner):
+        locations = [
+            group * local
+            for group in locations
+            for local in location_list._own_locations
+        ]
+    return tuple(locations)
 
 
 def _identity_locations() -> tuple[Location, ...]:

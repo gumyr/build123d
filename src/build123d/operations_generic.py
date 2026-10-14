@@ -99,13 +99,18 @@ def insert(
         Mode.SUBTRACT a Solid is a normal cut, cutting the shell wherever
         it passes, across bends included.
 
+    A Builder is inserted as its placed output - the ``part``, ``sketch``,
+    ``line`` or ``sheet`` it would have published - so a builder created in a
+    function and returned, which no enclosing builder received, can be added
+    here. The inserting ``mode`` applies; the builder's own mode does not.
+
     Args:
-        objects (Edge | Wire | Face | Shell | Solid | Compound or Iterable of):
-            objects to insert
+        objects (Edge | Wire | Face | Shell | Solid | Compound | Builder or
+            Iterable of): objects to insert
         rotation (float | RotationLike, optional): rotation angle for sketch,
             rotation about each axis for part or sheet. Defaults to None.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
-       mode (Mode, optional): combine mode. Defaults to Mode.ADD.
+        mode (Mode, optional): combine mode. Defaults to Mode.ADD.
     """
     context: Builder | None = Builder._get_context(None)
     if context is None:
@@ -122,14 +127,15 @@ def insert(
                 raise ValueError(
                     "Inserted BuildSheet must use the same sheet parameters"
                 )
-    object_iter = [
-        (
-            obj.unwrap(fully=False)
-            if isinstance(obj, Compound)
-            else obj._obj if isinstance(obj, Builder) and obj._obj else obj
-        )
+    # A Builder stands for its placed output, as if it had been published
+    placed_list = [
+        obj._output_obj() if isinstance(obj, Builder) else obj
         for obj in object_list
         if not (isinstance(obj, Builder) and not obj._obj)
+    ]
+    object_iter = [
+        obj.unwrap(fully=False) if isinstance(obj, Compound) else obj
+        for obj in placed_list
     ]
     validate_inputs(context, "insert", object_iter)
 

@@ -1134,6 +1134,37 @@ class TestPublicationTarget(unittest.TestCase):
                 with BuildPart():
                     Box(1, 1, 1)
 
+    def test_unpublished_builder_keeps_its_own_frame(self):
+        """A builder entered in a function is not published to the enclosing
+        builder, and the enclosing builder's location context does not reach
+        it; the location lists entered in the function do."""
+
+        def helper() -> BuildPart:
+            with GridLocations(10, 0, 2, 1):
+                with BuildPart() as builder:
+                    Box(1, 1, 1)
+            return builder
+
+        with BuildPart() as outer:
+            with Locations((0, 0, 50)):
+                helper_builder = helper()
+                with BuildPart() as same_frame:
+                    Box(1, 1, 1)
+        self.assertEqual(
+            sorted(round(s.center().X) for s in helper_builder.part.solids()),
+            [-5, 5],
+        )
+        self.assertEqual(
+            {round(s.center().Z) for s in helper_builder.part.solids()}, {0}
+        )
+        self.assertEqual(round(same_frame.part.center().Z), 50)
+        self.assertEqual(round(outer.part.center().Z), 50)
+
+        # Without an enclosing builder nothing was withheld; the context applies
+        with Locations((0, 0, 7)):
+            standalone = helper()
+        self.assertEqual({round(s.center().Z) for s in standalone.part.solids()}, {7})
+
 
 class TestContextAwareSelectors(unittest.TestCase):
     def test_context_aware_selectors(self):

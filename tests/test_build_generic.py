@@ -123,6 +123,65 @@ class InsertTests(unittest.TestCase):
             insert(wire.wires()[0])
         self.assertEqual(len(test.pending_edges), 3)
 
+    def test_insert_builder_is_its_placed_output(self):
+        # A builder made in a function is published to nothing and does not
+        # inherit the caller's location context; inserting the builder, its
+        # part, or the equivalent object inside Locations gives one placement
+        def knob(count: int) -> BuildPart:
+            with GridLocations(0, 20, 1, count + 1):
+                with BuildPart() as builder:
+                    Box(100, 10, 5)
+                return builder
+
+        class Knob(BasePartObject):
+            def __init__(self, count: int):
+                super().__init__(knob(count).part)
+
+        for spelling in (
+            lambda c: insert(knob(c)),
+            lambda c: insert(knob(c).part),
+            Knob,
+        ):
+            with self.subTest(spelling=spelling):
+                with BuildPart() as test:
+                    for count in range(3):
+                        with Locations((0, 0, 10 + count * 20)):
+                            spelling(count)
+                self.assertEqual(len(test.part.solids()), 6)
+                self.assertEqual(
+                    sorted({round(s.center().Z) for s in test.part.solids()}),
+                    [10, 30, 50],
+                )
+
+        # Location lists entered in a helper's callee chain are the builder's
+        def gridded() -> BuildPart:
+            with GridLocations(200, 0, 3, 1):
+                return knob(0)
+
+        with BuildPart() as test:
+            with Locations((0, 0, 50)):
+                insert(gridded())
+        self.assertEqual(
+            sorted(round(s.center().X) for s in test.part.solids()), [-200, 0, 200]
+        )
+        self.assertEqual({round(s.center().Z) for s in test.part.solids()}, {50})
+
+        # The builder's workplane is applied once, then the active location
+        with BuildPart(Plane.XZ.offset(10)) as placed:
+            Box(1, 1, 2)
+        with BuildPart() as test:
+            with Locations((5, 0, 0)):
+                insert(placed)
+        self.assertTupleAlmostEquals(test.part.center(), (5, -10, 0), 5)
+
+        # A builder made in no location context is placed by the active one
+        with BuildSketch() as plain:
+            Rectangle(2, 2)
+        with BuildSketch() as test:
+            with Locations((3, 4)):
+                insert(plain)
+        self.assertTupleAlmostEquals(test.sketch.center(), (3, 4, 0), 5)
+
     def test_errors(self):
         with self.assertRaises(RuntimeError):
             insert(Edge.make_line((0, 0, 0), (1, 1, 1)))
