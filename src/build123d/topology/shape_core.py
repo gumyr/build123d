@@ -1494,8 +1494,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
             # Copy the attribute only if the target's attribute not set
             if attr == "joints":
                 if not getattr(target, attr):
-                    target.joints = copy.deepcopy(self.joints)
-                JointDict._adopt(target)
+                    # bound where they are in the world: target, a boolean result
+                    # or a rewrapped shape, may sit in a different frame
+                    target.joints = JointDict(target, copy.deepcopy(self.joints))
+                else:
+                    JointDict._adopt(target)
             elif not getattr(target, attr):
                 setattr(target, attr, getattr(self, attr))
 
@@ -2874,6 +2877,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
             True,
         ).Shape()
         shape_copy.wrapped = tcast(TOPODS, downcast(transformed_shape))
+        # The geometry moved under the part's unchanged frame; so must its joints
+        for joint in getattr(shape_copy, "joints", {}).values():
+            joint._transform(transformation)
         return shape_copy
 
     def _bool_op(
@@ -4149,6 +4155,49 @@ class Joint(ABC):
         its location."""
         self._move(Joint._frame_of(parent).inverse() * Joint._frame_of(self.parent))
         self.parent = parent
+
+    @staticmethod
+    def _transformed_location(location: Location, transformation: gp_Trsf) -> Location:
+        """``location`` under a kernel transformation. The origin is transformed as
+        a point and the X and Z directions as directions, with Y recomputed to keep
+        the frame right-handed, as ``Location.mirror`` does for a reflection."""
+        plane = Plane(location)
+        return Location(
+            Plane(
+                origin=Vector(plane.origin.to_pnt().Transformed(transformation)),
+                x_dir=Vector(plane.x_dir.to_dir().Transformed(transformation)),
+                z_dir=Vector(plane.z_dir.to_dir().Transformed(transformation)),
+            )
+        )
+
+    @staticmethod
+    def _transformed_direction(
+        direction: Vector, transformation: gp_Trsf, frame: Location
+    ) -> Vector:
+        """A direction given in ``frame`` under a kernel transformation applied in
+        world coordinates, returned in ``frame`` again"""
+        world = (frame * Location(direction)).position - frame.position
+        transformed = Vector(world.to_dir().Transformed(transformation))
+        inverse = frame.inverse()
+        return (inverse * Location(transformed)).position - inverse.position
+
+    def _transform(self, transformation: gp_Trsf) -> None:
+        """Apply the kernel transformation its part's geometry was given to the
+        joint, in world coordinates; the part's frame is unchanged by it"""
+        frame = Joint._frame_of(self.parent)
+        if hasattr(self, "relative_location"):
+            world = frame * self.relative_location
+            self.relative_location = frame.inverse() * Joint._transformed_location(
+                world, transformation
+            )
+        elif hasattr(self, "relative_axis"):
+            world_axis = self.relative_axis.located(frame)
+            self.relative_axis = Axis(
+                Vector(world_axis.position.to_pnt().Transformed(transformation)),
+                Vector(world_axis.direction.to_dir().Transformed(transformation)),
+            ).located(frame.inverse())
+        else:  # pragma: no cover - all current concrete joints use one representation
+            raise TypeError(f"Unsupported joint type {type(self).__name__}")
 
     def _reference_size(self) -> float:
         """A size to draw the symbol at: the diagonal of the parent's bounding box,

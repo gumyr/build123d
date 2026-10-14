@@ -319,6 +319,13 @@ class RevoluteJoint(Joint):
         super().__init__()
         _bind(self, label, to_part, context)
 
+    def _transform(self, transformation) -> None:
+        frame = Joint._frame_of(self.parent)
+        super()._transform(transformation)
+        self.angle_reference = Joint._transformed_direction(
+            self.angle_reference, transformation, frame
+        )
+
     def connect_to(self, other: RigidJoint, *, angle: float | None = None):
         """Connect RevoluteJoint and RigidJoint
 
@@ -605,6 +612,13 @@ class CylindricalJoint(Joint):
         super().__init__()
         _bind(self, label, to_part, context)
 
+    def _transform(self, transformation) -> None:
+        frame = Joint._frame_of(self.parent)
+        super()._transform(transformation)
+        self.angle_reference = Joint._transformed_direction(
+            self.angle_reference, transformation, frame
+        )
+
     def connect_to(
         self,
         other: RigidJoint,
@@ -743,6 +757,14 @@ class BallJoint(Joint):
         self.angle_reference = angle_reference
         super().__init__()
         _bind(self, label, to_part, context)
+
+    def _transform(self, transformation) -> None:
+        frame = Joint._frame_of(self.parent)
+        super()._transform(transformation)
+        world = frame * Location(self.angle_reference)
+        self.angle_reference = Plane(
+            frame.inverse() * Joint._transformed_location(world, transformation)
+        )
 
     def connect_to(self, other: RigidJoint, *, angles: RotationLike | None = None):
         """Connect BallJoint and RigidJoint

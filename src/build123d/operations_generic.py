@@ -689,13 +689,18 @@ def mirror(
     if context is not None:
         context._add_to_context(*mirrored, mode=mode)
 
-    mirrored_compound = Compound(mirrored)
+    mirrored_compound: Compound = Compound(mirrored)
     if all([obj._dim == 3 for obj in object_list]):
-        return Part(mirrored_compound.wrapped)
-    if all([obj._dim == 2 for obj in object_list]):
-        return Sketch(mirrored_compound.wrapped)
-    if all([obj._dim == 1 for obj in object_list]):
-        return Curve(mirrored_compound.wrapped)
+        mirrored_compound = Part(mirrored_compound.wrapped)
+    elif all([obj._dim == 2 for obj in object_list]):
+        mirrored_compound = Sketch(mirrored_compound.wrapped)
+    elif all([obj._dim == 1 for obj in object_list]):
+        mirrored_compound = Curve(mirrored_compound.wrapped)
+    # The first object's attributes, its mirrored joints among them, carry over
+    # as they do through + and -
+    mirrored[0].copy_attributes_to(
+        mirrored_compound, ["wrapped", "_NodeMixin__children"]
+    )
     return mirrored_compound
 
 

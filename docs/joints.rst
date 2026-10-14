@@ -86,6 +86,15 @@ context, alongside the geometry it belongs to:
 
 ``label`` may also be a sequence with one label per location, used as given.
 
+Joints follow their part. Moving or rotating a part moves its joints with it, and the
+operations that regenerate the geometry - ``mirror``, ``scale``, and ``rotate`` or
+``translate`` with ``transform=True`` - transform the joints the same way. A mirrored
+joint keeps a right-handed frame (its X and Z directions are reflected and Y recomputed,
+as :meth:`~geometry.Location.mirror` does) and keeps its ranges, so a mirrored hinge
+opens the mirror-image way for the same angle. In a builder, ``mirror`` with
+``Mode.ADD`` keeps the original geometry alongside the mirrored copy and leaves the
+builder's joints as they are.
+
 ***********
 Rigid Joint
 ***********

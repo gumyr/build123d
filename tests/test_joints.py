@@ -46,6 +46,7 @@ from build123d.joints import (
 )
 from build123d.objects_part import Box, Cone, Cylinder, Sphere
 from build123d.objects_sketch import Circle
+from build123d.operations_generic import mirror
 from build123d.operations_part import extrude
 from build123d.topology import Edge, JointDict, Solid
 
@@ -572,6 +573,21 @@ class TestJointPropagation(DirectApiTestCase):
         c = b - Cylinder(0.5, 2)
         self.assertVectorAlmostEquals(c.joints["top"].location.position, (0, 0, 1), 5)
 
+    def test_located_part_keeps_joint_positions_through_booleans(self):
+        # a boolean result sits at the identity; joints stay where they were
+        part = Box(10, 10, 2).moved(Location((20, 0, 0)))
+        RigidJoint("top", part, Location((22, 3, 1), (0, 30, 0)))
+        tool = Cylinder(1, 5).moved(Location((20, 0, 0)))
+        for name, result in (("cut", part - tool), ("fuse", part + tool)):
+            with self.subTest(op=name):
+                self.assertVectorAlmostEquals(result.location.position, (0, 0, 0), 5)
+                self.assertVectorAlmostEquals(
+                    result.joints["top"].location.position, (22, 3, 1), 5
+                )
+                self.assertVectorAlmostEquals(
+                    result.joints["top"].location.orientation, (0, 30, 0), 5
+                )
+
     def test_algebra_fuse_keeps_joints(self):
         # The left operand's joints survive a fuse whether the pieces overlap,
         # touch or are apart
@@ -846,6 +862,86 @@ class TestJointsInLocations(DirectApiTestCase):
         self.assertVectorAlmostEquals(part.joints["p1"].location.position, (2, 0, 1), 5)
         with self.assertRaisesRegex(ValueError, "single label"):
             RigidJoint(["a", "b"])
+
+
+class TestJointTransforms(DirectApiTestCase):
+    """Joints follow their part through the transforms baked into its geometry."""
+
+    def jointed_part(self):
+        part = Box(10, 10, 2).moved(Location((20, 0, 0)))
+        RigidJoint("top", part, Location((22, 3, 1), (0, 30, 0)))
+        RevoluteJoint(
+            "hinge", part, axis=Axis((25, 0, 1), (1, 0, 0)), angle_reference=(0, 1, 0)
+        )
+        BallJoint("ball", part, Location((18, 0, 1)), angle_reference=Plane.XZ)
+        return part
+
+    def test_mirror_method(self):
+        part = self.jointed_part()
+        mirrored = part.mirror(Plane.YZ)
+        self.assertAlmostEqual(mirrored.center().X, -20, 5)
+        top = mirrored.joints["top"]
+        self.assertIs(top.parent, mirrored)
+        self.assertEqual(top.location, part.joints["top"].location.mirror(Plane.YZ))
+        hinge = mirrored.joints["hinge"]
+        self.assertVectorAlmostEquals(hinge.location.position, (-25, 0, 1), 5)
+        self.assertVectorAlmostEquals(hinge.relative_axis.direction, (-1, 0, 0), 5)
+        self.assertVectorAlmostEquals(hinge.angle_reference, (0, 1, 0), 5)
+        self.assertVectorAlmostEquals(
+            mirrored.joints["ball"].angle_reference.z_dir, (0, -1, 0), 5
+        )
+        # the original is untouched
+        self.assertVectorAlmostEquals(
+            part.joints["top"].location.position, (22, 3, 1), 5
+        )
+
+    def test_mirror_operation(self):
+        part = self.jointed_part()
+        mirrored = mirror(part, Plane.YZ)
+        self.assertEqual(sorted(mirrored.joints), ["ball", "hinge", "top"])
+        self.assertVectorAlmostEquals(
+            mirrored.joints["top"].location.position, (-22, 3, 1), 5
+        )
+        self.assertIs(mirrored.joints["top"].parent, mirrored)
+
+        # a builder's joints are left alone by mirror (Mode.ADD would collide)
+        with BuildPart() as builder:
+            Box(10, 10, 2)
+            RigidJoint("left", joint_location=Location((-3, 0, 1)))
+            mirror(about=Plane.YZ)
+        self.assertEqual(list(builder.part.joints), ["left"])
+
+    def test_scale_and_transformed_rotation(self):
+        # scale is about the part's location, (20, 0, 0)
+        part = self.jointed_part()
+        scaled = part.scale(2)
+        self.assertVectorAlmostEquals(
+            scaled.joints["top"].location.position, (24, 6, 2), 5
+        )
+        self.assertVectorAlmostEquals(
+            scaled.joints["top"].location.orientation, (0, 30, 0), 5
+        )
+        self.assertVectorAlmostEquals(
+            scaled.joints["hinge"].location.position, (30, 0, 2), 5
+        )
+
+        # regenerating the geometry gives the same joints as moving it
+        moved = part.rotate(Axis.Z, 90)
+        regenerated = part.rotate(Axis.Z, 90, transform=True)
+        for label in ("top", "ball"):
+            self.assertEqual(
+                moved.joints[label].location, regenerated.joints[label].location
+            )
+        self.assertVectorAlmostEquals(
+            regenerated.joints["hinge"].location.position,
+            moved.joints["hinge"].location.position,
+            5,
+        )
+        self.assertVectorAlmostEquals(
+            Plane(regenerated.joints["hinge"].location).z_dir,
+            Plane(moved.joints["hinge"].location).z_dir,
+            5,
+        )
 
 
 class TestJointValidation(DirectApiTestCase):
