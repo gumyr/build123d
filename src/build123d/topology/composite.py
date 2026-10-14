@@ -537,6 +537,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 )
             if not isinstance(result, Compound):
                 result = Shape.make_composite([result], self._dim)
+            self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
 
         return result
 

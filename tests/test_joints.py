@@ -574,6 +574,23 @@ class TestJointPropagation(DirectApiTestCase):
         c = b - Cylinder(0.5, 2)
         self.assertVectorAlmostEquals(c.joints["top"].location.position, (0, 0, 1), 5)
 
+    def test_algebra_fuse_keeps_joints(self):
+        # The left operand's joints survive a fuse whether the pieces overlap,
+        # touch or are apart
+        b = Box(2, 2, 2)
+        RigidJoint("top", b, Location((0, 0, 1)))
+        for name, other in (
+            ("overlapping", Box(1, 1, 3)),
+            ("touching", Box(1, 1, 1).moved(Location((0, 0, 1.5)))),
+            ("apart", Box(1, 1, 1).moved(Location((50, 0, 0)))),
+        ):
+            with self.subTest(other=name):
+                fused = b + other
+                self.assertVectorAlmostEquals(
+                    fused.joints["top"].location.position, (0, 0, 1), 5
+                )
+                self.assertIs(fused.joints["top"].parent, fused)
+
     def test_builder_mode(self):
         with BuildPart() as base_builder:
             Box(6, 6, 6)
