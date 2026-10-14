@@ -544,6 +544,28 @@ class TestJointCopy(DirectApiTestCase):
         test_copy = copy.deepcopy(test.part, None)
         self.assertEqual(test_copy.joints["test"].parent, test_copy)
 
+    def test_copy_keeps_the_connection_by_reference(self):
+        # Copying a connected part must not copy the part it is connected to
+        base = Box(10, 10, 2)
+        arm = Box(2, 2, 10)
+        RigidJoint("top", base, Location((0, 0, 1)))
+        RigidJoint("bottom", arm, Location((0, 0, -5)))
+        base.joints["top"].connect_to(arm.joints["bottom"])
+
+        for name, base_copy in (
+            ("deepcopy", copy.deepcopy(base)),
+            ("moved", base.moved(Location((100, 0, 0)))),
+            ("cut", base - Cylinder(0.5, 2)),
+        ):
+            with self.subTest(copy=name):
+                joint = base_copy.joints["top"]
+                self.assertIs(joint.parent, base_copy)
+                self.assertIs(joint.connected_to, arm.joints["bottom"])
+                self.assertIs(joint.connected_to.parent, arm)
+                self.assertIsNot(
+                    joint.relative_location, base.joints["top"].relative_location
+                )
+
 
 class TestJointPropagation(DirectApiTestCase):
     def test_algebra_mode(self):

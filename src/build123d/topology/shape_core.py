@@ -4102,6 +4102,20 @@ class Joint(ABC):
         self.parent = parent
         self.connected_to: Joint | None = None
 
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
+        """Copy the joint's own state only. ``parent`` and ``connected_to`` refer
+        to shapes outside the joint and are carried by reference; whoever copies
+        a shape rebinds ``parent`` to the copy."""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for key, value in self.__dict__.items():
+            if key in ("parent", "connected_to"):
+                setattr(result, key, value)
+            else:
+                setattr(result, key, copy.deepcopy(value, memo))
+        return result
+
     def _reparent(self, parent: Solid | Compound) -> None:
         """Bind this joint to a new parent without changing its location."""
         relative_to_new_parent = parent.location.inverse() * self.parent.location
