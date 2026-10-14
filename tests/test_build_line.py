@@ -27,7 +27,7 @@ license:
 """
 
 import unittest
-from math import sqrt, pi
+from math import cos, pi, radians, sin, sqrt
 from build123d import *
 
 
@@ -247,6 +247,34 @@ class BuildLineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             EllipticalCenterArc((0, 0), 2, 1, 0, arc_size=(0, 5))
 
+    def test_elliptical_center_arc_limit_from_start(self):
+        # The arc to a limit begins at the start angle, not at the x radius
+        limit = Edge.make_line((1, -2), (1, 2))
+        for start_angle, start, end_y in (
+            (0, (2, 0, 0), None),
+            (90, (0, 1, 0), 0.75**0.5),
+            (200, (2 * cos(radians(200)), sin(radians(200)), 0), -(0.75**0.5)),
+        ):
+            with self.subTest(start_angle=start_angle):
+                arc = EllipticalCenterArc((0, 0), 2, 1, start_angle, arc_size=limit)
+                self.assertAlmostEqual(arc @ 0, start, 5)
+                self.assertAlmostEqual((arc @ 1).X, 1, 5)
+                if end_y is not None:
+                    self.assertAlmostEqual((arc @ 1).Y, end_y, 5)
+
+        # y radius larger than x radius, and a moved and rotated ellipse
+        tall = EllipticalCenterArc(
+            (0, 0), 1, 2, 0, arc_size=Edge.make_line((-5, 1), (0, 1))
+        )
+        self.assertAlmostEqual(tall @ 0, (1, 0, 0), 5)
+        self.assertAlmostEqual(tall @ 1, (-(0.75**0.5), 1, 0), 5)
+
+        turned = EllipticalCenterArc(
+            (10, 5), 2, 1, 45, arc_size=Axis((0, 6, 0), (1, 0, 0)), rotation=90
+        )
+        self.assertAlmostEqual(turned @ 0, (10 - 0.5**0.5, 5 + 2**0.5, 0), 5)
+        self.assertAlmostEqual((turned @ 1).Y, 6, 5)
+
     def test_parabolic_center_arc(self):
         # General conic section equation: (1+K)x^2-2Rx+y^2=0
         # parabola (K = -1) => -2Rx+y^2=0
@@ -295,6 +323,38 @@ class BuildLineTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             ParabolicCenterArc((0, 0), 0.5, 0, arc_size=(0, 5))
+
+    def test_parabolic_center_arc_limit_from_start(self):
+        # Issue #1432: the arc starts at the start angle whichever way it goes
+        # round the parabola, and reaches a limit however far along it is
+        start = (pi**2 / 32, pi / 2, 0)
+        for limit_x, end_y in ((2, 4), (0.2, 1.6**0.5), (3, 24**0.5), (40, 320**0.5)):
+            with self.subTest(limit_x=limit_x):
+                limit = Edge.make_line((limit_x, 0), (limit_x, 60))
+                arc = ParabolicCenterArc((0, 0), 2, 90, arc_size=limit)
+                self.assertAlmostEqual(arc @ 0, start, 5)
+                self.assertAlmostEqual(arc @ 1, (limit_x, end_y, 0), 5)
+
+    def test_parabolic_center_arc_unbounded_limits(self):
+        start = (pi**2 / 32, pi / 2, 0)
+        for limit in (Axis((3, 0, 0), (0, 1, 0)), Plane.YZ.offset(3)):
+            with self.subTest(limit=type(limit).__name__):
+                arc = ParabolicCenterArc((0, 0), 2, 90, arc_size=limit)
+                self.assertAlmostEqual(arc @ 0, start, 5)
+                self.assertAlmostEqual(arc @ 1, (3, 24**0.5, 0), 5)
+
+        behind = ParabolicCenterArc((0, 0), 2, 90, arc_size=Location((0.5, -2, 0)))
+        self.assertAlmostEqual(behind @ 0, start, 5)
+        self.assertAlmostEqual(behind @ 1, (0.5, -2, 0), 5)
+
+        moved = ParabolicCenterArc(
+            (10, 20), 2, 90, arc_size=Axis((0, 26, 0), (1, 0, 0)), rotation=90
+        )
+        self.assertAlmostEqual(moved @ 0, (10 - pi / 2, 20 + pi**2 / 32, 0), 5)
+        self.assertAlmostEqual((moved @ 1).Y, 26, 5)
+
+        with self.assertRaises(ValueError):
+            ParabolicCenterArc((0, 0), 2, 90, arc_size=Axis((-1, 0, 0), (0, 1, 0)))
 
     def test_parabolic_center_arc_arc_size(self):
         e1 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=90)
@@ -356,6 +416,29 @@ class BuildLineTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=(0, 5))
+
+    def test_hyperbolic_center_arc_limit_from_start(self):
+        start = HyperbolicCenterArc((0, 0), 2, 1, 30, arc_size=10) @ 0
+        for limit_y in (3, -3, 40):
+            with self.subTest(limit_y=limit_y):
+                limit = Axis((0, limit_y, 0), (1, 0, 0))
+                arc = HyperbolicCenterArc((0, 0), 2, 1, 30, arc_size=limit)
+                self.assertAlmostEqual(arc @ 0, start, 5)
+                self.assertAlmostEqual(
+                    arc @ 1, (2 * (1 + limit_y**2) ** 0.5, limit_y, 0), 4
+                )
+
+        # y_radius larger than x_radius: the branch opens along Y
+        start = HyperbolicCenterArc((0, 0), 1, 2, 100, arc_size=10) @ 0
+        for limit_x in (6, -6):
+            with self.subTest(limit_x=limit_x):
+                limit = Axis((limit_x, 0, 0), (0, 1, 0))
+                arc = HyperbolicCenterArc((0, 0), 1, 2, 100, arc_size=limit)
+                self.assertAlmostEqual(arc @ 0, start, 5)
+                self.assertAlmostEqual(arc @ 1, (limit_x, 2 * 37**0.5, 0), 4)
+
+        with self.assertRaises(ValueError):
+            HyperbolicCenterArc((0, 0), 2, 1, 30, arc_size=Axis((1, 0, 0), (0, 1, 0)))
 
     def test_hyperbolic_center_arc_arc_size(self):
         e1 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=90)

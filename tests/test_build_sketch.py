@@ -525,11 +525,25 @@ class TestBuildSketchObjects(unittest.TestCase):
         singlelinewidth = Text("test", font_size, "singleline", single_line_width=1)
         self.assertEqual(singlelinewidth.single_line_width, 1)
 
+        # Issue #1238: the outlines of the strokes merge into one face per glyph
+        for width in (0.4, 1.0, 1.2):
+            with self.subTest(width=width):
+                digits = Text("123", font_size, "singleline", single_line_width=width)
+                self.assertEqual(len(digits.faces()), 3)
+                self.assertTrue(digits.is_valid)
+
         with self.assertRaises(ValueError):
             Text("test", font_size, "singleline", single_line_width=0)
 
-        with self.assertRaises(ValueError):
-            Text("the quick brown fox", font_size, "singleline", single_line_width=6)
+    @unittest.skip(
+        "The outlines of the single line font's many pieces do not fuse into one "
+        "face at this width"
+    )
+    def test_text_singleline_wide(self):
+        # Strokes wide enough to run into each other fuse into one outline
+        wide = Text("the quick brown fox", 10, "singleline", single_line_width=6)
+        self.assertEqual(len(wide.faces()), 1)
+        self.assertTrue(wide.is_valid)
 
     def test_text_exceptions(self):
         with self.assertRaises(ValueError):

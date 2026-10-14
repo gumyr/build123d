@@ -29,7 +29,7 @@ from build123d.importers import (
     import_step,
     import_stl,
 )
-from build123d.geometry import Pos, Vector
+from build123d.geometry import Location, Pos, Vector
 from build123d.exporters import ExportSVG
 from build123d.exporters3d import export_brep, export_step
 from build123d.build_constants import UNITS_PER_METER
@@ -305,6 +305,55 @@ class ImportSTEP(unittest.TestCase):
         self.assertAlmostEqual(p.X, -1.0, 6)
         self.assertAlmostEqual(p.Y, -2.0, 6)
         self.assertAlmostEqual(p.Z, -3.0, 6)
+
+    def test_located_shape_round_trip(self):
+        """Issue #1014: a shape with a location comes back as the shape,
+        with its label, color and location, as an unmoved shape does."""
+        box = Solid.make_box(1, 2, 3)
+        box.label = "box"
+        box.color = Color(0, 0, 1)
+        placement = Location((-10, 0, 0), (0, 0, 30))
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            step_file = os.path.join(tmp_dir, "located.step")
+            for name, shape in (("unmoved", box), ("moved", placement * box)):
+                with self.subTest(name):
+                    export_step(shape, step_file)
+                    imported = import_step(step_file)
+                    self.assertIsInstance(imported, Solid)
+                    self.assertIsNone(imported.parent)
+                    self.assertEqual(imported.label, "box")
+                    self.assertAlmostEqual(tuple(imported.color), (0, 0, 1, 1), 5)
+                    self.assertAlmostEqual(imported.volume, 6, 5)
+                    self.assertAlmostEqual(
+                        imported.location.position, shape.location.position, 5
+                    )
+                    self.assertAlmostEqual(
+                        imported.location.orientation, shape.location.orientation, 5
+                    )
+
+            # a shape without a label is unwrapped as well
+            export_step(placement * Solid.make_box(1, 2, 3), step_file)
+            imported = import_step(step_file)
+            self.assertIsInstance(imported, Solid)
+            self.assertAlmostEqual(imported.location.position, (-10, 0, 0), 5)
+            self.assertAlmostEqual(imported.location.orientation, (0, 0, 30), 5)
+
+            # while an unlabeled assembly of one part stays an assembly
+            export_step(Compound(children=[Solid.make_box(1, 1, 1)]), step_file)
+            imported = import_step(step_file)
+            self.assertIsInstance(imported, Compound)
+            self.assertEqual(len(imported.children), 1)
+
+            # an assembly with one part of another name is still an assembly
+            part = Solid.make_box(1, 1, 1)
+            part.label = "part"
+            assembly = Compound(children=[Pos(5, 0, 0) * part])
+            assembly.label = "assembly"
+            export_step(assembly, step_file)
+            imported = import_step(step_file)
+            self.assertEqual(imported.label, "assembly")
+            self.assertEqual([child.label for child in imported.children], ["part"])
 
     def test_reexport_imported_assembly(self):
         """import_step's result must be exportable again: the single-free-

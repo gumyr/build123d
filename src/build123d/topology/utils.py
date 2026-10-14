@@ -412,13 +412,13 @@ def new_edges(*objects: Shape, combined: Shape) -> ShapeList[Edge]:
     # Create a list of combined object edges
     combined_topo_edges = List_TopoDS_Shape()
     for edge in combined.edges():
-        if edge.wrapped is not None:
+        if not edge.is_empty:
             combined_topo_edges.Append(edge.wrapped)
 
     # Create a list of original object edges
     original_topo_edges = List_TopoDS_Shape()
     for edge in [e for obj in objects for e in obj.edges()]:
-        if edge.wrapped is not None:
+        if not edge.is_empty:
             original_topo_edges.Append(edge.wrapped)
 
     # Cut the original edges from the combined edges

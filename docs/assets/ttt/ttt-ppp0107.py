@@ -35,7 +35,7 @@ with BuildPart() as p:
     )
     pln = Plane(pln2)
     pln.origin = pln.origin + Vector(20 / 2, 0, 0)
-    pln = pln.rotated((0, 45, 0))
+    pln = pln.rotated((0, -45, 0))  # about the plane's own y, which points along -Y
     pln = pln.offset(-25 + 3 + 0.10)
     with BuildSketch(pln) as s6:
         Rectangle((73 - 35) / 2 * 1.414 + 5, 3)

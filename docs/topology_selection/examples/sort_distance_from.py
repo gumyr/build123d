@@ -12,7 +12,7 @@ boxes = ShapeList(
     for i, j in product(range(-3, 4), repeat=2)
 )
 
-boxes = boxes.sort_by_distance(Vertex())
+boxes = boxes.sort_by_distance(Vertex(0, 0, 0))
 show(*boxes, colors=ColorMap.listed(len(boxes)))
 save_screenshot(os.path.join(filedir, "sort_distance_from_origin.png"))
 

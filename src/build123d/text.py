@@ -154,9 +154,12 @@ class FontManager:
                     fonts = ttCollection.TTCollection(path)
 
             # FontTools may defer parsing tables until they are accessed, so
-            # extract every face before registering any of them.
+            # extract every face before registering any of them. A font's
+            # position in its file is what selects it when the text is drawn.
             system_fonts = [
-                face for font in fonts for face in self._get_font_faces(font, path)
+                face
+                for face_index, font in enumerate(fonts)
+                for face in self._get_font_faces(font, path, face_index)
             ]
         except TTLibError as err:
             logger.warning("Failed to load font file '%s': %s", path, err)
@@ -223,9 +226,16 @@ class FontManager:
                 self.register_folder(path)
 
     def _get_font_faces(
-        self, ft_font: TTFont, path: str
+        self, ft_font: TTFont, path: str, face_index: int = 0
     ) -> list[Font_SystemFont]:  # pragma: no cover
-        """Extract font info from font files and return list of font object."""
+        """Extract font info from font files and return list of font object.
+
+        Args:
+            ft_font (TTFont): one font of the file
+            path (str): the font file
+            face_index (int, optional): position of the font within a font
+                collection. Defaults to 0.
+        """
 
         family, sub, preferred = "", "", ""
         for record in ft_font["name"].names:
@@ -243,25 +253,28 @@ class FontManager:
 
         family = preferred if preferred != "" else family
 
+        # The font as it stands, then each named instance of a variable font.
+        # Instances are numbered from 1, in the order the font lists them; an
+        # instance is named by the first readable record of its name, as the
+        # family and subfamily are.
+        styles = [(0, sub)]
         if "fvar" in ft_font:
-            sub_ids = [i.subfamilyNameID for i in ft_font["fvar"].instances]
-            subfamilies = []
-            for record in ft_font["name"].names:
-                if record.nameID in sub_ids:
+            for instance, definition in enumerate(ft_font["fvar"].instances, start=1):
+                for record in ft_font["name"].names:
+                    if record.nameID != definition.subfamilyNameID:
+                        continue
                     try:
-                        subfamilies.append(record.toUnicode())
+                        styles.append((instance, record.toUnicode()))
                     except UnicodeDecodeError:
                         continue
-
-        else:
-            subfamilies = [sub]
+                    break
 
         # Replicate OCCT font aspect substitution rules, but make them correct
         # - OCCT treats "Oblique" as "Italic", which seems fine
         # - OCCT treats "Book" as "Regular", which is wrong
         aspects = ["Regular", "Bold", "Italic", "Oblique"]
         fonts: list[Font_SystemFont] = []
-        for i, subfamily in enumerate(subfamilies):
+        for instance, subfamily in styles:
             labels = subfamily.split()
             matches = {aspect for aspect in aspects if aspect in labels}
 
@@ -289,7 +302,10 @@ class FontManager:
             font_name = font_name.strip()
 
             ocp_font = Font_SystemFont(TCollection_AsciiString(font_name))
-            ocp_font.SetFontPath(aspect, TCollection_AsciiString(path), i << 16)
+            # FreeType takes the font in the low 16 bits and the instance above
+            ocp_font.SetFontPath(
+                aspect, TCollection_AsciiString(path), face_index | (instance << 16)
+            )
             try:
                 # Some fonts have bad unicode characters in their name and I couldn't
                 # figure out how to fix them. Skipping these fonts for now

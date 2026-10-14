@@ -208,8 +208,10 @@ class TestTopoExplore(DirectApiTestCase):
         common_vertex = topo_explore_common_vertex(hypotenuse, base)
         self.assertIsNotNone(common_vertex)
         self.assertVectorAlmostEquals(Vector(common_vertex), (4, 0, 0), 5)
-        self.assertIsNone(
-            topo_explore_common_vertex(hypotenuse, Edge.make_line((0, 0), (4, 0)))
+        self.assertTrue(
+            topo_explore_common_vertex(
+                hypotenuse, Edge.make_line((0, 0), (4, 0))
+            ).is_empty
         )
 
 

@@ -655,6 +655,19 @@ class TestHole(unittest.TestCase):
 
 
 class TestLoft(unittest.TestCase):
+    def test_return_is_cleaned_inside_a_builder(self):
+        # Issue #451: a section edge drawn as two collinear lines lofts into
+        # two coplanar faces that clean merges, in a builder or not
+        sections = [
+            Face(Wire.make_polygon([(0, 0), (1, 0), (2, 0), (2, 1), (0, 1)])),
+            Pos(0, 0, 1) * Face.make_rect(2, 1, Plane((1, 0.5, 0))),
+        ]
+        with BuildPart():
+            inside = loft(sections)
+        self.assertEqual(len(inside.faces()), 6)
+        self.assertEqual(len(loft(sections).faces()), 6)
+        self.assertEqual(len(loft(sections, clean=False).faces()), 7)
+
     def test_simple_loft(self):
         with BuildPart() as test:
             slice_count = 10
@@ -799,6 +812,18 @@ class TestProjectWorkplane(unittest.TestCase):
 
 
 class TestRevolve(unittest.TestCase):
+    def test_return_is_cleaned_inside_a_builder(self):
+        # Issue #451: a profile edge drawn as two collinear lines revolves
+        # into two faces that clean merges, in a builder or not
+        profile = Pos(5, 0, 0) * Face(
+            Wire.make_polygon([(0, 0), (1, 0), (2, 0), (2, 1), (0, 1)])
+        )
+        with BuildPart():
+            inside = revolve(profile, Axis.Y)
+        self.assertEqual(len(inside.faces()), 4)
+        self.assertEqual(len(revolve(profile, Axis.Y).faces()), 4)
+        self.assertEqual(len(revolve(profile, Axis.Y, clean=False).faces()), 5)
+
     def test_simple_revolve(self):
         with BuildPart() as test:
             with BuildSketch():

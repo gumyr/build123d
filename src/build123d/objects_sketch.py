@@ -209,9 +209,15 @@ class Rectangle(BaseSketchObject):
 
     Create a rectangle defined by width and height.
 
+    The names follow the 2D drawing convention: ``width`` is the size along the
+    X axis and ``height`` the size along the Y axis of the sketch plane. Note
+    that this differs from :class:`~objects_part.Box`, where ``height`` is the Z
+    size: ``Rectangle(width=w, height=h)`` extruded by ``d`` matches
+    ``Box(length=w, width=h, height=d)``.
+
     Args:
-        width (float): rectangle width
-        height (float): rectangle height
+        width (float): rectangle width, the size along the X axis
+        height (float): rectangle height, the size along the Y axis
         rotation (float, optional): angle to rotate object. Defaults to 0
         align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
             Defaults to (Align.CENTER, Align.CENTER)

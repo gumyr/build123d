@@ -28,6 +28,7 @@ license:
 
 from __future__ import annotations
 
+from typing import cast
 
 from build123d.build_common import BaseObject, Builder
 from build123d.build_enums import GeomType, Mode, Select, SheetSurface
@@ -115,14 +116,14 @@ class BuildSheet(Builder[Shell]):
         return self._sheet_parameters.sheet_surface
 
     @property
-    def sheet(self) -> Shell | Compound | None:
-        """Get the placed reference shell, or None before anything is built.
+    def sheet(self) -> Shell | Compound:
+        """Get the placed reference shell, empty before anything is built.
 
         A single placement returns the Shell itself; multiple placements return
         a Compound holding one Shell per placement, matching how the other
         Builders publish placed output.
         """
-        return self._output_obj()
+        return cast("Shell | Compound", self._output_obj())
 
     @sheet.setter
     def sheet(self, value: Shell) -> None:
@@ -139,14 +140,9 @@ class BuildSheet(Builder[Shell]):
         return self._sheet
 
     @property
-    def _obj(self) -> Shell | None:
-        """Alias the Builder object to the local reference shell.
-
-        A shell with nothing in it reads as None, which is how the Builder
-        machinery - and every other Builder's published output - says that
-        nothing has been built.
-        """
-        return self._sheet if self._sheet else None
+    def _obj(self) -> Shell:
+        """Alias the Builder object to the local reference shell."""
+        return self._sheet
 
     @_obj.setter
     def _obj(self, value: Shell) -> None:

@@ -84,7 +84,7 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(box_bb.max.Z, 0, 5)
 
     def test_compute_mass(self):
-        self.assertAlmostEqual(Vertex().compute_mass(), 0, 5)
+        self.assertAlmostEqual(Vertex(0, 0, 0).compute_mass(), 0, 5)
 
     def test_combined_center(self):
         objs = [Solid.make_box(1, 1, 1, Plane((x, 0, 0))) for x in [-2, 1]]
@@ -192,6 +192,40 @@ class TestShape(unittest.TestCase):
         self.assertLess(s2.volume, s.volume)
         self.assertGreater(s2.volume, 0.0)
 
+    def test_split_curved_faces_by_plane(self):
+        # Issue #1035: a small piece of a curved face lies on one side of the
+        # plane while the middle of its surface lies on the other
+        spine = Edge.make_line((0, -2, 0), (0, 2, 0))
+        sections = [
+            Plane(spine ^ position) * Rotation(0, 0, twist) * Wire.make_rect(size, size)
+            for size, twist, position in zip(
+                (1, 2, 2, 1), (10, 0, 0, -10), (0, 0.33, 0.66, 1)
+            )
+        ]
+        solid = Solid.make_loft(sections)
+        edge = (
+            solid.edges()
+            .group_by(Edge.length)[-1]
+            .sort_by(Axis.X)[-2:]
+            .sort_by(Axis.Z)[-1]
+        )
+        faces = [f for f in solid.faces() if any(edge == e for e in f.edges())]
+        self.assertEqual(len(faces), 2)
+
+        for u_value in (0.0, 0.4):
+            plane = Plane(edge ^ u_value)
+            for face in faces:
+                with self.subTest(u_value=u_value, area=round(face.area, 2)):
+                    top, bottom = face.split(plane, keep=Keep.BOTH)
+                    self.assertIsInstance(top, Face)
+                    self.assertIsInstance(bottom, Face)
+                    self.assertAlmostEqual(top.area + bottom.area, face.area, 5)
+                    heights = lambda piece: [
+                        plane.to_local_coords(Vector(v)).Z for v in piece.vertices()
+                    ]
+                    self.assertGreater(min(heights(top)), -1e-6)
+                    self.assertLess(max(heights(bottom)), 1e-6)
+
     def test_split_by_non_planar_face(self):
         box = Solid.make_box(1, 1, 1)
         tool = Circle(1).wire()
@@ -287,7 +321,7 @@ class TestShape(unittest.TestCase):
 
     def test_located_vertex(self):
         """located() replaces a vertex's location rather than adding to it."""
-        moved = Vertex().moved(Pos(-2.5, 0, 0))
+        moved = Vertex(0, 0, 0).moved(Pos(-2.5, 0, 0))
         self.assertAlmostEqual(moved.located(Pos(1, 0, 0)).X, 1, 5)
 
         extracted = Compound([moved]).vertices()[0]
@@ -366,8 +400,8 @@ class TestShape(unittest.TestCase):
         box = Solid.make_box(1, 2, 3)
         zero = Solid()
 
-        self.assertIsNone(box.intersect(zero))
-        self.assertIsNone(zero.intersect(box))
+        self.assertEqual(box.intersect(zero), [])
+        self.assertEqual(zero.intersect(box), [])
 
     def test_boolean_zero_cut_multi_args(self):
         box1 = Solid.make_box(1, 1, 1)
@@ -648,7 +682,7 @@ class TestShape(unittest.TestCase):
         with self.assertRaises(ValueError):
             empty.geom_type
         self.assertIs(empty, empty.fix())
-        self.assertEqual(hash(empty), 0)
+        self.assertEqual(hash(empty), hash(Solid()))
         self.assertFalse(empty.is_same(Solid()))
         self.assertFalse(empty.is_equal(Solid()))
         self.assertTrue(empty.is_valid)
@@ -668,15 +702,11 @@ class TestShape(unittest.TestCase):
         ]
         self.assertIs(empty, empty.transform_shape(Matrix(translate_matrix)))
         self.assertIs(empty, empty.transform_geometry(Matrix(translate_matrix)))
-        with self.assertRaises(ValueError):
-            empty.locate(Location())
-
-        with self.assertRaises(ValueError):
-            empty.located(Location())
-        with self.assertRaises(ValueError):
-            empty.move(Location())
-        with self.assertRaises(ValueError):
-            empty.moved(Location())
+        # nothing is nothing wherever it is put
+        self.assertIs(empty, empty.locate(Location((1, 2, 3))))
+        self.assertTrue(empty.located(Location((1, 2, 3))).is_empty)
+        self.assertIs(empty, empty.move(Location((1, 2, 3))))
+        self.assertTrue(empty.moved(Location((1, 2, 3))).is_empty)
         # with self.assertRaises(ValueError):
         #     empty.relocate(Location())
         # with self.assertRaises(ValueError):
@@ -740,9 +770,8 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(rotated_line @ 1, (1, 0))
         self.assertFalse(line.wrapped.IsPartner(rotated_line.wrapped))
 
-        line._wrapped = None
-        rotated_line = line.rotate(Axis((1, 0, 0), (0, 0, 1)), 45)
-        self.assertIsNone(rotated_line._wrapped)
+        rotated_empty = Edge().rotate(Axis((1, 0, 0), (0, 0, 1)), 45)
+        self.assertTrue(rotated_empty.is_empty)
 
     def test_translate(self):
         line = Edge.make_line((0, 0), (1, 0))
@@ -756,9 +785,8 @@ class TestShape(unittest.TestCase):
         self.assertAlmostEqual(translated_line @ 1, (1, 1, 0))
         self.assertFalse(line.wrapped.IsPartner(translated_line.wrapped))
 
-        line._wrapped = None
-        translated_line = line.translate((0, 1, 0))
-        self.assertIsNone(translated_line._wrapped)
+        translated_empty = Edge().translate((0, 1, 0))
+        self.assertTrue(translated_empty.is_empty)
 
     def test_rmul_iterable_non_location(self):
         line = Edge.make_line((0, 0), (1, 0))
@@ -910,7 +938,7 @@ class TestShapeAlgebraEdges(unittest.TestCase):
         self.assertIs(solid + None, solid)
 
     def test_intersect_with_no_arguments(self):
-        self.assertIsNone(Box(1, 1, 1).intersect())
+        self.assertEqual(Box(1, 1, 1).intersect(), [])
 
     def test_intersect_yielding_disjoint_pieces(self):
         """A bar crossing two separated blocks intersects in two solids, which

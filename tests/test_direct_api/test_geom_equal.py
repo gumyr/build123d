@@ -496,63 +496,32 @@ class TestEdgeGeomEqualBSpline:
 class TestEdgeGeomEqualOffset:
     """Tests for Edge.geom_equal with OFFSET type."""
 
+    @staticmethod
+    def _offset_edge(distance: float, direction=(0, 0, 1)) -> Edge:
+        """An edge on an offset curve; offset_2d fits splines to those it makes"""
+        from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
+        from OCP.Geom import Geom_OffsetCurve
+        from OCP.gp import gp_Dir
+
+        adaptor = Spline((0, 0), (1, 1), (2, 0), (3, 1)).edge().geom_adaptor()
+        curve = Geom_OffsetCurve(adaptor.Curve().Curve(), distance, gp_Dir(*direction))
+        edge = Edge(
+            BRepBuilderAPI_MakeEdge(
+                curve, adaptor.FirstParameter(), adaptor.LastParameter()
+            ).Edge()
+        )
+        assert edge.geom_type == GeomType.OFFSET
+        return edge
+
     def test_same_offset(self):
-        v = [Vertex(p) for p in ((0, 0), (1, 1), (2, 0), (3, 1))]
-        s = Spline(*v)
-        w = Wire([s.edge()])
-        offset_wire1 = w.offset_2d(0.1)
-        offset_wire2 = w.offset_2d(0.1)
-
-        offset_edges1 = [
-            e for e in offset_wire1.edges() if e.geom_type == GeomType.OFFSET
-        ]
-        offset_edges2 = [
-            e for e in offset_wire2.edges() if e.geom_type == GeomType.OFFSET
-        ]
-
-        assert len(offset_edges1) > 0
-        assert offset_edges1[0].geom_equal(offset_edges2[0])
+        assert self._offset_edge(0.1).geom_equal(self._offset_edge(0.1))
 
     def test_different_offset_value(self):
-        v = [Vertex(p) for p in ((0, 0), (1, 1), (2, 0), (3, 1))]
-        s = Spline(*v)
-        w = Wire([s.edge()])
-        offset_wire1 = w.offset_2d(0.1)
-        offset_wire2 = w.offset_2d(0.2)
-
-        offset_edges1 = [
-            e for e in offset_wire1.edges() if e.geom_type == GeomType.OFFSET
-        ]
-        offset_edges2 = [
-            e for e in offset_wire2.edges() if e.geom_type == GeomType.OFFSET
-        ]
-
-        assert not offset_edges1[0].geom_equal(offset_edges2[0])
+        assert not self._offset_edge(0.1).geom_equal(self._offset_edge(0.2))
 
     def test_different_offset_direction(self):
-        """Offset curves with different offset directions (on different planes)."""
-        from build123d import Axis
-
-        v = [Vertex(p) for p in ((0, 0), (1, 1), (2, 0), (3, 1))]
-        s = Spline(*v)
-        w = Wire([s.edge()])
-
-        # Offset on XY plane (Z direction)
-        offset_wire1 = w.offset_2d(0.1)
-        offset_edges1 = [
-            e for e in offset_wire1.edges() if e.geom_type == GeomType.OFFSET
-        ]
-
-        # Rotate wire 90 degrees around X axis to put it on XZ plane
-        w_rotated = w.rotate(Axis.X, 90)
-        offset_wire2 = w_rotated.offset_2d(0.1)
-        offset_edges2 = [
-            e for e in offset_wire2.edges() if e.geom_type == GeomType.OFFSET
-        ]
-
-        if len(offset_edges1) > 0 and len(offset_edges2) > 0:
-            # Different directions means not equal
-            assert not offset_edges1[0].geom_equal(offset_edges2[0])
+        """Offset curves with different offset directions."""
+        assert not self._offset_edge(0.1).geom_equal(self._offset_edge(0.1, (0, 0, -1)))
 
 
 class TestEdgeGeomEqualTolerance:

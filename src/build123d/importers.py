@@ -266,6 +266,22 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
         root = root.children[0]
         root.parent = None
 
+    # A shape exported with a location is written as an assembly holding one
+    # instance of it. Both carry the shape's name, or if it had none the
+    # assembly has the name OCCT generates for an instance, "=>[...]". Return
+    # the shape itself, as one exported without a location is returned.
+    if isinstance(root, Compound) and len(root.children) == 1:
+        placed = root.children[0]
+        if (
+            not placed.children
+            and (placed.label == root.label or root.label.startswith("=>["))
+            and root.location == Location()
+        ):
+            placed.parent = None
+            if placed.color is None:
+                placed.color = root.color
+            root = placed
+
     return root
 
 

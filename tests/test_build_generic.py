@@ -575,6 +575,15 @@ class OffsetTests(unittest.TestCase):
             offset(amount=1)
         self.assertAlmostEqual(test.wires()[0].length, 2 + 2 * pi, 5)
 
+    def test_single_line_offset_stays_in_plane(self):
+        # Issue #604
+        around = offset(Plane.XZ * Line((0, 0), (10, 10)), 1)
+        self.assertAlmostEqual(around.bounding_box().size.Y, 0, 5)
+        with BuildLine(Plane.XZ) as test:
+            Line((0, 0), (10, 10))
+            offset(amount=1)
+        self.assertAlmostEqual(test.line.bounding_box().size.Y, 0, 5)
+
     def test_line_offset(self):
         with BuildSketch() as test:
             with BuildLine():
@@ -719,13 +728,15 @@ class OffsetTests(unittest.TestCase):
 
     def test_offset_bad_type(self):
         with self.assertRaises(TypeError):
-            offset(Vertex(), amount=1)
+            offset(Vertex(0, 0, 0), amount=1)
 
     def test_offset_failure(self):
         with BuildPart() as cup:
             with BuildSketch():
                 Circle(35)
-            extrude(amount=50, taper=-3)
+            with BuildSketch(Plane.XY.offset(50)):
+                Circle(37.62)
+            loft()
             topf = cup.faces().sort_by(Axis.Z)[-1]
             with self.assertRaises(RuntimeError):
                 offset(amount=-2, openings=topf)
@@ -931,6 +942,22 @@ class SplitReturnTypeTests(unittest.TestCase):
 
 
 class TestSweep(unittest.TestCase):
+    def test_return_is_cleaned_inside_a_builder(self):
+        # Issue #451: a path of two collinear lines sweeps seams between the
+        # side faces; clean removes them from the returned shape in both modes
+        path = Wire(
+            [
+                Edge.make_line((0, 0, 0), (0, 0, 1)),
+                Edge.make_line((0, 0, 1), (0, 0, 2)),
+            ]
+        )
+        section = Face.make_rect(2, 1)
+        with BuildPart():
+            inside = sweep(section, path)
+        self.assertEqual(len(inside.faces()), 6)
+        self.assertEqual(len(sweep(section, path).faces()), 6)
+        self.assertEqual(len(sweep(section, path, clean=False).faces()), 10)
+
     def test_fixed_normal(self):
         """normal= holds the section's orientation instead of letting it follow
         the path's own framing, which gives a different solid."""

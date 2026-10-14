@@ -39,10 +39,10 @@ import numpy as np
 from OCP.BRepGProp import BRepGProp
 from OCP.GProp import GProp_GProps
 from build123d.build_common import Locations
-from build123d.build_enums import Align, GeomType, Mode
+from build123d.build_enums import Align, Extrinsic, GeomType, Intrinsic, Mode
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Location, Plane, Pos, Vector
+from build123d.geometry import Axis, Location, Plane, Pos, Rotation, Vector
 from build123d.objects_part import Box, Cylinder
 from build123d.objects_sketch import Circle, Rectangle
 from build123d.operations_generic import fillet, insert
@@ -608,6 +608,33 @@ class TestPlane(unittest.TestCase):
             rotated_plane.z_dir, (0, -math.sqrt(2) / 2, math.sqrt(2) / 2), 5
         )
         self.assertAlmostEqual(rotated_plane.origin, (0, 0, 2), 5)
+
+    def test_rotated_about_the_planes_own_axes(self):
+        # Issue #1166: the angles are about the plane's x, y and z directions
+        # A turn about the normal keeps the plane where it is
+        turned = Plane.XZ.rotated((0, 0, 90))
+        self.assertAlmostEqual(turned.z_dir, Plane.XZ.z_dir, 5)
+        self.assertAlmostEqual(turned.x_dir, (0, 0, 1), 5)
+        self.assertAlmostEqual(turned.y_dir, (-1, 0, 0), 5)
+        # A turn about the plane's x tips the normal towards the plane's y
+        tipped = Plane.YZ.rotated((90, 0, 0))
+        self.assertAlmostEqual(tipped.x_dir, Plane.YZ.x_dir, 5)
+        self.assertAlmostEqual(tipped.z_dir, (0, 0, -1), 5)
+        # The origin stays put, wherever the plane is
+        elsewhere = Plane.XZ.offset(5).rotated((0, 0, 90))
+        self.assertAlmostEqual(elsewhere.origin, Plane.XZ.offset(5).origin, 5)
+        self.assertAlmostEqual(elsewhere.x_dir, (0, 0, 1), 5)
+        # The ordering gives the composition order; ZYX reads the angles as (z, y, x)
+        self.assertEqual(
+            Plane.XZ.rotated((0, 0, 90), Intrinsic.ZYX), Plane.XZ.rotated((90, 0, 0))
+        )
+        # The same rotation applied as a Rotation in the plane's frame
+        for ordering in (Intrinsic.XYZ, Extrinsic.XYZ, Intrinsic.ZYX):
+            with self.subTest(ordering=ordering):
+                self.assertEqual(
+                    Plane.YZ.rotated((30, 20, 10), ordering),
+                    Plane(Plane.YZ.location * Rotation(30, 20, 10, ordering)),
+                )
 
     def test_invalid_plane(self):
         # Test plane creation error handling

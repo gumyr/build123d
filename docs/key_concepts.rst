@@ -112,6 +112,47 @@ topology of a shape as shown here for a unit cube:
 Users of build123d will often reference topological objects as part of the
 process of creating the object as described below.
 
+.. _empty_shapes:
+
+Empty shapes
+------------
+
+Every shape class has an empty value, made by its constructor with no
+arguments: ``Solid()``, ``Face()``, ``Part()``, ``Sketch()``, ``Curve()`` and so
+on, including ``Vertex()``. An empty shape is a shape with nothing in it that
+still knows what kind of shape it is. It is what an operation returns when it
+legitimately leaves nothing, so a model that cuts a feature away entirely, or
+intersects two parts that do not meet, carries on with an empty ``Part`` rather
+than ``None`` or an error.
+
+An empty shape behaves like the number zero:
+
+* ``bool(shape)`` is ``False`` and ``shape.is_empty`` is ``True``
+* ``a + Part()`` is ``a``, ``Part() - a`` is ``Part()`` and ``a & Part()`` is ``Part()``
+* ``a - a`` is the empty ``Part``, ``Rectangle(1, 1) - Rectangle(1, 1)`` the empty ``Sketch``
+* every selector returns an empty ``ShapeList``: ``Solid().faces() == []``
+* ``volume``, ``area`` and the moments of an empty shape are ``0``
+* moving, copying and pickling an empty shape give an empty shape
+* ``shape.intersect(other)`` returns an empty ``ShapeList`` when nothing intersects
+* ``shape.split(plane)`` returns the empty shape for a side with nothing on it
+
+An empty shape has no place or direction, so asking for one raises
+``ValueError``: ``Solid().center()`` says "An empty Solid has no center", and
+``location``, ``position``, ``normal_at`` and the like do the same. Exporting
+an empty shape raises too, since there is nothing to write.
+
+A builder that has not yet built anything holds the empty shape of its type:
+``BuildPart().part`` is ``Part()`` until something is added. A first operation
+that removes - ``Mode.SUBTRACT`` or ``Mode.INTERSECT`` on nothing - still
+raises, as it can only be a mistake.
+
+To test whether a result has anything in it, use its truth value or
+``is_empty``; a shape result is never ``None``. Geometry is different: a
+``Vector``, ``Axis`` or ``Plane`` is a value rather than a set of points, so it
+has no empty form, and an intersection of geometry that finds nothing, such as
+two parallel axes, returns ``None``. Either kind of "nothing" reads as false, so
+``if not a & b:`` works for shapes and geometry alike.
+
 Location
 ========
 

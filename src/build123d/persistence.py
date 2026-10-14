@@ -51,13 +51,10 @@ from OCP.TopoDS import (
 from build123d.topology import downcast
 
 
-def serialize_shape(shape: TopoDS_Shape) -> bytes | None:
+def serialize_shape(shape: TopoDS_Shape) -> bytes:
     """
     Serialize a OCP shape, this method can be used to provide a custom serialization algo for pickle
     """
-    if shape is None:
-        return None
-
     bio = io.BytesIO()
     BinTools.Write_s(shape, bio)
     buffer = bio.getvalue()
@@ -68,22 +65,17 @@ def deserialize_shape(buffer: bytes) -> TopoDS_Shape:
     """
     This does the opposite as serialize, it construct a TopoDS_Shape from bytes.
     """
-    if buffer is None:
-        return None
-
     shape = TopoDS_Shape()
     bio = io.BytesIO(buffer)
     BinTools.Read_s(shape, bio)
     return downcast(shape)
 
 
-def serialize_location(location: TopLoc_Location) -> bytearray | None:
+def serialize_location(location: TopLoc_Location) -> bytearray:
     """
     Serialize a OCP location, this method can be used to provide
     a custom serialization algo for pickle
     """
-    if location is None:
-        return None
     transform = location.Transformation()
     translation = transform.TranslationPart()
     rotation = transform.GetRotation()
@@ -107,9 +99,6 @@ def deserialize_location(buffer: bytes) -> TopLoc_Location:
     """
     This does the opposite as serialize, it construct a TopLoc_Location from bytes.
     """
-    if buffer is None:
-        return None
-
     # Makes 4 bytes chunks (floats are 4 bytes long)
     chunks = iter(struct.iter_unpack("f", buffer))
     translation = gp_Vec(

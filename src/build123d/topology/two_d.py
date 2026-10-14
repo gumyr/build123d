@@ -56,7 +56,6 @@ license:
 from __future__ import annotations
 
 import copy
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from math import degrees
@@ -287,7 +286,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
 
     def __neg__(self) -> Self:
         """Reverse normal operator -"""
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Invalid Shape")
         new_surface = copy.deepcopy(self)
         new_surface.wrapped = tcast(TOPODS, downcast(self.wrapped.Complemented()))
@@ -300,22 +299,22 @@ class Mixin2D(ABC, Shape[TOPODS]):
     @overload
     def split_by_perimeter(
         self, perimeter: Edge | Wire, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
-    ) -> Face | Shell | ShapeList[Face] | None:
+    ) -> Face | Shell | ShapeList[Face]:
         """split_by_perimeter and keep inside or outside"""
 
     @overload
     def split_by_perimeter(
         self, perimeter: Edge | Wire, keep: Literal[Keep.BOTH]
     ) -> tuple[
-        Face | Shell | ShapeList[Face] | None,
-        Face | Shell | ShapeList[Face] | None,
+        Face | Shell | ShapeList[Face],
+        Face | Shell | ShapeList[Face],
     ]:
         """split_by_perimeter and keep inside and outside"""
 
     @overload
     def split_by_perimeter(
         self, perimeter: Edge | Wire, keep: Literal[Keep.INSIDE] = Keep.INSIDE
-    ) -> Face | Shell | ShapeList[Face] | None:
+    ) -> Face | Shell | ShapeList[Face]:
         """split_by_perimeter and keep inside (default)"""
 
     def split_by_perimeter(self, perimeter: Edge | Wire, keep: Keep = Keep.INSIDE):
@@ -335,15 +334,15 @@ class Mixin2D(ABC, Shape[TOPODS]):
             ValueError: keep must be one of Keep.INSIDE|OUTSIDE|BOTH
 
         Returns:
-            Union[Face | Shell | ShapeList[Face] | None,
-            Tuple[Face | Shell | ShapeList[Face] | None]: The result of the split operation.
+            Union[Face | Shell | ShapeList[Face],
+            tuple[Face | Shell | ShapeList[Face]]: The result of the split operation.
 
-            - **Keep.INSIDE**: Returns the inside part as a `Shell` or `Face`, or `None`
+            - **Keep.INSIDE**: Returns the inside part as a `Shell` or `Face`, or the empty Face
               if no inside part is found.
-            - **Keep.OUTSIDE**: Returns the outside part as a `Shell` or `Face`, or `None`
+            - **Keep.OUTSIDE**: Returns the outside part as a `Shell` or `Face`, or the empty Face
               if no outside part is found.
             - **Keep.BOTH**: Returns a tuple `(inside, outside)` where each element is
-              either a `Shell`, `Face`, or `None` if no corresponding part is found.
+              either a `Shell`, `Face`, or the empty Face if no corresponding part is found.
 
         """
 
@@ -358,10 +357,10 @@ class Mixin2D(ABC, Shape[TOPODS]):
             return shapes
 
         def process_sides(sides):
-            """Process sides to determine if it should be None, a single element,
-            a Shell, or a ShapeList."""
+            """Process sides to determine if it should be the empty Face, a
+            single element, a Shell, or a ShapeList."""
             if not sides:
-                return None
+                return Face()
             if len(sides) == 1:
                 return sides[0]
             # Attempt to create a shell
@@ -408,7 +407,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
             seam_vertices: list[Vertex] = []
             for seam in seams:
                 seam_intersection = perimeter_edge.intersect(seam)
-                if seam_intersection is None:
+                if not seam_intersection:
                     continue
                 for vertex in seam_intersection.vertices():
                     if all(
@@ -464,7 +463,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
         Returns:
             list[tuple[Vector, Vector]]: Point and normal of intersection
         """
-        if self._wrapped is None:
+        if self.is_empty:
             return []
 
         intersection_line = gce_MakeLin(other.wrapped).Value()
@@ -912,7 +911,7 @@ class Face(Mixin2D[TopoDS_Face]):
             float: The total surface area, including the area of holes. Returns 0.0 if
             the face is empty.
         """
-        if self._wrapped is None:
+        if self.is_empty:
             return 0.0
 
         return self.without_holes().area
@@ -920,16 +919,20 @@ class Face(Mixin2D[TopoDS_Face]):
     @property
     def axis_of_rotation(self) -> None | Axis:
         """Get the rotational axis of a cylinder or torus"""
+        if self.is_empty:
+            geom_type = GeomType.OTHER  # nothing has no axis
+        else:
+            # Get the underlying geometric surface
+            surf: Geom_Surface = self.geom_adaptor()
 
-        # Get the underlying geometric surface
-        surf: Geom_Surface = self.geom_adaptor()
+            # Unwrap trimmed and offset surfaces to get at the basis surface
+            while isinstance(
+                surf, (Geom_RectangularTrimmedSurface, Geom_OffsetSurface)
+            ):
+                surf = surf.BasisSurface()
 
-        # Unwrap trimmed and offset surfaces to get at the basis surface
-        while isinstance(surf, (Geom_RectangularTrimmedSurface, Geom_OffsetSurface)):
-            surf = surf.BasisSurface()
-
-        # Get the geometry type from the geometric surface
-        geom_type = Shape.geom_LUT_FACE[GeomAdaptor_Surface(surf).GetType()]
+            # Get the geometry type from the geometric surface
+            geom_type = Shape.geom_LUT_FACE[GeomAdaptor_Surface(surf).GetType()]
 
         # Determine the axis of rotation if there is one
         match geom_type:
@@ -987,7 +990,7 @@ class Face(Mixin2D[TopoDS_Face]):
             ValueError: If the face or its underlying representation is empty.
             ValueError: If the face is not planar.
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't determine axes_of_symmetry of empty face")
 
         if not self.is_planar:
@@ -1038,7 +1041,7 @@ class Face(Mixin2D[TopoDS_Face]):
             if type(top) != type(bottom):  # exit early if not same
                 continue
 
-            if top is None or bottom is None:  # Impossible to actually happen?
+            if not top or not bottom:  # nothing on one side of the plane
                 continue
 
             top_list = ShapeList(top if isinstance(top, list) else [top])
@@ -1055,7 +1058,7 @@ class Face(Mixin2D[TopoDS_Face]):
             bottom_area = sum(f.area for f in bottom_list)
             for flipped_face, bottom_face in zip(top_flipped_list, bottom_list):
                 intersection = flipped_face.intersect(bottom_face)
-                if intersection is None:
+                if not intersection:
                     intersect_area = -1.0
                     break
                 intersect_area = sum(f.area for f in intersection.faces())
@@ -1080,12 +1083,15 @@ class Face(Mixin2D[TopoDS_Face]):
     @property
     def center_location(self) -> Location:
         """Location at the center of face"""
+        self._needs_geometry("center")
         origin = self.position_at(0.5, 0.5)
         return Plane(origin, z_dir=self.normal_at(origin)).location
 
     @property
     def geometry(self) -> None | str:
         """geometry of planar face"""
+        if self.is_empty:
+            return None
         result = None
         if self.is_planar:
             flat_face: Face = Plane(self).to_local_coords(self)
@@ -1131,7 +1137,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Raises:
             ValueError: the surface is degenerate everywhere it was sampled
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("an empty face has no convexity")
         surface = BRepAdaptor_Surface(self.wrapped)
         outward = BRepGProp_Face(self.wrapped)
@@ -1194,6 +1200,8 @@ class Face(Mixin2D[TopoDS_Face]):
     @property
     def is_planar(self) -> Plane | None:
         """Is the face planar even though its geom_type may not be PLANE - if so return Plane"""
+        if self.is_empty:
+            return None
         surface = BRep_Tool.Surface_s(self.wrapped)
         planar_searcher = GeomLib_IsPlanarSurface(surface, TOLERANCE)
         if not planar_searcher.IsPlanar():
@@ -1212,6 +1220,8 @@ class Face(Mixin2D[TopoDS_Face]):
         Taken from the face's own parameters rather than from a bounding box,
         so it does not depend on how the face is oriented in space.
         """
+        if self.is_empty:
+            return None
         if self.is_planar:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
@@ -1241,6 +1251,8 @@ class Face(Mixin2D[TopoDS_Face]):
         Read through the same adaptor as ``geom_type``, so a cylinder or
         sphere that arrived as a trimmed surface has its radius all the same.
         """
+        if self.is_empty:
+            return None
         adaptor = BRepAdaptor_Surface(self.wrapped)
         if self.geom_type == GeomType.CYLINDER:
             return adaptor.Cylinder().Radius()
@@ -1300,6 +1312,7 @@ class Face(Mixin2D[TopoDS_Face]):
             ValueError: If an initially generated UV edge cannot be associated
                 uniquely with an edge in the completed UV face.
         """
+        self._needs_geometry("surface")
 
         uv_face, edge_map = _uv_topods_face_with_map(self.wrapped)
         return Face(uv_face), {
@@ -1322,6 +1335,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             A planar ``Face`` in UV parameter space.
         """
+        self._needs_geometry("surface")
         return self.uv_face_with_map[0]
 
     @property
@@ -1343,6 +1357,8 @@ class Face(Mixin2D[TopoDS_Face]):
         face wraps through - the width of the strip it would flatten into.
         Length times width is the area for both.
         """
+        if self.is_empty:
+            return None
         if self.is_planar:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
@@ -1989,6 +2005,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Vector: center
         """
+        self._needs_geometry("center")
         center_point: Vector | gp_Pnt
         if (center_of == CenterOf.MASS) or (
             center_of == CenterOf.GEOMETRY and self.is_planar
@@ -2029,7 +2046,7 @@ class Face(Mixin2D[TopoDS_Face]):
         """
         # MakeFillet2d merges the wires of a face with holes, so chamfer each
         # wire separately and rebuild the face, as fillet_2d does
-        vertices = [vertex for vertex in vertices if vertex.wrapped is not None]
+        vertices = [vertex for vertex in vertices if not vertex.is_empty]
         if not vertices:
             return self
 
@@ -2095,7 +2112,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Vector: the derivative
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't find derivative on empty face")
         if u_order < 0 or v_order < 0 or u_order + v_order == 0:
             raise ValueError("orders must not be negative and must not both be zero")
@@ -2120,7 +2137,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
 
         """
-        vertices = [vertex for vertex in vertices if vertex.wrapped is not None]
+        vertices = [vertex for vertex in vertices if not vertex.is_empty]
         if not vertices:
             return self
 
@@ -2154,6 +2171,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     def geom_adaptor(self) -> Geom_Surface:
         """Return the Geom Surface for this Face"""
+        self._needs_geometry("surface")
         return BRep_Tool.Surface_s(self.wrapped)
 
     def fold_lines(self) -> ShapeList[Edge]:
@@ -2198,7 +2216,7 @@ class Face(Mixin2D[TopoDS_Face]):
     def _sheet_selected_from(self) -> Shape:
         """The shell this face was taken from, for questions about its neighbours."""
         parent = self.topo_parent
-        if parent is None or parent.wrapped is None or len(parent.faces()) < 2:
+        if parent is None or parent.is_empty or len(parent.faces()) < 2:
             raise ValueError(
                 "this face was not selected from a sheet, so its neighbours are "
                 "unknown - take it from the sheet, as in sheet.flats()[0]"
@@ -2207,6 +2225,8 @@ class Face(Mixin2D[TopoDS_Face]):
 
     def inner_wires(self) -> ShapeList[Wire]:
         """Extract the inner or hole wires from this Face"""
+        if self.is_empty:
+            return ShapeList()
         outer = self.outer_wire()
         inners = [w for w in self.wires() if not w.is_same(outer)]
         for w in inners:
@@ -2293,6 +2313,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Raises:
             ValueError: If only one of `u` or `v` is provided or invalid keyword args are passed.
         """
+        self._needs_geometry("location")
         surface_point, u, v = None, -1.0, -1.0
 
         if args:
@@ -2436,6 +2457,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Vector: surface normal direction
         """
+        self._needs_geometry("normal")
         surface_point, u, v = None, -1.0, -1.0
 
         if args:
@@ -2483,6 +2505,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     def outer_wire(self) -> Wire:
         """Extract the perimeter wire from this Face"""
+        self._needs_geometry("outer wire")
         outer = Wire(BRepTools.OuterWire_s(self.wrapped))
         outer._extracted_from(self)  # pylint: disable=protected-access
         return outer
@@ -2515,7 +2538,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             tuple[float, float]: u, v
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't find param on empty face")
 
         pnt = Vector(point)
@@ -2627,7 +2650,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Face: A new Face instance identical to the original but without any holes.
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Cannot remove holes from an empty face")
 
         if not (inner_wires := self.inner_wires()):
@@ -2641,15 +2664,6 @@ class Face(Mixin2D[TopoDS_Face]):
         # pylint: disable=attribute-defined-outside-init
         holeless.wrapped = TopoDS.Face(modified_shape)
         return holeless
-
-    def wire(self) -> Wire:
-        """Return the outerwire, generate a warning if inner_wires present"""
-        if self.inner_wires():
-            warnings.warn(
-                "Found holes, returning outer_wire",
-                stacklevel=2,
-            )
-        return self.outer_wire()
 
     def uv_frame(self, location: Location, tolerance: float = 1e-4) -> UVFrame:
         """uv_frame
@@ -2736,7 +2750,7 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             Edge | Wire | Face | Shell: the shape on the surface
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't wrap around an empty face")
         frame = self.uv_frame(surface_loc, tolerance)
         if isinstance(planar_shape, Edge):
@@ -2809,6 +2823,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
     def _uv_bounds(self) -> tuple[float, float, float, float]:
         """Return the u min, u max, v min, v max values"""
+        self._needs_geometry("surface")
         return BRepTools.UVBounds_s(self.wrapped)
 
 
@@ -3234,6 +3249,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
 
     def center(self) -> Vector:
         """Center of mass of the shell"""
+        self._needs_geometry("center")
         properties = GProp_GProps()
         BRepGProp.LinearProperties_s(self.wrapped, properties)
         return Vector(properties.CentreOfMass())

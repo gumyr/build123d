@@ -363,8 +363,7 @@ class AlgebraTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = f1 + e1
 
-        with self.assertRaises(ValueError):
-            _ = Shape() + f2
+        self.assertEqual(Shape() + f2, f2)
 
         f5 = Face() + f1
         self.assertTupleAlmostEquals(f5.bounding_box().size, (1, 3, 0), 6)
@@ -714,8 +713,9 @@ class AlgebraTests(unittest.TestCase):
 
     def test_empty_minus_part(self):
         b = Box(1, 2, 3)
-        with self.assertRaises(ValueError):
-            r = Part() - b
+        r = Part() - b
+        self.assertTrue(r.is_empty)
+        self.assertIsInstance(r, Part)
 
     def test_part_minus_empty(self):
         b = Box(1, 2, 3)
@@ -725,13 +725,15 @@ class AlgebraTests(unittest.TestCase):
 
     def test_empty_and_part(self):
         b = Box(1, 2, 3)
-        with self.assertRaises(ValueError):
-            r = Part() & b
+        r = Part() & b
+        self.assertTrue(r.is_empty)
+        self.assertIsInstance(r, Part)
 
     def test_part_and_empty(self):
         b = Box(1, 2, 3)
-        with self.assertRaises(ValueError):
-            r = b & Part()
+        r = b & Part()
+        self.assertTrue(r.is_empty)
+        self.assertIsInstance(r, Part)
 
     # Sketch + - & Empty
 
@@ -749,8 +751,9 @@ class AlgebraTests(unittest.TestCase):
 
     def test_empty_minus_sketch(self):
         b = Rectangle(1, 2)
-        with self.assertRaises(ValueError):
-            r = Sketch() - b
+        r = Sketch() - b
+        self.assertTrue(r.is_empty)
+        self.assertIsInstance(r, Sketch)
 
     def test_sketch_minus_empty(self):
         b = Rectangle(1, 2)
@@ -774,13 +777,15 @@ class AlgebraTests(unittest.TestCase):
 
     def test_empty_and_sketch(self):
         b = Rectangle(1, 3)
-        with self.assertRaises(ValueError):
-            r = Sketch() & b
+        r = Sketch() & b
+        self.assertTrue(r.is_empty)
+        self.assertIsInstance(r, Sketch)
 
     def test_sketch_and_empty(self):
         b = Rectangle(1, 2)
-        with self.assertRaises(ValueError):
-            r = b & Sketch()
+        r = b & Sketch()
+        self.assertTrue(r.is_empty)
+        self.assertIsInstance(r, Sketch)
 
     def test_1d_2d_minus(self):
         line = Line((0, 0), (1, 1))

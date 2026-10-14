@@ -136,7 +136,10 @@ from OCP.GeomAPI import (
     GeomAPI_PointsToBSpline,
     GeomAPI_ProjectPointOnCurve,
 )
-from OCP.GeomConvert import GeomConvert_CompCurveToBSplineCurve
+from OCP.GeomConvert import (
+    GeomConvert_ApproxCurve,
+    GeomConvert_CompCurveToBSplineCurve,
+)
 from OCP.GeomFill import (
     GeomFill_CorrectedFrenet,
     GeomFill_Frenet,
@@ -468,6 +471,50 @@ def _splice_wire_fillet_corner(
     return Wire(wire_builder.Wire())._made_by(history)
 
 
+def _offset_curves_to_bsplines(wire: Wire) -> Wire:
+    """Replace the offset curves in an offset wire with B-splines fitted to them
+
+    The offset of anything but a line or a circle is not a curve of the same
+    kind, and the kernel returns it as a curve defined by the offset itself.
+    STEP export, among others, cannot handle those, so each is replaced by a
+    B-spline within a tenth of TOLERANCE of it. A wire without offset curves
+    is returned as it is.
+    """
+    edges = wire.edges()
+    if all(edge.geom_type != GeomType.OFFSET for edge in edges):
+        return wire
+
+    fitted_edges: list[Edge] = []
+    for edge in edges:
+        if edge.geom_type != GeomType.OFFSET:
+            fitted_edges.append(edge)
+            continue
+        adaptor = edge.geom_adaptor()
+        # Fit only the part of the offset curve that the edge uses
+        approximation = GeomConvert_ApproxCurve(
+            Geom_TrimmedCurve(
+                adaptor.Curve().Curve(),
+                adaptor.FirstParameter(),
+                adaptor.LastParameter(),
+            ),
+            TOLERANCE / 10,
+            GeomAbs_C2,
+            100,  # maximum number of segments
+            9,  # maximum degree
+        )
+        if not approximation.HasResult():  # pragma: no cover
+            raise RuntimeError("2D offset curve could not be converted to a spline")
+        fitted = BRepBuilderAPI_MakeEdge(approximation.Curve()).Edge()
+        # The curve is stored without the placement or direction of its edge
+        fitted.Location(edge.wrapped.Location())
+        fitted.Orientation(edge.wrapped.Orientation())
+        fitted_edges.append(Edge(fitted))
+
+    # The edges were taken from the wire with its direction already applied to
+    # them, so the wire made from them winds the way the original does
+    return Wire(fitted_edges)
+
+
 def _joined_wire(
     edges: Sequence[Edge],
     before: Iterable[TopoDS_Shape],
@@ -550,14 +597,14 @@ class Mixin1D(Shape[TOPODS]):
     @property
     def is_closed(self) -> bool:
         """Are the start and end points equal?"""
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't determine if empty Edge or Wire is closed")
         return BRep_Tool.IsClosed_s(self.wrapped)
 
     @property
     def is_forward(self) -> bool:
         """Does the Edge/Wire loop forward or reverse"""
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't determine direction of empty Edge or Wire")
         return self.wrapped.Orientation() == TopAbs_Orientation.TopAbs_FORWARD
 
@@ -708,7 +755,7 @@ class Mixin1D(Shape[TOPODS]):
         summand_edges = [e for summand in summands for e in summand.edges()]
         brought = [s.wrapped for s in summands]
 
-        if self._wrapped is None:  # an empty object
+        if self.is_empty:  # an empty object
             if len(summands) == 1:
                 sum_shape: Edge | Wire | Shape = summands[0]
             else:
@@ -759,9 +806,7 @@ class Mixin1D(Shape[TOPODS]):
         Returns:
             Vector: center
         """
-        if self._wrapped is None:
-            raise ValueError("Can't find center of empty edge/wire")
-
+        self._needs_geometry("center")
         if center_of == CenterOf.GEOMETRY:
             middle = self.position_at(0.5)
         elif center_of == CenterOf.MASS:
@@ -796,6 +841,8 @@ class Mixin1D(Shape[TOPODS]):
         ]
         if any(not isinstance(line, (Edge, Wire)) for line in all_lines):
             raise ValueError("Only Edges or Wires are valid")
+        if any(line.is_empty for line in all_lines):
+            return None  # nothing lies in no plane
 
         result = None
         # Are they all co-axial - if so, select one of the infinite planes
@@ -898,7 +945,7 @@ class Mixin1D(Shape[TOPODS]):
             >>> show(my_wire, Curve(comb))
 
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't create curvature_comb for empty curve")
         pln = self.common_plane()
         if pln is None or not isclose(abs(pln.z_dir.Z), 1.0, abs_tol=TOLERANCE):
@@ -1054,7 +1101,7 @@ class Mixin1D(Shape[TOPODS]):
             section = self._bool_op_list((self,), (other,), BRepAlgoAPI_Section())
             # Extract vertices from section (edges already in Common for wires)
             for shape in section:
-                if isinstance(shape, Vertex) and not shape.is_null:
+                if isinstance(shape, Vertex) and not shape.is_empty:
                     results.append(shape)
 
         # 1D + Vertex: point containment on edge
@@ -1208,7 +1255,7 @@ class Mixin1D(Shape[TOPODS]):
         Returns:
 
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't find normal of empty edge/wire")
 
         curve = self.geom_adaptor()
@@ -1238,35 +1285,109 @@ class Mixin1D(Shape[TOPODS]):
         kind: Kind = Kind.ARC,
         side: Side = Side.BOTH,
         closed: bool = True,
+        plane: Plane | None = None,
+        as_bspline: bool = True,
     ) -> Edge | Wire:
         """2d Offset
 
-        Offsets a planar edge/wire
+        Offsets a planar edge/wire within its plane.
+
+        Left and right are those of someone travelling along the edge/wire from
+        its start with the normal of the plane pointing up. The plane is
+        ``plane`` if given, otherwise the one the edge/wire lies in, with its
+        normal taken from the location of the edge/wire or from Plane.XY where
+        one of them matches. A straight edge/wire lies in many planes: that of
+        its location is used if the line is in it, then Plane.XY.
+
+        The offset of a line is a line and that of a circle is a circle, but
+        the offset of any other curve is not a curve of the same kind. The
+        kernel describes it as an offset curve: the original curve and a
+        distance. By default each of these is replaced by a B-spline within a
+        tenth of TOLERANCE of it, as some operations - STEP export among them -
+        cannot handle offset curves.
 
         Args:
             distance (float): distance from edge/wire to offset
             kind (Kind, optional): offset corner transition. Defaults to Kind.ARC.
             side (Side, optional): side to place offset. Defaults to Side.BOTH.
             closed (bool, optional): if Side!=BOTH, close the LEFT or RIGHT
-                offset. Defaults to True.
+                offset of an open edge/wire. Defaults to True.
+            plane (Plane, optional): plane of the offset. Needed for a straight
+                edge/wire that is in neither the plane of its location nor
+                Plane.XY, and to set which side is left where the normal can't
+                be found. Defaults to None.
+            as_bspline (bool, optional): replace the kernel's offset curves with
+                B-splines; when False they are returned as they are, with a
+                geom_type of GeomType.OFFSET. Defaults to True.
         Raises:
             RuntimeError: 2D offset calculation failed
             RuntimeError: Multiple Wires generated
             RuntimeError: Unexpected result type
+            ValueError: Nothing is left of the offset on the requested side
 
         Returns:
             Wire: offset wire
         """
+        # pylint: disable=too-many-locals, too-many-branches, too-many-statements
         kind_dict = {
             Kind.ARC: GeomAbs_JoinType.GeomAbs_Arc,
             Kind.INTERSECTION: GeomAbs_JoinType.GeomAbs_Intersection,
             Kind.TANGENT: GeomAbs_JoinType.GeomAbs_Tangent,
         }
         line = self if isinstance(self, Wire) else Wire([self])
+        line_edges = line.edges()
+        start = line.position_at(0)
+        tangent = line.tangent_at(0)
+        start_axis = Axis(start, tangent)
+        is_straight = all(
+            edge.geom_type == GeomType.LINE
+            and Axis(edge @ 0, edge % 0).is_coaxial(start_axis)
+            for edge in line_edges
+        )
+
+        # The normal of the plane of the offset. The edge/wire fixes the plane
+        # but not which way its normal points, and a straight one doesn't fix
+        # the plane either, so both are settled by the location the edge/wire
+        # carries from the plane it was made on, or failing that by Plane.XY.
+        references = [
+            self.location.z_axis.direction,
+            line_edges[0].location.z_axis.direction,
+            Vector(0, 0, 1),
+        ]
+        normal: Vector | None = None
+        if plane is not None:
+            normal = plane.z_dir
+        elif is_straight:
+            for reference in references:
+                if abs(reference.dot(tangent)) < TOLERANCE:
+                    normal = reference
+                    break
+        else:
+            own_plane = line.common_plane()
+            if own_plane is not None:
+                normal = own_plane.z_dir
+                for reference in references:
+                    if abs(normal.dot(reference)) > 1 - TOLERANCE:
+                        normal = reference
+                        break
+
+        signed_distance = distance
+        if side != Side.BOTH and line.is_closed and normal is not None:
+            # The kernel offsets a closed wire outwards for a positive distance.
+            # Which side is the outside depends on the way round the wire runs.
+            steps = max(16, 8 * len(line_edges))
+            points = [line.position_at(i / steps) for i in range(steps)]
+            twice_area = sum(
+                (points[i] - points[0]).cross(points[i + 1] - points[0]).dot(normal)
+                for i in range(1, steps - 1)
+            )
+            left_is_outside = twice_area < 0
+            outwards = left_is_outside == (side == Side.LEFT)
+            signed_distance = abs(distance) if outwards else -abs(distance)
 
         # Avoiding a bug when the wire contains a single Edge
-        if len(line.edges()) == 1:
-            edge = line.edges()[0]
+        if len(line_edges) == 1:
+            edge = line_edges[0]
             # pylint: disable=[no-member]
             edges = [edge.trim(0.0, 0.5), edge.trim(0.5, 1.0)]
             topods_wire = Wire(edges).wrapped
@@ -1275,10 +1396,15 @@ class Mixin1D(Shape[TOPODS]):
         assert topods_wire is not None
 
         offset_builder = BRepOffsetAPI_MakeOffset()
-        offset_builder.Init(kind_dict[kind])
+        if is_straight and normal is not None:
+            # A straight line has no plane of its own to offset within
+            spine = BRepBuilderAPI_MakeFace(Plane(start, z_dir=normal).wrapped).Face()
+            offset_builder.Init(spine, kind_dict[kind])
+        else:
+            offset_builder.Init(kind_dict[kind])
         # offset_builder.SetApprox(True)
         offset_builder.AddWire(topods_wire)
-        offset_builder.Perform(distance)
+        offset_builder.Perform(signed_distance)
         if not offset_builder.IsDone():
             raise RuntimeError(f"2D offset failed with distance {distance}")
 
@@ -1287,10 +1413,12 @@ class Mixin1D(Shape[TOPODS]):
             obj = unwrap_topods_compound(obj, fully=True)
         if isinstance(obj, TopoDS_Wire):
             offset_wire = Wire(obj)
+            if as_bspline:
+                offset_wire = _offset_curves_to_bsplines(offset_wire)
         else:  # Likely multiple Wires were generated
             raise RuntimeError("Unexpected result type")
 
-        if side != Side.BOTH:
+        if side != Side.BOTH and not line.is_closed:
             # Find and remove the end arcs
             endpoints = (line.position_at(0), line.position_at(1))
             offset_edges = offset_wire.edges().filter_by(
@@ -1301,15 +1429,37 @@ class Mixin1D(Shape[TOPODS]):
                 reverse=True,
             )
             wires = edges_to_wires(offset_edges)
-            centers = [w.position_at(0.5) for w in wires]
-            angles = [
-                line.tangent_at(0).get_signed_angle(c - line.position_at(0))
-                for c in centers
-            ]
-            if side == Side.LEFT:
-                offset_wire = wires[int(angles[0] > angles[1])]
+            if normal is None:
+                centers = [w.position_at(0.5) for w in wires]
+                angles = [
+                    line.tangent_at(0).get_signed_angle(c - line.position_at(0))
+                    for c in centers
+                ]
+                if side == Side.LEFT:
+                    offset_wire = wires[int(angles[0] > angles[1])]
+                else:
+                    offset_wire = wires[int(angles[0] <= angles[1])]
             else:
-                offset_wire = wires[int(angles[0] <= angles[1])]
+                # Each side starts beside the start of the line, to its left or
+                # right. A side can be missing: offsetting an arc by more than
+                # its radius leaves nothing on the inside.
+                to_the_left = normal.cross(tangent)
+                on_side = []
+                for wire in wires:
+                    beside_start = min(
+                        (wire.position_at(0), wire.position_at(1)),
+                        key=lambda end: (end - start).length,
+                    )
+                    is_left = (beside_start - start).dot(to_the_left) > 0
+                    if is_left == (side == Side.LEFT):
+                        on_side.append(wire)
+                if not on_side:
+                    raise ValueError(
+                        f"Nothing is left of an offset of {distance} on the "
+                        f"{side.name} side - reduce the distance or use the "
+                        "other side"
+                    )
+                offset_wire = on_side[0]
 
             if closed:
                 self0 = line.position_at(0)
@@ -1443,7 +1593,7 @@ class Mixin1D(Shape[TOPODS]):
         Returns:
 
         """
-        if self._wrapped is None or not face:
+        if self.is_empty or not face:
             raise ValueError("Can't project an empty Edge or Wire onto empty Face")
 
         bldr = BRepProj_Projection(
@@ -1515,7 +1665,7 @@ class Mixin1D(Shape[TOPODS]):
 
             return edges
 
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't project empty edge/wire")
 
         # Setup the projector
@@ -2445,8 +2595,8 @@ class Edge(Mixin1D[TopoDS_Edge]):
     def make_mid_way(cls, first: Edge, second: Edge, middle: float = 0.5) -> Edge:
         """make line between edges
 
-        Create a new linear Edge between the two provided Edges. If the Edges are parallel
-        but in the opposite directions one Edge is flipped such that the mid way Edge isn't
+        Create a new linear Edge between the two provided Edges. If the Edges run in
+        opposite directions one Edge is flipped such that the mid way Edge isn't
         truncated.
 
         Args:
@@ -2457,7 +2607,12 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Edge: linear Edge between two Edges
         """
-        flip = Axis(first).is_opposite(Axis(second))
+        # The ends are paired by the way each Edge runs, which position_at follows.
+        # An Axis made from an Edge ignores a reversed orientation, so it can't be
+        # used to decide this.
+        first_run = first.position_at(1) - first.position_at(0)
+        second_run = second.position_at(1) - second.position_at(0)
+        flip = first_run.dot(second_run) < 0
         pnts = [
             Edge.make_line(
                 first.position_at(i), second.position_at(1 - i if flip else i)
@@ -2804,7 +2959,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             ShapeList[Vector]: list of intersection points
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't find intersections of empty edge")
 
         # Convert an Axis into an edge at least as large as self and Axis start point
@@ -2830,7 +2985,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
             self.param_at(0),
             self.param_at(1),
         )
-        if other is not None and other.wrapped is not None:
+        if other is not None and not other.is_empty:
             edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
                 other.wrapped,
                 edge_surface,
@@ -2932,7 +3087,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
     def geom_adaptor(self) -> BRepAdaptor_Curve:
         """Return the Geom Curve from this Edge"""
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't find adaptor for empty edge")
         return BRepAdaptor_Curve(self.wrapped)
 
@@ -3176,7 +3331,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
             float: Normalized parameter in [0.0, 1.0] corresponding to the point's
             closest location on the edge.
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't find param on empty edge")
 
         pnt = Vector(point)
@@ -3191,7 +3346,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         nearest_vertex = min(self.vertices(), key=lambda v: (Vector(v) - pnt).length)
         if (
             Vector(nearest_vertex) - pnt
-        ).length <= TOLERANCE and nearest_vertex.wrapped is not None:
+        ).length <= TOLERANCE and not nearest_vertex.is_empty:
             param = BRep_Tool.Parameter_s(nearest_vertex.wrapped, self.wrapped)
             curve_adaptor = BRepAdaptor_Curve(self.wrapped)
             u_value = GCPnts_AbscissaPoint.Length_s(curve_adaptor, param_min, param)
@@ -3315,7 +3470,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Edge: reversed
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("An empty edge can't be reversed")
 
         assert isinstance(self._wrapped, TopoDS_Edge)
@@ -3398,13 +3553,13 @@ class Edge(Mixin1D[TopoDS_Edge]):
         Returns:
             Edge: trimmed edge
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't trim empty edge")
 
         start_u = Mixin1D._to_param(self, start, "start")
 
         self_copy = copy.deepcopy(self)
-        assert self_copy.wrapped is not None
+        assert not self_copy.is_empty
 
         new_curve = BRep_Tool.Curve_s(
             self_copy.wrapped, self.param_at(0), self.param_at(1)
@@ -3429,8 +3584,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
     def trim_to_other(
         self: Edge,
         other: Shape | Axis | Location | Plane | VectorLike,
-    ) -> Edge | None:
-        """Return the shortest Edge of self trimmed by other or None if they don't intersect"""
+    ) -> Edge:
+        """Return the shortest Edge of self trimmed by other, or the empty Edge if
+        they don't intersect"""
 
         other_obj = Vector(other) if isinstance(other, Sequence) else other
 
@@ -3438,7 +3594,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         intersections = self.intersect(other_obj)
 
         if not intersections:
-            return None
+            return Edge()
 
         # Get the vertices from any edges and all of the other vertices
         intersection_pnts = intersections.vertices()
@@ -3700,7 +3856,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         wire_builder = BRepBuilderAPI_MakeWire()
         combined_edges = List_TopoDS_Shape()
         for edge in edges:
-            if edge.wrapped is not None:
+            if not edge.is_empty:
                 combined_edges.Append(edge.wrapped)
         wire_builder.Add(combined_edges)
 
@@ -3738,7 +3894,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         wires_out = HSequence_TopoDS_Shape()
 
         for edge in [e for w in wires for e in w.edges()]:
-            if edge.wrapped is not None:
+            if not edge.is_empty:
                 edges_in.Append(edge.wrapped)
 
         ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
@@ -4016,7 +4172,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         Returns:
             Wire: chamfered wire
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't chamfer empty wire")
 
         reference_edge = edge
@@ -4045,7 +4201,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
             )
 
             edge1, edge2 = Wire.order_chamfer_edges(reference_edge, edges)
-            if edge1.wrapped is not None and edge2.wrapped is not None:
+            if not edge1.is_empty and not edge2.is_empty:
                 chamfer_builder.AddChamfer(
                     TopoDS.Edge(edge1.wrapped),
                     TopoDS.Edge(edge2.wrapped),
@@ -4079,6 +4235,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
     def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
         """edges - all the edges in this Shape, in connection order"""
+        if self.is_empty:
+            return ShapeList()
         # The WireExplorer is a tool to explore the edges of a wire in a connection order.
         explorer = BRepTools_WireExplorer(self.wrapped)
 
@@ -4122,7 +4280,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         Returns:
             Wire: filleted wire
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't fillet an empty wire")
 
         wire_pln = self.common_plane()
@@ -4185,7 +4343,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         Returns:
             Wire: fixed wire
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't fix an empty edge")
 
         sf_w = ShapeFix_Wireframe(self.wrapped)
@@ -4197,7 +4355,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
     def geom_adaptor(self) -> BRepAdaptor_CompCurve:
         """Return the Geom Comp Curve for this Wire"""
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't get geom adaptor of empty wire")
 
         return BRepAdaptor_CompCurve(self.wrapped)
@@ -4310,12 +4468,12 @@ class Wire(Mixin1D[TopoDS_Wire]):
             float: Normalized parameter in [0.0, 1.0] representing the relative
             position of the projected point along the wire.
         """
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't find point on empty wire")
 
         point_on_curve = Vector(point)
         vertex_on_curve = Vertex(point_on_curve)
-        assert vertex_on_curve.wrapped is not None
+        assert not vertex_on_curve.is_empty
 
         separation = self.distance_to(point)
         if not isclose_b(separation, 0, abs_tol=TOLERANCE):
@@ -4491,7 +4649,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
           ValueError: Only one of direction or center must be provided
 
         """
-        if self._wrapped is None or not target_object:
+        if self.is_empty or not target_object:
             raise ValueError("Can't project empty Wires or to empty Shapes")
 
         if direction is not None and center is None:
@@ -4583,7 +4741,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         Returns:
             Wire: stitched wires
         """
-        if self._wrapped is None or not other:
+        if self.is_empty or not other:
             raise ValueError("Can't stitch empty wires")
 
         wire_builder = BRepBuilderAPI_MakeWire()
@@ -4627,7 +4785,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         """
         # Build a single Geom_BSplineCurve from the wire, in *topological order*
         builder = GeomConvert_CompCurveToBSplineCurve()
-        if self._wrapped is None:
+        if self.is_empty:
             raise ValueError("Can't convert an empty wire")
         wire_explorer = BRepTools_WireExplorer(self.wrapped)
 
@@ -4728,7 +4886,7 @@ def edges_to_wires(edges: Iterable[Edge], tol: float = 1e-6) -> ShapeList[Wire]:
     wires_out = HSequence_TopoDS_Shape()
 
     for edge in edges:
-        if edge.wrapped is not None:
+        if not edge.is_empty:
             edges_in.Append(edge.wrapped)
     ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
 
@@ -4784,7 +4942,7 @@ def topo_explore_connected_edges(
     connected_edges = set()
 
     # Find all the TopoDS_Edges for this Shape
-    topods_edges = [e.wrapped for e in parent.edges() if e.wrapped is not None]
+    topods_edges = [e.wrapped for e in parent.edges() if not e.is_empty]
 
     # Work with the parent's own copy of the edge so vertices match
     parent_edge = find_same_topods(edge.wrapped, topods_edges)
@@ -4798,13 +4956,10 @@ def topo_explore_connected_edges(
         if given_topods_edge.IsSame(topods_edge):
             continue
         # If the edge shares a vertex with the given edge they are connected
-        common_topods_vertex: Vertex | None = topo_explore_common_vertex(
+        common_topods_vertex = topo_explore_common_vertex(
             given_topods_edge, topods_edge
         )
-        if (
-            common_topods_vertex is not None
-            and common_topods_vertex.wrapped is not None
-        ):
+        if not common_topods_vertex.is_empty:
             # shared_vertex is the TopoDS_Vertex common to edge1 and edge2
             u1 = BRep_Tool.Parameter_s(common_topods_vertex.wrapped, given_topods_edge)
             u2 = BRep_Tool.Parameter_s(common_topods_vertex.wrapped, topods_edge)

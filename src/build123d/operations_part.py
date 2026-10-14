@@ -133,16 +133,25 @@ def extrude(
         until (Until, optional): extrude limit. Defaults to None.
         target (Shape, optional): extrude until target. Defaults to None.
         both (bool, optional): extrude in both directions. Defaults to False.
-        taper (float, optional): taper angle. Defaults to 0.0.
+        taper (float, optional): taper angle in degrees. A positive angle narrows
+            the extrusion as it moves away from the face and a negative angle
+            widens it. The sides are drafted where they are planes, cylinders or
+            cones, which keeps sharp corners sharp, and lofted otherwise. Only
+            applied when extruding by an amount. Defaults to 0.0.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
-        ValueError: Inputs do not identify faces or sheets that can be thickened.
-        TypeError: ``sheet_parameters`` has the wrong type.
+        ValueError: A face or sketch must be provided
+        ValueError: dir must be provided when extruding non-planar faces
+        ValueError: Either amount or until must be provided
+        ValueError: A target object must be provided
+        ValueError: The extrusion does not reach the target
+        RuntimeError: The tapered solid could not be built, as when the taper
+            collapses the face over the extrusion distance
 
     Returns:
-        The material created from the input faces or sheets.
+        Part: extruded object
     """
     context: BuildPart | None = BuildPart._get_context("extrude")
     validate_inputs(context, "extrude", to_extrude)
@@ -219,7 +228,7 @@ def extrude(
                     target_object = context.part_local
                 else:
                     target_object = target
-                if target_object is None:
+                if not target_object:
                     raise ValueError("No target object provided")
 
                 new_solids.append(
@@ -284,7 +293,10 @@ def loft(
         context.pending_faces = []
         context.pending_face_planes = []
     else:
-        input_sections = section_list
+        # an empty section is no section; a loft through nothing is nothing
+        input_sections = [s for s in section_list if s]
+        if not input_sections:
+            return Part()
 
     # Validate Vertex placement
     if any(isinstance(s, Vertex) for s in input_sections):
@@ -361,10 +373,11 @@ def loft(
         except Exception as e:
             raise RuntimeError("Failed to create valid loft") from e
 
+    if clean:
+        new_solid = new_solid.clean()
+
     if context is not None:
         context._add_to_context(new_solid, clean=clean, mode=mode)
-    elif clean:
-        new_solid = new_solid.clean()
 
     return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
 
@@ -579,14 +592,13 @@ def revolve(
         profile_faces = profile_list.faces()
 
     new_solids = [Solid.revolve(profile, angle, axis) for profile in profile_faces]
+    if clean:
+        new_solids = [solid.clean() for solid in new_solids]
 
-    new_solid = Compound(new_solids)
     if context is not None:
         context._add_to_context(*new_solids, clean=clean, mode=mode)
-    elif clean:
-        new_solid = new_solid.clean()
 
-    return Part(new_solid.wrapped)
+    return Part(Compound(new_solids).wrapped)
 
 
 def section(
@@ -642,7 +654,7 @@ def section(
     new_objects: list[Face | Shell] = []
     for plane in planes:
         intersection = to_section.intersect(plane)
-        if intersection is not None:
+        if intersection:
             new_objects.extend(intersection)
 
     if context is not None:

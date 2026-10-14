@@ -13,7 +13,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from fontTools.ttLib import TTCollection, TTFont
+from fontTools.ttLib import TTCollection, TTFont, newTable
+from fontTools.ttLib.tables._f_v_a_r import NamedInstance
 from OCP.TCollection import TCollection_AsciiString
 
 from build123d import available_fonts, FontStyle
@@ -88,6 +89,79 @@ class TestFontManager(unittest.TestCase):
             font_names = manager.register_font(str(fake_ttf))
 
         self.assertTrue(font_names)
+
+    def _bundled_font(self, index: int) -> TTFont:
+        manager = FontManager()
+        font_path = (
+            Path(__file__).resolve().parent.parent
+            / "src/build123d"
+            / manager.bundled_path
+            / manager.bundled_fonts[index][1]
+        )
+        return TTFont(str(font_path))
+
+    def test_font_faces_keep_their_place_in_a_collection(self):
+        """Issue #1485: the second font of a collection is face 1, not face 0."""
+        manager = FontManager()
+        collection = TTCollection()
+        collection.fonts = [self._bundled_font(0), self._bundled_font(0)]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = str(Path(tmp_dir) / "two_fonts.ttc")
+            collection.save(path)
+
+            with patch.object(
+                manager, "_get_font_faces", wraps=manager._get_font_faces
+            ) as get_faces:
+                self.assertTrue(manager.register_font(path))
+            self.assertEqual(
+                [call.args[2] for call in get_faces.call_args_list], [0, 1]
+            )
+
+        for face_index in (0, 1):
+            (face,) = manager._get_font_faces(
+                collection.fonts[face_index], "two_fonts.ttc", face_index
+            )
+            aspect = next(a for a in FONT_ASPECT.values() if face.HasFontAspect(a))
+            self.assertEqual(face.FontFaceId(aspect), face_index)
+
+    def test_font_faces_of_a_variable_font(self):
+        """Issue #1485: one face per named instance, numbered from 1 in the
+        font's order, however many languages name each instance."""
+        font = self._bundled_font(0)
+        family = FontManager()._get_font_faces(font, "plain.ttf")[0].FontName()
+
+        names = font["name"]
+        for name_id, english, german in (
+            (256, "Light", "Leicht"),
+            (257, "Black", "Schwarz"),
+        ):
+            names.setName(german, name_id, 3, 1, 0x407)
+            names.setName(english, name_id, 3, 1, 0x409)
+        fvar = newTable("fvar")
+        fvar.axes = []
+        fvar.instances = []
+        for name_id in (257, 256):  # listed Black first, then Light
+            instance = NamedInstance()
+            instance.subfamilyNameID = name_id
+            instance.coordinates = {}
+            fvar.instances.append(instance)
+        font["fvar"] = fvar
+
+        faces = FontManager()._get_font_faces(font, "variable.ttf", 3)
+        found = []
+        for face in faces:
+            aspect = next(a for a in FONT_ASPECT.values() if face.HasFontAspect(a))
+            found.append((face.FontName().ToCString(), face.FontFaceId(aspect)))
+        base = family.ToCString()
+        self.assertEqual(found[0], (base, 3))
+        self.assertEqual(len(found), 3)
+        self.assertEqual(
+            [face_id for _, face_id in found[1:]], [3 | (1 << 16), 3 | (2 << 16)]
+        )
+        # the first record of each name is used, as for the family name
+        self.assertEqual(found[1][0], f"{base} Schwarz")
+        self.assertEqual(found[2][0], f"{base} Leicht")
 
     def test_register_corrupt_font(self):
         """A malformed font is skipped with a warning."""

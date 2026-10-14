@@ -354,9 +354,9 @@ class TestLocation(unittest.TestCase):
         e4 = Edge.make_line((1, -1), (1, 1))
         e5 = Edge.make_line((2, -1), (2, 1))
         i = e3.intersect(e4, e5)
-        self.assertIsNone(i)
+        self.assertEqual(i, [])
 
-        self.assertIsNone(b.intersect(b.moved(Pos(X=10))))
+        self.assertEqual(b.intersect(b.moved(Pos(X=10))), [])
 
         # Look for common vertices (endpoint-endpoint contacts are "touch", not "intersect")
         e1 = Edge.make_line((0, 0), (1, 0))

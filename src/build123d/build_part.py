@@ -31,7 +31,7 @@ license:
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from build123d.build_common import Builder, logger
 from build123d.build_enums import Mode
@@ -68,7 +68,7 @@ class BuildPart(Builder[Part]):
         mode: Mode = Mode.ADD,
     ):
         self.joints: dict[str, Joint] = {}
-        self._part: Part | None = None  # Use a private attribute
+        self._part: Part = Part()  # nothing yet; use a private attribute
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []
         self.pending_planes: list[Plane] = []
@@ -98,9 +98,9 @@ class BuildPart(Builder[Part]):
         super()._accept_publication(build_product, source, mode)
 
     @property
-    def part(self) -> Part | None:
+    def part(self) -> Part:
         """Get the placed part."""
-        return self._output_obj()
+        return cast(Part, self._output_obj())
 
     @part.setter
     def part(self, value: Part) -> None:
@@ -108,12 +108,12 @@ class BuildPart(Builder[Part]):
         self._part = value
 
     @property
-    def part_local(self) -> Part | None:
+    def part_local(self) -> Part:
         """Get the part in the Builder's local construction coordinates."""
         return self._part
 
     @property
-    def _obj(self) -> Part | None:
+    def _obj(self) -> Part:
         """Alias _obj to part"""
         return self._part
 
@@ -130,7 +130,7 @@ class BuildPart(Builder[Part]):
     @property
     def location(self) -> Location:
         """Builder's location"""
-        return self.part.location if self.part is not None else Location()
+        return self.part.location if self.part else Location()
 
     def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
         """Add objects to BuildPart pending lists

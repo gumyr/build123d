@@ -70,12 +70,12 @@ class BuildSketch(Builder[Sketch]):
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
-        self._sketch_local: Sketch | None = None
+        self._sketch_local: Sketch = Sketch()  # nothing yet
         self.pending_edges: ShapeList[Edge] = ShapeList()
         super().__init__(*placements, mode=mode)
 
     @property
-    def sketch_local(self) -> Sketch | None:
+    def sketch_local(self) -> Sketch:
         """Get the builder's object"""
         return self._sketch_local
 
@@ -85,7 +85,7 @@ class BuildSketch(Builder[Sketch]):
         self._sketch_local = value
 
     @property
-    def _obj(self) -> Sketch | None:
+    def _obj(self) -> Sketch:
         """Alias _obj to sketch"""
         return self._sketch_local
 

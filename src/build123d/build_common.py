@@ -244,8 +244,8 @@ class Builder(ABC, Generic[ShapeT]):
 
     @property
     @abstractmethod
-    def _obj(self) -> Shape | None:
-        """Object to pass to parent"""
+    def _obj(self) -> Shape:
+        """Object to pass to parent; the empty shape until something is built"""
         raise NotImplementedError  # pragma: no cover
 
     @_obj.setter
@@ -328,7 +328,7 @@ class Builder(ABC, Generic[ShapeT]):
     def _exit_extras(self):
         """Any builder specific exit actions"""
 
-    def _publication_product(self) -> Shape | None:
+    def _publication_product(self) -> Shape:
         """Return the local object published to the parent on context exit."""
         return self._obj
 
@@ -360,9 +360,9 @@ class Builder(ABC, Generic[ShapeT]):
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
-            if local_product is None and not sys.exc_info()[1]:
+            if not local_product and not sys.exc_info()[1]:
                 warnings.warn(
-                    f"{self._obj_name} is None - {self._tag} didn't create anything",
+                    f"{self._tag} created nothing - its {self._obj_name} is empty",
                     stacklevel=2,
                 )
         self._published_obj = _PublicationService.publish(
@@ -384,19 +384,17 @@ class Builder(ABC, Generic[ShapeT]):
 
         logger.info("Exiting %s", type(self).__name__)
 
-    def _place_output(self) -> Shape | None:
+    def _place_output(self) -> Shape:
         """Apply publication locations and output placements to the local product."""
         scope = _get_build_scope()
         assert scope is not None and scope.owner is self
-        try:
-            local_product = self._obj
-        except AttributeError:
-            return None
-        return _PublicationService.place(
+        local_product = self._obj
+        placed = _PublicationService.place(
             local_product, scope, result_type=self._sub_class
         )
+        return local_product if placed is None else placed
 
-    def _output_obj(self) -> Shape | None:
+    def _output_obj(self) -> Shape:
         """Return placed output during and after Builder construction."""
         if self._placed_obj is not None:
             return self._placed_obj
@@ -561,7 +559,7 @@ class Builder(ABC, Generic[ShapeT]):
                 needs_clean = clean
                 brought_in = list(typed[self._shape])
                 if mode == Mode.ADD:
-                    if self._obj is None:
+                    if not self._obj:
                         if len(typed[self._shape]) == 1:
                             combined = typed[self._shape][0]
                             history = ShapeHistory()  # nothing changed: all untouched
@@ -576,13 +574,14 @@ class Builder(ABC, Generic[ShapeT]):
                         needs_clean = False
                         history = ShapeHistory.of(combined)
                 elif mode == Mode.SUBTRACT:
-                    if self._obj is None:
+                    # a first operation that removes is a mistake, not a zero
+                    if not self._obj:
                         raise RuntimeError("Nothing to subtract from")
                     combined = self._obj.cut(*typed[self._shape])
                     needs_clean = False
                     history = ShapeHistory.of(combined)
                 elif mode == Mode.INTERSECT:
-                    if self._obj is None:
+                    if not self._obj:
                         raise RuntimeError("Nothing to intersect with")
                     combined = self._obj.intersect(Compound(typed[self._shape]))
                     needs_clean = False
@@ -597,7 +596,7 @@ class Builder(ABC, Generic[ShapeT]):
                     history = ShapeHistory.of(*objects)
                     combined = self._sub_class(list(typed[self._shape]))
 
-                if combined is None:  # empty intersection result
+                if not combined:  # empty intersection result
                     self._obj = self._sub_class()
                 elif isinstance(
                     combined, list
@@ -612,7 +611,7 @@ class Builder(ABC, Generic[ShapeT]):
                 #     else combined
                 # )
 
-                if self._obj is not None and needs_clean:
+                if needs_clean:
                     self._obj = self._obj.clean()
                     cleaned = getattr(self._obj, "_history", None)
                     if history is not None and cleaned is not None:
@@ -632,19 +631,18 @@ class Builder(ABC, Generic[ShapeT]):
             # the sub-shapes still identical to before are untouched and
             # everything else is new
             record = (history if history is not None else ShapeHistory()).with_inputs(
-                [] if self.obj_before is None else [self.obj_before.wrapped],
+                [] if not self.obj_before else [self.obj_before.wrapped],
                 (s.wrapped for s in brought_in),
             )
 
             # Cast to appropriate base types (Curve, Sketch or Part)
             # _sub_class is an abstract class variable assigned in the sub classes
             # pylint: disable=not-callable
-            if self._obj is not None:
-                if isinstance(self._obj, Compound):
-                    self._obj = self._sub_class(self._obj.wrapped)
-                else:
-                    self._obj = self._sub_class(Compound(self._shapes()).wrapped)
-                self._obj._made_by(record)
+            if isinstance(self._obj, Compound):
+                self._obj = self._sub_class(self._obj.wrapped)
+            else:
+                self._obj = self._sub_class(Compound(self._shapes()).wrapped)
+            self._obj._made_by(record)
 
             # Add to pending
             if self._tag == "BuildPart":
@@ -674,7 +672,7 @@ class Builder(ABC, Generic[ShapeT]):
         """
         vertex_list: list[Vertex] = []
         if select == Select.ALL:
-            obj_edges = [] if self._obj is None else self._obj.edges()
+            obj_edges = self._obj.edges()
             for obj_edge in obj_edges:
                 vertex_list.extend(obj_edge.vertices())
         else:
@@ -710,7 +708,7 @@ class Builder(ABC, Generic[ShapeT]):
             ShapeList[Edge]: Edges extracted
         """
         if select == Select.ALL:
-            edge_list = ShapeList() if self._obj is None else self._obj.edges()
+            edge_list = self._obj.edges()
         else:
             edge_list = self._selected(Edge, select)
         return ShapeList(edge_list)
@@ -744,7 +742,7 @@ class Builder(ABC, Generic[ShapeT]):
             ShapeList[Wire]: Wires extracted
         """
         if select == Select.ALL:
-            wire_list = ShapeList() if self._obj is None else self._obj.wires()
+            wire_list = self._obj.wires()
         else:
             wire_list = Wire.combine(self.edges(select))
         return ShapeList(wire_list)
@@ -778,7 +776,7 @@ class Builder(ABC, Generic[ShapeT]):
             ShapeList[Face]: Faces extracted
         """
         if select == Select.ALL:
-            face_list = ShapeList() if self._obj is None else self._obj.faces()
+            face_list = self._obj.faces()
         else:
             face_list = self._selected(Face, select)
         return ShapeList(face_list)
@@ -812,7 +810,7 @@ class Builder(ABC, Generic[ShapeT]):
             ShapeList[Solid]: Solids extracted
         """
         if select == Select.ALL:
-            solid_list = ShapeList() if self._obj is None else self._obj.solids()
+            solid_list = self._obj.solids()
         else:
             solid_list = self._selected(Solid, select)
         return ShapeList(solid_list)
@@ -840,8 +838,6 @@ class Builder(ABC, Generic[ShapeT]):
         select: Select,
     ) -> ShapeList:
         """Shapes of one type as the object's own record classifies them."""
-        if self._obj is None:
-            return ShapeList()
         if cls == Vertex:
             return self._obj.vertices(select)
         if cls == Edge:
@@ -870,8 +866,6 @@ class Builder(ABC, Generic[ShapeT]):
     ) -> ShapeList:
         """Extract Shapes"""
         obj_type = self._shape if obj_type is None else obj_type
-        if self._obj is None:
-            return ShapeList()
 
         if obj_type == Vertex:
             return self._obj.vertices()
@@ -1654,7 +1648,7 @@ class _PublicationService:
         result_type: Type[Shape] | None = None,
     ) -> Shape | None:
         """Apply every publication/output placement combination exactly once."""
-        if build_product is None or getattr(build_product, "_wrapped", None) is None:
+        if build_product is None:
             return None
         if scope.publication_locations == (Location(),) and scope.output_placements == (
             Location(),

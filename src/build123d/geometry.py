@@ -1150,6 +1150,15 @@ class BoundBox:
         return prod([x for x in self.size if x > TOLERANCE])
 
     @property
+    def is_empty(self) -> bool:
+        """True for the bounding box of nothing
+
+        An empty box has zero size at the origin, adds nothing to another box,
+        and contains, covers, touches and intersects nothing.
+        """
+        return self.wrapped is None
+
+    @property
     def diagonal(self) -> float:
         """body diagonal length (i.e. object maximum size)"""
         if self.wrapped is None:
@@ -2253,6 +2262,11 @@ class OrientedBoundBox:
         return self._wrapped
 
     @property
+    def is_empty(self) -> bool:
+        """True for the oriented bounding box of nothing, which has no size or axes"""
+        return self.wrapped.IsVoid()
+
+    @property
     def corners(self) -> list[Vector]:
         """
         Compute and return the unique corner points of the oriented bounding box
@@ -2318,6 +2332,8 @@ class OrientedBoundBox:
             Plane: The coordinate system defined by the center and primary
                    (X) and tertiary (Z) directions of the bounding box.
         """
+        if self.is_empty:
+            return Plane.XY  # nothing has no axes of its own
         return Plane(
             origin=self.center(), x_dir=self.x_direction, z_dir=self.z_direction
         )
@@ -2330,6 +2346,8 @@ class OrientedBoundBox:
         Returns:
             Vector: The oriented size (full dimensions) of the box.
         """
+        if self.is_empty:
+            return Vector(0, 0, 0)
         return (
             Vector(self.wrapped.XHSize(), self.wrapped.YHSize(), self.wrapped.ZHSize())
             * 2.0
@@ -3300,6 +3318,9 @@ class Plane(metaclass=PlaneMeta):
             return Location(self) * other
         if isinstance(other, Plane):
             return Location(self) * other.location
+        if callable(getattr(other, "moved", None)):
+            # a shape, iterable or not, is moved as a whole by its own __rmul__
+            return NotImplemented
         try:
             others = list(other)
             if all(isinstance(other, Location | Plane) for other in others):
@@ -3453,17 +3474,22 @@ class Plane(metaclass=PlaneMeta):
         rotation: VectorLike = (0, 0, 0),
         ordering: Extrinsic | Intrinsic | None = None,
     ) -> Plane:
-        """Returns a copy of this plane, rotated about the specified axes
+        """Returns a copy of this plane, rotated about its own axes
 
-        The origin of the workplane is unaffected by the rotation.
+        The angles are about the plane's own x, y and z directions, not the
+        world axes: ``Plane.XZ.rotated((0, 0, 90))`` turns the plane about its
+        normal and leaves it in the XZ plane, with its x direction now along
+        world Z. For a plane whose axes coincide with the world's, such as
+        ``Plane.XY``, the two readings are the same. The origin of the plane is
+        unaffected by the rotation.
 
         Rotations are done in order x, y, z. If you need a different order,
         specify ordering. e.g. Intrinsic.ZYX changes rotation to
         (z angle, y angle, x angle) and rotates in that order.
 
         Args:
-            rotation (VectorLike, optional): (x angle, y angle, z angle).
-                Defaults to (0, 0, 0)
+            rotation (VectorLike, optional): (x angle, y angle, z angle), each
+                about the plane's own direction of that name. Defaults to (0, 0, 0)
             ordering (Intrinsic |  Extrinsic, optional): order of rotations in
                 Intrinsic or Extrinsic rotation mode. Defaults to Intrinsic.XYZ
 
@@ -3474,16 +3500,10 @@ class Plane(metaclass=PlaneMeta):
         if ordering is None:
             ordering = Intrinsic.XYZ
 
-        # Note: this is not a geometric Vector
-        a1, a2, a3 = map(radians, Vector(rotation))
-        quaternion = gp_Quaternion()
-        quaternion.SetEulerAngles(Location._rot_order_dict[ordering], a1, a2, a3)
-        trsf_rotation = gp_Trsf()
-        trsf_rotation.SetRotation(quaternion)
-
-        ax = self.to_gp_ax2().Transformed(trsf_rotation)
-        ax.SetLocation(self.wrapped.Location())
-        return Plane(gp_Pln(gp_Ax3(ax)))
+        # A rotation applied after the plane's own location acts in the
+        # plane's frame, about its origin
+        x_angle, y_angle, z_angle = Vector(rotation)  # not a geometric vector
+        return Plane(self.location * Rotation((x_angle, y_angle, z_angle), ordering))
 
     def moved(self, loc: Location | Plane) -> Plane:
         """Change the position & orientation of a copy of self by applying a relative location
