@@ -33,6 +33,8 @@ from __future__ import annotations
 
 from typing import ClassVar, cast
 
+from typing_extensions import deprecated
+
 from build123d.build_common import Builder, logger
 from build123d.build_enums import Mode
 from build123d.build_sheet import BuildSheet
@@ -128,9 +130,18 @@ class BuildPart(Builder[Part]):
         return Wire.combine(self.pending_edges)[0]
 
     @property
+    @deprecated(
+        "BuildPart.location is deprecated: a builder has no single location. "
+        "Its workplanes are placements and its placed output is part."
+    )
     def location(self) -> Location:
-        """Builder's location"""
-        return self.part.location if self.part else Location()
+        """The identity; a builder constructs in its own frame.
+
+        .. deprecated::
+            A builder has no single location. Its workplanes are
+            :attr:`placements` and its placed output is :attr:`part`.
+        """
+        return Location()
 
     def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
         """Add objects to BuildPart pending lists

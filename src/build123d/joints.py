@@ -50,6 +50,13 @@ from build123d.topology import Compound, Edge, Joint, Solid
 # pylint: disable=arguments-differ
 
 
+def _owner_frame(owner: BuildPart | Solid | Compound) -> Location:
+    """The frame a joint on ``owner`` is stored relative to: a part's location, or
+    the identity for a builder, which constructs in its own frame and places the
+    joints with the part on exit"""
+    return Location() if isinstance(owner, BuildPart) else owner.location
+
+
 class RigidJoint(Joint):
     """RigidJoint
 
@@ -95,7 +102,9 @@ class RigidJoint(Joint):
         if joint_location is None:
             joint_location = Location()
 
-        self.relative_location = part_or_builder.location.inverse() * joint_location
+        self.relative_location = (
+            _owner_frame(part_or_builder).inverse() * joint_location
+        )
         part_or_builder.joints[label] = self
         super().__init__(label, part_or_builder)
 
@@ -284,7 +293,7 @@ class RevoluteJoint(Joint):
         else:
             self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
         self._angle: float | None = None
-        self.relative_axis = axis.located(part_or_builder.location.inverse())
+        self.relative_axis = axis.located(_owner_frame(part_or_builder).inverse())
         part_or_builder.joints[label] = self
         super().__init__(label, part_or_builder)
 
@@ -401,7 +410,7 @@ class LinearJoint(Joint):
         self.axis = axis
         self.linear_range = linear_range
         self.position = None
-        self.relative_axis = axis.located(part_or_builder.location.inverse())
+        self.relative_axis = axis.located(_owner_frame(part_or_builder).inverse())
         self.angle = None
         part_or_builder.joints[label] = self
         super().__init__(label, part_or_builder)
@@ -592,7 +601,7 @@ class CylindricalJoint(Joint):
             self.angle_reference = Plane(origin=(0, 0, 0), z_dir=axis.direction).x_dir
         self.angular_range = angular_range
         self.linear_range = linear_range
-        self.relative_axis = axis.located(part_or_builder.location.inverse())
+        self.relative_axis = axis.located(_owner_frame(part_or_builder).inverse())
         self.position: float | None = None
         self.angle: float | None = None
         part_or_builder.joints[label] = self
@@ -744,7 +753,9 @@ class BallJoint(Joint):
         if joint_location is None:
             joint_location = Location()
 
-        self.relative_location = part_or_builder.location.inverse() * joint_location
+        self.relative_location = (
+            _owner_frame(part_or_builder).inverse() * joint_location
+        )
         part_or_builder.joints[label] = self
         self.angular_range = angular_range
         self.angle_reference = angle_reference

@@ -31,7 +31,7 @@ import copy
 import unittest
 
 from build123d.build_enums import Align, CenterOf, GeomType
-from build123d.build_common import Mode
+from build123d.build_common import Locations, Mode
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Location, Plane, Rotation, Vector, VectorLike
@@ -563,6 +563,64 @@ class TestJointPropagation(DirectApiTestCase):
         base = base_builder.part
         self.assertVectorAlmostEquals(
             base.joints["top"].location.position, (0, 0, 3), 5
+        )
+
+
+class TestJointPlacement(DirectApiTestCase):
+    """Issue #1514: a joint made in a builder is placed with the part."""
+
+    def test_builder_location_is_deprecated(self):
+        with BuildPart() as builder:
+            Box(1, 1, 1)
+        with self.assertWarns(DeprecationWarning):
+            self.assertEqual(builder.location, Location())
+
+    def test_rigid_joint_follows_the_workplane(self):
+        plane = Plane.XZ.offset(10)
+        with BuildPart(plane) as builder:
+            Box(6, 6, 6)
+            top = builder.faces().sort_by(Axis.Z)[-1]
+            RigidJoint("top", joint_location=top.location_at(0.5, 0.5))
+        part = builder.part
+        joint = part.joints["top"]
+        expected = plane.location * Location((0, 0, 3))
+        self.assertVectorAlmostEquals(joint.location.position, expected.position, 5)
+        self.assertVectorAlmostEquals(
+            joint.location.orientation, expected.orientation, 5
+        )
+        # the joint sits on the face it was made from, on the placed part: the
+        # local top face, which Plane.XZ sends to the smallest world Y
+        face = part.faces().sort_by(Axis.Y)[0]
+        self.assertVectorAlmostEquals(joint.location.position, face.center(), 5)
+        # and a part connected to it lands on that face
+        peg = Box(1, 1, 2)
+        RigidJoint("base", peg, Location((0, 0, -1)))
+        joint.connect_to(peg.joints["base"])
+        self.assertTrue(
+            any((f.center() - face.center()).length < 1e-5 for f in peg.faces())
+        )
+
+    def test_revolute_joint_follows_the_workplane(self):
+        plane = Plane.XZ.offset(10)
+        axis = Axis((0, 0, 3), (1, 0, 0))
+        with BuildPart(plane) as builder:
+            Box(6, 6, 6)
+            RevoluteJoint("hinge", axis=axis)
+        joint = builder.part.joints["hinge"]
+        expected = plane.location * axis.location
+        self.assertVectorAlmostEquals(joint.location.position, expected.position, 5)
+        self.assertVectorAlmostEquals(
+            joint.location.orientation, expected.orientation, 5
+        )
+
+    def test_joint_follows_a_locations_context(self):
+        with BuildPart():
+            with Locations((20, 0, 0)):
+                with BuildPart() as inner:
+                    Box(2, 2, 2)
+                    RigidJoint("j", joint_location=Location((0, 0, 1)))
+        self.assertVectorAlmostEquals(
+            inner.part.joints["j"].location.position, (20, 0, 1), 5
         )
 
 
