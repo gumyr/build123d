@@ -81,7 +81,6 @@ license:
 
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
-import copy as copy_module
 import ctypes
 import math
 import os
@@ -97,6 +96,7 @@ import OCP.TopAbs as ta
 from lib3mf import Lib3MF
 from OCP.BRep import BRep_Tool
 from OCP.BRepBuilderAPI import (
+    BRepBuilderAPI_Copy,
     BRepBuilderAPI_MakeFace,
     BRepBuilderAPI_MakePolygon,
     BRepBuilderAPI_MakeSolid,
@@ -417,7 +417,7 @@ class Mesher:
 
             # Mesh the shape
             ocp_mesh_vertices, triangles = Mesher._mesh_shape(
-                copy_module.deepcopy(b3d_shape),
+                Shape.cast(BRepBuilderAPI_Copy(b3d_shape.wrapped).Shape()),
                 linear_deflection,
                 angular_deflection,
             )
