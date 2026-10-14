@@ -407,6 +407,7 @@ class Mixin3D(Shape[TOPODS]):
 
         Raises:
             ValueError: Kind.TANGENT not supported
+            RuntimeError: the kernel could not build the shell
 
         Returns:
             Solid: A hollow solid.
@@ -434,12 +435,19 @@ class Mixin3D(Shape[TOPODS]):
             Join=kind_dict[kind],
         )
         shell_builder.Build()
+        shell_shape = shell_builder.Shape()
+        # The kernel can report success and still hand back a null shape, and
+        # any method on a null shape is a segfault
+        if shell_shape.IsNull():
+            raise RuntimeError(
+                "hollow Error, an alternative kind may resolve this error"
+            )
 
         if faces:
-            return_value = self.__class__.cast(shell_builder.Shape())
+            return_value = self.__class__.cast(shell_shape)
 
         else:  # if no faces provided a watertight solid will be constructed
-            shell1 = self.__class__.cast(shell_builder.Shape()).shells()[0].wrapped
+            shell1 = self.__class__.cast(shell_shape).shells()[0].wrapped
             shell2 = self.shells()[0].wrapped  # pylint: disable=no-member
 
             # s1 can be outer or inner shell depending on the thickness sign
@@ -650,6 +658,7 @@ class Mixin3D(Shape[TOPODS]):
 
         Raises:
             ValueError: Kind.TANGENT not supported
+            RuntimeError: the kernel could not build the offset
 
         Returns:
             Solid: A shelled solid.
@@ -686,6 +695,12 @@ class Mixin3D(Shape[TOPODS]):
             raise RuntimeError(
                 "offset Error, an alternative kind may resolve this error"
             ) from err
+        # The kernel can report success and still hand back a null shape, and
+        # any method on a null shape is a segfault
+        if offset_occt_solid.IsNull():
+            raise RuntimeError(
+                "offset Error, an alternative kind may resolve this error"
+            )
 
         if offset_occt_solid.ShapeType() == ta.TopAbs_SOLID:
             offset_occt_solid = _forward_solid(TopoDS.Solid(offset_occt_solid))
@@ -1890,11 +1905,15 @@ class Solid(Mixin3D[TopoDS_Solid]):
         )
         offset_builder.MakeOffsetShape()
         try:
-            result = Solid(TopoDS.Solid(offset_builder.Shape()))
+            thickened = offset_builder.Shape()
         except StdFail_NotDone as err:
             raise RuntimeError("Error applying thicken to given surface") from err
+        # The kernel can report success and still hand back a null shape, and
+        # any method on a null shape is a segfault
+        if thickened.IsNull():
+            raise RuntimeError("Error applying thicken to given surface")
 
-        return result
+        return Solid(TopoDS.Solid(thickened))
 
     def draft(self, faces: Iterable[Face], neutral_plane: Plane, angle: float) -> Solid:
         """Apply a draft angle to the given faces of the solid.

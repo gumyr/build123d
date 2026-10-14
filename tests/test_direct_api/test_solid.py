@@ -52,6 +52,7 @@ import build123d
 from OCP.BRepOffsetAPI import BRepOffsetAPI_DraftAngle
 from OCP.StdFail import StdFail_NotDone
 from OCP.TopAbs import TopAbs_Orientation
+from OCP.TopoDS import TopoDS_Shape
 
 
 class TestSolid(unittest.TestCase):
@@ -394,6 +395,27 @@ class TestSolidThicken(unittest.TestCase):
         with patch(
             "build123d.topology.three_d.BRepOffset_MakeOffset",
             return_value=offset_builder,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Error applying thicken"):
+                Solid.thicken(Face.make_rect(1, 1), 1)
+
+    def test_null_kernel_result_raises(self):
+        # Issue #1516: the kernel can report success and return a null shape,
+        # on which any method segfaults; each offset path raises instead
+        builder = MagicMock()
+        builder.Shape.return_value = TopoDS_Shape()
+        box = Solid.make_box(1, 1, 1)
+        with patch(
+            "build123d.topology.three_d.BRepOffsetAPI_MakeThickSolid",
+            return_value=builder,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "offset Error"):
+                box.offset_3d([], -0.1)
+            with self.assertRaisesRegex(RuntimeError, "hollow Error"):
+                box.hollow([], -0.1)
+        with patch(
+            "build123d.topology.three_d.BRepOffset_MakeOffset",
+            return_value=builder,
         ):
             with self.assertRaisesRegex(RuntimeError, "Error applying thicken"):
                 Solid.thicken(Face.make_rect(1, 1), 1)
