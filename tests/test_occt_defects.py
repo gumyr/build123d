@@ -78,11 +78,11 @@ from build123d import (
     Sphere,
     Spline,
     Vector,
-    add,
     export_step,
     extrude,
     fillet,
     import_step,
+    insert,
     loft,
     make_face,
     make_hull,
@@ -180,7 +180,7 @@ class TestBooleanSeams(unittest.TestCase):
                 arc = profile.edges().sort_by(Axis.Y)[:-1].sort_by(Axis.X)[1:]
                 make_face(offset(arc, amount=8, side=Side.LEFT))
                 Rectangle(46, 16, align=Align.MIN)
-                add(profile, mode=Mode.INTERSECT)
+                insert(profile, mode=Mode.INTERSECT)
             extrude(section.sketch, amount=50)
             fillet(
                 part.faces()
