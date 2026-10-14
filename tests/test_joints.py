@@ -30,8 +30,10 @@ license:
 import copy
 import unittest
 
+import pickle
+
 from build123d.build_enums import Align, CenterOf, GeomType
-from build123d.build_common import Locations, Mode
+from build123d.build_common import GridLocations, Locations, Mode, PolarLocations
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Location, Plane, Rotation, Vector, VectorLike
@@ -45,7 +47,7 @@ from build123d.joints import (
 from build123d.objects_part import Box, Cone, Cylinder, Sphere
 from build123d.objects_sketch import Circle
 from build123d.operations_part import extrude
-from build123d.topology import Edge, Solid
+from build123d.topology import Edge, JointDict, Solid
 
 
 class DirectApiTestCase(unittest.TestCase):
@@ -93,8 +95,8 @@ class TestRigidJoint(DirectApiTestCase):
         self.assertTrue(isinstance(test.part.joints["test"], RigidJoint))
 
     def test_no_to_part(self):
-        with self.assertRaises(ValueError):
-            RigidJoint("test")
+        # a joint with no part and no builder is free
+        self.assertIsNone(RigidJoint("test").parent)
 
     def test_error_handling(self):
         j1 = RigidJoint("one", Box(1, 1, 1))
@@ -244,8 +246,7 @@ class TestRevoluteJoint(DirectApiTestCase):
         self.assertTrue(isinstance(test.part.joints["test"], RevoluteJoint))
 
     def test_no_to_part(self):
-        with self.assertRaises(ValueError):
-            RevoluteJoint("test")
+        self.assertIsNone(RevoluteJoint("test").parent)
 
 
 class TestLinearJoint(DirectApiTestCase):
@@ -311,8 +312,7 @@ class TestLinearJoint(DirectApiTestCase):
         self.assertTrue(isinstance(test.part.joints["test"], LinearJoint))
 
     def test_no_to_part(self):
-        with self.assertRaises(ValueError):
-            LinearJoint("test")
+        self.assertIsNone(LinearJoint("test").parent)
 
     def test_error_handling(self):
         j1 = LinearJoint("one", Box(1, 1, 1))
@@ -403,8 +403,7 @@ class TestCylindricalJoint(DirectApiTestCase):
         self.assertTrue(isinstance(test.part.joints["test"], CylindricalJoint))
 
     def test_no_to_part(self):
-        with self.assertRaises(ValueError):
-            CylindricalJoint("test")
+        self.assertIsNone(CylindricalJoint("test").parent)
 
     def test_error_handling(self):
         j1 = CylindricalJoint("one", Box(1, 1, 1))
@@ -456,8 +455,7 @@ class TestBallJoint(DirectApiTestCase):
         self.assertTrue(isinstance(test.part.joints["test"], BallJoint))
 
     def test_no_to_part(self):
-        with self.assertRaises(ValueError):
-            BallJoint("test")
+        self.assertIsNone(BallJoint("test").parent)
 
     def test_error_handling(self):
         j1 = BallJoint("one", Box(1, 1, 1))
@@ -681,6 +679,173 @@ class TestJointPlacement(DirectApiTestCase):
         self.assertVectorAlmostEquals(
             inner.part.joints["j"].location.position, (20, 0, 1), 5
         )
+
+
+class TestFreeJoints(DirectApiTestCase):
+    """Joints made without a part, placed with * and bound by assignment or +."""
+
+    def test_free_joint_has_its_own_location(self):
+        free = RigidJoint(joint_location=Location((5, 0, 1)))
+        self.assertIsNone(free.parent)
+        self.assertEqual(free.label, "")
+        self.assertVectorAlmostEquals(free.location.position, (5, 0, 1), 5)
+        self.assertGreater(free.symbol.bounding_box().diagonal, 0)
+        with self.assertRaisesRegex(ValueError, "free joint cannot be connected"):
+            free.connect_to(RigidJoint(joint_location=Location()))
+
+    def test_assignment_binds_a_joint_where_it_is(self):
+        part = Box(2, 2, 2).moved(Location((5, 0, 0)))
+        free = RigidJoint(joint_location=Location((5, 0, 1)))
+        part.joints["lid"] = free
+        self.assertIs(part.joints["lid"], free)
+        self.assertEqual(free.label, "lid")
+        self.assertIs(free.parent, part)
+        self.assertVectorAlmostEquals(free.location.position, (5, 0, 1), 5)
+        self.assertVectorAlmostEquals(free.relative_location.position, (0, 0, 1), 5)
+
+        # a joint moves across from another part without moving in the world
+        other = Box(2, 2, 2)
+        other.joints["lid"] = free
+        self.assertNotIn("lid", part.joints)
+        self.assertIs(other.joints["lid"].parent, other)
+        self.assertVectorAlmostEquals(free.location.position, (5, 0, 1), 5)
+
+        del other.joints["lid"]
+        self.assertIsNone(free.parent)
+        self.assertVectorAlmostEquals(free.location.position, (5, 0, 1), 5)
+        with self.assertRaises(TypeError):
+            part.joints["bad"] = "not a joint"
+
+    def test_joints_dict_methods_attach_and_free(self):
+        part = Box(2, 2, 2)
+        a, b = RigidJoint(), RigidJoint(joint_location=Location((0, 0, 1)))
+        part.joints.update({"a": a}, b=b)
+        self.assertEqual(sorted(part.joints), ["a", "b"])
+        self.assertTrue(all(j.parent is part for j in (a, b)))
+        self.assertIs(part.joints.setdefault("a", RigidJoint()), a)
+        self.assertIs(part.joints.pop("a"), a)
+        self.assertIsNone(a.parent)
+        part.joints |= {"c": RigidJoint()}
+        part.joints.clear()
+        self.assertIsNone(b.parent)
+        self.assertEqual(part.joints, {})
+
+    def test_multiplying_a_free_joint_places_copies(self):
+        joint = RigidJoint("mount", joint_location=Location((0, 0, 1)))
+        one = Location((1, 2, 3)) * joint
+        self.assertIsNot(one, joint)
+        self.assertEqual(one.label, "mount")
+        self.assertVectorAlmostEquals(one.location.position, (1, 2, 4), 5)
+
+        grid = GridLocations(60, 60, 2, 2) * joint
+        self.assertEqual(
+            [j.label for j in grid], ["mount0", "mount1", "mount2", "mount3"]
+        )
+        self.assertVectorAlmostEquals(grid[0].location.position, (-30, -30, 1), 5)
+        self.assertVectorAlmostEquals(
+            (Plane.XZ * RevoluteJoint(axis=Axis.Z)).relative_axis.direction,
+            (0, -1, 0),
+            5,
+        )
+
+        bound = Box(1, 1, 1)
+        RigidJoint("top", bound, Location((0, 0, 0.5)))
+        with self.assertRaisesRegex(ValueError, "bound to a part"):
+            Location((1, 0, 0)) * bound.joints["top"]
+
+    def test_adding_joints_binds_copies_to_the_result(self):
+        plate = Box(100, 100, 10)
+        top = plate.faces().sort_by(Axis.Z)[-1]
+        mounts = Plane(top) * GridLocations(60, 60, 2, 2) * RigidJoint("mount")
+        plated = plate + mounts
+        self.assertEqual(
+            sorted(plated.joints), ["mount0", "mount1", "mount2", "mount3"]
+        )
+        self.assertVectorAlmostEquals(
+            plated.joints["mount0"].location.position, (-30, -30, 5), 5
+        )
+        self.assertTrue(all(j.parent is plated for j in plated.joints.values()))
+        self.assertEqual(plate.joints, {})  # the operand is untouched
+        self.assertIsNone(mounts[0].parent)
+
+        mixed = plated + [Box(5, 5, 5).moved(Location((0, 0, 10))), RigidJoint("extra")]
+        self.assertEqual(len(mixed.joints), 5)
+        self.assertAlmostEqual(mixed.volume, 100 * 100 * 10 + 125, 5)
+        solid = Solid.make_box(1, 1, 1) + RigidJoint("s", joint_location=Location())
+        self.assertIsInstance(solid, Solid)
+        self.assertIn("s", solid.joints)
+        with self.assertRaisesRegex(ValueError, "needs a label"):
+            plate + RigidJoint()
+
+    def test_copies_keep_the_joints_dict(self):
+        plate = Box(10, 10, 2) + RigidJoint("top", joint_location=Location((0, 0, 1)))
+        for name, copied in (
+            ("deepcopy", copy.deepcopy(plate)),
+            ("moved", plate.moved(Location((0, 0, 50)))),
+            ("pickle", pickle.loads(pickle.dumps(plate))),
+        ):
+            with self.subTest(copy=name):
+                self.assertIsInstance(copied.joints, JointDict)
+                self.assertIs(copied.joints.owner, copied)
+                self.assertIs(copied.joints["top"].parent, copied)
+        self.assertVectorAlmostEquals(
+            plate.moved(Location((0, 0, 50))).joints["top"].location.position,
+            (0, 0, 51),
+            5,
+        )
+
+
+class TestJointsInLocations(DirectApiTestCase):
+    """A joint constructor inside a Locations context makes one joint per location."""
+
+    def test_builder_grid_of_joints(self):
+        with BuildPart() as builder:
+            Box(100, 100, 10)
+            with Locations(builder.faces().sort_by(Axis.Z)[-1]):
+                with GridLocations(60, 60, 2, 2):
+                    RigidJoint("mount")
+        part = builder.part
+        self.assertEqual(sorted(part.joints), ["mount0", "mount1", "mount2", "mount3"])
+        self.assertVectorAlmostEquals(
+            part.joints["mount0"].location.position, (-30, -30, 5), 5
+        )
+        self.assertTrue(all(j.parent is part for j in part.joints.values()))
+
+    def test_polar_locations_rotate_the_axis(self):
+        with BuildPart() as builder:
+            Box(10, 10, 2)
+            with PolarLocations(4, 3):
+                RevoluteJoint("hinge", axis=Axis.X)
+        directions = [
+            builder.part.joints[f"hinge{i}"].relative_axis.direction for i in range(3)
+        ]
+        self.assertVectorAlmostEquals(directions[0], (1, 0, 0), 5)
+        self.assertVectorAlmostEquals(directions[1], (-0.5, 0.866025, 0), 5)
+        self.assertVectorAlmostEquals(directions[2], (-0.5, -0.866025, 0), 5)
+
+    def test_label_sequence(self):
+        with BuildPart() as builder:
+            Box(10, 10, 2)
+            with GridLocations(4, 0, 2, 1):
+                RigidJoint(["left", "right"], joint_location=Location((0, 0, 1)))
+            with self.assertRaisesRegex(ValueError, "3 labels .* 2 locations"):
+                with GridLocations(4, 0, 2, 1):
+                    RigidJoint(["a", "b", "c"])
+            with self.assertRaisesRegex(ValueError, "needs a label"):
+                RigidJoint()
+        self.assertEqual(sorted(builder.part.joints), ["left", "right"])
+        self.assertVectorAlmostEquals(
+            builder.part.joints["left"].location.position, (-2, 0, 1), 5
+        )
+
+    def test_algebra_constructor_in_locations(self):
+        part = Box(10, 10, 2)
+        with GridLocations(4, 0, 2, 1):
+            RigidJoint("p", part, Location((0, 0, 1)))
+        self.assertEqual(sorted(part.joints), ["p0", "p1"])
+        self.assertVectorAlmostEquals(part.joints["p1"].location.position, (2, 0, 1), 5)
+        with self.assertRaisesRegex(ValueError, "single label"):
+            RigidJoint(["a", "b"])
 
 
 class TestJointValidation(DirectApiTestCase):

@@ -40,7 +40,17 @@ from build123d.build_enums import Mode
 from build123d.build_sheet import BuildSheet
 from build123d.geometry import Location, Plane
 from build123d.sheet_utils import SheetMetalParameters
-from build123d.topology import Edge, Face, Joint, Part, Shape, Shell, Solid, Wire
+from build123d.topology import (
+    Edge,
+    Face,
+    Joint,
+    JointDict,
+    Part,
+    Shape,
+    Shell,
+    Solid,
+    Wire,
+)
 
 
 class BuildPart(Builder[Part]):
@@ -69,7 +79,7 @@ class BuildPart(Builder[Part]):
         *placements: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
-        self._joints: dict[str, Joint] = {}
+        self._joints: JointDict = JointDict(self)
         self._part: Part = Part()  # nothing yet; use a private attribute
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []
@@ -126,9 +136,9 @@ class BuildPart(Builder[Part]):
     @joints.setter
     def joints(self, value: dict[str, Joint]) -> None:
         if self._placed_obj is not None:
-            self.part.joints = value
+            self.part.joints = JointDict(self.part, value)
         else:
-            self._joints = value
+            self._joints = JointDict(self, value)
 
     @property
     def _obj(self) -> Part:
@@ -187,6 +197,4 @@ class BuildPart(Builder[Part]):
     def _exit_extras(self):
         """Transfer joints on exit"""
         if self._joints:
-            self.part_local.joints = self._joints
-            for joint in self.part_local.joints.values():
-                joint.parent = self.part_local
+            self.part_local.joints = JointDict(self.part_local, self._joints)

@@ -37,6 +37,55 @@ The following sections provide more detail on the available joints and describes
 
 .. py:module:: joints
 
+****************
+Attaching Joints
+****************
+
+A joint is bound to a part in one of three ways. Giving the constructor a ``to_part``
+binds it on the spot; constructing it inside a :class:`~build_part.BuildPart` binds it
+to the part being built; and a joint made with neither is *free* - it has a location
+of its own and no parent - until it is assigned into a part's ``joints`` under its
+label, or added to a part with ``+``:
+
+.. code-block:: build123d
+
+    RigidJoint("top", part, Location((0, 0, 5)))               # bound on construction
+    part.joints["top"] = RigidJoint(joint_location=Location((0, 0, 5)))  # the same thing
+    part += RigidJoint("top", joint_location=Location((0, 0, 5)))        # a new part with the joint
+
+``part.joints`` is a dictionary of the part's joints by label. Assigning a joint to it
+binds the joint where it is in the world, so a joint can also be moved from one part
+to another this way, and deleting a joint frees it again. The ``+`` form follows the
+algebra rules: the operand is untouched and the result is a new part, sharing the
+geometry, with copies of the joints.
+
+A free joint can be placed with ``*`` like a shape, which is how joints are made in
+bulk in algebra mode: a :class:`~build_common.GridLocations` (or any iterable of
+locations) gives one copy per location, with the label suffixed by the location's
+index:
+
+.. code-block:: build123d
+
+    plate = Box(100, 100, 10)
+    top = plate.faces().sort_by(Axis.Z)[-1]
+    plate -= Plane(top) * GridLocations(60, 60, 2, 2) * Cylinder(5, 10)
+    plate += Plane(top) * GridLocations(60, 60, 2, 2) * RigidJoint("mount")
+    plate.joints["mount0"]  # ... mount3
+
+In builder mode the same comes from constructing the joint inside a locations
+context, alongside the geometry it belongs to:
+
+.. code-block:: build123d
+
+    with BuildPart() as joints_on_holes:
+        Box(100, 100, 10)
+        with Locations(joints_on_holes.faces().sort_by(Axis.Z)[-1]):
+            with GridLocations(60, 60, 2, 2):
+                Hole(5)
+                RigidJoint("mount")
+
+``label`` may also be a sequence with one label per location, used as given.
+
 ***********
 Rigid Joint
 ***********

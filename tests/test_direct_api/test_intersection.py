@@ -660,19 +660,6 @@ def test_compound_intersection_keeps_joints_connected_to_the_assembly():
     assert part.joints["top"].parent is part
 
 
-def test_compound_intersection_leaves_shared_joints_alone():
-    """A child's joint that the assembly also lists stays with the child."""
-    part = Solid.make_box(1, 1, 1)
-    RigidJoint("top", part, Location((0, 0, 1)))
-    assembly = Compound(children=[part])
-    assembly.joints["top"] = part.joints["top"]
-    assembly.location = Location((10, 0, 0))
-
-    assembly.intersect(Pos(10.5, 0.5, 0.5) * Box(1, 1, 1))
-    assert part.joints["top"].parent is part
-    assert tuple(part.joints["top"].location.position) == pytest.approx((0, 0, 1))
-
-
 def test_compound_elements_reach_only_consistent_trees():
     """Shapes reached from a placed child through its joints form valid trees."""
     a1 = Solid.make_box(1, 1, 1)

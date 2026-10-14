@@ -54,10 +54,13 @@ license:
 
 from __future__ import annotations
 
+import copy
 import warnings
 from collections.abc import Iterable
 from math import radians, tan
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, cast, overload
+
+from typing_extensions import Self
 
 from bd_materials import FinishedMaterial
 
@@ -134,6 +137,7 @@ from .one_d import Edge, Mixin1D, Wire
 from .shape_core import (
     TOPODS,
     Joint,
+    JointDict,
     Shape,
     ShapeList,
     _sew_topods_faces,
@@ -159,6 +163,52 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class Mixin3D(Shape[TOPODS]):
     """Additional methods to add to 3D Shape classes"""
+
+    joints: JointDict
+
+    # ---- Operators ----
+
+    # Only 3D shapes hold joints, so only their + accepts them. mypy refuses a
+    # wider operand type on an overloaded operator override, hence the ignore.
+    @overload  # type: ignore[override]
+    def __add__(self, other: None) -> Self: ...
+    @overload
+    def __add__(
+        self, other: Shape | Joint | Iterable[Shape | Joint]
+    ) -> Self | Compound: ...
+    def __add__(self, other):
+        """fuse shape to self operator +; joints among other are bound to the result"""
+        joints, shapes = Mixin3D._joint_operands(other)
+        result = super().__add__(shapes)
+        return result._with_joints(joints) if joints else result
+
+    @staticmethod
+    def _joint_operands(
+        other: None | Shape | Joint | Iterable[Shape | Joint],
+    ) -> tuple[list[Joint], None | Shape | list[Shape]]:
+        """Separate the joints from the shapes in a ``+`` operand"""
+        if isinstance(other, Joint):
+            return [other], None
+        if other is None or isinstance(other, Shape):
+            return [], other
+        items = list(other)
+        return (
+            [o for o in items if isinstance(o, Joint)],
+            [o for o in items if not isinstance(o, Joint)],
+        )
+
+    def _with_joints(self, joints: Iterable[Joint]) -> Self:
+        """A copy of self, sharing its geometry, with copies of ``joints`` bound to it
+
+        Raises:
+            ValueError: a joint has no label
+        """
+        result = copy.copy(self)
+        for joint in joints:
+            if not joint.label:
+                raise ValueError("A joint added to a part needs a label")
+            result.joints[joint.label] = copy.deepcopy(joint)
+        return result
 
     find_intersection_points = Mixin2D.find_intersection_points
 
@@ -819,7 +869,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             parent=parent,
         )
         self.material = material
-        self.joints = {} if joints is None else joints
+        self.joints = JointDict(self, joints)
 
     # ---- Properties ----
 
