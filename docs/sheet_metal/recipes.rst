@@ -124,7 +124,7 @@ A part from its drawing
 
 A U channel dimensioned to its outside faces, 60 wide, 40 high and 100 long,
 in 2 mm sheet bent to an inside radius of 3, is drawn with exactly those
-numbers: ``position`` puts the outside corner on the edge and ``length_mode``
+numbers: ``position`` puts the outside corner on the edge and ``length_from``
 measures the wall to the outer sharp:
 
 .. code-block:: build123d
@@ -137,7 +137,7 @@ measures the wall to the outer sharp:
                 channel.rims().filter_by(Axis.Y),
                 length=40,
                 position=BendPosition.MATERIAL_OUTSIDE,
-                length_mode=FlangeLength.OUTER_SHARP,
+                length_from=LengthFrom.OUTER_SHARP,
             )
         thicken()
 

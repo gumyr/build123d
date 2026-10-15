@@ -34,7 +34,12 @@ Enums
     :undoc-members:
     :noindex:
 
-.. autoclass:: build_enums.FlangeLength
+.. autoclass:: build_enums.LengthFrom
+    :members:
+    :undoc-members:
+    :noindex:
+
+.. autoclass:: build_enums.LengthMode
     :members:
     :undoc-members:
     :noindex:

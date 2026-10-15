@@ -116,13 +116,13 @@ How long the wall is
 
 ``length`` is the flat wall by default, measured from the bend's tangent line.
 A drawing usually gives the overall size instead, to a virtual sharp, and
-``length_mode`` takes it that way so the trigonometry is left to the flange:
+``length_from`` takes it that way so the trigonometry is left to the flange:
 
 .. image:: ../assets/sheet_metal/flange_length.svg
     :align: center
 
 =================  ============================================================
-Length mode        ``length`` is measured from
+Length from        ``length`` is measured from
 =================  ============================================================
 ``TANGENT``        The bend's tangent line: the length is the flat wall alone.
                    The default.
@@ -136,10 +136,36 @@ Length mode        ``length`` is measured from
     :start-after: [flange_length]
     :end-before: [flange_length]
 
-With ``position`` placing one corner on the edge and ``length_mode`` measuring
+With ``position`` placing one corner on the edge and ``length_from`` measuring
 to the other, a part can be modelled straight from its drawing dimensions. The
 worked example under :ref:`dimensioning <sheet_metal_dimensioning>` shows a
 channel drawn with its outside sizes.
+
+A wall at an angle is as often dimensioned by its height above the face it
+comes from, or by how far it reaches along that face, and ``length_mode``
+names which side of that triangle ``length`` is, as it does for ``PolarLine``:
+
+.. image:: ../assets/sheet_metal/flange_length_mode.svg
+    :align: center
+
+=================  ============================================================
+Length mode        ``length`` is
+=================  ============================================================
+``DIAGONAL``       The wall itself. The default.
+``VERTICAL``       The wall's height above the face it comes from.
+``HORIZONTAL``     The wall's run along that face.
+=================  ============================================================
+
+.. literalinclude:: ../sheet_metal_examples.py
+    :language: build123d
+    :start-after: [flange_length_mode]
+    :end-before: [flange_length_mode]
+
+The two combine as a drawing does: a leg at 60 degrees dimensioned by the
+overall height between its outside faces is ``length_mode=LengthMode.VERTICAL``
+measured ``length_from=LengthFrom.OUTER_SHARP``. A wall of 180 degrees lies
+along its face and has no height, and one of 90 degrees no run, so those
+modes are refused there.
 
 ************
 Algebra mode

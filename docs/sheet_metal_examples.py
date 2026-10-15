@@ -79,6 +79,11 @@ def vertical(x: float, y_min: float, y_max: float) -> list[Edge]:
     return [Edge.make_line((x, y_min), (x, y_max))]
 
 
+def horizontal(y: float, x_min: float, x_max: float) -> list[Edge]:
+    """A reference line across the page, for a marker."""
+    return [Edge.make_line((x_min, y), (x_max, y))]
+
+
 def projected(
     shape: Shape,
     view: VectorLike,
@@ -249,7 +254,7 @@ write_layout(
 
 
 # [flange_length]
-def wall_measured(length_mode: FlangeLength) -> Shell:
+def wall_measured(length_from: LengthFrom) -> Shell:
     """A 20 long wall, measured the way a drawing gives it."""
     with BuildSheet(thickness=1, bend_radius=2) as bracket:
         with BuildSketch():
@@ -258,7 +263,7 @@ def wall_measured(length_mode: FlangeLength) -> Shell:
             bracket.rims().sort_by(Axis.X)[-1],
             length=20,
             position=BendPosition.MATERIAL_OUTSIDE,
-            length_mode=length_mode,
+            length_from=length_from,
         )
     return bracket.sheet
 
@@ -266,10 +271,43 @@ def wall_measured(length_mode: FlangeLength) -> Shell:
 # [flange_length]
 write_layout(
     [
-        profile(wall_measured(mode), mode.name, marker=vertical(30, -3, 22))
-        for mode in FlangeLength
+        profile(wall_measured(origin), origin.name, marker=vertical(30, -3, 22))
+        for origin in LengthFrom
     ],
     "flange_length",
+)
+
+
+# [flange_length_mode]
+def wall_sized(length_mode: LengthMode) -> Shell:
+    """A 60 degree wall whose 20 is the side of its triangle the mode names."""
+    with BuildSheet(thickness=1, bend_radius=2) as bracket:
+        with BuildSketch():
+            Rectangle(60, 40)
+        flange(
+            bracket.rims().sort_by(Axis.X)[-1],
+            length=20,
+            angle=60,
+            position=BendPosition.MATERIAL_OUTSIDE,
+            length_mode=length_mode,
+            length_from=LengthFrom.OUTER_SHARP,
+        )
+    return bracket.sheet
+
+
+# [flange_length_mode]
+# the plate's outside face is at z = -1 and its corner on the edge at x = 30,
+# so the wall's height is marked 20 above the face and its run 20 past the edge
+write_layout(
+    [
+        profile(wall_sized(mode), mode.name, marker=marker)
+        for mode, marker in (
+            (LengthMode.DIAGONAL, None),
+            (LengthMode.VERTICAL, horizontal(19, 30, 48)),
+            (LengthMode.HORIZONTAL, vertical(50, -3, 22)),
+        )
+    ],
+    "flange_length_mode",
 )
 
 # ---------------------------------------------------------------------------

@@ -42,13 +42,14 @@ Enums
 .. autoclass:: BendPosition
 .. autoclass:: CenterOf
 .. autoclass:: Convexity
-.. autoclass:: FlangeLength
 .. autoclass:: FontStyle
 .. autoclass:: GeomType
 .. autoclass:: HemType
 .. autoclass:: SheetSurface
 .. autoclass:: Keep
 .. autoclass:: Kind
+.. autoclass:: LengthFrom
+.. autoclass:: LengthMode
 .. autoclass:: Mode
 .. autoclass:: ReliefType
 .. autoclass:: Select

@@ -65,7 +65,8 @@ of its edge so the neighbouring walls clear each other at the corners:
 
 The wall ``length`` is the flat past the bend. A drawing would more likely
 give the overall height to the outside corner; the flange page explains how
-``position`` and ``length_mode`` take a drawing's numbers directly.
+``position``, ``length_from`` and ``length_mode`` take a drawing's numbers
+directly.
 
 ***************************
 Step 3: Relieve the corners
