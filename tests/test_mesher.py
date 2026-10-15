@@ -203,6 +203,25 @@ class TestAddShape(DirectApiTestCase):
         shapes = importer.read(filename)
         self.assertEqual(importer.mesh_count, 2)
 
+    def test_add_moved_assembly(self):
+        """An assembly's children are meshed where the assembly places them."""
+        sub_assembly = Compound(children=[Solid.make_box(1, 1, 1)])
+        sub_assembly.location = Location((5, 0, 0), (0, 0, 30))
+        assembly = Compound(children=[sub_assembly, Solid.make_box(1, 1, 1)])
+        assembly.location = Location((10, 0, 0), (0, 0, 90))
+        # Like any other shape, the assembly is meshed at its own location,
+        # without that of an assembly it sits in
+        holder = Compound(children=[assembly])
+        holder.location = Location((0, 100, 0))
+        exporter = Mesher()
+        exporter.add_shape(assembly)
+        points = [v.Coordinates for mesh in exporter.meshes for v in mesh.GetVertices()]
+        # boxes mesh exactly; a curved face would make these bounds inexact
+        bbox = assembly.bounding_box()
+        for axis, (low, high) in enumerate(zip(bbox.min, bbox.max)):
+            self.assertAlmostEqual(min(p[axis] for p in points), low, 5)
+            self.assertAlmostEqual(max(p[axis] for p in points), high, 5)
+
     def test_add_assembly_with_joint_chain(self):
         """An assembly of chained parts meshes, and the parts stay unmeshed."""
         boxes = [Solid.make_box(1, 1, 1, Plane((2 * i, 0, 0))) for i in range(200)]
