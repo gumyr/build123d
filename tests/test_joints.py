@@ -1098,6 +1098,21 @@ class TestJointTransforms(DirectApiTestCase):
         self.assertIs(copied.joints["top"].parent, copied)
         self.assertEqual(copied.joints["top"].location, part.joints["top"].location)
 
+    def test_joints_survive_an_empty_result(self):
+        # a boolean that leaves nothing still carries the operand's joints, and
+        # an empty part has no location to express them against
+        part = Box(10, 10, 2).moved(Location((20, 0, 0)))
+        RigidJoint("top", part, Location((22, 3, 1)))
+        nothing = part & Box(1, 1, 1)  # far from the part
+        self.assertTrue(nothing.is_empty)
+        self.assertIn("top", nothing.joints)
+        self.assertVectorAlmostEquals(
+            nothing.joints["top"].location.position, (22, 3, 1), 5
+        )
+        above, below = part.split(Plane.XY.offset(50), keep=Keep.BOTH)
+        self.assertTrue(above.is_empty)
+        self.assertIn("top", below.joints)
+
     def test_cutter_joints_stay_off_the_result(self):
         part = Box(10, 10, 2)
         RigidJoint("top", part, Location((0, 0, 1)))

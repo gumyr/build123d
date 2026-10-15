@@ -4143,8 +4143,11 @@ class Joint(ABC):
     def _frame_of(owner: BuildPart | Solid | Compound | None) -> Location:
         """The frame a joint on ``owner`` is stored relative to: a shape's location,
         or the identity for a builder, which constructs in its own frame and places
-        its joints with the part on exit, and for a free joint"""
-        return owner.location if isinstance(owner, Shape) else Location()
+        its joints with the part on exit, for a free joint, and for an empty shape,
+        which has no location of its own"""
+        if isinstance(owner, Shape) and not owner.is_empty:
+            return owner.location
+        return Location()
 
     def _move(self, location: Location) -> None:
         """Move the joint by ``location`` within its frame. Joints with a reference
