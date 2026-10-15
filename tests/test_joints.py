@@ -46,7 +46,15 @@ from build123d.joints import (
 )
 from build123d.objects_part import Box, Cone, Cylinder, Sphere
 from build123d.objects_sketch import Circle
-from build123d.operations_generic import chamfer, fillet, mirror, offset, scale, split
+from build123d.operations_generic import (
+    chamfer,
+    fillet,
+    insert,
+    mirror,
+    offset,
+    scale,
+    split,
+)
 from build123d.operations_part import draft, extrude
 from build123d.topology import Compound, Edge, JointDict, Solid
 
@@ -891,6 +899,72 @@ class TestJointsInLocations(DirectApiTestCase):
             builder.part.joints["left"].location.position, (-2, 0, 1), 5
         )
 
+    def test_axis_joints_under_rotated_locations(self):
+        # the axis and its angle reference turn together and stay normal
+        turned = Location((5, 0, 0), (0, 0, 90))
+        with BuildPart() as builder:
+            Box(20, 20, 2)
+            with Locations(turned):
+                RevoluteJoint("hinge", axis=Axis.X, angle_reference=(0, 1, 0))
+                LinearJoint("slide", axis=Axis.X)
+                CylindricalJoint("screw", axis=Axis.X, angle_reference=(0, 1, 0))
+                BallJoint("ball", joint_location=Location(), angle_reference=Plane.XZ)
+        joints = builder.part.joints
+        for label in ("hinge", "slide", "screw"):
+            with self.subTest(joint=label):
+                self.assertVectorAlmostEquals(
+                    joints[label].relative_axis.position, (5, 0, 0), 5
+                )
+                self.assertVectorAlmostEquals(
+                    joints[label].relative_axis.direction, (0, 1, 0), 5
+                )
+        for label in ("hinge", "screw"):
+            self.assertVectorAlmostEquals(joints[label].angle_reference, (-1, 0, 0), 5)
+        # a ball joint's reference is in the joint's own frame and rides along
+        self.assertEqual(joints["ball"].angle_reference, Plane.XZ)
+
+        # a joint moved across to a part turned 90 degrees keeps its reference normal
+        a, c = Box(4, 4, 4), Box(4, 4, 4).rotate(Axis.Z, 90)
+        RevoluteJoint("h", a, axis=Axis.X, angle_reference=(0, 1, 0))
+        c.joints["h"] = a.joints["h"]
+        hinge = c.joints["h"]
+        self.assertAlmostEqual(
+            hinge.angle_reference.dot(hinge.relative_axis.direction), 0, 5
+        )
+        self.assertVectorAlmostEquals(hinge.relative_axis.direction, (0, -1, 0), 5)
+
+    def test_nested_locations_compose(self):
+        with BuildPart() as builder:
+            Box(30, 10, 2)
+            with Locations((10, 0, 0)):
+                with GridLocations(4, 0, 2, 1):
+                    RigidJoint("pin", joint_location=Location((0, 0, 1)))
+        positions = sorted(
+            builder.part.joints[label].location.position.X for label in ("pin0", "pin1")
+        )
+        self.assertAlmostEqual(positions[0], 8, 5)
+        self.assertAlmostEqual(positions[1], 12, 5)
+
+    def test_duplicate_labels_raise(self):
+        part = Box(10, 10, 2)
+        RigidJoint("top", part, Location((0, 0, 1)))
+        with self.assertRaisesRegex(ValueError, "already exist"):
+            RigidJoint("top", part, Location((0, 0, -1)))
+        RigidJoint("pin1", part, Location())
+        with GridLocations(4, 0, 2, 1):
+            with self.assertRaisesRegex(ValueError, "must be unique"):
+                RigidJoint(["a", "a"], part)
+            with self.assertRaisesRegex(ValueError, "already exist"):
+                RigidJoint("pin", part)  # expands to pin0, pin1
+        self.assertEqual(sorted(part.joints), ["pin1", "top"])
+        with self.assertRaisesRegex(ValueError, "already exist"):
+            part + RigidJoint("top", joint_location=Location())
+        # explicit assignment is the way to replace a joint
+        replacement = RigidJoint(joint_location=Location((0, 0, -1)))
+        part.joints["top"] = replacement
+        self.assertIs(part.joints["top"], replacement)
+        self.assertEqual(sorted(part.joints), ["pin1", "top"])
+
     def test_algebra_constructor_in_locations(self):
         part = Box(10, 10, 2)
         with GridLocations(4, 0, 2, 1):
@@ -927,9 +1001,7 @@ class TestJointTransforms(DirectApiTestCase):
         self.assertVectorAlmostEquals(hinge.location.position, (-25, 0, 1), 5)
         self.assertVectorAlmostEquals(hinge.relative_axis.direction, (-1, 0, 0), 5)
         self.assertVectorAlmostEquals(hinge.angle_reference, (0, 1, 0), 5)
-        self.assertVectorAlmostEquals(
-            mirrored.joints["ball"].angle_reference.z_dir, (0, -1, 0), 5
-        )
+        self.assertEqual(mirrored.joints["ball"].angle_reference, Plane.XZ)
         screw = mirrored.joints["screw"]
         self.assertVectorAlmostEquals(screw.location.position, (-20, -3, 1), 5)
         self.assertVectorAlmostEquals(screw.angle_reference, (-1, 0, 0), 5)
@@ -937,6 +1009,107 @@ class TestJointTransforms(DirectApiTestCase):
         self.assertVectorAlmostEquals(
             part.joints["top"].location.position, (22, 3, 1), 5
         )
+
+    def test_mirror_across_each_principal_plane(self):
+        part = self.jointed_part()
+        for plane in (Plane.XY, Plane.XZ, Plane.YZ):
+            with self.subTest(plane=plane):
+                mirrored = part.mirror(plane)
+                self.assertEqual(
+                    mirrored.joints["top"].location,
+                    part.joints["top"].location.mirror(plane),
+                )
+                hinge = mirrored.joints["hinge"]
+                expected_axis = Axis((25, 0, 1), (1, 0, 0))
+                mirror_point = (
+                    lambda p: p - 2 * (p - plane.origin).dot(plane.z_dir) * plane.z_dir
+                )
+                mirror_dir = lambda d: d - 2 * d.dot(plane.z_dir) * plane.z_dir
+                self.assertVectorAlmostEquals(
+                    hinge.location.position, mirror_point(expected_axis.position), 5
+                )
+                self.assertVectorAlmostEquals(
+                    Plane(hinge.location).z_dir, mirror_dir(expected_axis.direction), 5
+                )
+                self.assertAlmostEqual(
+                    hinge.angle_reference.dot(hinge.relative_axis.direction), 0, 5
+                )
+
+    def test_mirrored_hinge_motion(self):
+        # a reflection reverses the sense of rotation: the mirrored hinge at an angle
+        # points its axis and reference where the mirror of the original at the
+        # negated angle does, whether the axis is normal to the mirror plane or in it
+        def connected_frame(base, angle):
+            peg = Box(1, 1, 6)
+            RigidJoint("p", peg, Location((0, 0, -3)))
+            base.joints["h"].connect_to(peg.joints["p"], angle=angle)
+            return Plane(peg.joints["p"].location)
+
+        mirror_x = lambda v: Vector(-v.X, v.Y, v.Z)
+        for axis, reference in (
+            (Axis((0, 0, 1), (1, 0, 0)), (0, 0, 1)),  # normal to Plane.YZ
+            (Axis((0, 0, 1), (0, 0, 1)), (1, 0, 0)),  # lies in Plane.YZ
+        ):
+            with self.subTest(axis=tuple(axis.direction)):
+                base = Box(10, 10, 2)
+                RevoluteJoint(
+                    "h",
+                    base,
+                    axis=axis,
+                    angle_reference=reference,
+                    angular_range=(-180, 180),
+                )
+                mirrored = base.mirror(Plane.YZ)
+                original = connected_frame(base, -30)
+                reflected = connected_frame(mirrored, 30)
+                self.assertVectorAlmostEquals(
+                    reflected.origin, mirror_x(original.origin), 5
+                )
+                self.assertVectorAlmostEquals(
+                    reflected.z_dir, mirror_x(original.z_dir), 5
+                )
+                self.assertVectorAlmostEquals(
+                    reflected.x_dir, mirror_x(original.x_dir), 5
+                )
+
+    def test_mirrored_linear_joint_motion(self):
+        base = Box(10, 10, 2)
+        LinearJoint(
+            "slide", base, axis=Axis((0, 0, 1), (1, 0, 0)), linear_range=(0, 10)
+        )
+        mirrored = base.mirror(Plane.YZ)
+        for part, expected_x in ((base, 4), (mirrored, -4)):
+            peg = Box(1, 1, 1)
+            RigidJoint("p", peg, Location())
+            part.joints["slide"].connect_to(peg.joints["p"], position=4)
+            self.assertVectorAlmostEquals(peg.center(), (expected_x, 0, 1), 5)
+
+    def test_frames_after_locate_rotate_and_copy(self):
+        part = self.jointed_part()
+        located = part.located(Location((0, 0, 10)))
+        self.assertVectorAlmostEquals(
+            located.joints["top"].location.position, (2, 3, 11), 5
+        )
+        rotated = part.rotate(Axis.Z, 90)
+        self.assertVectorAlmostEquals(
+            rotated.joints["top"].location.position, (-3, 22, 1), 5
+        )
+        copied = copy.deepcopy(part)
+        self.assertIs(copied.joints["top"].parent, copied)
+        self.assertEqual(copied.joints["top"].location, part.joints["top"].location)
+
+    def test_cutter_joints_stay_off_the_result(self):
+        part = Box(10, 10, 2)
+        RigidJoint("top", part, Location((0, 0, 1)))
+        cutter = Cylinder(1, 5)
+        RigidJoint("tool", cutter, Location())
+        result = part - cutter
+        self.assertEqual(list(result.joints), ["top"])
+        with BuildPart() as builder:
+            Box(10, 10, 2)
+            RigidJoint("top", joint_location=Location((0, 0, 1)))
+            insert(cutter, mode=Mode.SUBTRACT)
+        self.assertEqual(list(builder.part.joints), ["top"])
 
     def test_mirror_operation(self):
         part = self.jointed_part()

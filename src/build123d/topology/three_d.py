@@ -201,12 +201,17 @@ class Mixin3D(Shape[TOPODS]):
         """A copy of self, sharing its geometry, with copies of ``joints`` bound to it
 
         Raises:
-            ValueError: a joint has no label
+            ValueError: a joint has no label, or its label is already taken
         """
         result = copy.copy(self)
         for joint in joints:
             if not joint.label:
                 raise ValueError("A joint added to a part needs a label")
+            if joint.label in result.joints:
+                raise ValueError(
+                    f"Joint label '{joint.label}' already exists on the part; "
+                    "assign to joints[label] to replace a joint"
+                )
             result.joints[joint.label] = copy.deepcopy(joint)
         return result
 

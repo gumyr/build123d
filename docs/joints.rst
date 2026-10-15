@@ -62,7 +62,9 @@ geometry, with copies of the joints.
 A free joint can be placed with ``*`` like a shape, which is how joints are made in
 bulk in algebra mode: a :class:`~build_common.GridLocations` (or any iterable of
 locations) gives one copy per location, with the label suffixed by the location's
-index:
+index: ``"mount"`` becomes ``mount0``, ``mount1``, ``mount2``, ``mount3``. A label a
+part already has raises ``ValueError``; assign to ``part.joints[label]`` to replace a
+joint deliberately.
 
 .. code-block:: build123d
 
@@ -89,9 +91,14 @@ context, alongside the geometry it belongs to:
 Joints follow their part. Moving or rotating a part moves its joints with it, and the
 operations that regenerate the geometry - ``mirror``, ``scale``, and ``rotate`` or
 ``translate`` with ``transform=True`` - transform the joints the same way. A mirrored
-joint keeps a right-handed frame (its X and Z directions are reflected and Y recomputed,
-as :meth:`~geometry.Location.mirror` does) and keeps its ranges, so a mirrored hinge
-opens the mirror-image way for the same angle. In a builder, ``mirror`` with
+joint keeps a right-handed frame: its origin, axis and reference direction are reflected
+and the remaining direction recomputed, as :meth:`~geometry.Location.mirror` does, and its
+ranges are unchanged. A reflection reverses the sense of every rotation, so a mirrored
+hinge at an angle points its reference where the mirror image of the original hinge at
+the *negated* angle does; a mirrored slide at a position sits at the mirror image of the
+original at that position. Because the frame is rebuilt right-handed rather than
+reflected, a part connected to a mirrored joint and offset along the joint's recomputed
+axis lands on the opposite side from the reflected original. In a builder, ``mirror`` with
 ``Mode.ADD`` keeps the original geometry alongside the mirrored copy and leaves the
 builder's joints as they are.
 

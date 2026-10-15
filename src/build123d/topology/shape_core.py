@@ -4147,13 +4147,19 @@ class Joint(ABC):
         return owner.location if isinstance(owner, Shape) else Location()
 
     def _move(self, location: Location) -> None:
-        """Move the joint by ``location`` within its frame"""
+        """Move the joint by ``location`` within its frame. Joints with a reference
+        direction or plane rotate it along with the axis."""
         if hasattr(self, "relative_location"):
             self.relative_location = location * self.relative_location
         elif hasattr(self, "relative_axis"):
             self.relative_axis = self.relative_axis.located(location)
         else:  # pragma: no cover - all current concrete joints use one representation
             raise TypeError(f"Unsupported joint type {type(self).__name__}")
+
+    @staticmethod
+    def _rotated_direction(direction: Vector, location: Location) -> Vector:
+        """``direction`` turned by the rotation of ``location``"""
+        return (location * Location(direction)).position - location.position
 
     def _reparent(self, parent: BuildPart | Solid | Compound | None) -> None:
         """Bind this joint to a new parent, or free it with None, without changing

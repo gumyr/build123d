@@ -100,6 +100,15 @@ def _bind(
                 f"{len(labels)} labels were given for {len(locations)} locations"
             )
 
+    if len(set(labels)) != len(labels):
+        raise ValueError(f"Joint labels must be unique, got {labels}")
+    taken = [name for name in labels if name in owner.joints]
+    if taken:
+        raise ValueError(
+            f"Joint label(s) {taken} already exist on the part; assign to "
+            "joints[label] to replace a joint"
+        )
+
     copies = [joint.moved(location) for location in locations[1:]]
     joint._move(locations[0])
     for placed, name in zip([joint] + copies, labels):
@@ -325,6 +334,10 @@ class RevoluteJoint(Joint):
         self.angle_reference = Joint._transformed_direction(
             self.angle_reference, transformation, frame
         )
+
+    def _move(self, location: Location) -> None:
+        super()._move(location)
+        self.angle_reference = Joint._rotated_direction(self.angle_reference, location)
 
     def connect_to(self, other: RigidJoint, *, angle: float | None = None):
         """Connect RevoluteJoint and RigidJoint
@@ -619,6 +632,10 @@ class CylindricalJoint(Joint):
             self.angle_reference, transformation, frame
         )
 
+    def _move(self, location: Location) -> None:
+        super()._move(location)
+        self.angle_reference = Joint._rotated_direction(self.angle_reference, location)
+
     def connect_to(
         self,
         other: RigidJoint,
@@ -758,13 +775,8 @@ class BallJoint(Joint):
         super().__init__()
         _bind(self, label, to_part, context)
 
-    def _transform(self, transformation) -> None:
-        frame = Joint._frame_of(self.parent)
-        super()._transform(transformation)
-        world = frame * Location(self.angle_reference)
-        self.angle_reference = Plane(
-            frame.inverse() * Joint._transformed_location(world, transformation)
-        )
+    # angle_reference is applied within the joint's own frame (see relative_to),
+    # so it rides along unchanged when the joint is moved or transformed
 
     def connect_to(self, other: RigidJoint, *, angles: RotationLike | None = None):
         """Connect BallJoint and RigidJoint
