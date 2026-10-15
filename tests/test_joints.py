@@ -48,7 +48,7 @@ from build123d.objects_part import Box, Cone, Cylinder, Sphere
 from build123d.objects_sketch import Circle
 from build123d.operations_generic import chamfer, fillet, mirror, offset, scale, split
 from build123d.operations_part import draft, extrude
-from build123d.topology import Edge, JointDict, Solid
+from build123d.topology import Compound, Edge, JointDict, Solid
 
 
 class DirectApiTestCase(unittest.TestCase):
@@ -628,6 +628,19 @@ class TestJointPlacement(DirectApiTestCase):
         with self.assertWarns(DeprecationWarning):
             self.assertEqual(builder.location, Location())
 
+    def test_builder_joints_can_be_assigned(self):
+        # free joints made outside the builder; inside, a constructor binds
+        free_a = RigidJoint(joint_location=Location((0, 0, 1)))
+        free_b = RigidJoint(joint_location=Location((0, 0, -1)))
+        with BuildPart() as builder:
+            Box(2, 2, 2)
+            builder.joints = {"a": free_a}
+            self.assertIs(builder.joints["a"].parent, builder)
+        self.assertIs(builder.part.joints["a"].parent, builder.part)
+        builder.joints = {"b": free_b}
+        self.assertEqual(list(builder.part.joints), ["b"])
+        self.assertIs(builder.part.joints["b"].parent, builder.part)
+
     def test_builder_joints_are_the_placed_parts_joints(self):
         # While open, the builder's joints are the ones being defined; once it
         # has exited they are the placed part's, so both routes to a joint
@@ -739,12 +752,30 @@ class TestFreeJoints(DirectApiTestCase):
         self.assertEqual(sorted(part.joints), ["a", "b"])
         self.assertTrue(all(j.parent is part for j in (a, b)))
         self.assertIs(part.joints.setdefault("a", RigidJoint()), a)
+        self.assertIs(part.joints.setdefault("d", RigidJoint()).parent, part)
+        with self.assertRaises(TypeError):
+            part.joints.setdefault("e")
         self.assertIs(part.joints.pop("a"), a)
         self.assertIsNone(a.parent)
+        self.assertIsNone(part.joints.pop("a", None))
+        with self.assertRaises(KeyError):
+            part.joints.pop("a")
+        label, popped = part.joints.popitem()
+        self.assertEqual(label, "d")
+        self.assertIsNone(popped.parent)
         part.joints |= {"c": RigidJoint()}
         part.joints.clear()
         self.assertIsNone(b.parent)
         self.assertEqual(part.joints, {})
+
+    def test_plain_dict_joints_are_adopted_on_copy(self):
+        # a part unpickled from an earlier version holds its joints in a dict
+        part = Box(2, 2, 2)
+        RigidJoint("top", part, Location((0, 0, 1)))
+        object.__setattr__(part, "joints", dict(part.joints))
+        copied = copy.deepcopy(part)
+        self.assertIsInstance(copied.joints, JointDict)
+        self.assertIs(copied.joints["top"].parent, copied)
 
     def test_multiplying_a_free_joint_places_copies(self):
         joint = RigidJoint("mount", joint_location=Location((0, 0, 1)))
@@ -792,6 +823,12 @@ class TestFreeJoints(DirectApiTestCase):
         self.assertIn("s", solid.joints)
         with self.assertRaisesRegex(ValueError, "needs a label"):
             plate + RigidJoint()
+        # a 1D Compound sums to a Wire, which cannot hold joints
+        with self.assertRaisesRegex(TypeError, "Wire"):
+            Compound([Edge.make_line((0, 0, 0), (1, 0, 0))]) + [
+                Edge.make_line((1, 0, 0), (1, 1, 0)),
+                RigidJoint("x"),
+            ]
 
     def test_copies_keep_the_joints_dict(self):
         plate = Box(10, 10, 2) + RigidJoint("top", joint_location=Location((0, 0, 1)))
@@ -874,6 +911,9 @@ class TestJointTransforms(DirectApiTestCase):
             "hinge", part, axis=Axis((25, 0, 1), (1, 0, 0)), angle_reference=(0, 1, 0)
         )
         BallJoint("ball", part, Location((18, 0, 1)), angle_reference=Plane.XZ)
+        CylindricalJoint(
+            "screw", part, axis=Axis((20, -3, 1), (0, 0, 1)), angle_reference=(1, 0, 0)
+        )
         return part
 
     def test_mirror_method(self):
@@ -890,6 +930,9 @@ class TestJointTransforms(DirectApiTestCase):
         self.assertVectorAlmostEquals(
             mirrored.joints["ball"].angle_reference.z_dir, (0, -1, 0), 5
         )
+        screw = mirrored.joints["screw"]
+        self.assertVectorAlmostEquals(screw.location.position, (-20, -3, 1), 5)
+        self.assertVectorAlmostEquals(screw.angle_reference, (-1, 0, 0), 5)
         # the original is untouched
         self.assertVectorAlmostEquals(
             part.joints["top"].location.position, (22, 3, 1), 5
@@ -898,7 +941,7 @@ class TestJointTransforms(DirectApiTestCase):
     def test_mirror_operation(self):
         part = self.jointed_part()
         mirrored = mirror(part, Plane.YZ)
-        self.assertEqual(sorted(mirrored.joints), ["ball", "hinge", "top"])
+        self.assertEqual(sorted(mirrored.joints), ["ball", "hinge", "screw", "top"])
         self.assertVectorAlmostEquals(
             mirrored.joints["top"].location.position, (-22, 3, 1), 5
         )
