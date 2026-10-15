@@ -88,7 +88,8 @@ if has_vtk:
         def build_mesh(self):
             """Build triangular mesh from Shape using Mesher"""
             # Use Mesher to triangulate the shape
-            vertices, triangles = Mesher._mesh_shape(
+            # a face without a triangulation is left out; a display mesh may be open
+            vertices, triangles, _ = Mesher._mesh_shape(
                 self.obj, self.deviation_coefficient, self.deviation_angle
             )
 
