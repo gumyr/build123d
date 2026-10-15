@@ -112,7 +112,7 @@ from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Shell
 
 from build123d.build_enums import MeshType, Unit
-from build123d.geometry import TOLERANCE, Color
+from build123d.geometry import TOLERANCE, Color, Location
 from build123d.topology.composite import Compound
 from build123d.topology.shape_core import Shape, downcast
 from build123d.topology.three_d import Solid
@@ -393,7 +393,10 @@ class Mesher:
             Warning: Degenerate shape skipped
             Warning: 3mf mesh is not manifold
         """
-        shapes: list[Shape] = []
+        # Each shape is meshed where its input places it. The children of an
+        # assembly are stored relative to it, so they are moved by its own
+        # location; a child that is itself an assembly is meshed whole.
+        shapes: list[tuple[Shape, Location]] = []
         input_shapes = [shape] if isinstance(shape, Shape) else list(shape)
         for input_shape in input_shapes:
             if input_shape.is_empty:
@@ -403,21 +406,24 @@ class Mesher:
                 )
             if isinstance(input_shape, Compound):
                 if input_shape.children:
-                    shapes.extend(input_shape.children)
+                    shapes.extend(
+                        (child, input_shape.location) for child in input_shape.children
+                    )
                 elif input_shape.label or input_shape.color is not None:
-                    shapes.append(input_shape)
+                    shapes.append((input_shape, Location()))
                 else:
-                    shapes.extend(list(input_shape))
+                    shapes.extend((s, Location()) for s in input_shape)
             else:
-                shapes.append(input_shape)
+                shapes.append((input_shape, Location()))
 
-        for b3d_shape in shapes:
+        for b3d_shape, placement in shapes:
             # Create a 3MF mesh object
             mesh_3mf: Lib3MF.MeshObject = self.model.AddMeshObject()
 
-            # Mesh the shape
+            # Mesh a placed copy of the shape
+            copied = BRepBuilderAPI_Copy(b3d_shape.wrapped).Shape()
             ocp_mesh_vertices, triangles = Mesher._mesh_shape(
-                Shape.cast(BRepBuilderAPI_Copy(b3d_shape.wrapped).Shape()),
+                Shape.cast(copied.Moved(placement.wrapped)),
                 linear_deflection,
                 angular_deflection,
             )
