@@ -351,6 +351,14 @@ class TestShape(unittest.TestCase):
         self.assertEqual(len(verts), 24)
         self.assertEqual(len(triangles), 12)
 
+    def test_tessellate_missing_triangulation(self):
+        """Faces without a triangulation are skipped."""
+        with patch(
+            "build123d.topology.shape_core.BRep_Tool.Triangulation_s",
+            return_value=None,
+        ):
+            self.assertEqual(Solid.make_box(1, 1, 1).tessellate(0.1), ([], []))
+
     def test_transformed(self):
         """Validate that transformed works the same as changing location"""
         rotation = (uniform(0, 360), uniform(0, 360), uniform(0, 360))

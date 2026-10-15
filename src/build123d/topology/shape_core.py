@@ -2448,6 +2448,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
             assert not face.is_empty
             loc = TopLoc_Location()
             poly = BRep_Tool.Triangulation_s(face.wrapped, loc)
+            if poly is None:
+                continue
             trsf = loc.Transformation()
             reverse = face.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED
 
