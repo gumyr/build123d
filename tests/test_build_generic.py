@@ -182,6 +182,31 @@ class InsertTests(unittest.TestCase):
                 insert(plain)
         self.assertTupleAlmostEquals(test.sketch.center(), (3, 4, 0), 5)
 
+    def test_insert_sketch_builder_into_sketch_uses_local_coordinates(self):
+        # Both sketches draw in local XY and are placed on exit, so a sketch
+        # builder goes in as drawn, not as placed on its workplane
+        with BuildSketch(Plane.YZ) as source:
+            with Locations((3, 1)):
+                Rectangle(10, 4)
+        with BuildSketch(Plane.YZ) as from_builder:
+            insert(source)
+        with BuildSketch(Plane.YZ) as from_local:
+            insert(source.sketch_local)
+        built, local = (
+            from_builder.sketch_local.bounding_box(),
+            from_local.sketch_local.bounding_box(),
+        )
+        self.assertTupleAlmostEquals(built.min, local.min, 5)
+        self.assertTupleAlmostEquals(built.max, local.max, 5)
+        self.assertTupleAlmostEquals(built.min, (-2, -1, 0), 5)
+        # into a part the sketch arrives placed, as a face on its workplane
+        with BuildPart() as part:
+            insert(source)
+        self.assertEqual(len(part.pending_faces), 1)
+        self.assertTupleAlmostEquals(
+            part.pending_faces[0].center(), source.sketch.center(), 5
+        )
+
     def test_errors(self):
         with self.assertRaises(RuntimeError):
             insert(Edge.make_line((0, 0, 0), (1, 1, 1)))

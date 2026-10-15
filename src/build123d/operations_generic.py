@@ -99,10 +99,13 @@ def insert(
         Mode.SUBTRACT a Solid is a normal cut, cutting the shell wherever
         it passes, across bends included.
 
-    A Builder is inserted as its placed output - the ``part``, ``sketch``,
-    ``line`` or ``sheet`` it would have published - so a builder created in a
-    function and returned, which no enclosing builder received, can be added
-    here. The inserting ``mode`` applies; the builder's own mode does not.
+    A Builder is inserted as its output in the receiving builder's frame. Into
+    a BuildPart that is its placed output - the ``part`` or ``sketch`` it would
+    have published - so a builder created in a function and returned, which no
+    enclosing builder received, can be added here. Into a BuildSketch or
+    BuildLine, which draw in local coordinates and are placed on exit, it is
+    the local product (``sketch_local``, ``line_local``). The inserting
+    ``mode`` applies; the builder's own mode does not.
 
     Args:
         objects (Edge | Wire | Face | Shell | Solid | Compound | Builder or
@@ -127,9 +130,17 @@ def insert(
                 raise ValueError(
                     "Inserted BuildSheet must use the same sheet parameters"
                 )
-    # A Builder stands for its placed output, as if it had been published
+    # A Builder stands for its output expressed in the receiving builder's frame.
+    # A part is built in world coordinates, so it receives the placed output, as
+    # if the builder had been published to it. A sketch or line is drawn in its
+    # own local coordinates and placed on exit, so it receives the local product
+    # of a builder of the same kind, drawn in the same way.
     placed_list = [
-        obj._output_obj() if isinstance(obj, Builder) else obj
+        (
+            (obj._output_obj() if isinstance(context, BuildPart) else obj._obj)
+            if isinstance(obj, Builder)
+            else obj
+        )
         for obj in object_list
         if not (isinstance(obj, Builder) and not obj._obj)
     ]
