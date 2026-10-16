@@ -1,21 +1,25 @@
 """
 Creation of a complex sheet metal part
 
-name: ttt_sm_hanger.py
+name: ttt-23-02-02_sm_hanger.py
 by:   Gumyr
-date: July 17, 2023
+date: October 15, 2026
 
 desc:
     This example implements the sheet metal part described in Too Tall Toby's
     sm_hanger CAD challenge.
 
-    Notably, a BuildLine/Curve object is filleted by providing all the vertices
-    and allowing the fillet operation filter out the end vertices. The
-    make_brake_formed operation is used both in Algebra and Builder mode to
-    create a sheet metal part from just an outline and some dimensions.
-    license:
+    The part is built as one BuildSheet of 4 mm steel and thickened at the end.
+    Half the base is sketched with its tab cutout, and the tab is flanged up from
+    the cutout's edge and drilled. The leg is flanged down at 60° to the drawing's
+    height, mitered to flare, and the foot flanged back under it, its length measured
+    off the model. The slots are cut through as normal cuts, the half is mirrored,
+    and the two wings are flanged down the long sides. Every dimension is the drawing's
+    own.
 
-    Copyright 2023 Gumyr
+license:
+
+    Copyright 2026 Gumyr
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -32,86 +36,93 @@ desc:
 """
 
 from build123d import *
-from ocp_vscode import *
+from ocp_vscode import show
+from bd_materials.materials.metals import mild_steel
 
-sheet_thickness = 4 * MM
+with BuildPart() as sm_hanger_builder:
+    with BuildSheet(thickness=4 * MM, bend_radius=4 * MM) as sheet:
+        # Create the top with a sketch that has the hole for the tab
+        with BuildSketch() as base:
+            Rectangle(170 / 2, 80, align=(Align.MIN, Align.CENTER))
+            with Locations((40 / 2, 0)):
+                Rectangle(30, 30, align=(Align.MIN, Align.CENTER), mode=Mode.SUBTRACT)
+            fillet(base.vertices(Select.LAST).group_by(Axis.X)[-1], 7)
 
-# Create the main body from a side profile
-with BuildPart() as side:
-    with BuildLine(Plane.XZ) as side_line:
-        l1 = Line((0, 65), (170 / 2, 65))
-        l2 = PolarLine(
-            l1 @ 1,
+        # Create vertical tab
+        hole_rim = sheet.face().inner_wires()[0].edges().sort_by(Axis.X)[0]
+        flange(hole_rim, length=23, length_from=LengthFrom.INNER_SHARP, gaps=2)
+        fillet(sheet.vertices().group_by(Axis.Z)[-1], 5)
+        with Locations(Plane((0, 0, 80 - 65), z_dir=(1, 0, 0))):
+            h = Hole(10 / 2)
+
+        # From the end of the sheet, create a flange at 60° downward
+        far_end = sheet.rims().sort_by(Axis.X)[-1]
+        flange(
+            far_end,
+            angle=-60,
             length=65,
-            direction=(0.5, -0.866025403784),
             length_mode=LengthMode.VERTICAL,
+            length_from=LengthFrom.OUTER_SHARP,
+            position=BendPosition.MATERIAL_OUTSIDE,
         )
-        l3 = Line(l2 @ 1, (170 / 2, 0))
-        fillet(side_line.vertices(), 7)
-    make_brake_formed(
-        thickness=sheet_thickness,
-        station_widths=[40, 40, 40, 112.52 / 2, 112.52 / 2, 112.52 / 2],
-        side=Side.RIGHT,
-    )
-    # Ensure the part is always on the +ve side of Plane.YZ
-    if side.vertices().sort_by(Axis.X)[0].X < -sheet_thickness:
-        mirror(about=Plane.YZ, mode=Mode.REPLACE)
-    fe = side.edges().filter_by(Axis.Z).group_by(Axis.Z)[0].sort_by(Axis.Y)[-1]
-    fillet(fe, radius=7)
 
-# Create the "wings" at the top
-with BuildPart() as wing:
-    with BuildLine(Plane.YZ) as wing_line:
-        l1 = Line((0, 65), (80 / 2 + 1.526 * sheet_thickness, 65))
-        PolarLine(l1 @ 1, 20.371288916, direction=(0.258819045103, -0.965925826289))
-        fillet(wing_line.vertices(), 7)
-    make_brake_formed(
-        thickness=sheet_thickness,
-        station_widths=110 / 2,
-        side=Side.RIGHT,
-    )
-    # Ensure the part is always on the +ve side of Plane.YZ
-    if wing.vertices().sort_by(Axis.X)[0].X < -sheet_thickness:
-        mirror(about=Plane.YZ, mode=Mode.REPLACE)
-    bottom_edge = wing.edges().group_by(Axis.X)[-1].sort_by(Axis.Z)[0]
-    fillet(bottom_edge, radius=7)
+        # Miter the new flange to make it flare out
+        miter(sheet.rims().sort_by(Axis.X)[-1].vertices(), -26 / 2)
 
-# Create the tab at the top in Algebra mode
-tab_line = Plane.XZ * Polyline(
-    (20, 65 - sheet_thickness), (56 / 2, 65 - sheet_thickness), (56 / 2, 88)
-)
-tab_line = fillet(tab_line.vertices(), 7)
-tab = make_brake_formed(sheet_thickness, 8, tab_line, Side.RIGHT)
-# Ensure the tab is always on the +ve side of Plane.XZ
-if tab.vertices().sort_by(Axis.Y)[0].Y < -sheet_thickness:
-    tab = mirror(tab, about=Plane.XZ)
-tab = fillet(tab.edges().filter_by(Axis.X).group_by(Axis.Z)[-1].sort_by(Axis.Y)[-1], 5)
-tab -= Pos((0, 0, 80)) * Rot(0, 90, 0) * Hole(5, 100)
+        # Create the foot as another flange
+        far_end = sheet.rims().sort_by(Axis.X)[-1]
+        flange(
+            far_end,
+            length=far_end.position_at(0).X - (170 / 2),
+            angle=-120,
+            position=BendPosition.MATERIAL_OUTSIDE,
+            length_from=LengthFrom.OUTER_SHARP,
+        )
+        fillet(sheet.vertices().group_by(Axis.Z)[0].group_by(Axis.X)[0], 7)
 
-# Combine the parts together
-with BuildPart() as sm_hanger:
-    insert([side.part, wing.part])
-    mirror(about=Plane.XZ)
-    with BuildSketch(Plane.XY.offset(65)) as h1:
-        with Locations((20, 0)):
-            Rectangle(30, 30, align=(Align.MIN, Align.CENTER))
-            fillet(h1.vertices().group_by(Axis.X)[-1], 7)
-        SlotCenterPoint((154, 0), (154 / 2, 0), 20)
-    extrude(amount=-40, mode=Mode.SUBTRACT)
-    with BuildSketch() as h2:
-        SlotCenterPoint((206, 0), (206 / 2, 0), 20)
-    extrude(amount=40, mode=Mode.SUBTRACT)
-    insert(tab)
-    mirror(about=Plane.YZ)
-    mirror(about=Plane.XZ)
+        # Create notches
+        with BuildPart(mode=Mode.SUBTRACT) as cutouts:
+            with BuildSketch():
+                SlotCenterPoint((170, 0), (154 / 2, 0), 20)
+            extrude(amount=-65 / 2)  # clear the base but not the foot
+            with BuildSketch():
+                SlotCenterPoint((170, 0), (206 / 2, 0), 20)
+            extrude(amount=-65)
 
-got_mass = sm_hanger.part.volume * 7800 * 1e-6
+        # Mirror to create the other half
+        mirror(about=Plane.YZ)
+
+        # Create the side flanges
+        side_rims = [
+            sheet.flats()
+            .filter_by(Axis.Z)
+            .sort_by(Axis.Z)[-1]
+            .edges()
+            .sort_by(Axis.Y)[i]
+            for i in (0, -1)
+        ]
+        flange(
+            side_rims,
+            length=15,
+            angle=-75,
+            length_from=LengthFrom.TANGENT,
+            gaps=(side_rims[0].length - 110) / 2,
+        )
+        fillet(sheet.flats(Select.LAST).vertices().group_by(Axis.Z)[0], 7)
+
+    thicken()  # Parameters taken from BuildSheet
+
+    sm_hanger_flat = sheet.sheet.unfold()
+
+sm_hanger = sm_hanger_builder.part
+sm_hanger.material = mild_steel()  # 7800 kg/m³
+
+sm_hanger_flat.position -= sm_hanger_flat.center() + (0, 0, 65)
+got_mass = sm_hanger.mass()
 want_mass = 1028
 tolerance = 10
-delta = abs(got_mass - want_mass)
+diff_mass = abs(got_mass - want_mass)
 print(f"Mass: {got_mass:0.1f} g")
-assert delta < tolerance, f"{got_mass=}, {want_mass=}, {delta=}, {tolerance=}"
+assert diff_mass < tolerance, f"{got_mass=}, {want_mass=}, {diff_mass=}, {tolerance=}"
 
-# assert abs(got_mass - 1028) < 10, f"{got_mass=}, want=1028, tolerance=10"
-
-show(sm_hanger)
+show(sm_hanger, sm_hanger_flat)
