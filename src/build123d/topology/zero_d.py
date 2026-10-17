@@ -60,7 +60,6 @@ from typing import ClassVar, overload, TYPE_CHECKING
 from collections.abc import Iterable
 
 import OCP.TopAbs as ta
-from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve2d
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 from OCP.BRepTools import BRepTools
@@ -71,6 +70,7 @@ from OCP.collections import (
 )
 from OCP.TopoDS import TopoDS, TopoDS_Face, TopoDS_Vertex, TopoDS_Edge
 from OCP.gp import gp_Pnt, gp_Pnt2d, gp_Vec2d
+from build123d.kernel import BRep_Tool, list_shapes
 from build123d.geometry import (
     TOLERANCE,
     Matrix,
@@ -81,7 +81,6 @@ from build123d.geometry import (
     Plane,
 )
 from build123d.build_enums import Convexity, Keep, Select, Unit
-from .kernel import list_shapes
 from .shape_core import Shape, ShapeList, TrimmingTool, downcast, find_same_topods
 
 if TYPE_CHECKING:  # pragma: no cover

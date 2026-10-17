@@ -33,7 +33,6 @@ from math import atan2, cos, isnan, sin, pi
 from typing import overload, TYPE_CHECKING, Callable, TypeVar
 from typing import cast as tcast
 
-from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeVertex
 from OCP.BRepLib import BRepLib
@@ -77,6 +76,7 @@ from OCP.IntAna2d import IntAna2d_AnaIntersection
 from OCP.Standard import Standard_ConstructionError, Standard_Failure
 from OCP.TopoDS import TopoDS_Edge
 
+from build123d.kernel import BRep_Tool
 from build123d.build_enums import Sagitta, Tangency
 from build123d.geometry import Axis, TOLERANCE, Vector, VectorLike
 from .zero_d import Vertex
@@ -124,8 +124,7 @@ def _edge_to_qualified_2d(
     """Convert a TopoDS_Edge into 2d curve & extract properties"""
 
     # 1) Underlying curve + range (also retrieve location to be safe)
-    hcurve3d = BRep_Tool.Curve_s(edge, float(), float())
-    first, last = BRep_Tool.Range_s(edge)
+    hcurve3d, first, last = BRep_Tool.Curve_s(edge)
 
     # 2) Convert to 2D on Plane.XY (Z-up frame at origin)
     hcurve2d = GeomAPI.To2d_s(hcurve3d, _pln_xy)  # -> Handle_Geom2d_Curve

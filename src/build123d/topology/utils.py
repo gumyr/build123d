@@ -57,7 +57,7 @@ from typing import Any, TYPE_CHECKING
 
 from collections.abc import Iterable
 
-from OCP.BRep import BRep_Builder, BRep_Tool
+from OCP.BRep import BRep_Builder
 from OCP.BRepAdaptor import BRepAdaptor_Curve
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
@@ -84,6 +84,7 @@ from OCP.TopoDS import (
     TopoDS_Wire,
 )
 from build123d.geometry import TOLERANCE, BoundBox, Vector, VectorLike
+from build123d.kernel import BRep_Tool
 
 from .shape_core import (
     Shape,

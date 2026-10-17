@@ -140,7 +140,8 @@ class FontManager:
 
     def find_font(self, name: str, style: FontStyle) -> Font_SystemFont:
         """Find font in FontManager library by name and style"""
-        return self.manager.FindFont(TCollection_AsciiString(name), FONT_ASPECT[style])
+        font = self.manager.FindFont(TCollection_AsciiString(name), FONT_ASPECT[style])
+        return font
 
     def register_font(
         self, path: str, override: bool = False, single_stroke: bool = False

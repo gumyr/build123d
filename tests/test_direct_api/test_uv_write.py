@@ -31,12 +31,12 @@ import unittest
 
 from build123d.build_enums import Align, GeomType
 from build123d.geometry import Axis, Location, Matrix, Pos, Rot, Vector
+from build123d.kernel import BRep_Tool
 from build123d.objects_part import Box, Cone, Cylinder, Sphere, Torus
 from build123d.objects_sketch import Circle, Polygon, Rectangle, SlotOverall, Text
 from build123d.topology import Edge, Face, Solid, UVFrame, Wire
 from build123d.topology.uv_write import _affine_map, _geodesic_map, _sphere_map
 
-from OCP.BRep import BRep_Tool
 from OCP.Geom2d import Geom2d_BSplineCurve, Geom2d_Ellipse, Geom2d_Line
 
 
@@ -90,10 +90,7 @@ class TestCylinderFrame(unittest.TestCase):
         # the written edge's pcurve on the surface is the image
         def pcurve(edge):
             written = self.frame.write_edge(edge)
-            first, last = BRep_Tool.Range_s(written.wrapped)
-            return BRep_Tool.CurveOnSurface_s(
-                written.wrapped, self.surface.wrapped, first, last
-            )
+            return BRep_Tool.CurveOnSurface_s(written.wrapped, self.surface.wrapped)[0]
 
         self.assertIsInstance(pcurve(line), Geom2d_Line)
         self.assertIsInstance(pcurve(circle), Geom2d_Ellipse)
