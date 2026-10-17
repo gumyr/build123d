@@ -78,7 +78,7 @@ from typing import TypeVar
 
 from scipy.integrate import solve_ivp
 
-from OCP.BRep import BRep_Builder, BRep_Tool
+from OCP.BRep import BRep_Builder
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
 from OCP.BRepLib import BRepLib
@@ -100,6 +100,7 @@ from OCP.TopAbs import TopAbs_Orientation, TopAbs_State
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS
 
+from build123d.kernel import BRep_Tool
 from build123d.build_enums import GeomType, Keep
 from build123d.geometry import TOLERANCE, Location, Matrix, Plane, Vector, VectorLike
 
@@ -337,8 +338,7 @@ class UVFrame:
             ValueError: the interpolated image cannot be brought within the
                 tolerance
         """
-        first, last = BRep_Tool.Range_s(edge.wrapped)
-        curve = BRep_Tool.Curve_s(edge.wrapped, first, last)
+        curve, first, last = BRep_Tool.Curve_s(edge.wrapped)
         if isinstance(self.mapping, Matrix):
             image, first, last = _affine_image(
                 GeomAPI.To2d_s(curve, gp_Pln()), first, last, self.mapping
@@ -364,7 +364,7 @@ class UVFrame:
             lifted = Edge.make_spline(
                 list[VectorLike](uvs), parameters=params, tol=1e-9
             )
-            spline = BRep_Tool.Curve_s(lifted.wrapped, float(), float())
+            spline = BRep_Tool.Curve_s(lifted.wrapped)[0]
             # check midway between samples, in 3D
             error = max(
                 (
@@ -459,8 +459,7 @@ class UVFrame:
         line along a cylinder's axis or a circle about it, and is built from
         that exactly; any other curve gets its 3D form from the kernel.
         """
-        first, last = BRep_Tool.Range_s(lifted.wrapped)
-        curve = BRep_Tool.Curve_s(lifted.wrapped, first, last)
+        curve, first, last = BRep_Tool.Curve_s(lifted.wrapped)
         pcurve = GeomAPI.To2d_s(curve, gp_Pln())
         points = [pcurve.Value(first + (last - first) * i / 4) for i in range(5)]
         along_v = all(abs(p.X() - points[0].X()) < 1e-9 for p in points)

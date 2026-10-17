@@ -77,7 +77,7 @@ from anytree import NodeMixin, RenderTree
 from IPython.lib.pretty import RepresentationPrinter, pretty
 from OCP.Bnd import Bnd_OBB
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
-from OCP.BRep import BRep_TEdge, BRep_Tool
+from OCP.BRep import BRep_TEdge
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.GCPnts import GCPnts_AbscissaPoint
 from OCP.GeomAdaptor import GeomAdaptor_Curve
@@ -142,6 +142,7 @@ from typing_extensions import Self, deprecated
 
 from bd_materials import FinishedMaterial, resolve as resolve_material
 
+from build123d.kernel import BRep_Tool, list_shapes
 from build123d.build_constants import UNITS_PER_KILOGRAM, UNITS_PER_METER
 from build123d.build_enums import (
     CenterOf,
@@ -172,7 +173,6 @@ from build123d.geometry import (
 from build123d.pack_utils import _pack2d
 
 from .history import ShapeHistory
-from .kernel import list_shapes
 
 if TYPE_CHECKING:  # pragma: no cover
     from build123d.build_part import BuildPart  # pylint: disable=R0801

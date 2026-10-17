@@ -42,7 +42,7 @@ from build123d.objects_sketch import Rectangle
 from build123d.operations_generic import fillet
 from build123d.topology import Curve, Edge, Face, ShapeHistory, Solid
 from build123d.topology.history import tracked_subshapes
-from build123d.topology.kernel import list_shapes
+from build123d.kernel import list_shapes
 
 
 class TestShapeHistory(unittest.TestCase):

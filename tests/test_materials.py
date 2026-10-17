@@ -352,7 +352,8 @@ def gltf_shape_names(doc: TDocStd_Document) -> list[str]:
     names = []
     for i in range(1, labels.Length() + 1):
         name = TDataStd_Name()
-        if labels.Value(i).FindAttribute(TDataStd_Name.GetID_s(), name):
+        found = labels.Value(i).FindAttribute(TDataStd_Name.GetID_s(), name)
+        if found:
             names.append(name.Get().ToExtString())
     return names
 
