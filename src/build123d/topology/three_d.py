@@ -86,6 +86,7 @@ from OCP.BRepPrimAPI import (
     BRepPrimAPI_MakeTorus,
     BRepPrimAPI_MakeWedge,
 )
+from OCP.ChFiDS import ChFiDS_ErrorStatus
 from OCP.GeomAbs import GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.gp import gp_Ax2, gp_Pln, gp_Pnt, gp_Vec
 from OCP.GProp import GProp_GProps
@@ -96,6 +97,7 @@ from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Compound,
+    TopoDS_Edge,
     TopoDS_Face,
     TopoDS_Iterator,
     TopoDS_Shape,
@@ -360,6 +362,9 @@ class Mixin3D(Shape[TOPODS]):
             radius (float): float > 0, the radius of the fillet
             edge_list (Iterable[Edge]): a list of Edge objects, which must belong to this solid
 
+        Raises:
+            ValueError: The fillet could not be created.
+
         Returns:
             Solid | Part: Filleted solid or 3D composite
         """
@@ -375,9 +380,15 @@ class Mixin3D(Shape[TOPODS]):
             if not new_shape.is_valid:
                 raise Standard_Failure
         except (StdFail_NotDone, Standard_Failure) as err:
+            details = ""
+            try:
+                details = _fillet_failure_details(fillet_builder, native_edges)
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass  # Diagnostics must not mask the original kernel failure.
             raise ValueError(
-                f"Failed creating a fillet with radius of {radius}, try a smaller value"
-                f" or use max_fillet() to find the largest valid fillet radius"
+                f"Failed creating a fillet with radius of {radius}{details}, try a"
+                f" smaller value or use max_fillet() to find the largest valid fillet"
+                f" radius"
             ) from err
 
         return new_shape._made_by(
@@ -739,6 +750,50 @@ class Mixin3D(Shape[TOPODS]):
         return Mixin1D.project_to_viewport(
             self, viewport_origin, viewport_up, look_at, focus
         )
+
+
+def _fillet_failure_details(
+    fillet_builder: BRepFilletAPI_MakeFillet, native_edges: list[TopoDS_Edge]
+) -> str:
+    """Describe faulty contours in terms of the caller's selected edges."""
+    reasons = {
+        ChFiDS_ErrorStatus.ChFiDS_WalkingFailure: "walking failure",
+        ChFiDS_ErrorStatus.ChFiDS_StartsolFailure: "no starting solution",
+        ChFiDS_ErrorStatus.ChFiDS_TwistedSurface: "twisted surface",
+    }
+    faulty_edges: dict[str, set[Edge]] = {}
+    for i in range(1, fillet_builder.NbFaultyContours() + 1):
+        contour = fillet_builder.FaultyContour(i)
+        # A faulty stripe past NbContours() can lack a spine, and OCCT dereferences
+        # it unchecked in StripeStatus() and Edge(), crashing the interpreter
+        if not 1 <= contour <= fillet_builder.NbContours():
+            continue
+        reason = reasons.get(fillet_builder.StripeStatus(contour), "error")
+        faulty_edges.setdefault(reason, set()).update(
+            Edge(fillet_builder.Edge(contour, j))
+            for j in range(1, fillet_builder.NbEdges(contour) + 1)
+        )
+    if not faulty_edges:
+        return ""
+
+    selected_edges = [Edge(edge) for edge in native_edges]
+    rejected_indices: set[int] = set()
+    groups = []
+    for reason, edges in faulty_edges.items():
+        entries = []
+        for i, edge in enumerate(selected_edges):
+            if edge in edges:
+                rejected_indices.add(i)
+                entries.append(f"[{i}] at {edge.center():.6g}")
+        tangent_count = len(edges.difference(selected_edges))
+        if tangent_count:
+            noun = "edge" if tangent_count == 1 else "edges"
+            entries.append(f"{tangent_count} additional tangent {noun}")
+        groups.append(f"{reason}: {', '.join(entries)}")
+    return (
+        f" on {len(rejected_indices)} of {len(native_edges)} edges "
+        f"({'; '.join(groups)})"
+    )
 
 
 def _forward_solid(solid: TopoDS_Solid) -> TopoDS_Solid:
