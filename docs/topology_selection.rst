@@ -341,8 +341,9 @@ evaluate them, and they are the criteria most selectors start with.
   keeps the circular edges; ``geom_type`` is the property behind it.
 - **Size**: :class:`~build_enums.SortBy` orders by ``LENGTH``, ``RADIUS``, ``AREA``,
   ``VOLUME`` or ``DISTANCE``; the properties ``length``, ``radius``, ``area`` and
-  ``volume`` can be passed to |sort_by|, |group_by| and |filter_by| directly.
-  |filter_by_value| keeps the features of a given size, within a tolerance:
+  ``volume`` can be passed to |sort_by| and |group_by| directly. |filter_by| tests
+  a property's truth, so a size goes through |filter_by_value|, which keeps the
+  features of a given size within a tolerance:
   ``part.faces().filter_by_value(Face.radius, 2)`` keeps the R2 fillets.
 - **Direction**: an ``Axis`` passed to |filter_by| keeps the planar faces whose normal,
   or the linear edges whose direction, is parallel to it; a ``Plane`` keeps those

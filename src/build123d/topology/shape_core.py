@@ -55,7 +55,6 @@ from collections import deque
 from collections.abc import Callable, Iterable, Iterator
 from functools import reduce
 from math import inf
-from numbers import Real
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -3848,8 +3847,8 @@ class ShapeList(list[T]):
             )
             if measured is None:
                 return False
-            if isinstance(measured, Real) and isinstance(value, Real):
-                return tcast(float, abs(measured - value)) <= tolerance
+            if isinstance(measured, (int, float)) and isinstance(value, (int, float)):
+                return abs(measured - value) <= tolerance
             return measured == value
 
         return ShapeList(obj for obj in self if matches(obj) != reverse)
