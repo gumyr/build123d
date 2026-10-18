@@ -33,7 +33,6 @@ import copyreg
 import io
 import struct
 
-from OCP.BinTools import BinTools
 from OCP.gp import gp_Quaternion, gp_Trsf, gp_Vec
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import (
@@ -48,6 +47,7 @@ from OCP.TopoDS import (
     TopoDS_Wire,
 )
 
+from build123d.kernel import BinTools
 from build123d.topology import downcast
 
 
@@ -55,10 +55,7 @@ def serialize_shape(shape: TopoDS_Shape) -> bytes:
     """
     Serialize a OCP shape, this method can be used to provide a custom serialization algo for pickle
     """
-    bio = io.BytesIO()
-    BinTools.Write_s(shape, bio)
-    buffer = bio.getvalue()
-    return buffer
+    return BinTools.Write_s(shape)
 
 
 def deserialize_shape(buffer: bytes) -> TopoDS_Shape:

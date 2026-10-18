@@ -38,7 +38,6 @@ import OCP.TopAbs as ta
 from OCP.collections import (
     IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
 )
-from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_GTransform,
@@ -60,6 +59,7 @@ from OCP.TopoDS import (
 
 from build123d.build_enums import SheetSurface
 from build123d.geometry import TOLERANCE, Location, Matrix, Plane, Vector
+from build123d.kernel import BRep_Tool
 from build123d.topology.one_d import Edge
 from build123d.topology.shape_core import _topods_area, _topods_entities
 from build123d.topology.utils import (
@@ -210,8 +210,7 @@ def _uv_topods_edge(
         xy_face = BRepBuilderAPI_MakeFace(Plane.XY.wrapped).Face()
         xy_surface = BRep_Tool.Surface_s(xy_face)
 
-    first, last = BRep_Tool.Range_s(source_edge, source_face)
-    pcurve = BRep_Tool.CurveOnSurface_s(source_edge, source_face, first, last)
+    pcurve, first, last = BRep_Tool.CurveOnSurface_s(source_edge, source_face)
     edge_builder = BRepBuilderAPI_MakeEdge(pcurve, xy_surface, first, last)
     if not edge_builder.IsDone():  # pragma: no cover
         raise ValueError("Unable to convert pcurve to a planar edge")

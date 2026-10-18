@@ -65,7 +65,6 @@ from typing import overload
 import numpy as np
 import OCP.TopAbs as ta
 from OCP.BOPAlgo import BOPAlgo_Splitter
-from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_CompCurve, BRepAdaptor_Curve
 from OCP.BRepAlgoAPI import (
     BRepAlgoAPI_Common,
@@ -196,6 +195,7 @@ from scipy.optimize import minimize_scalar
 from scipy.spatial import ConvexHull
 from typing_extensions import Self
 
+from build123d.kernel import BRep_Tool, list_shapes
 from build123d.build_enums import (
     AngularDirection,
     CenterOf,
@@ -234,7 +234,6 @@ from .constrained_lines import (
     _make_tan_oriented_lines,
 )
 from .history import ShapeHistory, tracked_subshapes
-from .kernel import list_shapes
 from .shape_core import (
     TOPODS,
     Shape,
@@ -2979,20 +2978,12 @@ class Edge(Mixin1D[TopoDS_Edge]):
         edge_surface = BRep_Tool.Surface_s(pln_shape)
 
         self_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
-            self.wrapped,
-            edge_surface,
-            TopLoc_Location(),
-            self.param_at(0),
-            self.param_at(1),
-        )
+            self.wrapped, edge_surface, TopLoc_Location()
+        )[0]
         if other is not None and not other.is_empty:
             edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
-                other.wrapped,
-                edge_surface,
-                TopLoc_Location(),
-                other.param_at(0),
-                other.param_at(1),
-            )
+                other.wrapped, edge_surface, TopLoc_Location()
+            )[0]
             intersector = Geom2dAPI_InterCurveCurve(
                 self_2d_curve, edge_2d_curve, tolerance
             )
@@ -3365,7 +3356,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         # end points.
 
         # Extract the normalized parameter using OCCT GeomAPI_ProjectPointOnCurve
-        curve = BRep_Tool.Curve_s(self.wrapped, float(), float())
+        curve = BRep_Tool.Curve_s(self.wrapped)[0]
         projector = GeomAPI_ProjectPointOnCurve(pnt.to_pnt(), curve)
         param = projector.LowerDistanceParameter()
         # Note that for some periodic curves the LowerDistanceParameter might
@@ -3480,7 +3471,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         if reconstruct:
             first: float = self.param_at(0)
             last: float = self.param_at(1)
-            curve = BRep_Tool.Curve_s(self._wrapped, first, last)
+            curve = BRep_Tool.Curve_s(self._wrapped)[0]
             first = curve.ReversedParameter(first)
             last = curve.ReversedParameter(last)
             topods_edge = BRepBuilderAPI_MakeEdge(curve.Reversed(), last, first).Edge()
@@ -3513,17 +3504,13 @@ class Edge(Mixin1D[TopoDS_Edge]):
         start_point = self.position_at(start_u)
 
         # Convert the normalized edge parameters into curve parameters
-        comp_curve_start, parm_start, _ = self._occt_param_at(start_u)
+        _comp_curve_start, parm_start, _ = self._occt_param_at(start_u)
         _comp_curve_end, parm_end, _ = self._occt_param_at(end_u)
 
         # Rebuild the edge
         trimmed_edge = Edge(
             BRepBuilderAPI_MakeEdge(
-                BRep_Tool.Curve_s(
-                    self.wrapped,
-                    comp_curve_start.FirstParameter(),
-                    comp_curve_start.LastParameter(),
-                ),
+                BRep_Tool.Curve_s(self.wrapped)[0],
                 *sorted([parm_start, parm_end]),
             ).Edge()
         )
@@ -3561,9 +3548,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         self_copy = copy.deepcopy(self)
         assert not self_copy.is_empty
 
-        new_curve = BRep_Tool.Curve_s(
-            self_copy.wrapped, self.param_at(0), self.param_at(1)
-        )
+        new_curve = BRep_Tool.Curve_s(self_copy.wrapped)[0]
 
         # Create an adaptor for the curve
         adaptor_curve = GeomAdaptor_Curve(new_curve)
@@ -3891,13 +3876,12 @@ class Wire(Mixin1D[TopoDS_Wire]):
         """
 
         edges_in = HSequence_TopoDS_Shape()
-        wires_out = HSequence_TopoDS_Shape()
 
         for edge in [e for w in wires for e in w.edges()]:
             if not edge.is_empty:
                 edges_in.Append(edge.wrapped)
 
-        ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
+        wires_out = ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False)
 
         wires = ShapeList()
         for i in range(wires_out.Length()):
@@ -4193,8 +4177,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
                 continue
             edge_list = vertex_edge_map.FindFromKey(v.wrapped)
 
-            # Only the two ends are wanted; iterating the kernel list through
-            # Python is slow (see kernel.list_shapes), so take them directly
+            # Only the two ends are wanted, so take them directly
             edges = (
                 Edge(tcast(TopoDS_Edge, downcast(edge_list.First()))),
                 Edge(tcast(TopoDS_Edge, downcast(edge_list.Last()))),
@@ -4795,8 +4778,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
             if BRep_Tool.Degenerated_s(topods_edge):
                 wire_explorer.Next()
                 continue
-            param_min, param_max = BRep_Tool.Range_s(topods_edge)
-            new_curve = BRep_Tool.Curve_s(topods_edge, float(), float())
+            new_curve, param_min, param_max = BRep_Tool.Curve_s(topods_edge)
             trimmed_curve = Geom_TrimmedCurve(new_curve, param_min, param_max)
 
             # Append this edge's trimmed curve into the composite spline.
@@ -4883,12 +4865,11 @@ def edges_to_wires(edges: Iterable[Edge], tol: float = 1e-6) -> ShapeList[Wire]:
     """
 
     edges_in = HSequence_TopoDS_Shape()
-    wires_out = HSequence_TopoDS_Shape()
 
     for edge in edges:
         if not edge.is_empty:
             edges_in.Append(edge.wrapped)
-    ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
+    wires_out = ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False)
 
     wires: ShapeList[Wire] = ShapeList()
     for i in range(wires_out.Length()):
@@ -5022,8 +5003,8 @@ def _dihedral_convexity(
     """
     curve = BRepAdaptor_Curve(edge)
     first, last = curve.FirstParameter(), curve.LastParameter()
-    pcurve1 = BRep_Tool.CurveOnSurface_s(edge, face1, first, last)
-    pcurve2 = BRep_Tool.CurveOnSurface_s(edge, face2, first, last)
+    pcurve1 = BRep_Tool.CurveOnSurface_s(edge, face1)[0]
+    pcurve2 = BRep_Tool.CurveOnSurface_s(edge, face2)[0]
     reversed_in_face2 = (
         _edge_as_bounded_by(face2, edge).Orientation()
         == TopAbs_Orientation.TopAbs_REVERSED

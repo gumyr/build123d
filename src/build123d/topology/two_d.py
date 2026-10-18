@@ -64,7 +64,6 @@ from typing import cast as tcast
 from typing import overload
 
 import OCP.TopAbs as ta
-from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Section
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing
@@ -133,6 +132,7 @@ from OCP.TopLoc import TopLoc_Location
 from ocp_gordon import interpolate_curve_network
 from typing_extensions import Self
 
+from build123d.kernel import BRep_Tool
 from build123d.build_enums import (
     CenterOf,
     ContinuityLevel,
@@ -347,7 +347,7 @@ class Mixin2D(ABC, Shape[TOPODS]):
         """
 
         def get(los: List_TopoDS_Shape) -> list:
-            """Return objects from List_TopoDS_Shape as list"""
+            """Return objects from a kernel list as a Python list"""
             shapes = []
             for _ in range(los.Size()):
                 first = los.First()
@@ -1500,7 +1500,7 @@ class Face(Mixin2D[TopoDS_Face]):
                 raise ValueError("input Edge cannot be empty")
 
             adaptor = BRepAdaptor_Curve(shape.wrapped)
-            curve = BRep_Tool.Curve_s(shape.wrapped, 0, 1)
+            curve = BRep_Tool.Curve_s(shape.wrapped)[0]
             if not (
                 (adaptor.IsPeriodic() and adaptor.IsClosed())
                 or adaptor.GetType() == GeomAbs_CurveType.GeomAbs_BSplineCurve

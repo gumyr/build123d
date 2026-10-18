@@ -147,11 +147,11 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
     def get_name(label: TDF_Label) -> str:
         """Extract name and format"""
         name = ""
-        std_name = TDataStd_Name()
-        if label.IsAttribute(TDataStd_Name.GetID_s()) and label.FindAttribute(
-            TDataStd_Name.GetID_s(), std_name
-        ):
-            name = TCollection_AsciiString(std_name.Get()).ToCString()
+        if label.IsAttribute(TDataStd_Name.GetID_s()):
+            std_name = TDataStd_Name()
+            found = label.FindAttribute(TDataStd_Name.GetID_s(), std_name)
+            if found:
+                name = TCollection_AsciiString(std_name.Get()).ToCString()
         # Remove characters that cause ocp_vscode to fail
         clean_name = "".join(ch for ch in name if unicodedata.category(ch)[0] != "C")
         return clean_name.translate(str.maketrans(" .()", "____"))

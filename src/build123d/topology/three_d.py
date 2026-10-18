@@ -108,6 +108,7 @@ from OCP.collections import (
     List_TopoDS_Shape,
 )
 
+from build123d.kernel import list_shapes
 from build123d.build_enums import (
     CenterOf,
     GeomType,
@@ -144,7 +145,6 @@ from .shape_core import (
     _make_topods_compound_from_shapes,
 )
 from .history import ShapeHistory
-from .kernel import list_shapes
 from .two_d import Face, Mixin2D, Shell, sort_wires_by_build_order
 from .utils import (
     _extrude_topods_shape,

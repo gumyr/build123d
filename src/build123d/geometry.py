@@ -58,7 +58,6 @@ import numpy as np
 import webcolors  # type: ignore
 from typing_extensions import deprecated
 from OCP.Bnd import Bnd_Box, Bnd_OBB
-from OCP.BRep import BRep_Tool
 from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_Transform
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
@@ -90,6 +89,7 @@ from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape, TopoDS_Vertex
 
 from build123d.build_enums import Align, Align2D, Align3D, Extrinsic, Intrinsic
+from build123d.kernel import BRep_Tool
 
 if TYPE_CHECKING:  # pragma: no cover
     from .topology import Edge, Face, Shape, Vertex
@@ -716,8 +716,7 @@ class Axis(metaclass=AxisMeta):
                 raise ValueError(f"Invalid edge argument: {edge}")
 
             topods_edge: TopoDS_Edge = edge.wrapped  # type: ignore[annotation-unchecked]
-            curve = BRep_Tool.Curve_s(topods_edge, float(), float())
-            param_min, _ = BRep_Tool.Range_s(topods_edge)
+            curve, param_min, _ = BRep_Tool.Curve_s(topods_edge)
             origin_pnt = gp_Pnt()
             tangent_vec = gp_Vec()
             curve.D1(param_min, origin_pnt, tangent_vec)

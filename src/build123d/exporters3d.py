@@ -43,15 +43,13 @@ import requests
 from anytree import PreOrderIter
 from OCP.APIHeaderSection import APIHeaderSection_MakeHeader
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.BRepTools import BRepTools
 from OCP.IFSelect import IFSelect_ReturnStatus
 from OCP.IGESControl import IGESControl_Controller
 from OCP.Interface import Interface_Static
 from OCP.Message import Message, Message_Gravity, Message_ProgressRange
 from OCP.RWGltf import RWGltf_CafWriter
-from OCP.STEPCAFControl import STEPCAFControl_Controller, STEPCAFControl_Writer
+from OCP.STEPCAFControl import STEPCAFControl_Controller
 from OCP.STEPControl import STEPControl_Controller, STEPControl_StepModelType
-from OCP.StlAPI import StlAPI_Writer
 from OCP.TCollection import (
     TCollection_AsciiString,
     TCollection_ExtendedString,
@@ -73,6 +71,7 @@ from threejs_materials import PbrProperties, inject_materials
 from build123d.build_constants import UNITS_PER_METER
 from build123d.build_enums import PrecisionMode, Unit
 from build123d.geometry import Location
+from build123d.kernel import BRepTools, STEPCAFControl_Writer, StlAPI_Writer
 from build123d.topology import Compound, Curve, Part, Shape, Sketch
 
 
@@ -287,12 +286,10 @@ def export_brep(
     """
     _nothing_to_export(to_export)
     if isinstance(file_path, (PathLike | str | bytes)):
-        file_path = fsdecode(file_path)
-    else:
-        file_path = cast(BytesIO, file_path)
-    return_value = BRepTools.Write_s(to_export.wrapped, file_path)
-
-    return True if return_value is None else return_value
+        return BRepTools.Write_s(to_export.wrapped, fsdecode(file_path))
+    # without a path Write_s returns the BREP text; the caller's stream is binary
+    cast(BytesIO, file_path).write(BRepTools.Write_s(to_export.wrapped).encode())
+    return True
 
 
 def export_gltf(
@@ -479,8 +476,9 @@ def export_step(
     if isinstance(file_path, (PathLike, str, bytes)):
         status = writer.Write(fsdecode(file_path))
     else:
-        # need to cast for type checker because BinaryIO is OK but OCP doesn't know
-        status = writer.WriteStream(cast(BytesIO, file_path))
+        # WriteStream returns the STEP text; the caller's stream is binary
+        status, text = writer.WriteStream()
+        cast(BytesIO, file_path).write(text.encode())
 
     success = status == IFSelect_ReturnStatus.IFSelect_RetDone
     if not success:
@@ -531,7 +529,7 @@ def export_stl(
 
     writer = StlAPI_Writer()
 
-    writer.ASCIIMode = ascii_format
+    writer.SetASCIIMode(ascii_format)
     return writer.Write(to_export.wrapped, str(output_path))
 
 

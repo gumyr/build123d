@@ -94,7 +94,6 @@ from uuid import UUID
 
 import OCP.TopAbs as ta
 from lib3mf import Lib3MF
-from OCP.BRep import BRep_Tool
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_Copy,
     BRepBuilderAPI_MakeFace,
@@ -112,6 +111,7 @@ from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Shell
 
 from build123d.build_enums import MeshType, Unit
+from build123d.kernel import BRep_Tool
 from build123d.geometry import TOLERANCE, Color, Location
 from build123d.topology.composite import Compound
 from build123d.topology.shape_core import Shape, downcast
