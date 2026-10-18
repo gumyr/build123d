@@ -186,6 +186,7 @@ from .utils import (
     _extrude_topods_shape,
     _make_loft,
     _make_topods_face_from_wires,
+    _make_topods_face_on_surface,
     _make_topods_shell,
     _topods_face_center,
     _topods_face_position,
@@ -826,8 +827,16 @@ class Face(Mixin2D[TopoDS_Face]):
         label: str = "",
         color: Color | None = None,
         parent: Compound | None = None,
+        surface: Face | None = None,
     ):
-        """Build a planar Face from a boundary Wire with optional hole Wires.
+        """Build a Face from a boundary Wire with optional hole Wires.
+
+        The face lies on ``surface``'s surface, or on the plane the wires lie
+        in when no surface is given. The surface is used untrimmed and where
+        ``surface`` places it, so any face on the right surface will do: the
+        wall of a cylinder or cone made with the surface's axis and radius,
+        for instance. The wires must lie on that surface; they are not
+        projected onto it from elsewhere.
 
         Args:
             outer_wire (Wire): closed perimeter wire
@@ -835,11 +844,18 @@ class Face(Mixin2D[TopoDS_Face]):
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
+            surface (Face, optional): a face on the surface to build on.
+                Defaults to None: the plane the wires lie in.
+
+        Raises:
+            ValueError: a wire is not closed, the wires are not planar when no
+                surface is given, or an empty surface
+            RuntimeError: the wires do not lie on the surface
         """
 
     def __init__(self, *args: Any, **kwargs: Any):
         obj: TopoDS_Face | Plane | None
-        outer_wire, inner_wires, obj, label, color, parent = (None,) * 6
+        outer_wire, inner_wires, obj, label, color, parent, surface = (None,) * 7
 
         if args:
             l_a = len(args)
@@ -848,9 +864,9 @@ class Face(Mixin2D[TopoDS_Face]):
             elif isinstance(args[0], TopoDS_Shape):
                 obj, label, color, parent = args[:4] + (None,) * (4 - l_a)
             elif isinstance(args[0], Wire):
-                outer_wire, inner_wires, label, color, parent = args[:5] + (None,) * (
-                    5 - l_a
-                )
+                outer_wire, inner_wires, label, color, parent, surface = args[
+                    :6
+                ] + (None,) * (6 - l_a)
 
         unknown_args = ", ".join(
             set(kwargs.keys()).difference(
@@ -861,6 +877,7 @@ class Face(Mixin2D[TopoDS_Face]):
                     "label",
                     "color",
                     "parent",
+                    "surface",
                 ]
             )
         )
@@ -873,6 +890,7 @@ class Face(Mixin2D[TopoDS_Face]):
         label = kwargs.get("label", label)
         color = kwargs.get("color", color)
         parent = kwargs.get("parent", parent)
+        surface = kwargs.get("surface", surface)
 
         if isinstance(obj, Plane):
             obj = BRepBuilderAPI_MakeFace(obj.wrapped).Face()
@@ -886,7 +904,16 @@ class Face(Mixin2D[TopoDS_Face]):
                 for w in [outer_wire.wrapped] + inner_topods_wires
             ):
                 raise ValueError("Face can only be created with closed wires")
-            obj = _make_topods_face_from_wires(outer_wire.wrapped, inner_topods_wires)
+            if surface is None:
+                obj = _make_topods_face_from_wires(
+                    outer_wire.wrapped, inner_topods_wires
+                )
+            else:
+                if surface.is_empty:
+                    raise ValueError("Can't build a face on an empty surface")
+                obj = _make_topods_face_on_surface(
+                    surface.wrapped, outer_wire.wrapped, inner_topods_wires
+                )
 
         super().__init__(
             obj=obj,

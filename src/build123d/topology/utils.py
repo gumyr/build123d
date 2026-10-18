@@ -59,6 +59,7 @@ from collections.abc import Iterable
 
 from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve
+from OCP.BRepCheck import BRepCheck_Analyzer
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
@@ -361,6 +362,41 @@ def _make_topods_face_from_wires(
     sf_f.Perform()
 
     return TopoDS.Face(sf_f.Result())
+
+
+def _make_topods_face_on_surface(
+    surface_face: TopoDS_Face,
+    outer_wire: TopoDS_Wire,
+    inner_wires: Iterable[TopoDS_Wire] | None = None,
+) -> TopoDS_Face:
+    """A face on the surface of ``surface_face`` bounded by wires lying on it.
+
+    The surface is taken untrimmed and where the face places it, so the extent
+    of ``surface_face`` does not matter. The wires' curves are projected onto
+    it, and the face is fixed afterwards, which supplies the seam of a periodic
+    surface that the wires wrap around.
+
+    Raises:
+        ValueError: the wires do not bound a face on the surface
+        RuntimeError: the face built is not valid, as when the wires do not
+            lie on the surface
+    """
+    surface = BRep_Tool.Surface_s(surface_face)
+    face_builder = BRepBuilderAPI_MakeFace(surface, outer_wire, True)
+    for inner_wire in inner_wires or []:
+        face_builder.Add(inner_wire)
+    if not face_builder.IsDone():
+        raise ValueError(f"Cannot build face(s): {face_builder.Error()}")
+
+    sf_s = ShapeFix_Shape(face_builder.Face())
+    sf_s.Perform()
+    fixed = sf_s.Shape()
+    if fixed.ShapeType() != TopAbs_ShapeEnum.TopAbs_FACE:
+        raise RuntimeError("Cannot build face(s): the wires do not bound one face")
+    face = TopoDS.Face(fixed)
+    if not BRepCheck_Analyzer(face).IsValid():
+        raise RuntimeError("Cannot build face(s): the wires do not lie on the surface")
+    return face
 
 
 def delta(shapes_one: Iterable[Shape], shapes_two: Iterable[Shape]) -> list[Shape]:

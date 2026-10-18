@@ -541,6 +541,45 @@ class TestFace(unittest.TestCase):
         self.assertAlmostEqual(bbox.min, (-5, -5, -1), 5)
         self.assertAlmostEqual(bbox.max, (5, 5, 0), 5)
 
+    def test_face_on_surface(self):
+        # a band of a cylinder between two circles: the seam comes from the fix
+        wall = Solid.make_cylinder(2, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        top = Wire([Edge.make_circle(2, Plane.XY.offset(7))])
+        bottom = Wire([Edge.make_circle(2, Plane.XY.offset(3))])
+        band = Face(top, [bottom], surface=wall)
+        self.assertTrue(band.is_valid)
+        self.assertEqual(band.geom_type, GeomType.CYLINDER)
+        self.assertAlmostEqual(band.area, 2 * math.pi * 2 * 4, 5)
+
+        # a frustum of a cone, on a cone face of a different extent
+        cone = Solid.make_cone(4, 0, 4).faces().filter_by(GeomType.CONE)[0]
+        outer = Wire([Edge.make_circle(3, Plane.XY.offset(1))])
+        inner = Wire([Edge.make_circle(1, Plane.XY.offset(3))])
+        frustum = Face(outer, [inner], surface=cone)
+        self.assertTrue(frustum.is_valid)
+        self.assertEqual(frustum.geom_type, GeomType.CONE)
+        self.assertAlmostEqual(frustum.area, math.pi * (3 + 1) * math.hypot(2, 2), 5)
+
+        # a planar surface gives the planar face
+        square = Rectangle(4, 4).face().outer_wire()
+        on_plane = Face(square, surface=Face.make_rect(1, 1))
+        self.assertAlmostEqual(on_plane.area, Face(square).area, 5)
+
+        # the surface's placement is applied
+        shift = Pos(10, 0, 0)
+        shifted = Face(
+            top.moved(shift), [bottom.moved(shift)], surface=wall.moved(shift)
+        )
+        self.assertAlmostEqual(shifted.bounding_box().center().X, 10, 5)
+        self.assertAlmostEqual(shifted.area, band.area, 5)
+
+        with self.assertRaises(ValueError):
+            Face(top, [bottom], surface=Face())
+        with self.assertRaises(ValueError):
+            Face(Wire([Edge.make_line((0, 0, 7), (2, 0, 7))]), surface=wall)
+        with self.assertRaises(RuntimeError):
+            Face(Wire([Edge.make_circle(3, Plane.XY.offset(7))]), surface=wall)
+
     def test_make_holes(self):
         radius = 10
         circumference = 2 * math.pi * radius
