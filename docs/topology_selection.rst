@@ -101,6 +101,8 @@ list of |ShapeList| objects accessible by index or key.
 +----------------------+---------------------------------------------------------------------------+-------------------------------------------------------+
 | |filter_by_position| | ``Axis``                                                                  | Filter ``ShapeList`` by ``Axis`` & min / max values   |
 +----------------------+---------------------------------------------------------------------------+-------------------------------------------------------+
+| |filter_by_value|    | property or callable, and a value                                         | Filter ``ShapeList`` by a measured value              |
++----------------------+---------------------------------------------------------------------------+-------------------------------------------------------+
 
 The most common operators also have a shorthand, so a selection can read as a chain:
 
@@ -237,7 +239,8 @@ Examples
 Filter
 ======
 
-A |ShapeList| can be filtered with the |filter_by| and |filter_by_position| methods.
+A |ShapeList| can be filtered with the |filter_by|, |filter_by_position| and
+|filter_by_value| methods.
 Filters are a flexible way to isolate (or exclude) features based on known criteria.
 
 Let's say we need all the faces with a normal in the ``+Z`` direction. One way to do this
@@ -338,7 +341,10 @@ evaluate them, and they are the criteria most selectors start with.
   keeps the circular edges; ``geom_type`` is the property behind it.
 - **Size**: :class:`~build_enums.SortBy` orders by ``LENGTH``, ``RADIUS``, ``AREA``,
   ``VOLUME`` or ``DISTANCE``; the properties ``length``, ``radius``, ``area`` and
-  ``volume`` can be passed to |sort_by|, |group_by| and |filter_by| directly.
+  ``volume`` can be passed to |sort_by| and |group_by| directly. |filter_by| tests
+  a property's truth, so a size goes through |filter_by_value|, which keeps the
+  features of a given size within a tolerance:
+  ``part.faces().filter_by_value(Face.radius, 2)`` keeps the R2 fillets.
 - **Direction**: an ``Axis`` passed to |filter_by| keeps the planar faces whose normal,
   or the linear edges whose direction, is parallel to it; a ``Plane`` keeps those
   parallel to the plane. Passed to |sort_by| or |group_by|, an ``Axis`` orders by
@@ -611,4 +617,5 @@ question from the record, for every shape type.
 .. |topo_distance_to| replace:: :func:`~topology.topo_distance_to`
 .. |filter_by| replace:: :meth:`~topology.ShapeList.filter_by`
 .. |filter_by_position| replace:: :meth:`~topology.ShapeList.filter_by_position`
+.. |filter_by_value| replace:: :meth:`~topology.ShapeList.filter_by_value`
 .. |ShapeList| replace:: :class:`~topology.ShapeList`

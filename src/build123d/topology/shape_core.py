@@ -3804,6 +3804,55 @@ class ShapeList(list[T]):
 
         return ShapeList(objects).sort_by(axis)
 
+    def filter_by_value(
+        self,
+        measure: property | Callable[[T], Any],
+        value: Any,
+        tolerance: float = TOLERANCE,
+        reverse: bool = False,
+    ) -> ShapeList[T]:
+        """filter by value
+
+        Keep the objects whose measure is within ``tolerance`` of ``value``, such as
+        the edges of a given length or the faces of a given radius. When the measure
+        and ``value`` are both real numbers, an object is kept if
+        ``abs(measure - value) <= tolerance``; otherwise, as for a ``GeomType`` or a
+        ``Convexity``, if the measure equals ``value``. An object whose measure is
+        ``None``, like the radius of a planar face, never matches, so
+        ``reverse=True`` keeps it.
+
+        Args:
+            measure (property | Callable[[T], Any]): a property of the shape class,
+                such as ``Edge.length`` or ``Face.radius``, or a function of one object.
+            value (Any): the value to select
+            tolerance (float, optional): maximum absolute difference between a numeric
+                measure and value. Defaults to TOLERANCE.
+            reverse (bool, optional): keep the objects that don't match instead.
+                Defaults to False.
+
+        Raises:
+            ValueError: Unsupported measure
+
+        Returns:
+            ShapeList: filtered list of objects
+        """
+        if not isinstance(measure, property) and not callable(measure):
+            raise ValueError(f"Unsupported filter_by_value measure: {measure}")
+
+        def matches(obj: T) -> bool:
+            measured = (
+                measure.__get__(obj)  # pylint: disable=unnecessary-dunder-call
+                if isinstance(measure, property)
+                else measure(obj)
+            )
+            if measured is None:
+                return False
+            if isinstance(measured, (int, float)) and isinstance(value, (int, float)):
+                return abs(measured - value) <= tolerance
+            return measured == value
+
+        return ShapeList(obj for obj in self if matches(obj) != reverse)
+
     def group_by(
         self,
         group_by: Callable[[T], K] | Axis | Edge | Wire | SortBy | property = Axis.Z,
