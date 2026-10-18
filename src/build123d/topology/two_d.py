@@ -2847,15 +2847,28 @@ class Shell(Mixin2D[TopoDS_Shell]):
         label: str = "",
         color: Color | None = None,
         parent: Compound | None = None,
+        tolerance: float = TOLERANCE,
     ):
         """Build a shell from an OCCT TopoDS_Shape/TopoDS_Shell
+
+        Faces are sewn together where their edges coincide. Edges further apart
+        than ``tolerance`` stay separate, so faces whose shared edges were
+        built independently, as approximated copies of one curve, may need a
+        tolerance above the approximation error to close into one shell.
 
         Args:
             obj (TopoDS_Shape | Face | Iterable[Face], optional): OCCT Shell, Face or Faces.
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
+            tolerance (float, optional): largest gap between edges that are
+                sewn as one. Defaults to TOLERANCE.
+
+        Raises:
+            ValueError: tolerance is not positive
         """
+        if tolerance <= 0:
+            raise ValueError("tolerance must be positive")
         obj = list(obj) if isinstance(obj, Iterable) else obj
         if isinstance(obj, Iterable) and len(obj_list := list(obj)) == 1:
             obj = obj_list[0]
@@ -2865,7 +2878,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
                 raise ValueError("Can't create a Shell from empty Face")
             obj = _make_topods_shell([obj.wrapped])
         elif isinstance(obj, Iterable):
-            obj = _make_topods_shell([f.wrapped for f in obj])
+            obj = _make_topods_shell([f.wrapped for f in obj], tolerance)
 
         super().__init__(
             obj=obj,

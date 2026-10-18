@@ -138,9 +138,16 @@ def _topods_point_on_face(
     return classifier.IsOnAFace()
 
 
-def _make_topods_shell(faces: Iterable[TopoDS_Face]) -> TopoDS_Shell:
+def _make_topods_shell(
+    faces: Iterable[TopoDS_Face], tolerance: float = TOLERANCE
+) -> TopoDS_Shell:
     """One shell from faces: a single face held in a shell of its own, or
     several sewn together.
+
+    Args:
+        faces (Iterable[TopoDS_Face]): the faces of the shell
+        tolerance (float, optional): largest gap between edges that are sewn
+            as one. Defaults to TOLERANCE.
 
     Raises:
         ValueError: no faces, or faces that do not sew into one shell
@@ -154,7 +161,7 @@ def _make_topods_shell(faces: Iterable[TopoDS_Face]) -> TopoDS_Shell:
         builder.MakeShell(shell)
         builder.Add(shell, faces[0])
         return shell
-    sewn = _sew_topods_faces(faces)
+    sewn = _sew_topods_faces(faces, tolerance)
     if not isinstance(sewn, TopoDS_Shell):
         raise ValueError("the faces do not sew into one connected shell")
     return sewn

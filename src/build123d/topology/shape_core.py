@@ -4187,9 +4187,17 @@ def _topods_area(shape: TopoDS_Shape) -> float:
     return properties.Mass()
 
 
-def _sew_topods_faces(faces: Iterable[TopoDS_Face]) -> TopoDS_Shape:
-    """Sew faces into a shell if possible"""
-    shell_builder = BRepBuilderAPI_Sewing()
+def _sew_topods_faces(
+    faces: Iterable[TopoDS_Face], tolerance: float = TOLERANCE
+) -> TopoDS_Shape:
+    """Sew faces into a shell if possible
+
+    Args:
+        faces (Iterable[TopoDS_Face]): the faces to sew
+        tolerance (float, optional): largest gap between edges that are sewn
+            as one. Defaults to TOLERANCE.
+    """
+    shell_builder = BRepBuilderAPI_Sewing(tolerance)
     for face in faces:
         shell_builder.Add(face)
     shell_builder.Perform()

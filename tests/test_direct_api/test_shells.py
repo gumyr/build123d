@@ -30,7 +30,7 @@ import math
 import unittest
 
 from build123d.build_enums import GeomType
-from build123d.geometry import Color, Plane, Pos, Rot, Vector
+from build123d.geometry import Axis, Color, Plane, Pos, Rot, Vector
 from build123d.objects_curve import JernArc, Polyline, Spline
 from build123d.objects_sketch import Circle, Rectangle
 from build123d.operations_generic import sweep
@@ -47,6 +47,21 @@ class TestShells(unittest.TestCase):
         face = Solid.make_cone(1, 0, 2).faces().filter_by(GeomType.CONE).first
         shell = Shell(face)
         self.assertTrue(shell.is_valid)
+
+    def test_shell_init_tolerance(self):
+        # the lid sits 1e-5 above the box's sides: too far for the default
+        # tolerance, within reach of a larger one
+        faces = Solid.make_box(1, 1, 1).faces().sort_by(Axis.Z)
+        faces = [*faces[:-1], faces[-1].moved(Pos(0, 0, 1e-5))]
+        with self.assertRaises(ValueError):
+            Shell(faces)
+        with self.assertRaises(ValueError):
+            Shell(faces, tolerance=1e-6)
+        sewn = Shell(faces, tolerance=1e-4)
+        self.assertTrue(sewn.is_manifold)
+        self.assertTrue(Solid(sewn).is_valid)
+        with self.assertRaises(ValueError):
+            Shell(faces, tolerance=0)
 
     def test_center(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
