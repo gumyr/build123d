@@ -184,6 +184,11 @@ class TestBasePartObjectFirewall(unittest.TestCase):
 
 
 class TestMakeBrakeFormed(unittest.TestCase):
+    def test_make_brake_formed_is_deprecated(self):
+        outline = Polyline((0, 0), (5, 0), (5, 5))
+        with self.assertWarnsRegex(DeprecationWarning, "use BuildSheet"):
+            make_brake_formed(thickness=0.5, station_widths=1, line=outline)
+
     def test_make_brake_formed(self):
         with BuildPart() as bp:
             with BuildLine() as bl:

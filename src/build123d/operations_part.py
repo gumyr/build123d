@@ -31,6 +31,9 @@ from typing import cast
 
 from collections.abc import Iterable
 from itertools import cycle, permutations, starmap
+
+from typing_extensions import deprecated
+
 from build123d.build_enums import GeomType, Mode, Until, Kind, Side
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector, VectorLike
@@ -382,6 +385,7 @@ def loft(
     return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
 
 
+@deprecated("make_brake_formed() is deprecated; use BuildSheet instead.")
 def make_brake_formed(
     thickness: float,
     station_widths: float | Iterable[float],
@@ -392,6 +396,11 @@ def make_brake_formed(
     mode: Mode = Mode.ADD,
 ) -> Part:
     """make_brake_formed
+
+    .. deprecated::
+        Use :class:`~build_sheet.BuildSheet` instead: draw the flat, then
+        :func:`~operations_sheet.flange`, :func:`~operations_sheet.bend` and
+        :func:`~operations_part.thicken` it.
 
     Create a part typically formed with a sheet metal brake from a single outline.
     The line parameter describes how the material is to be bent. Either a single

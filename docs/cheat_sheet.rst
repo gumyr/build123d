@@ -117,7 +117,6 @@ Cheat Sheet
             | :func:`~operations_part.extrude`
             | :func:`~operations_generic.fillet`
             | :func:`~operations_part.loft`
-            | :func:`~operations_part.make_brake_formed`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
             | :func:`~operations_generic.project`
