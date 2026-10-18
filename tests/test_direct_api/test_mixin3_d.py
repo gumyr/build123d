@@ -32,6 +32,7 @@ from unittest.mock import Mock, patch, PropertyMock
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet
 from OCP.ChFiDS import ChFiDS_ErrorStatus
 from OCP.Standard import Standard_Failure
+from OCP.StdFail import StdFail_NotDone
 from OCP.TopoDS import TopoDS
 
 from build123d.build_enums import CenterOf, GeomType, Kind
@@ -42,6 +43,10 @@ from build123d.objects_sketch import RectangleRounded
 from build123d.operations_generic import fillet
 from build123d.operations_part import extrude
 from build123d.topology import Compound, Edge, Face, Part, Shape, Solid
+
+# A failed fillet is StdFail_NotDone on Linux and Windows and Standard_Failure
+# on macOS; the two are unrelated classes in OCP, and Mixin3D.fillet catches both
+KERNEL_FAILURES = (StdFail_NotDone, Standard_Failure)
 
 
 class TestFilletFailures(unittest.TestCase):
@@ -66,7 +71,7 @@ class TestFilletFailures(unittest.TestCase):
                 with self.assertRaises(ValueError) as caught:
                     shape.fillet(3, shape.edges())
                 self.assertEqual(str(caught.exception), self.plate_message)
-                self.assertIsInstance(caught.exception.__cause__, Standard_Failure)
+                self.assertIsInstance(caught.exception.__cause__, KERNEL_FAILURES)
 
     def test_operation(self):
         """The fillet operation reports the same edges in algebra and builder mode."""
@@ -172,7 +177,7 @@ class TestFilletFailures(unittest.TestCase):
                     str(caught.exception),
                     "Failed creating a fillet with radius of 3" + self.advice,
                 )
-                self.assertIsInstance(caught.exception.__cause__, Standard_Failure)
+                self.assertIsInstance(caught.exception.__cause__, KERNEL_FAILURES)
 
     def test_group_failure_reasons(self):
         """Different kernel statuses form separate readable groups in caller order."""
