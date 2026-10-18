@@ -102,15 +102,21 @@ def _create_xde(
     Returns:
         TDocStd_Document: XDE document
     """
-    # Create the XCAF document
-    doc = TDocStd_Document(TCollection_ExtendedString("XmlOcaf"))
-
-    # Initialize the XCAF application
+    # Create and initialize the XCAF document through the application.
+    # NewDocument opens the new document in the application and returns it; the
+    # handle passed in only selects this overload and is otherwise ignored, so
+    # it must be captured. The caller closes the returned document once the
+    # export is done, otherwise every export leaves an open document behind.
     application = XCAFApp_Application.GetApplication_s()
-
-    # Create and initialize a new document
-    application.NewDocument(TCollection_ExtendedString("MDTV-XCAF"), doc)
-    application.InitDocument(doc)
+    # Both NewDocument overloads accept a TDocStd_Document, so the stubs resolve
+    # the call to the first (CDM_Document) overload; recover the concrete type.
+    doc = cast(
+        TDocStd_Document,
+        application.NewDocument(
+            TCollection_ExtendedString("MDTV-XCAF"),
+            TDocStd_Document(TCollection_ExtendedString("XmlOcaf")),
+        )[0],
+    )
 
     XCAFDoc_DocumentTool.SetLengthUnit_s(doc, 1 / UNITS_PER_METER[unit])
 
@@ -369,6 +375,9 @@ def export_gltf(
 
     status = writer.Perform(doc, index_map, progress)
 
+    # Close the document opened by _create_xde now that it has been written
+    XCAFApp_Application.GetApplication_s().Close(doc)
+
     # Reset tessellation (removes all triangulations including any UV changes)
     BRepTools.Clean_s(to_export.wrapped)
 
@@ -481,6 +490,9 @@ def export_step(
     else:
         # need to cast for type checker because BinaryIO is OK but OCP doesn't know
         status = writer.WriteStream(cast(BytesIO, file_path))
+
+    # Close the document opened by _create_xde now that it has been written
+    XCAFApp_Application.GetApplication_s().Close(doc)
 
     success = status == IFSelect_ReturnStatus.IFSelect_RetDone
     if not success:
