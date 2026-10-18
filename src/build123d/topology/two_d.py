@@ -2756,8 +2756,10 @@ class Face(Mixin2D[TopoDS_Face]):
         A shape crossing the seam of a periodic surface is split there, as
         the kernel's own faces are: a wire gets a vertex at the seam, and a
         face comes back as a Shell of one face per period it reaches into,
-        which thickens and fuses as one. A shape spanning a whole turn or
-        more, or surrounding a pole of the surface, is refused.
+        which thickens and fuses as one. A shape may span more than a whole
+        turn when it is sheared along the surface, as a helical band is; one
+        that would overlap itself once wrapped, or one surrounding a pole of
+        the surface, is refused.
 
         :meth:`uv_frame` gives the frame behind this, which can also punch an
         outline into the face.
@@ -2770,8 +2772,8 @@ class Face(Mixin2D[TopoDS_Face]):
                 curve's image has to be interpolated. Defaults to 1e-4.
 
         Raises:
-            ValueError: empty face, or the shape spans a whole turn of the
-                surface or surrounds a pole
+            ValueError: empty face, or the shape would overlap itself wrapped
+                around the surface or surrounds a pole
             TypeError: planar_shape is not an Edge, Wire or Face
 
         Returns:

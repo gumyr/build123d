@@ -43,8 +43,9 @@ desc:
     whole periods into the surface's own range and then written, its edges
     given the piece's curves as pcurves. So write_face returns one face per
     period the shape reaches into, and a wire gets a vertex where it
-    crosses. A shape spanning a whole turn or more, or one surrounding a
-    pole, is refused.
+    crosses. A shape may span more than a whole turn when it is sheared
+    along the surface, as a helical band is; one that would overlap itself
+    once wrapped, or one surrounding a pole, is refused.
     Pieces from one shape meet along the seam, so once thickened they are
     best joined into one tool before a boolean with the target solid.
 
@@ -254,8 +255,8 @@ class UVFrame:
             wire (Wire): a planar wire on ``Plane.XY``
 
         Raises:
-            ValueError: the wire spans a whole turn of the surface or more,
-                or surrounds a pole
+            ValueError: the wire would overlap itself wrapped around the
+                surface, or surrounds a pole
 
         Returns:
             Wire: a wire on the face's surface
@@ -277,8 +278,8 @@ class UVFrame:
             planar (Face): a planar face on ``Plane.XY``
 
         Raises:
-            ValueError: the shape spans a whole turn of the surface or more,
-                or surrounds a pole
+            ValueError: the shape would overlap itself wrapped around the
+                surface, or surrounds a pole
 
         Returns:
             ShapeList[Face]: faces on the target's surface
@@ -412,12 +413,20 @@ class UVFrame:
         of the surface's range
 
         Raises:
-            ValueError: the shape spans a whole turn of the surface or more
+            ValueError: the shape would overlap itself wrapped around the
+                surface
         """
         box = lifted.bounding_box()
         cutters = []
         for axis, start, period in self._periods:
             low, high = box.min.dot(axis) - start, box.max.dot(axis) - start
+            if high - low >= period - 1e-9 and _overlaps_wrapped(
+                lifted, axis, period, high - low
+            ):
+                raise ValueError(
+                    "the shape would overlap itself wrapped around the face: it "
+                    "spans a whole turn or more where it is not sheared"
+                )
             cutters += [
                 Plane(axis * (start + k * period), z_dir=axis)
                 for k in _periods_crossed(low, high, period)
@@ -565,17 +574,25 @@ def _surface_periods(surface: Geom_Surface) -> list[Period]:
     return periods
 
 
-def _periods_crossed(low: float, high: float, period: float) -> list[int]:
-    """The multiples of the period between two parameter values
+def _overlaps_wrapped(shape: Shape, axis: Vector, period: float, extent: float) -> bool:
+    """Whether a uv-plane shape spanning ``extent`` along a periodic ``axis``
+    would overlap itself once wrapped: whether it meets its own image, moved
+    by any whole number of periods it spans, in more than isolated points
 
-    Raises:
-        ValueError: the values are a period or more apart
+    A shape sheared along the axis, a helical band say, can span several
+    periods and wrap without meeting itself. One wider than a period meets
+    itself in a region, and one exactly a period wide along its own edge,
+    which the kernel's seam cannot represent either.
     """
-    if high - low >= period - 1e-9:
-        raise ValueError(
-            "the shape spans a whole turn of the face or more, and would "
-            "overlap itself"
-        )
+    for k in range(1, ceil(extent / period) + 1):
+        common = shape & shape.moved(Location(axis * (k * period)))
+        if any(edge.length > TOLERANCE for edge in common.edges()):
+            return True
+    return False
+
+
+def _periods_crossed(low: float, high: float, period: float) -> list[int]:
+    """The multiples of the period between two parameter values"""
     # touching a seam is not crossing it
     return [
         k
