@@ -2241,9 +2241,18 @@ class Face(Mixin2D[TopoDS_Face]):
         )
 
     def _sheet_selected_from(self) -> Shape:
-        """The shell this face was taken from, for questions about its neighbours."""
+        """The shell this face was taken from, for questions about its neighbours.
+
+        A sheet of one flat is still a sheet, so a Shell parent is accepted
+        whatever its face count; any other parent has to hold more than this
+        face, or it is only a wrapper around it and knows no neighbours.
+        """
         parent = self.topo_parent
-        if parent is None or parent.is_empty or len(parent.faces()) < 2:
+        if (
+            parent is None
+            or parent.is_empty
+            or (len(parent.faces()) < 2 and not isinstance(parent, Shell))
+        ):
             raise ValueError(
                 "this face was not selected from a sheet, so its neighbours are "
                 "unknown - take it from the sheet, as in sheet.flats()[0]"

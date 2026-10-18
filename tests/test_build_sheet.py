@@ -2118,6 +2118,19 @@ class TestSheetSelectors(unittest.TestCase):
             bend(bs.flats().sort_by(Axis.X)[0].fold_lines()[0], angle=90)
             self.assertEqual(len(bs.bends()), 2)
 
+    def test_a_sheet_of_one_flat_answers(self):
+        """A lone flat is the whole sheet, so every edge is a rim, holes included"""
+        with BuildSheet(thickness=3 * MM, bend_radius=5 * MM) as sheet:
+            with BuildSketch():
+                Rectangle(200, 300)
+                with GridLocations(20, 20, 5, 5):
+                    Circle(5, mode=Mode.SUBTRACT)
+            flat = sheet.flats()[0]
+            self.assertEqual(len(flat.rims()), 4 + 25)
+            self.assertEqual(len(flat.rims()), len(sheet.rims()))
+            self.assertEqual(len(flat.rims().filter_by(GeomType.CIRCLE)), 25)
+            self.assertEqual(len(flat.fold_lines()), 0)
+
     def test_a_face_not_taken_from_a_sheet_cannot_answer(self):
         with self.assertRaisesRegex(ValueError, "not selected from a sheet"):
             Face.make_rect(1, 1).fold_lines()
