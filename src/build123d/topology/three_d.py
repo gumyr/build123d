@@ -784,11 +784,7 @@ def _fillet_failure_details(
         for i, edge in enumerate(selected_edges):
             if edge in edges:
                 rejected_indices.add(i)
-                point = ", ".join(
-                    str(round(value, 6) + 0.0).removesuffix(".0")
-                    for value in edge.center()
-                )
-                entries.append(f"[{i}] at ({point})")
+                entries.append(f"[{i}] at {edge.center():.6g}")
         tangent_count = len(edges.difference(selected_edges))
         if tangent_count:
             noun = "edge" if tangent_count == 1 else "edges"
