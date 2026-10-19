@@ -455,9 +455,9 @@ def test_export_unicode_labels(tmp_path):
 def test_exports_do_not_leak_open_xcaf_documents(tmp_path):
     """Regression test for #1522.
 
-    ``_create_xde`` must not leave the document that the XCAF application
-    creates for it open once the export has finished, otherwise every STEP and
-    glTF export leaks one open document for the life of the process.
+    ``_create_xde`` must not leave a document open in the XCAF application
+    once the export has finished, otherwise every STEP and glTF export leaks
+    one open document for the life of the process.
     """
     application = XCAFApp_Application.GetApplication_s()
     box = Box(1, 1, 1)
