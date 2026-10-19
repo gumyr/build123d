@@ -41,6 +41,7 @@ from zoneinfo import ZoneInfo
 import pytest
 import requests
 from OCP.Standard import Standard_Failure
+from OCP.XCAFApp import XCAFApp_Application
 
 from build123d.build_common import GridLocations
 from build123d.build_enums import Unit
@@ -449,6 +450,26 @@ def test_export_unicode_labels(tmp_path):
     assert text.encode("utf-8") in step_raw
     mojibake = text.encode("utf-8").decode("latin-1").encode("utf-8")
     assert mojibake not in step_raw
+
+
+def test_exports_do_not_leak_open_xcaf_documents(tmp_path):
+    """Regression test for #1522.
+
+    ``_create_xde`` must not leave a document open in the XCAF application
+    once the export has finished, otherwise every STEP and glTF export leaks
+    one open document for the life of the process.
+    """
+    application = XCAFApp_Application.GetApplication_s()
+    box = Box(1, 1, 1)
+    box.label = "box"
+
+    before = application.NbDocuments()
+    assert export_step(box, tmp_path / "box.step")
+    assert application.NbDocuments() == before
+
+    before = application.NbDocuments()
+    assert export_gltf(box, tmp_path / "box.glb", binary=True)
+    assert application.NbDocuments() == before
 
 
 @pytest.mark.parametrize(
