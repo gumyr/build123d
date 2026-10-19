@@ -20,6 +20,25 @@ Builder
     :members:
     :noindex:
 
+************
+Flat pattern
+************
+
+What :func:`~operations_sheet.unfold` returns: the pattern and, for each of
+its faces, what it developed from.
+
+.. autoclass:: build123d.sheet_utils.UnfoldOutput
+    :members:
+    :noindex:
+
+.. autoclass:: build123d.sheet_utils.UnfoldedFace
+    :members:
+    :noindex:
+
+.. autoclass:: build123d.sheet_utils.FaceMap
+    :members:
+    :noindex:
+
 *****
 Enums
 *****

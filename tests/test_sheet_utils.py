@@ -236,10 +236,10 @@ class TestSheetUtils(unittest.TestCase):
         split = Shell(Face.sew_faces(pieces + others)[0])
         self.assertEqual(len(split.faces()), 4)
 
-        flat = Shell(_unfold_shell(split.wrapped, builder.sheet_parameters))
+        flat = Shell(_unfold_shell(split.wrapped, builder.sheet_parameters)[0])
         self.assertTrue(flat.is_valid)
         self.assertEqual(len(flat.faces()), 4)
-        whole = Shell(_unfold_shell(sheet.wrapped, builder.sheet_parameters))
+        whole = Shell(_unfold_shell(sheet.wrapped, builder.sheet_parameters)[0])
         self.assertAlmostEqual(flat.area, whole.area, 6)
 
     def test_closed_shell_requires_a_cut(self):

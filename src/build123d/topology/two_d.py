@@ -156,6 +156,7 @@ from build123d.geometry import (
 )
 from build123d.sheet_utils import (
     SheetMetalParameters,
+    UnfoldOutput,
     _unfold_shell,
     _uv_topods_edge,
     _uv_topods_face_with_map,
@@ -3269,7 +3270,9 @@ class Shell(Mixin2D[TopoDS_Shell]):
         """
         return tcast(Shell, super().__add__(other))
 
-    def unfold(self, sheet_parameters: SheetMetalParameters | None = None) -> Shell:
+    def unfold(
+        self, sheet_parameters: SheetMetalParameters | None = None
+    ) -> UnfoldOutput:
         """Develop this planar/cylindrical shell onto ``Plane.XY``.
 
         Adjacent faces are placed by matching the developed representations of
@@ -3282,6 +3285,13 @@ class Shell(Mixin2D[TopoDS_Shell]):
         bend to its neutral radius using the face orientation to distinguish
         positive and negative bends.
 
+        The result unpacks as ``flat, face_map = shell.unfold(parameters)``:
+        the flat pattern, and a :class:`~sheet_utils.FaceMap` that answers
+        ``face_map[face]`` for any face of the pattern with an
+        :class:`~sheet_utils.UnfoldedFace` saying which face of this shell it
+        developed from and, for a bend, its angle, radii, bend line and
+        direction.
+
         Args:
             sheet_parameters: Optional material and reference-surface parameters
                 used to produce a neutral-axis flat pattern.
@@ -3292,11 +3302,13 @@ class Shell(Mixin2D[TopoDS_Shell]):
                 consistently without a cut.
 
         Returns:
-            The developed shell on ``Plane.XY``.
+            UnfoldOutput: the developed shell on ``Plane.XY`` and the record
+            of its faces
         """
         if not self:
             raise ValueError("unfold requires a non-empty Shell")
-        return Shell(_unfold_shell(self.wrapped, sheet_parameters))
+        flat, face_map = _unfold_shell(self.wrapped, sheet_parameters)
+        return UnfoldOutput(Shell(flat), face_map)
 
     def center(self) -> Vector:
         """Center of mass of the shell"""

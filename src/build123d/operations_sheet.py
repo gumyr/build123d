@@ -28,7 +28,7 @@ license:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import combinations
 from math import asin, atan, cos, degrees, radians, sin, sqrt, tan
 from statistics import median
@@ -55,7 +55,10 @@ from build123d.build_sheet import BuildSheet
 from build123d.geometry import Matrix, TOLERANCE, Axis, Location, Plane, Vector
 from build123d.sheet_utils import (
     MIN_BEND_RADIUS,
+    FaceMap,
     SheetMetalParameters,
+    UnfoldedFace,
+    UnfoldOutput,
     is_positive_bend,
     bend_allowance,
     neutral_radius,
@@ -1659,11 +1662,19 @@ def unfold(
     sheet: Shell | None = None,
     sheet_parameters: SheetMetalParameters | None = None,
     align: Align | tuple[Align, Align] | None = Align.NONE,
-) -> Shell:
+) -> UnfoldOutput:
     """Sheet Operation: unfold
 
     Develop a sheet metal reference shell into its flat pattern on ``Plane.XY``
     - the blank the folded part is cut from.
+
+    The result unpacks as ``flat, face_map = unfold()``: the pattern, and a
+    :class:`~sheet_utils.FaceMap` that answers ``face_map[face]`` for any face
+    of the pattern with an :class:`~sheet_utils.UnfoldedFace`. A flat's entry
+    says which face of the sheet it came from; a bend's adds the angle, the
+    inside and neutral radii, the bend line through the middle of its strip
+    and whether it folds up, toward +Z, as the blank lies. That is what a
+    press brake needs that the outline alone does not say.
 
     Each bend is developed at its neutral radius, derived from the thickness,
     K-factor and reference surface. :meth:`~topology.Shell.unfold` defaults to
@@ -1692,7 +1703,7 @@ def unfold(
         ValueError: sheet_parameters is supplied by the active BuildSheet
 
     Returns:
-        Shell: the flat pattern
+        UnfoldOutput: the flat pattern and the record of its faces
     """
     context: BuildSheet | None = BuildSheet._get_context("unfold")
     validate_inputs(context, "unfold", [sheet] if sheet is not None else None)
@@ -1706,8 +1717,21 @@ def unfold(
     if not sheet.faces():
         raise ValueError("Can't unfold an empty sheet Shell")
 
-    flat = sheet.unfold(_resolve_sheet_parameters(context, sheet_parameters))
-    return flat.moved(Location(flat.bounding_box().to_align_offset(align)))
+    flat, face_map = sheet.unfold(_resolve_sheet_parameters(context, sheet_parameters))
+    offset = Location(flat.bounding_box().to_align_offset(align))
+    # a move keeps the faces' kernel shapes, so the keys still answer for the
+    # moved pattern; only the bend lines have to follow it
+    aligned: FaceMap[UnfoldedFace] = FaceMap(
+        {
+            key: (
+                replace(record, bend_line=record.bend_line.moved(offset))
+                if record.bend_line is not None
+                else record
+            )
+            for key, record in face_map.items()
+        }
+    )
+    return UnfoldOutput(flat.moved(offset), aligned)
 
 
 def sheet_shells(

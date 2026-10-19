@@ -110,6 +110,9 @@ __all__ = [
     "BuildPart",
     "BuildSheet",
     "SheetMetalParameters",
+    "FaceMap",
+    "UnfoldedFace",
+    "UnfoldOutput",
     "BuildSketch",
     # 1D Curve Objects
     "BaseCurveObject",

@@ -112,7 +112,7 @@ with BuildPart() as sm_hanger_builder:
 
     thicken()  # Parameters taken from BuildSheet
 
-    sm_hanger_flat = sheet.sheet.unfold()
+    sm_hanger_flat = sheet.sheet.unfold().flat
 
 sm_hanger = sm_hanger_builder.part
 sm_hanger.material = mild_steel()  # 7800 kg/m³

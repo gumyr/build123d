@@ -66,7 +66,7 @@ the thickness and which surface it is, and the sheet operations apply:
     parameters = SheetMetalParameters(
         thickness=thickness, sheet_surface=SheetSurface.INSIDE
     )
-    flat_pattern = unfold(smaller, sheet_parameters=parameters, align=Align.MIN)
+    flat_pattern = unfold(smaller, sheet_parameters=parameters, align=Align.MIN).flat
 
 The bend radius is not returned; it is the radius of the smallest cylindrical
 face on the chosen surface if a later operation needs it.

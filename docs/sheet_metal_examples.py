@@ -490,7 +490,7 @@ def relieved_blank(relief_type: ReliefType, **sizes) -> Shell:
         flange(tray.rims(), length=15, gaps=3.1)
         base = tray.flats().sort_by(Axis.Z)[0]
         corner_relief(base.vertices().filter_by(Convexity.CONVEX), relief_type, **sizes)
-        return unfold(align=Align.MIN)
+        return unfold(align=Align.MIN).flat
 
 
 round_blank = relieved_blank(ReliefType.ROUND, radius=4)
@@ -546,7 +546,7 @@ def relieved_bend(relief_type: ReliefType) -> Shell:
             Rectangle(60, 40)
         flange(bracket.rims().sort_by(Axis.X)[-1], length=15, gaps=8)
         bend_relief(bracket.bends(), relief_type)  # default shop-rule sizes
-        return unfold(align=Align.MIN)
+        return unfold(align=Align.MIN).flat
 
 
 round_blank = relieved_bend(ReliefType.ROUND)
@@ -581,7 +581,7 @@ with BuildSheet(thickness=1, bend_radius=2) as tray:
         base.vertices().filter_by(Convexity.CONVEX), ReliefType.ROUND, radius=3
     )
     # the blank the tray is cut from, cornered on the origin
-    flat_pattern = unfold(align=Align.MIN)
+    flat_pattern = unfold(align=Align.MIN).flat
 # [unfold_basic]
 write_layout([drawn(flat_pattern)], "unfold_basic")
 
@@ -698,7 +698,9 @@ with tempfile.TemporaryDirectory() as scratch:
     docs_directory = os.getcwd()
     os.chdir(scratch)
     # [tutorial_7]
-    flat_pattern = unfold(enclosure.sheet, enclosure.sheet_parameters, align=Align.MIN)
+    flat_pattern = unfold(
+        enclosure.sheet, enclosure.sheet_parameters, align=Align.MIN
+    ).flat
     exporter = ExportDXF()
     exporter.add_shape(flat_pattern)
     exporter.write("enclosure_flat_pattern.dxf")

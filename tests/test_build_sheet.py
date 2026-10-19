@@ -1126,7 +1126,7 @@ class TestFlangePosition(unittest.TestCase):
         for position in BendPosition:
             with self.subTest(position=position):
                 bs = self.flanged(position)
-                flat = unfold(bs.sheet, bs.sheet_parameters)
+                flat = unfold(bs.sheet, bs.sheet_parameters).flat
                 length = 100 + 10 + allowance - self.setback(position)
                 self.assertAlmostEqual(flat.bounding_box().size.X, length, 6)
                 self.assertAlmostEqual(precise_area(flat), 60 * length, 4)
@@ -1156,7 +1156,7 @@ class TestFlangePosition(unittest.TestCase):
         bend = bs.sheet.bends()[0]
         self.assertEqual(len(bend.inner_wires()), 1)
         self.assertEqual(len(bs.sheet.flats().sort_by(Axis.X)[0].inner_wires()), 0)
-        flat = unfold(bs.sheet, bs.sheet_parameters)
+        flat = unfold(bs.sheet, bs.sheet_parameters).flat
         allowance = (5 + 0.5) * pi / 2
         self.assertAlmostEqual(precise_area(flat), 60 * (110 + allowance - 6) - pi, 4)
         self.assertTrue(materialize(bs).is_valid)
@@ -1185,7 +1185,7 @@ class TestFlangePosition(unittest.TestCase):
         self.assertTrue(materialize(bs).is_valid)
         # the blank is the face and the new material past its rim
         allowance = (2 + 0.5) * pi / 2
-        flat = unfold(bs.sheet, bs.sheet_parameters)
+        flat = unfold(bs.sheet, bs.sheet_parameters).flat
         self.assertAlmostEqual(
             precise_area(flat), 100 * 55 + rim_length * (allowance - setback + 10), 4
         )
@@ -1482,7 +1482,7 @@ class TestJog(unittest.TestCase):
         for offset, angle in ((10, 90), (-10, 60), (10, 120)):
             with self.subTest(offset=offset, angle=angle):
                 bs = self.jogged(offset, angle)
-                flat = unfold(bs.sheet, bs.sheet_parameters)
+                flat = unfold(bs.sheet, bs.sheet_parameters).flat
                 self.assertAlmostEqual(flat.bounding_box().size.X, 100, 6)
                 self.assertAlmostEqual(precise_area(flat), 6000, 4)
 
@@ -1515,7 +1515,7 @@ class TestJog(unittest.TestCase):
         near = bs.sheet.flats().sort_by(Axis.X)[0]
         self.assertAlmostEqual(near.bounding_box().max.X, -2, 6)
         self.assertAlmostEqual(bs.sheet.flats().sort_by(Axis.X)[-1].center().Z, 10, 6)
-        flat = unfold(bs.sheet, bs.sheet_parameters)
+        flat = unfold(bs.sheet, bs.sheet_parameters).flat
         self.assertAlmostEqual(precise_area(flat), 6000, 4)
 
     def test_a_jog_off_a_free_edge_is_a_stepped_flange(self):
@@ -1543,7 +1543,7 @@ class TestJog(unittest.TestCase):
                     far.bounding_box().max.X, 50 - setback + 5 + 15, 6
                 )
                 self.assertAlmostEqual(far.bounding_box().size.Y, 50, 6)
-                flat = unfold(bs.sheet, bs.sheet_parameters)
+                flat = unfold(bs.sheet, bs.sheet_parameters).flat
                 self.assertAlmostEqual(
                     precise_area(flat),
                     6000 + 50 * (2 * allowance + 5 + 15 - setback),
@@ -1618,8 +1618,8 @@ class TestUnfoldOperation(unittest.TestCase):
     def test_matches_the_method_given_parameters(self):
         sheet, parameters = self.flanged()
         self.assertAlmostEqual(
-            unfold(sheet, sheet_parameters=parameters).area,
-            sheet.unfold(parameters).area,
+            unfold(sheet, sheet_parameters=parameters).flat.area,
+            sheet.unfold(parameters).flat.area,
             5,
         )
 
@@ -1635,10 +1635,10 @@ class TestUnfoldOperation(unittest.TestCase):
             with BuildSketch():
                 Rectangle(100, 60)
             flange(bs.edges().filter_by(GeomType.LINE).sort_by(Axis.Y)[-1], length=20)
-            flat = unfold()
+            flat = unfold().flat
 
         sheet, parameters = self.flanged()
-        self.assertAlmostEqual(flat.area, sheet.unfold(parameters).area, 5)
+        self.assertAlmostEqual(flat.area, sheet.unfold(parameters).flat.area, 5)
 
     def test_builder_mode_rejects_explicit_parameters(self):
         _, parameters = self.flanged()
@@ -1662,7 +1662,7 @@ class TestUnfoldOperation(unittest.TestCase):
         so the pattern is built there rather than transformed there afterwards -
         the traversal root only sets connectivity order, not the result plane"""
         sheet, parameters = self.flanged()
-        reference = unfold(sheet, sheet_parameters=parameters)
+        reference = unfold(sheet, sheet_parameters=parameters).flat
 
         placements = {
             "translated": Pos(500, 300, 200) * sheet,
@@ -1671,7 +1671,7 @@ class TestUnfoldOperation(unittest.TestCase):
         }
         for label, placed in placements.items():
             with self.subTest(placement=label):
-                flat = unfold(placed, sheet_parameters=parameters)
+                flat = unfold(placed, sheet_parameters=parameters).flat
                 box = flat.bounding_box()
                 self.assertAlmostEqual(box.size.Z, 0, 5)
                 self.assertAlmostEqual(box.min.Z, 0, 5)
@@ -1681,11 +1681,11 @@ class TestUnfoldOperation(unittest.TestCase):
 
     def test_align_places_the_pattern_within_plane_xy(self):
         sheet, parameters = self.flanged()
-        loose = unfold(sheet, sheet_parameters=parameters).bounding_box()
+        loose = unfold(sheet, sheet_parameters=parameters).flat.bounding_box()
 
         cornered = unfold(
             sheet, sheet_parameters=parameters, align=Align.MIN
-        ).bounding_box()
+        ).flat.bounding_box()
         self.assertAlmostEqual(cornered.min.X, 0, 5)
         self.assertAlmostEqual(cornered.min.Y, 0, 5)
         self.assertAlmostEqual(cornered.size.X, loose.size.X, 5)
@@ -1693,24 +1693,26 @@ class TestUnfoldOperation(unittest.TestCase):
 
         centred = unfold(
             sheet, sheet_parameters=parameters, align=Align.CENTER
-        ).bounding_box()
+        ).flat.bounding_box()
         self.assertAlmostEqual(centred.center().X, 0, 5)
         self.assertAlmostEqual(centred.center().Y, 0, 5)
 
         mixed = unfold(
             sheet, sheet_parameters=parameters, align=(Align.MIN, Align.CENTER)
-        ).bounding_box()
+        ).flat.bounding_box()
         self.assertAlmostEqual(mixed.min.X, 0, 5)
         self.assertAlmostEqual(mixed.center().Y, 0, 5)
 
     def test_align_defaults_to_leaving_the_pattern_in_place(self):
         """Align.NONE keeps the pattern registered with the source sheet"""
         sheet, parameters = self.flanged()
-        default = unfold(sheet, sheet_parameters=parameters).bounding_box()
+        default = unfold(sheet, sheet_parameters=parameters).flat.bounding_box()
         explicit = unfold(
             sheet, sheet_parameters=parameters, align=Align.NONE
-        ).bounding_box()
-        as_none = unfold(sheet, sheet_parameters=parameters, align=None).bounding_box()
+        ).flat.bounding_box()
+        as_none = unfold(
+            sheet, sheet_parameters=parameters, align=None
+        ).flat.bounding_box()
 
         for other in (explicit, as_none):
             self.assertAlmostEqual(other.min.X, default.min.X, 5)
@@ -1736,7 +1738,7 @@ class TestUnfoldOperation(unittest.TestCase):
                     Rectangle(25, 25, mode=Mode.SUBTRACT)
             hole = builder.flats().sort_by(Axis.Z)[0].inner_wires()[0]
             flange(hole.edges(), length=10, gaps=3.5)
-            flat = unfold()
+            flat = unfold().flat
 
         plate = max(flat.faces(), key=lambda f: f.area)
         for face in flat.faces():
@@ -1756,7 +1758,7 @@ class TestUnfoldOperation(unittest.TestCase):
         sheet, parameters = self.flanged(k_factor=0.5)
         self.assertAlmostEqual(
             thicken(sheet, sheet_parameters=parameters).volume,
-            unfold(sheet, sheet_parameters=parameters).area * parameters.thickness,
+            unfold(sheet, sheet_parameters=parameters).flat.area * parameters.thickness,
             5,
         )
 
@@ -1767,6 +1769,87 @@ def precise_area(shape) -> float:
     props = GProp_GProps()
     BRepGProp.SurfaceProperties_s(shape.wrapped, props, 1e-9)
     return props.Mass()
+
+
+class TestUnfoldFaceMap(unittest.TestCase):
+    """Each face of the pattern says what it developed from"""
+
+    @staticmethod
+    def two_flanges():
+        """A base with a flange folded up on +X and one folded down on -X"""
+        with BuildSheet(thickness=1, bend_radius=2, k_factor=0.4) as bs:
+            with BuildSketch():
+                Rectangle(40, 30)
+            flange(bs.rims().sort_by(Axis.X)[-1], length=10, angle=90)
+            flange(bs.rims().sort_by(Axis.X)[0], length=10, angle=-90)
+            output = unfold(align=Align.MIN)
+        return bs, output
+
+    def test_every_face_has_an_entry_naming_its_source(self):
+        bs, (flat, face_map) = self.two_flanges()
+        self.assertIsInstance(flat, Shell)
+        self.assertEqual(len(face_map), 5)
+        self.assertTrue(all(face in face_map for face in flat.faces()))
+        for face in flat.faces():
+            sheet_face = face_map[face].sheet_face
+            self.assertTrue(any(sheet_face.is_same(f) for f in bs.sheet_local.faces()))
+        self.assertEqual(sum(face_map[face].is_bend for face in flat.faces()), 2)
+
+        base = face_map[flat.faces().sort_by(SortBy.AREA)[-1]]
+        self.assertFalse(base.is_bend)
+        self.assertEqual(base.angle, 0)
+        self.assertIsNone(base.bend_line)
+        self.assertFalse(base.up)
+
+        stranger = Face.make_rect(1, 1)
+        self.assertNotIn(stranger, face_map)
+        self.assertIsNone(face_map.get(stranger))
+        self.assertNotIn("not a face", face_map)
+
+    def test_a_bend_carries_its_angle_radii_line_and_direction(self):
+        _, (flat, face_map) = self.two_flanges()
+        strips = [face for face in flat.faces() if face_map[face].is_bend]
+        up = [face_map[s] for s in strips if face_map[s].up]
+        down = [face_map[s] for s in strips if not face_map[s].up]
+        self.assertEqual((len(up), len(down)), (1, 1))
+        for strip in strips:
+            record = face_map[strip]
+            self.assertAlmostEqual(record.angle, 90, 5)
+            self.assertAlmostEqual(record.inside_radius, 2, 5)
+            self.assertAlmostEqual(record.neutral_radius, 2.4, 5)
+            # the bend line runs down the middle of the strip, on the pattern
+            self.assertAlmostEqual(record.bend_line.length, 30, 5)
+            self.assertAlmostEqual(record.bend_line.center(), strip.center(), 5)
+        # the flange folded up is the one on +X
+        self.assertGreater(up[0].bend_line.center().X, down[0].bend_line.center().X)
+
+    def test_the_lookup_survives_moving_the_pattern(self):
+        _, (flat, face_map) = self.two_flanges()
+        moved = Pos(5, 7, 0) * flat
+        self.assertTrue(all(face in face_map for face in moved.faces()))
+
+    def test_bend_lines_follow_the_alignment(self):
+        sheet, parameters = TestUnfoldOperation.flanged()
+        loose = unfold(sheet, sheet_parameters=parameters)
+        cornered = unfold(sheet, sheet_parameters=parameters, align=Align.MIN)
+        shift = cornered.flat.bounding_box().min - loose.flat.bounding_box().min
+        self.assertGreater(shift.length, 1)
+        loose_lines = [r.bend_line for r in loose.face_map.values() if r.is_bend]
+        cornered_lines = [r.bend_line for r in cornered.face_map.values() if r.is_bend]
+        self.assertEqual(len(loose_lines), 1)
+        self.assertEqual(len(cornered_lines), 1)
+        self.assertAlmostEqual(
+            loose_lines[0].center() + shift, cornered_lines[0].center(), 5
+        )
+
+    def test_the_geometric_unfold_reports_the_source_radius(self):
+        """Without parameters a bend develops at the radius of its reference
+        face, and that is the radius the record reports for both"""
+        sheet, _ = TestUnfoldOperation.flanged()
+        _, faces = sheet.unfold()
+        (record,) = [r for r in faces.values() if r.is_bend]
+        self.assertAlmostEqual(record.inside_radius, 2, 5)
+        self.assertAlmostEqual(record.neutral_radius, 2, 5)
 
 
 class TestBendOutline(unittest.TestCase):
@@ -1832,7 +1915,7 @@ class TestBendOutline(unittest.TestCase):
                     with self.subTest(outline=name, surface=surface, angle=angle):
                         sheet = self.fold(blank, angle, surface)
                         self.assertTrue(sheet.sheet.is_valid)
-                        flat = unfold(sheet.sheet, sheet.sheet_parameters)
+                        flat = unfold(sheet.sheet, sheet.sheet_parameters).flat
                         self.assertAlmostEqual(precise_area(flat), blank.area, 6)
 
     def test_the_outline_lands_on_the_bend(self):
@@ -1949,7 +2032,7 @@ class TestFoldExtent(unittest.TestCase):
                     self.assertAlmostEqual(box.max.Y, 50, 5)
                     self.assertEqual(len(bs.flats()), 2)
                 self.assertTrue(bs.sheet.is_valid)
-                flat = unfold(bs.sheet, bs.sheet_parameters)
+                flat = unfold(bs.sheet, bs.sheet_parameters).flat
                 self.assertAlmostEqual(precise_area(flat), blank_area, 6)
 
     def test_material_hinged_behind_the_line_stays_and_is_kept(self):
@@ -1966,7 +2049,7 @@ class TestFoldExtent(unittest.TestCase):
             self.assertAlmostEqual(box.min.Y, 0, 5)
             self.assertAlmostEqual(box.max.Y, 50, 5)
         self.assertTrue(bs.sheet.is_valid)
-        flat = unfold(bs.sheet, bs.sheet_parameters)
+        flat = unfold(bs.sheet, bs.sheet_parameters).flat
         self.assertAlmostEqual(precise_area(flat), blank_area, 6)
 
     def test_a_fold_that_would_tear_the_sheet_is_refused(self):
@@ -2186,7 +2269,7 @@ class TestBendAllowance(unittest.TestCase):
             for angle in (90, -90):
                 with self.subTest(surface=surface, angle=angle):
                     builder = self.folded(surface, angle)
-                    flat = unfold(builder.sheet, builder.sheet_parameters)
+                    flat = unfold(builder.sheet, builder.sheet_parameters).flat
                     self.assertAlmostEqual(flat.area, 40 * 100, 6)
                     self.assertAlmostEqual(flat.bounding_box().size.Y, 100, 6)
 
@@ -2224,8 +2307,8 @@ class TestUnfold(unittest.TestCase):
                         sheet_parameters=parameters,
                     )
 
-                    geometric = sheet.unfold()
-                    neutral = sheet.unfold(parameters)
+                    geometric = sheet.unfold().flat
+                    neutral = sheet.unfold(parameters).flat
 
                     self.assertTrue(geometric.is_valid)
                     self.assertTrue(neutral.is_valid)
@@ -2390,7 +2473,7 @@ class TestMiter(unittest.TestCase):
             miter(corners, 45)
         parameters = builder.sheet_parameters
         part = thicken(builder.sheet_local, sheet_parameters=parameters)
-        flat = unfold(builder.sheet_local, sheet_parameters=parameters)
+        flat = unfold(builder.sheet_local, sheet_parameters=parameters).flat
         self.assertTrue(part.is_valid)
         self.assertAlmostEqual(part.volume, flat.area, 6)
 
@@ -2412,7 +2495,7 @@ class TestMiter(unittest.TestCase):
             )
             miter(rim.vertices(), 30, through_bend=True)
         parameters = builder.sheet_parameters
-        flat = unfold(builder.sheet_local, sheet_parameters=parameters)
+        flat = unfold(builder.sheet_local, sheet_parameters=parameters).flat
 
         square = 2400 + 60 * allowance + 900  # base, bend and wall untrimmed
         per_end = (
@@ -2447,7 +2530,7 @@ class TestMiter(unittest.TestCase):
         self.assertEqual(len(wall.edges()), 4)  # no steps at the tangent
         # in the flat pattern the miter is one straight cut from rim to blank
         # edge: the cut across the bend and the cut across the wall line up
-        flat = unfold(bs.sheet, bs.sheet_parameters)
+        flat = unfold(bs.sheet, bs.sheet_parameters).flat
         # (the bend's developed cut edges come back as splines, so no type filter)
         sloped = [
             e
@@ -2496,7 +2579,7 @@ class TestMiter(unittest.TestCase):
                 .sort_by_distance((25, 0, 0))[0:4]
             )
             miter(walls.vertices().group_by(Axis.Z)[-1], 45, through_bend=True)
-            flat = unfold()
+            flat = unfold().flat
 
         self.assertTrue(builder.sheet_local.is_valid)
         pieces = sorted(flat.faces(), key=lambda f: -f.area)[1:]
@@ -2775,8 +2858,8 @@ class TestCornerRelief(unittest.TestCase):
     def blank_removed(cls, before: Shell, after: Shell) -> float:
         """How much the blank loses - where a relief is laid out."""
         return (
-            unfold(before, sheet_parameters=cls.PARAMETERS).area
-            - unfold(after, sheet_parameters=cls.PARAMETERS).area
+            unfold(before, sheet_parameters=cls.PARAMETERS).flat.area
+            - unfold(after, sheet_parameters=cls.PARAMETERS).flat.area
         )
 
     @staticmethod
@@ -3000,7 +3083,7 @@ class TestCornerRelief(unittest.TestCase):
         parameters = builder.sheet_parameters
         part = thicken(builder.sheet_local, sheet_parameters=parameters)
         for sheet in (builder.sheet_local, builder.sheet):
-            flat = sheet.unfold(parameters)
+            flat = sheet.unfold(parameters).flat
             self.assertTrue(flat.is_valid)
             self.assertAlmostEqual(part.volume, flat.area, 3)
 
@@ -3019,7 +3102,7 @@ class TestCornerRelief(unittest.TestCase):
         after = sorted(f.area for f in result.faces().filter_by(GeomType.CYLINDER))
         for was, now in zip(before, after):
             self.assertLess(now, was - 1)
-        flat = result.unfold(self.PARAMETERS)
+        flat = result.unfold(self.PARAMETERS).flat
         self.assertTrue(flat.is_valid)
         self.assertAlmostEqual(
             flat.area, thicken(result, sheet_parameters=self.PARAMETERS).volume, 3
@@ -3084,7 +3167,7 @@ class TestCornerRelief(unittest.TestCase):
                 self.hole_corner(builder.sheet_local), ReliefType.ROUND, radius=1.5
             )
         parameters = builder.sheet_parameters
-        flat = unfold(builder.sheet_local, sheet_parameters=parameters)
+        flat = unfold(builder.sheet_local, sheet_parameters=parameters).flat
         part = thicken(builder.sheet_local, sheet_parameters=parameters)
         self.assertAlmostEqual(part.volume, flat.area, 6)
 
@@ -3181,8 +3264,8 @@ class TestBendRelief(unittest.TestCase):
     def blank_removed(cls, before: Shell, after: Shell) -> float:
         """How much the blank loses - where a relief is laid out."""
         return (
-            unfold(before, sheet_parameters=cls.PARAMETERS).area
-            - unfold(after, sheet_parameters=cls.PARAMETERS).area
+            unfold(before, sheet_parameters=cls.PARAMETERS).flat.area
+            - unfold(after, sheet_parameters=cls.PARAMETERS).flat.area
         )
 
     @staticmethod
@@ -3258,7 +3341,7 @@ class TestBendRelief(unittest.TestCase):
                 )
                 self.assertAlmostEqual(
                     sheet.area - result.area,
-                    sheet.unfold().area - result.unfold().area,
+                    sheet.unfold().flat.area - result.unfold().flat.area,
                     6,
                 )
 
@@ -3399,14 +3482,14 @@ class TestBendRelief(unittest.TestCase):
                         position=position,
                         gaps=10,
                     )
-                    before = unfold().area
+                    before = unfold().flat.area
                     bend_relief(
                         sheet.bends()[0],
                         relief_type=ReliefType.SQUARE,
                         depth=3,
                         width=2,
                     )
-                    after = unfold().area
+                    after = unfold().flat.area
                 self.assertTrue(sheet.sheet.is_valid)
                 # two notches, each width wide and depth plus the setback deep
                 self.assertAlmostEqual(before - after, 2 * 2 * (3 + setback), 3)
@@ -3540,7 +3623,7 @@ class TestBend(unittest.TestCase):
         self.assertAlmostEqual(sheet.area / 5, 32.0, 6)
         part = thicken(sheet, sheet_parameters=self.PARAMETERS)
         self.assertAlmostEqual(
-            part.volume, sheet.unfold(sheet_parameters=self.PARAMETERS).area, 6
+            part.volume, sheet.unfold(sheet_parameters=self.PARAMETERS).flat.area, 6
         )
 
     def test_input_validation(self):
@@ -3804,7 +3887,7 @@ class TestSheetShells(unittest.TestCase):
         parameters = SheetMetalParameters(
             thickness=thickness, sheet_surface=SheetSurface.INSIDE
         )
-        flat = unfold(smaller, sheet_parameters=parameters)
+        flat = unfold(smaller, sheet_parameters=parameters).flat
         self.assertTrue(flat.is_valid)
         self.assertTrue(all(f.is_planar for f in flat.faces()))
 

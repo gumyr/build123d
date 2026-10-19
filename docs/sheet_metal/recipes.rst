@@ -92,7 +92,7 @@ face was drawn to, and ``unfold`` shows the notch on the blank:
             gaps=(10, 30),
             position=BendPosition.MATERIAL_INSIDE,
         )
-    blank = unfold(plate.sheet, plate.sheet_parameters)
+    blank = unfold(plate.sheet, plate.sheet_parameters).flat
 
 The bend is 20 wide on a 60 edge, the base still reaches ``x = 50`` on the
 tabs either side of it, and the blank carries a notch 2 deep, the inside
