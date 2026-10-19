@@ -541,22 +541,24 @@ def _apply_faces(
 
     Faces of the target in ``replaced`` are ones the operation rebuilt; they
     leave the sheet and what replaced them arrives among the additions.
+
+    The faces are sewn as they are, in both modes. The builder's ``Mode.ADD``
+    merges coplanar faces that touch, which is right for sketch material
+    arriving in pieces but not for an operation's output: two flanges folded
+    flat off adjacent walls meet at the corner, and merged they would be one
+    face with nothing left to miter. So the builder is handed the whole
+    sheet with ``Mode.REPLACE``, which sews without merging and still works
+    out which faces the operation brought in.
     """
-    if not replaced:
-        if context is not None:
-            context._add_to_context(*additions)
-            return context.sheet_local
-        faces = list(target.faces()) + additions
-    else:
-        kept = [
-            face
-            for face in target.faces()
-            if not any(face.is_same(old) for old in replaced)
-        ]
-        faces = kept + additions
-        if context is not None:
-            context._add_to_context(*faces, mode=Mode.REPLACE)
-            return context.sheet_local
+    kept = [
+        face
+        for face in target.faces()
+        if not any(face.is_same(old) for old in replaced or [])
+    ]
+    faces = kept + additions
+    if context is not None:
+        context._add_to_context(*faces, mode=Mode.REPLACE)
+        return context.sheet_local
     joined = Shell.make_sheet(faces)
     if joined._history is not None:
         joined._history.with_inputs([target.wrapped], (a.wrapped for a in additions))

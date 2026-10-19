@@ -1068,6 +1068,41 @@ class TestFlange(unittest.TestCase):
                     sheet_parameters=SheetMetalParameters(thickness=1),
                 )
 
+    def test_coplanar_flanges_stay_separate_faces(self):
+        """Flanges folded flat off adjacent walls overlap at the corners, and
+        are sewn as the faces they are in Builder mode as in Algebra mode, so
+        each corner can be mitered. The builder's coplanar merge is for sketch
+        material arriving in pieces, not for an operation's output"""
+        parameters = SheetMetalParameters(thickness=3, bend_radius=5)
+        base = Shell([Rectangle(500, 500).face()])
+        walls = flange(
+            base.rims().filter_by(GeomType.LINE),
+            220,
+            gaps=1,
+            sheet_parameters=parameters,
+        )
+        algebra = flange(
+            walls.rims().group_by(Axis.Z)[-1], 25, gaps=1, sheet_parameters=parameters
+        )
+
+        with BuildSheet(thickness=3, bend_radius=5) as bs:
+            with BuildSketch():
+                Rectangle(500, 500)
+            flange(bs.flats()[0].rims().filter_by(GeomType.LINE), 220, gaps=1)
+            flange(bs.rims().group_by(Axis.Z)[-1], 25, gaps=1)
+            self.assertEqual(len(bs.faces(Select.LAST)), 8)
+            self.assertEqual(len(bs.flats().group_by(Axis.Z)[-1]), 4)
+            outer = bs.rims().group_by(Axis.Z)[-1].filter_by(lambda e: e.length > 400)
+            miter(outer.vertices(), 45)
+        self.assertEqual(len(algebra.faces()), 17)
+        self.assertEqual(len(algebra.flats().group_by(Axis.Z)[-1]), 4)
+        self.assertEqual(len(bs.sheet.faces()), 17)
+        mitered = bs.sheet.flats().group_by(Axis.Z)[-1]
+        self.assertEqual(len(mitered), 4)
+        for face in mitered:
+            self.assertAlmostEqual(face.area, mitered[0].area, 5)
+        self.assertTrue(bs.sheet.is_valid)
+
 
 class TestFlangePosition(unittest.TestCase):
     """Where a flange's bend sits on the edge it grows from, and what that
