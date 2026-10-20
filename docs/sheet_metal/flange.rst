@@ -52,6 +52,17 @@ clear each other. A single value applies to both ends; a pair gives the start
 and end of the edge separately. The gap has to be at least the sheet
 thickness, and slightly more leaves the corner comfortable to form.
 
+A negative gap runs the other way: the bend and wall extend past the end of
+the edge. That is how a wall ends up wider than the edge it folds from, and
+how a closed corner is made: flanges off two edges meeting at a corner reach
+toward each other, and the :ref:`corner relief <sheet_metal_corner_relief>`
+that follows clears the bends where they would cross. The walls must stop
+short of each other by a clearance. Walls that touch are sewn together, and a
+sheet closed into a loop that way cannot be unfolded. How far a negative gap
+can go depends on the angle, the reference surface and what lies beside the
+wall, so it is not checked; a collision shows in the thickened part, as any
+other does.
+
 .. image:: ../assets/sheet_metal/flange_gaps.svg
     :align: center
 

@@ -988,8 +988,8 @@ class TestFlange(unittest.TestCase):
                 flange(edge, length=5, gaps=(1,))
             with self.assertRaisesRegex(ValueError, "pair of numbers"):
                 flange(edge, length=5, gaps=(1, "2"))
-            with self.assertRaisesRegex(ValueError, "can't be negative"):
-                flange(edge, length=5, gaps=(-1, 0))
+            # a negative gap extends the bend past the edge, so it is allowed
+            self.assertEqual(len(flange(edge, length=5, gaps=(-1, 0)).faces()), 3)
 
         with self.assertRaises(ValueError):
             flange([], length=5, sheet_parameters=SheetMetalParameters(thickness=1))
@@ -1102,6 +1102,84 @@ class TestFlange(unittest.TestCase):
         for face in mitered:
             self.assertAlmostEqual(face.area, mitered[0].area, 5)
         self.assertTrue(bs.sheet.is_valid)
+
+
+class TestFlangeNegativeGaps(unittest.TestCase):
+    """A negative gap extends the bend and wall past the end of the edge"""
+
+    @staticmethod
+    def box(gaps, relieve=True):
+        with BuildSheet(thickness=1.5, bend_radius=1.5) as bs:
+            with BuildSketch():
+                Rectangle(100, 100)
+            flange(bs.rims(), 40, gaps=gaps)
+            if relieve:
+                corners = (
+                    bs.flats().filter_by(Axis.Z).vertices().filter_by(Convexity.CONVEX)
+                )
+                corner_relief(corners, relief_type=ReliefType.ROUND, radius=5)
+        return bs
+
+    def test_a_wall_can_overhang_its_edge(self):
+        with BuildSheet(thickness=1.5, bend_radius=1.5) as bs:
+            with BuildSketch():
+                Rectangle(100, 100)
+            flange(bs.rims().sort_by(Axis.X)[-1], 40, gaps=-10)
+            flat, _ = unfold()
+        wall = bs.sheet.flats().sort_by(Axis.X)[-1]
+        self.assertEqual(len(bs.sheet.faces()), 3)
+        self.assertTrue(bs.sheet.is_valid)
+        self.assertAlmostEqual(wall.bounding_box().size.Y, 120, 5)
+        self.assertTrue(flat.is_valid)
+
+    def test_a_closed_corner_with_a_clearance_and_a_relief(self):
+        """Walls reaching to within a clearance of each other, the bends
+        cleared by the relief, make a valid sheet that unfolds and thickens"""
+        bs = self.box(gaps=-1.3)
+        sheet = bs.sheet
+        self.assertEqual(len(sheet.faces()), 9)
+        self.assertTrue(sheet.is_valid)
+        walls = sheet.flats().filter_by(Axis.Z, reverse=True)
+        plus_x, plus_y = walls.sort_by(Axis.X)[-1], walls.sort_by(Axis.Y)[-1]
+        self.assertAlmostEqual(plus_x.bounding_box().max.Y, 51.3, 5)
+        # each wall stops 0.2 short of the other, so the ends are a diagonal apart
+        self.assertAlmostEqual(plus_x.distance_to(plus_y), 0.2 * sqrt(2), 5)
+        bends = sheet.faces().filter_by(GeomType.CYLINDER)
+        self.assertEqual(
+            len(bends.sort_by(Axis.X)[-1].intersect(bends.sort_by(Axis.Y)[-1]).edges()),
+            0,
+        )
+        flat, _ = sheet.unfold(bs.sheet_parameters)
+        self.assertTrue(flat.is_valid)
+        with BuildPart() as bp:
+            with BuildSheet(thickness=1.5, bend_radius=1.5) as inner:
+                with BuildSketch():
+                    Rectangle(100, 100)
+                flange(inner.rims(), 40, gaps=-1.3)
+                corners = (
+                    inner.flats()
+                    .filter_by(Axis.Z)
+                    .vertices()
+                    .filter_by(Convexity.CONVEX)
+                )
+                corner_relief(corners, relief_type=ReliefType.ROUND, radius=5)
+            thicken()
+        self.assertTrue(bp.part.is_valid)
+        self.assertEqual(len(bp.part.solids()), 1)
+
+    def test_walls_that_touch_close_the_sheet(self):
+        """At exactly the radius the walls meet, are sewn together, and the
+        unfold says so"""
+        bs = self.box(gaps=-1.5)
+        with self.assertRaisesRegex(ValueError, "touching at a corner"):
+            bs.sheet.unfold(bs.sheet_parameters)
+
+    def test_a_set_back_bend_still_refuses_a_negative_gap(self):
+        with BuildSheet(thickness=1.5, bend_radius=1.5) as bs:
+            with BuildSketch():
+                Rectangle(100, 100)
+            with self.assertRaisesRegex(ValueError, "leave gaps wider"):
+                flange(bs.rims(), 40, gaps=-1, position=BendPosition.MATERIAL_INSIDE)
 
 
 class TestFlangePosition(unittest.TestCase):

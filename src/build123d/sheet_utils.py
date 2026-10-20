@@ -781,7 +781,9 @@ def _unfold_shell(
                 for parent_point, child_point in zip(parent_points, child_points)
             ):
                 raise ValueError(
-                    "The sheet contains a cycle that requires a cut before unfolding"
+                    "The sheet contains a cycle that requires a cut before "
+                    "unfolding. Faces that meet along an edge are sewn "
+                    "together, so walls touching at a corner close one."
                 )
 
     if len(placed) != len(source_faces):

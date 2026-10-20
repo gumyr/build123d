@@ -263,7 +263,14 @@ def _flange_faces(
 
 
 def _gap_pair(gaps: float | tuple[float, float]) -> tuple[float, float]:
-    """The trims at the two ends of a bend, from a scalar or a pair."""
+    """The trims at the two ends of a bend, from a scalar or a pair.
+
+    A negative trim extends the bend past the end of its edge. Whether the
+    result collides with anything is not checked here: the limit depends on
+    the angle, the reference surface and what lies beside the wall, so a
+    collision shows the way every other one does, in the thickened part or
+    when the sheet is unfolded.
+    """
     if isinstance(gaps, (int, float)):
         pair = (float(gaps), float(gaps))
     elif (
@@ -274,8 +281,6 @@ def _gap_pair(gaps: float | tuple[float, float]) -> tuple[float, float]:
         pair = (float(gaps[0]), float(gaps[1]))
     else:
         raise ValueError("gaps must be a number or a pair of numbers")
-    if min(pair) < 0:
-        raise ValueError("gaps can't be negative")
     return pair
 
 
@@ -612,7 +617,13 @@ def flange(
         radius: Physical inside bend radius. Defaults to the bend radius in
             ``sheet_parameters``.
         gaps: Trim at the bend ends. A scalar applies to both ends; a tuple
-            specifies ``(edge start, edge end)``. Defaults to 0.
+            specifies ``(edge start, edge end)``. A negative value extends
+            the bend and wall past the end of the edge instead: a wall wider
+            than the edge it folds from, or walls off two edges meeting at
+            a corner that reach each other once a corner relief has cleared
+            the bends there. Those walls must stop short of each other by a
+            clearance; walls that touch are sewn together and the sheet can
+            no longer be unfolded. Defaults to 0.
         position: Where the bend sits relative to the edge. Defaults to
             ``BEND_OUTSIDE``, the whole bend past the edge.
         length_mode: Which side of the triangle the wall makes with its face
@@ -834,7 +845,8 @@ def jog(
             taken for a fold line, where the material is already there.
         radius: Physical inside radius of both bends. Defaults to the bend
             radius in ``sheet_parameters``.
-        gaps: Trim at the bend ends of a jog off a free edge. Defaults to 0.
+        gaps: Trim at the bend ends of a jog off a free edge; negative
+            extends them past the edge, as for ``flange``. Defaults to 0.
         position: Where the first bend sits relative to the edge. Defaults to
             ``BEND_OUTSIDE``.
         sheet_parameters: Material and reference-surface parameters. Required
