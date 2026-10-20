@@ -61,7 +61,7 @@ with BuildPart() as maker_coin:
     # Add an embossed label
     with BuildSketch(Plane.XY.offset(thickness)) as label:  # above coin
         Text("OS", font_size=15)
-    project()  # label on top of coin
+    project_to_shape()  # label on top of coin
     extrude(amount=-thickness / 5, mode=Mode.SUBTRACT)  # emboss label
 
 show(maker_coin)

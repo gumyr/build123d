@@ -865,14 +865,72 @@ class ProjectionTests(unittest.TestCase):
         self.assertAlmostEqual(projection_s.sketch.area, 104.85204601097809, 5)
         self.assertEqual(len(projection_s.edges()), 6)
 
-    def test_project_to_sketch2(self):
+    def test_project_in_build_part_forwards_to_project_to_shape(self):
+        """The BuildPart form of project is deprecated and still works"""
         with BuildPart() as test2:
             Box(4, 4, 1)
             with BuildSketch(Plane.XY.offset(0.1)) as c:
                 Rectangle(1, 1)
-            project()
+            with self.assertWarns(DeprecationWarning):
+                project()
             extrude(amount=1)
         self.assertAlmostEqual(test2.part.volume, 4 * 4 * 1 + 1 * 1 * 1, 5)
+
+    def test_project_with_a_target_forwards_to_project_to_shape(self):
+        plate = Box(10, 10, 2)
+        with self.assertWarns(DeprecationWarning):
+            projection = project(
+                Face.make_rect(2, 2, Plane.XY.offset(5)), Plane.XY, target=plate
+            )
+        self.assertEqual(len(projection.faces()), 2)
+        self.assertTrue(all(abs(f.center().Z) == 1 for f in projection.faces()))
+
+    def test_box_faces_onto_a_plane(self):
+        """#563: the faces edge-on to the plane gave the whole screen back"""
+        projection = project(Box(10, 10, 10).faces(), workplane=Plane.XY)
+        self.assertEqual(len(projection.faces()), 2)
+        self.assertTrue(all(abs(f.area - 100) < 1e-6 for f in projection.faces()))
+        self.assertEqual(
+            project(Box(10, 10, 10).faces().sort_by(Axis.X)[-1], Plane.XY).faces(), []
+        )
+
+    def test_a_face_in_build_line_contributes_its_edges(self):
+        """#951: a higher-dimension object is reduced to what the builder holds"""
+        box = Box(10, 10, 10)
+        with BuildLine() as outline:
+            project(box.faces().sort_by(Axis.Z)[-1])
+        self.assertEqual(len(outline.edges()), 4)
+        with BuildLine() as edge_on:
+            project(box.faces().sort_by(Axis.X)[-1])
+        self.assertEqual(len(edge_on.edges()), 1)  # its top and bottom edges coincide
+        with BuildLine() as whole:
+            project(box)
+        self.assertEqual(len(whole.edges()), 4)
+
+    def test_an_edge_on_face_adds_nothing_to_a_sketch(self):
+        side = Box(10, 10, 10).faces().sort_by(Axis.X)[-1]
+        with BuildSketch() as sketch:
+            project(side)
+        self.assertEqual(sketch.sketch.area, 0)
+
+    def test_objects_far_from_the_plane_origin(self):
+        far = Pos(1000, 1000, 50) * Box(10, 10, 10)
+        projection = project(far.faces().sort_by(Axis.Z)[-1], workplane=Plane.XY)
+        self.assertAlmostEqual(projection.area, 100, 5)
+        self.assertAlmostEqual(projection.center(), (1000, 1000, 0), 5)
+        curve = project(far.edges(), workplane=Plane.XY)
+        self.assertEqual(len(curve.edges()), 8)
+
+    def test_objects_on_both_sides_of_the_plane(self):
+        projection = project(
+            [
+                Face.make_rect(2, 2, Plane.XY.offset(3)),
+                Face.make_rect(3, 3, Plane.XY.offset(-3)),
+            ],
+            workplane=Plane.XY,
+        )
+        self.assertIsInstance(projection, Sketch)
+        self.assertEqual(sorted(f.area for f in projection.faces()), [4, 9])
 
     def test_project_point(self):
         pnt: Vector = project(Vector(1, 2, 3), Plane.XY)[0]
@@ -923,6 +981,13 @@ class ProjectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             with BuildLine():
                 pnt = project(Vertex(1, 2, 3))[0]
+
+        with self.assertRaisesRegex(ValueError, "PRIVATE"):
+            with BuildSketch():
+                project(Edge.make_line((0, 0, 1), (1, 0, 1)))
+        with BuildSketch():
+            curve = project(Edge.make_line((0, 0, 1), (1, 0, 1)), mode=Mode.PRIVATE)
+            self.assertEqual(len(curve.edges()), 1)
 
     def test_no_target(self):
         """A part builder with nothing built yet has no projection target."""

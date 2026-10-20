@@ -816,6 +816,89 @@ class TestLoft(unittest.TestCase):
         mock_clean.assert_called_once()
 
 
+class TestProjectToShape(unittest.TestCase):
+    def test_pending_faces_onto_the_part(self):
+        with BuildPart() as part:
+            Box(20, 20, 5)
+            with BuildSketch(Plane.XY.offset(10)):
+                Circle(3)
+            projection = project_to_shape()
+            self.assertEqual(len(part.pending_faces), 2)
+            extrude(amount=1)
+        self.assertIsInstance(projection, Sketch)
+        self.assertEqual(
+            sorted(round(f.center().Z, 6) for f in projection.faces()), [-2.5, 2.5]
+        )
+        self.assertAlmostEqual(part.part.volume, 20 * 20 * 5 + 2 * pi * 9 * 1, 3)
+
+    def test_a_sketch_beside_the_part_projects_toward_it(self):
+        with BuildPart() as part:
+            Box(20, 20, 5)
+            with BuildSketch(Plane.XY.offset(-10)):
+                Rectangle(2, 2)
+            projection = project_to_shape()
+        self.assertEqual(len(projection.faces()), 2)
+
+    def test_pending_edges_onto_the_part(self):
+        with BuildPart() as part:
+            Cylinder(5, 10)
+            with BuildLine(Plane.XZ.offset(-10)):
+                Line((-3, -3), (3, 3))
+            projection = project_to_shape(direction=Plane.XZ.z_dir)
+            self.assertEqual(len(part.pending_edges), 2)
+        self.assertIsInstance(projection, Curve)
+        self.assertEqual(len(projection.edges()), 2)
+        self.assertTrue(all(e.geom_type != GeomType.LINE for e in projection.edges()))
+
+    def test_explicit_objects_target_and_direction(self):
+        plate = Box(10, 10, 2)
+        label = Face.make_rect(2, 2, Plane.XY.offset(5))
+        projection = project_to_shape(label, target=plate, direction=(0, 0, -1))
+        self.assertIsInstance(projection, Sketch)
+        self.assertEqual(len(projection.faces()), 2)
+        # an explicit direction is used as given, even away from the target
+        self.assertEqual(
+            project_to_shape(label, target=plate, direction=(0, 0, 1)).faces(), []
+        )
+        # a planar face supplies the direction when none is given
+        self.assertEqual(len(project_to_shape(label, target=plate).faces()), 2)
+
+    def test_text_onto_a_cylinder(self):
+        """#951: a label cast onto a curved surface"""
+        with BuildPart() as part:
+            Cylinder(10, 20)
+            with BuildSketch(Plane.XZ.offset(-15)):
+                Text("B", 8)
+            projection = project_to_shape()
+            self.assertEqual(len(part.pending_faces), 2)
+        flat_area = Compound.make_text("B", 8).area
+        for face in projection.faces():
+            self.assertGreater(face.area, flat_area)
+            self.assertEqual(face.geom_type, GeomType.CYLINDER)
+
+    def test_errors(self):
+        with self.assertRaisesRegex(ValueError, "No object"):
+            project_to_shape(target=Box(1, 1, 1))
+        with self.assertRaisesRegex(ValueError, "No object"):
+            with BuildPart():
+                Box(1, 1, 1)
+                project_to_shape()
+        with self.assertRaisesRegex(ValueError, "not Vertex"):
+            project_to_shape(Vertex(1, 2, 3), target=Box(1, 1, 1))
+        with self.assertRaisesRegex(ValueError, "group_by"):
+            project_to_shape(Box(1, 1, 1).faces().group_by(Axis.Z), target=Box(1, 1, 1))
+        with self.assertRaisesRegex(ValueError, "target object must be provided"):
+            project_to_shape(Face.make_rect(1, 1))
+        with self.assertRaisesRegex(ValueError, "target object could not be dete"):
+            with BuildPart():
+                project_to_shape(Face.make_rect(1, 1))
+        with self.assertRaisesRegex(ValueError, "direction must be provided"):
+            project_to_shape(Edge.make_line((0, 0, 5), (1, 0, 5)), target=Box(1, 1, 1))
+        with self.assertRaises(RuntimeError):
+            with BuildSketch():
+                project_to_shape(Face.make_rect(1, 1), target=Box(1, 1, 1))
+
+
 class TestProjectWorkplane(unittest.TestCase):
     def test_invalid_context(self):
         with self.assertRaisesRegex(RuntimeError, "only be used from a BuildPart"):

@@ -1596,10 +1596,15 @@ class Mixin1D(Shape[TOPODS]):
             return [self.position_at(d, position_mode) for d in distances]
         raise ValueError("Either distances or deflection must be provided")
 
+    @deprecated("project is deprecated; use project_to_shape instead.")
     def project(
         self, face: Face, direction: VectorLike, closest: bool = True
     ) -> Edge | Wire | ShapeList[Edge | Wire]:
         """Project onto a face along the specified direction
+
+        .. deprecated::
+            Use :meth:`project_to_shape` instead; ``[0]`` of its result is the
+            nearest piece.
 
         Args:
           face: Face:

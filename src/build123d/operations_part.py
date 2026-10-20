@@ -41,6 +41,8 @@ from build123d.sheet_utils import SheetMetalParameters, material_offsets
 from build123d.topology import (
     ShapeHistory,
     Compound,
+    GroupBy,
+    Shape,
     Curve,
     DraftAngleError,
     Edge,
@@ -554,6 +556,123 @@ def project_workplane(
     workplane.x_dir = workplane_x_dir
 
     return workplane
+
+
+def project_to_shape(
+    objects: Face | Edge | Wire | Iterable[Face | Edge | Wire] | None = None,
+    target: Shape | None = None,
+    direction: VectorLike | None = None,
+    mode: Mode = Mode.ADD,
+) -> Sketch | Curve | Compound:
+    """Part Operation: project_to_shape
+
+    Project faces, edges or wires onto the surface of a shape along a direction,
+    as a label is cast onto a curved part. The result lies on the target's
+    surface: faces ready to be extruded into the part, or edges to follow.
+
+    In BuildPart the objects default to the pending faces and edges, those of
+    the sketches drawn since the last operation; the target to the part; and the
+    direction to the normal of the pending sketch plane, pointed toward the
+    part. The projected faces are pending in turn, so an ``extrude`` follows
+    directly. In algebra mode the objects and target must be given, and the
+    direction too unless a planar face among the objects supplies its normal.
+
+    Everything the projection passes through comes back, nearest first: a face
+    projected onto a plate lands on its near face and on its far face. The
+    direct methods :meth:`~topology.Face.project_to_shape` and
+    :meth:`~topology.Wire.project_to_shape` do the work.
+
+    To project onto a plane, see :func:`~operations_generic.project`.
+
+    Args:
+        objects (Face | Edge | Wire | Iterable of, optional): what to project.
+            Defaults to the pending faces and edges.
+        target (Shape, optional): shape to project onto. Defaults to the part.
+        direction (VectorLike, optional): projection direction. Defaults to the
+            normal of the pending sketch plane, or of the first planar face.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: project_to_shape doesn't accept group_by
+        ValueError: No object to project
+        ValueError: an object that is not a face, edge or wire
+        ValueError: A target object could not be determined
+        ValueError: A direction must be provided
+
+    Returns:
+        Sketch | Curve | Compound: the projection, on the target's surface
+    """
+    context: BuildPart | None = BuildPart._get_context("project_to_shape")
+
+    if isinstance(objects, GroupBy):
+        raise ValueError("project_to_shape doesn't accept group_by, did you miss [n]?")
+
+    pending_plane: Plane | None = None
+    if objects is None:
+        if context is None:
+            raise ValueError("No object to project")
+        object_list = ShapeList(context.pending_edges + context.pending_faces)
+        context.pending_edges = []
+        context.pending_faces = []
+        if context.pending_face_planes:
+            pending_plane = context.pending_face_planes[0]
+            context.pending_face_planes = []
+    else:
+        object_list = flatten_sequence(objects)
+    if not object_list:
+        raise ValueError("No object to project")
+    for obj in object_list:
+        if not isinstance(obj, (Face, Edge, Wire)):
+            raise ValueError(
+                f"project_to_shape accepts faces, edges and wires, not {type(obj).__name__}"
+            )
+
+    validate_inputs(context, "project_to_shape", object_list)
+
+    if target is None:
+        if context is None:
+            raise ValueError("A target object must be provided")
+        target = context.part_local
+    if not target:
+        raise ValueError("A target object could not be determined")
+
+    # An explicit direction is used as given; a defaulted one is pointed
+    # toward the target for each object, as a sketch beside the part expects
+    toward_target = direction is None
+    if direction is not None:
+        projection_direction = Vector(direction)
+    elif pending_plane is not None:
+        projection_direction = pending_plane.z_dir
+    else:
+        face_planes = [
+            plane
+            for obj in object_list
+            if isinstance(obj, Face) and (plane := obj.is_planar)
+        ]
+        if not face_planes:
+            raise ValueError("A direction must be provided")
+        projection_direction = face_planes[0].z_dir
+    projection_direction = projection_direction.normalized()
+
+    projected: list[Shape] = []
+    for obj in object_list:
+        obj_direction = projection_direction
+        if toward_target and (target.center() - obj.center()).dot(obj_direction) < 0:
+            obj_direction = -obj_direction
+        if isinstance(obj, Face):
+            projected.extend(obj.project_to_shape(target, obj_direction).faces())
+        else:
+            projected.extend(obj.project_to_shape(target, obj_direction))
+
+    if context is not None:
+        context._add_to_context(*projected, mode=mode)
+
+    result: Sketch | Curve | Compound = Compound(projected)
+    if all(obj._dim == 2 for obj in object_list):
+        result = Sketch(result.wrapped)
+    elif all(obj._dim == 1 for obj in object_list):
+        result = Curve(result.wrapped)
+    return result
 
 
 def revolve(

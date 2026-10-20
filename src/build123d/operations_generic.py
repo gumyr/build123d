@@ -29,6 +29,7 @@ license:
 
 import copy as copy_module
 import logging
+import warnings
 from collections.abc import Iterable
 from math import radians, tan
 from typing import TypeAlias, cast
@@ -48,10 +49,19 @@ from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sheet import BuildSheet
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Plane, Rotation, RotationLike, Vector, VectorLike
+from build123d.geometry import (
+    TOLERANCE,
+    Axis,
+    Plane,
+    Rotation,
+    RotationLike,
+    Vector,
+    VectorLike,
+)
 from build123d.objects_curve import BaseLineObject
 from build123d.objects_part import BasePartObject
 from build123d.objects_sketch import BaseSketchObject
+from build123d.operations_part import project_to_shape
 from build123d.topology import (
     Compound,
     ShapeHistory,
@@ -876,142 +886,170 @@ def project(
 
     Applies to 0, 1, and 2 dimensional objects.
 
-    Project the given objects or points onto a BuildLine or BuildSketch workplane in
-    the direction of the normal of that workplane. When projecting onto a
-    sketch a Face(s) are generated while Edges are generated for BuildLine.
-    Will only use the first if BuildSketch has multiple active workplanes.
-    In algebra mode a workplane must be provided and the output is either
-    a Face, Curve, Sketch, Compound, or ShapeList[Vector].
+    Project objects or points onto a plane along its normal, each from its own
+    side. The workplane defaults to the active BuildLine or BuildSketch plane;
+    in algebra mode it must be given. The result lies in the plane's local
+    coordinates: a Curve of edges, a Sketch of faces, or a list of points.
 
-    Note that only if mode is not Mode.PRIVATE only Faces can be projected into
-    BuildSketch and Edge/Wires into BuildLine.
+    What a builder can hold decides what is projected into it. BuildLine takes
+    edges, so a face or solid given to it contributes its edges. BuildSketch
+    takes faces; a face edge-on to the plane has no area there and is skipped.
+    Edges, wires and points cannot be added to BuildSketch, nor points to
+    BuildLine, so those raise unless ``mode`` is ``Mode.PRIVATE``, which returns
+    the result without adding it.
+
+    To project onto a shape, see :func:`~operations_part.project_to_shape`.
 
     Args:
-        objects (Edge |  Face |  Wire |  VectorLike |  Vertex or Iterable of):
+        objects (Edge | Face | Wire | VectorLike | Vertex or Iterable of):
             objects or points to project
-        workplane (Plane, optional): screen workplane
+        workplane (Plane, optional): plane to project onto. Defaults to the
+            builder's plane.
+        target (Shape, optional): deprecated; a call with a target, or in
+            BuildPart, forwards to :func:`~operations_part.project_to_shape`.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: project doesn't accept group_by
         ValueError: Either a workplane must be provided or a builder must be active
-        ValueError: Points and faces can only be projected in PRIVATE mode
-        ValueError: Edges, wires and points can only be projected in PRIVATE mode
-        RuntimeError: BuildPart doesn't have a project operation
+        ValueError: Points can only be projected into BuildLine in PRIVATE mode
+        ValueError: Edges, wires and points can only be projected into BuildSketch
+            in PRIVATE mode
     """
     context: Builder | None = Builder._get_context("project")
 
     if isinstance(objects, GroupBy):
         raise ValueError("project doesn't accept group_by, did you miss [n]?")
 
-    if objects is None and context is None:
+    if target is not None or isinstance(context, BuildPart):
+        warnings.warn(
+            "project() onto a shape is deprecated; use project_to_shape() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        # The old form pointed the plane's normal toward the target for each
+        # object; project_to_shape does that itself when no direction is given
+        # and a sketch plane or planar face supplies one. Only edges without a
+        # plane need the old fallback to the workplane, or to Plane.XY.
+        direction: Vector | None = None
+        if context is None or not context.pending_face_planes:
+            candidates = flatten_sequence(objects) if objects is not None else []
+            if not any(isinstance(obj, Face) and obj.is_planar for obj in candidates):
+                direction = (workplane or Plane.XY).z_dir
+                if candidates and target is not None:
+                    toward = target.center() - candidates[0].center()
+                    direction = direction if toward.dot(direction) >= 0 else -direction
+        return project_to_shape(
+            cast("Face | Edge | Wire | Iterable[Face | Edge | Wire] | None", objects),
+            target=target,
+            direction=direction,
+            mode=mode,
+        )
+
+    if objects is None:
         raise ValueError("No object to project")
-    if objects is None and context is not None and isinstance(context, BuildPart):
-        object_list = context.pending_edges + context.pending_faces
-        context.pending_edges = []
-        context.pending_faces = []
-        if len(context.pending_face_planes) > 0:
-            workplane = context.pending_face_planes[0]
-            context.pending_face_planes = []
-        else:
-            workplane = Plane.XY
-    else:
-        object_list = flatten_sequence(objects)
-        if object_list and all(not obj for obj in object_list):
-            # nothing projects to nothing, of the same dimension
-            first = object_list[0]
-            return Shape.make_composite(
-                [], first._dim if isinstance(first, Shape) else None
-            )
-
-    # The size of the object determines the size of the target projection screen
-    # as the screen is normal to the direction of parallel projection
-    shape_list = [Vertex(o) if isinstance(o, Vector) else o for o in object_list]
-    object_size = Compound(children=shape_list).bounding_box(optimal=False).diagonal
-
-    vct_vrt_list = [o for o in object_list if isinstance(o, (Vector, Vertex))]
-    point_list = [Vector(pnt) for pnt in vct_vrt_list]
-    face_list = [o for o in object_list if isinstance(o, Face)]
-    line_list = [o for o in object_list if isinstance(o, (Edge, Wire))]
+    object_list = flatten_sequence(objects)
+    if object_list and all(not obj for obj in object_list):
+        # nothing projects to nothing, of the same dimension
+        first = object_list[0]
+        return Shape.make_composite(
+            [], first._dim if isinstance(first, Shape) else None
+        )
 
     if workplane is None:
         if context is None:
             raise ValueError(
                 "Either a workplane must be provided or a builder must be active"
             )
-        if isinstance(context, BuildLine):
-            workplane = Plane(context.output_placements[0])
-            if mode != Mode.PRIVATE and (face_list or point_list):
-                raise ValueError(
-                    "Points and faces can only be projected in PRIVATE mode"
-                )
-        elif isinstance(context, BuildSketch):
-            workplane = Plane(context.output_placements[0])
-            if mode != Mode.PRIVATE and (line_list or point_list):
-                raise ValueError(
-                    "Edges, wires and points can only be projected in PRIVATE mode"
-                )
-    working_plane = cast(Plane, workplane)
-
-    # BuildLine and BuildSketch are from target to workplane while BuildPart is
-    # from workplane to target so the projection direction needs to be flipped
-    projection_flip = 1
-    if context is not None and isinstance(context, BuildPart):
-        if mode != Mode.PRIVATE and point_list:
-            raise ValueError("Points can only be projected in PRIVATE mode")
-        if target is None:
-            target = context.part_local
-        projection_flip = -1
-    else:
-        target = Face.make_rect(3 * object_size, 3 * object_size, plane=working_plane)
-
-    if not target:
-        raise ValueError("A target object could not be determined")
+        workplane = Plane(context.output_placements[0])
+    working_plane = workplane
 
     validate_inputs(context, "project")
 
-    projected_shapes = []
-    obj: Shape
-    for obj in face_list + line_list:
-        obj_to_screen = (target.center() - obj.center()).normalized()
-        if working_plane.from_local_coords(obj_to_screen).Z < 0:
-            projection_direction = -working_plane.z_dir * projection_flip
-        else:
-            projection_direction = working_plane.z_dir * projection_flip
-        projection = obj.project_to_shape(target, projection_direction)
-        if projection:
-            if isinstance(context, (BuildSketch, BuildLine)):
-                projected_shapes.extend(
-                    [working_plane.to_local_coords(p) for p in projection]
-                )
-            else:  # BuildPart
-                projected_shapes.extend(projection.faces())
+    point_list = [Vector(o) for o in object_list if isinstance(o, (Vector, Vertex))]
+    shape_list: list[Shape] = [
+        o for o in object_list if isinstance(o, Shape) and not isinstance(o, Vertex)
+    ]
+
+    # What the builder can hold decides what is projected into it
+    if isinstance(context, BuildLine):
+        if mode != Mode.PRIVATE and point_list:
+            raise ValueError(
+                "Points can only be projected into BuildLine in PRIVATE mode"
+            )
+        shape_list = [
+            piece
+            for obj in shape_list
+            for piece in ([obj] if isinstance(obj, (Edge, Wire)) else obj.edges())
+        ]
+    elif isinstance(context, BuildSketch):
+        if mode != Mode.PRIVATE and (
+            point_list or any(isinstance(obj, (Edge, Wire)) for obj in shape_list)
+        ):
+            raise ValueError(
+                "Edges, wires and points can only be projected into BuildSketch "
+                "in PRIVATE mode"
+            )
+    if not isinstance(context, BuildLine):
+        # A solid's silhouette is not available yet; as before, only faces,
+        # edges and wires cast a shadow onto a sketch or in algebra mode
+        shape_list = [obj for obj in shape_list if isinstance(obj, (Face, Edge, Wire))]
+
+    projected: list[Shape] = []
+    if shape_list:
+        # The plane itself is the target, as a face large enough to catch
+        # every object's shadow: the objects' footprint on the plane, padded
+        footprint = working_plane.to_local_coords(Compound(shape_list)).bounding_box(
+            optimal=False
+        )
+        screen_center = working_plane.from_local_coords(
+            Vector(footprint.center().X, footprint.center().Y, 0)
+        )
+        screen = Face.make_rect(
+            2 * footprint.size.X + 1,
+            2 * footprint.size.Y + 1,
+            plane=Plane(screen_center, working_plane.x_dir, working_plane.z_dir),
+        )
+        for obj in shape_list:
+            # Each object is projected from its own side of the plane
+            if working_plane.to_local_coords(obj.center()).Z > 0:
+                direction = -working_plane.z_dir
+            else:
+                direction = working_plane.z_dir
+            if (
+                isinstance(obj, Face)
+                and (face_plane := obj.is_planar) is not None
+                and abs(face_plane.z_dir.dot(working_plane.z_dir)) < TOLERANCE
+            ):
+                continue  # edge-on: no area on the plane
+            projected.extend(obj.project_to_shape(screen, direction))
 
     projected_points: ShapeList[Vector] = ShapeList()
     for pnt in point_list:
         pnt_to_target = (working_plane.origin - pnt).normalized()
         if working_plane.from_local_coords(pnt_to_target).Z < 0:
-            projection_axis = -Axis(pnt, working_plane.z_dir * projection_flip)
+            projection_axis = -Axis(pnt, working_plane.z_dir)
         else:
-            projection_axis = Axis(pnt, working_plane.z_dir * projection_flip)
+            projection_axis = Axis(pnt, working_plane.z_dir)
         intersection = working_plane.intersect(projection_axis)
         if isinstance(intersection, Axis):
             raise RuntimeError("working_plane and projection_axis are parallel")
         if intersection is not None:
             projected_points.append(working_plane.to_local_coords(intersection))
 
+    local_shapes = [working_plane.to_local_coords(shape) for shape in projected]
     if context is not None:
-        context._add_to_context(*projected_shapes, mode=mode)
+        context._add_to_context(*local_shapes, mode=mode)
 
     if projected_points:
-        result = projected_points
-    else:
-        result = Compound(projected_shapes)
-        if all([obj._dim == 2 for obj in object_list]):
-            result = Sketch(result.wrapped)
-        elif all([obj._dim == 1 for obj in object_list]):
-            result = Curve(result.wrapped)
+        return projected_points
 
+    dims = {shape._dim for shape in (local_shapes or shape_list)}
+    result: Curve | Sketch | Compound = Compound(local_shapes)
+    if dims == {2}:
+        result = Sketch(result.wrapped)
+    elif dims == {1}:
+        result = Curve(result.wrapped)
     return result
 
 

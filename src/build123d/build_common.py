@@ -164,7 +164,9 @@ operations_apply_to = {
     "mirror": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
     "miter": ["BuildSheet"],
     "offset": ["BuildPart", "BuildSketch", "BuildLine"],
+    # project in BuildPart forwards to project_to_shape until 1.0.0
     "project": ["BuildPart", "BuildSketch", "BuildLine"],
+    "project_to_shape": ["BuildPart"],
     "project_workplane": ["BuildPart"],
     "revolve": ["BuildPart"],
     "scale": ["BuildPart", "BuildSketch", "BuildLine"],
