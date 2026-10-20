@@ -132,7 +132,7 @@ from OCP.TopoDS import (
 )
 from OCP.TopLoc import TopLoc_Location
 from ocp_gordon import interpolate_curve_network
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from build123d.build_enums import (
     CenterOf,
@@ -167,6 +167,7 @@ from .history import ShapeHistory
 from .one_d import (
     Edge,
     Mixin1D,
+    ViewOutput,
     Wire,
     _split_edge_at_vertex,
     topo_explore_connected_faces,
@@ -763,32 +764,46 @@ class Mixin2D(ABC, Shape[TOPODS]):
         self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
         return tcast(Self, result)
 
+    def view(
+        self,
+        viewpoint: VectorLike,
+        up: VectorLike = (0, 0, 1),
+        look_at: VectorLike | None = None,
+        focus: float | None = None,
+    ) -> ViewOutput:
+        """view
+
+        The line drawing of this shape as seen from a viewpoint: its edges,
+        split into visible and hidden by hidden-line removal.
+
+        Args:
+            viewpoint (VectorLike): where the view is taken from
+            up (VectorLike, optional): direction of the view's y axis.
+                Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point the view is centred on.
+                Defaults to None (center of shape).
+            focus (float, optional): the focal length for a perspective view.
+                Defaults to None (orthographic view).
+
+        Returns:
+            ViewOutput: visible and hidden edges
+        """
+        return Mixin1D.view(self, viewpoint, up, look_at, focus)
+
+    @deprecated("project_to_viewport is deprecated; use view instead.")
     def project_to_viewport(
         self,
         viewport_origin: VectorLike,
         viewport_up: VectorLike = (0, 0, 1),
         look_at: VectorLike | None = None,
         focus: float | None = None,
-    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
+    ) -> ViewOutput:
         """project_to_viewport
 
-        Project a shape onto a viewport returning visible and hidden Edges.
-
-        Args:
-            viewport_origin (VectorLike): location of viewport
-            viewport_up (VectorLike, optional): direction of the viewport y axis.
-                Defaults to (0, 0, 1).
-            look_at (VectorLike, optional): point to look at.
-                Defaults to None (center of shape).
-            focus (float, optional): the focal length for perspective projection
-                Defaults to None (orthographic projection)
-
-        Returns:
-            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+        .. deprecated::
+            Use :meth:`view` instead.
         """
-        return Mixin1D.project_to_viewport(
-            self, viewport_origin, viewport_up, look_at, focus
-        )
+        return self.view(viewport_origin, viewport_up, look_at, focus)
 
 
 class Face(Mixin2D[TopoDS_Face]):

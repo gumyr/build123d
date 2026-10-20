@@ -97,8 +97,8 @@ if True:
         except:
             counter = 1
 
-        visible, _hidden = shape.project_to_viewport(
-            (-5, 1, 10), viewport_up=(0, 1, 0), look_at=(0, 0, 0)
+        visible, _hidden = shape.view(
+            (-5, 1, 10), up=(0, 1, 0), look_at=(0, 0, 0)
         )
         if color is not None:
             svg.add_layer(str(counter), fill_color=color, line_weight=1)

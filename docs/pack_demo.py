@@ -29,7 +29,7 @@ b4 = Box(24, 24, 24, align=(Align.MAX, Align.MAX, Align.CENTER), mode=Mode.SUBTR
 # [Export SVG files]
 def write_svg(part, filename: str, view_port_origin=(-100, 100, 150)):
     """Save an image of the BuildPart object as SVG"""
-    visible, hidden = part.project_to_viewport(view_port_origin)
+    visible, hidden = part.view(view_port_origin)
     max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
     exporter = ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible", line_weight=0.2)

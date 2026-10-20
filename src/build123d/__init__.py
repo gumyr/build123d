@@ -191,6 +191,7 @@ __all__ = [
     "Vector",
     "VectorLike",
     "Vertex",
+    "ViewOutput",
     "Edge",
     "Wire",
     "Face",

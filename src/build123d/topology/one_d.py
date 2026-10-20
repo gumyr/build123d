@@ -58,7 +58,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from math import atan2, ceil, copysign, cos, floor, inf, isclose, pi, radians
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, NamedTuple
 from typing import cast as tcast
 from typing import overload
 
@@ -194,7 +194,7 @@ from OCP.TopoDS import (
 )
 from scipy.optimize import minimize_scalar
 from scipy.spatial import ConvexHull
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from build123d.build_enums import (
     AngularDirection,
@@ -582,6 +582,22 @@ def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
         )
 
     raise ValueError("Filleting failed to create a closed wire.")
+
+
+class ViewOutput(NamedTuple):
+    """What :meth:`~topology.Shape.view` gives back: the edges of the shape as
+    seen from the viewpoint, split by hidden-line removal.
+
+    ``visible, hidden = part.view(viewpoint)`` unpacks it, and the fields are
+    there by name too.
+
+    Args:
+        visible (ShapeList[Edge]): edges in sight from the viewpoint
+        hidden (ShapeList[Edge]): edges behind the shape's own surface
+    """
+
+    visible: ShapeList[Edge]
+    hidden: ShapeList[Edge]
 
 
 class Mixin1D(Shape[TOPODS]):
@@ -1627,28 +1643,29 @@ class Mixin1D(Shape[TOPODS]):
 
         return return_value
 
-    def project_to_viewport(
+    def view(
         self,
-        viewport_origin: VectorLike,
-        viewport_up: VectorLike = (0, 0, 1),
+        viewpoint: VectorLike,
+        up: VectorLike = (0, 0, 1),
         look_at: VectorLike | None = None,
         focus: float | None = None,
-    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
-        """project_to_viewport
+    ) -> ViewOutput:
+        """view
 
-        Project a shape onto a viewport returning visible and hidden Edges.
+        The line drawing of this shape as seen from a viewpoint: its edges,
+        split into visible and hidden by hidden-line removal.
 
         Args:
-            viewport_origin (VectorLike): location of viewport
-            viewport_up (VectorLike, optional): direction of the viewport y axis.
+            viewpoint (VectorLike): where the view is taken from
+            up (VectorLike, optional): direction of the view's y axis.
                 Defaults to (0, 0, 1).
-            look_at (VectorLike, optional): point to look at.
+            look_at (VectorLike, optional): point the view is centred on.
                 Defaults to None (center of shape).
-            focus (float, optional): the focal length for perspective projection
-                Defaults to None (orthographic projection)
+            focus (float, optional): the focal length for a perspective view.
+                Defaults to None (orthographic view).
 
         Returns:
-            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+            ViewOutput: visible and hidden edges
         """
 
         def extract_edges(compound):
@@ -1672,15 +1689,13 @@ class Mixin1D(Shape[TOPODS]):
         hidden_line_removal = HLRBRep_Algo()
         hidden_line_removal.Add(self.wrapped)
 
-        viewport_origin = Vector(viewport_origin)
+        eye = Vector(viewpoint)
         look_at = Vector(look_at) if look_at else self.center()
-        projection_dir: Vector = (viewport_origin - look_at).normalized()
-        viewport_up = Vector(viewport_up).normalized()
+        projection_dir: Vector = (eye - look_at).normalized()
+        up = Vector(up).normalized()
         camera_coordinate_system = gp_Ax2()
-        camera_coordinate_system.SetAxis(
-            gp_Ax1(viewport_origin.to_pnt(), projection_dir.to_dir())
-        )
-        camera_coordinate_system.SetYDirection(viewport_up.to_dir())
+        camera_coordinate_system.SetAxis(gp_Ax1(eye.to_pnt(), projection_dir.to_dir()))
+        camera_coordinate_system.SetYDirection(up.to_dir())
         projector = (
             HLRAlgo_Projector(camera_coordinate_system, focus)
             if focus
@@ -1723,7 +1738,22 @@ class Mixin1D(Shape[TOPODS]):
         visible_edges = ShapeList(Edge(e) for e in visible_edges)
         hidden_edges = ShapeList(Edge(e) for e in hidden_edges)
 
-        return (visible_edges, hidden_edges)
+        return ViewOutput(visible_edges, hidden_edges)
+
+    @deprecated("project_to_viewport is deprecated; use view instead.")
+    def project_to_viewport(
+        self,
+        viewport_origin: VectorLike,
+        viewport_up: VectorLike = (0, 0, 1),
+        look_at: VectorLike | None = None,
+        focus: float | None = None,
+    ) -> ViewOutput:
+        """project_to_viewport
+
+        .. deprecated::
+            Use :meth:`view` instead.
+        """
+        return self.view(viewport_origin, viewport_up, look_at, focus)
 
     def start_point(self) -> Vector:
         """The start point of this edge

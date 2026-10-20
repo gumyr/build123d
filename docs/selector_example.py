@@ -35,7 +35,7 @@ with BuildPart() as example:
         RegularPolygon(radius=7, side_count=6)
         Circle(radius=4, mode=Mode.SUBTRACT)
     extrude(amount=-2, mode=Mode.SUBTRACT)
-    visible, hidden = example.part.project_to_viewport((-100, 100, 100))
+    visible, hidden = example.part.view((-100, 100, 100))
     exporter = ExportSVG(scale=6)
     exporter.add_layer("Visible")
     exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
@@ -51,7 +51,7 @@ with BuildPart() as example:
         radius=1,
     )
 
-visible, hidden = example.part.project_to_viewport((-100, 100, 100))
+visible, hidden = example.part.view((-100, 100, 100))
 exporter = ExportSVG(scale=6)
 exporter.add_layer("Visible")
 exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)

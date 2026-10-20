@@ -151,16 +151,16 @@ There are a couple ways to generate a 2D drawing of a 3D part:
 
 * Generate a section: The  :func:`~operations_part.section` operation can be used to
   create a 2D cross section of a 3D part at a given plane.
-* Generate a projection: The :meth:`~topology.Shape.project_to_viewport` method can be
-  used to create a 2D projection of a 3D scene. Similar to a camera, the ``viewport_origin``
-  defines the location of camera, the ``viewport_up`` defines the orientation of the camera,
+* Generate a view: The :meth:`~topology.Shape.view` method can be
+  used to create a 2D line drawing of a 3D scene. Similar to a camera, the ``viewpoint``
+  defines the location of camera, the ``up`` defines the orientation of the camera,
   and the ``look_at`` parameter defined where the camera is pointed.  By default, 
-  ``viewport_up`` is the positive z axis and ``look_up`` is the center of the shape.  The
-  return value is a tuple of lists of edges, the first the visible edges and the second
-  the hidden edges.  
+  ``up`` is the positive z axis and ``look_at`` is the center of the shape.  The
+  return value is a :class:`~topology.ViewOutput` of two lists of edges, ``visible``
+  and ``hidden``, which unpacks as a tuple.  
   
 Each of these Edges and Faces can be assigned different line color/types and fill colors
-as described below (as ``project_to_viewport`` only generates Edges, fill doesn't apply).  
+as described below (as ``view`` only generates Edges, fill doesn't apply).  
 The shapes generated from the above steps are to be added as shapes 
 in one of the exporters described below and written as either a DXF or SVG file as shown
 in this example:
@@ -168,7 +168,7 @@ in this example:
 .. code-block:: build123d
 
     view_port_origin=(-100, -50, 30)
-    visible, hidden = part.project_to_viewport(view_port_origin)
+    visible, hidden = part.view(view_port_origin)
     max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
     exporter = ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible")

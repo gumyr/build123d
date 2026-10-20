@@ -620,11 +620,11 @@ class TestMixin1D(unittest.TestCase):
             Edge.make_line((0, 0), (1, 0)).derivative_at((0, 0), 2), (0, 0, 0), 5
         )
 
-    def test_project_to_viewport(self):
+    def test_view(self):
         line = Edge.make_line((0, 0), (1, 0))
         line.wrapped = None
         with self.assertRaises(ValueError):
-            line.project_to_viewport((0, 0, 0))
+            line.view((0, 0, 0))
 
     def test_split(self):
         # nothing to split leaves nothing on either side
