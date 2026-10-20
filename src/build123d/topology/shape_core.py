@@ -2013,24 +2013,41 @@ class Shape(NodeMixin, Generic[TOPODS]):
         path: Wire | Edge,
         start: float = 0,
     ) -> ShapeList[Face]:
-        """Projected Faces following the given path on Shape
+        """Project a row of planar faces onto this shape along a path
 
-        Project by positioning each face of to the shape along the path and
-        projecting onto the surface.
+        The faces, drawn on ``Plane.XY``, are laid out along ``path``, a curve
+        on this shape, by their x positions: the leftmost point of the set
+        lands ``start`` of the way along the path and each face's centre as far
+        beyond that as it is to the right of the leftmost point. Each face is
+        stood on the surface at its own point, x along the path's tangent and z
+        along the surface normal there, and projected onto the shape along that
+        normal with :meth:`~topology.Face.project_to_shape`. A line of text
+        follows the path this way.
 
-        Note that projection may result in distortion depending on
-        the shape at a position along the path.
+        This is the tool for a target with several faces: a face that straddles
+        the boundary between two faces of the target, a glyph running round a
+        filleted corner, comes back as a Shell with a piece on each. For a
+        single surface :meth:`~topology.Face.wrap_faces` is the better choice:
+        it writes the faces into the surface's parameter space, which keeps
+        their lengths on a developable surface and handles seams, where a
+        projection foreshortens on a slope.
+
+        Limits: the surface normal at each point is found by a ray from the
+        path toward the shape's centre, so the shape's centre must lie behind
+        the surface along the whole path, and a face placed at a sharp corner
+        of the target projects poorly.
 
         .. image:: projectText.png
 
         Args:
-            faces (Union[list[Face], Compound]): faces to project
-            path: Path on the Shape to follow
-            start: Relative location on path to start the faces. Defaults to 0.
+            faces (Union[list[Face], Compound]): planar faces on ``Plane.XY``
+            path (Wire | Edge): a curve on this shape to lay the faces along
+            start (float, optional): how far along the path, from 0 to 1, the
+                leftmost point of the faces lands. Defaults to 0.
 
         Returns:
-            The projected faces
-
+            ShapeList[Face]: the faces on the surface, a Shell where a face
+            spans more than one face of the target
         """
         path_length = path.length
         # The derived classes of Shape implement center

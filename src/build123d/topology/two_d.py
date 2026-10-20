@@ -2814,6 +2814,13 @@ class Face(Mixin2D[TopoDS_Face]):
         face per period it reaches into, as :meth:`wrap` describes, so the
         result can hold more faces than were given.
 
+        The path must lie on this one face. For a path that runs over several
+        faces of a shape, a label round a filleted corner, use
+        :meth:`~topology.Shape.project_faces`, which projects each face onto the
+        whole shape and carries a face across the boundary between two target
+        faces. Wrapping is exact on a developable surface; projection is the
+        approximate alternative there and the only one for a multi-face target.
+
         Args:
             faces (Iterable[Face]): planar faces on ``Plane.XY``
             path (Wire | Edge): a curve on this face to lay the faces along
