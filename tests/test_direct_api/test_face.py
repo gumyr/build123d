@@ -114,24 +114,21 @@ class TestFace(unittest.TestCase):
         rect = Face.make_rect(1, 1)
         self.assertAlmostEqual(rect.volume, 0, 5)
 
-    def test_project_to_face_with_compound_boolean_result(self):
+    def test_project_through_two_faces_gives_a_face_per_surface(self):
         source = Face.make_rect(1, 1, Plane.XY.offset(1))
-        target = Face.make_rect(3, 3)
-        boolean_result = Compound(
+        target = Compound(
             children=[
-                Face.make_rect(1, 1),
-                Face.make_rect(1, 1, Plane.XY.offset(-1)),
+                Face.make_rect(3, 3),
+                Face.make_rect(3, 3, Plane.XY.offset(-1)),
             ]
         )
 
-        with patch(
-            "build123d.topology.two_d._topods_bool_op",
-            return_value=boolean_result.wrapped,
-        ):
-            projected = source.project_to_shape(target, (0, 0, -1))
+        projected = source.project_to_shape(target, (0, 0, -1))
 
         self.assertEqual(len(projected), 2)
         self.assertTrue(all(isinstance(face, Face) for face in projected))
+        self.assertAlmostEqual(projected[0].center().Z, 0, 5)
+        self.assertAlmostEqual(projected[1].center().Z, -1, 5)
 
     def test_split_by_perimeter(self):
         def area_of(shape_or_shapes):

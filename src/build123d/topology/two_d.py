@@ -128,6 +128,7 @@ from OCP.TopoDS import (
     TopoDS_Shape,
     TopoDS_Shell,
     TopoDS_Solid,
+    TopoDS_Vertex,
 )
 from OCP.TopLoc import TopLoc_Location
 from ocp_gordon import interpolate_curve_network
@@ -176,7 +177,6 @@ from .shape_core import (
     ShapeList,
     SkipClean,
     _sew_topods_faces,
-    _topods_bool_op,
     _topods_entities,
     _topods_face_normal_at,
     downcast,
@@ -2641,42 +2641,14 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             ShapeList[Face]: Face(s) projected on target object ordered by distance
         """
-        max_dimension = find_max_dimension([self, target_object])
-        extruded_topods_self = _extrude_topods_shape(
-            self.wrapped, Vector(direction) * max_dimension
-        )
-
-        intersected_shapes: ShapeList[Face | Shell] = ShapeList()
-        if isinstance(target_object, Vertex):
-            raise TypeError("projection to a vertex is not supported")
-        if isinstance(target_object, Face):
-            topods_shape = _topods_bool_op(
-                (extruded_topods_self,), (target_object.wrapped,), BRepAlgoAPI_Common()
-            )
-            if not topods_shape.IsNull():
-                intersected_shapes.extend(
-                    Face(TopoDS.Face(topods_face))
-                    for topods_face in get_top_level_topods_shapes(topods_shape)
-                )
-        else:
-            for target_shell in target_object.shells():
-                topods_shape = _topods_bool_op(
-                    (extruded_topods_self,),
-                    (target_shell.wrapped,),
-                    BRepAlgoAPI_Common(),
-                )
-                for topods_shell in get_top_level_topods_shapes(topods_shape):
-                    intersected_shapes.append(Shell(TopoDS.Shell(topods_shell)))
-
-        intersected_shapes = intersected_shapes.sort_by(Axis(self.center(), direction))
         projected_shapes: ShapeList[Face | Shell] = ShapeList()
-        for shape in intersected_shapes:
-            if len(shape.faces()) == 1:
-                shape_face = shape.face()
-                if shape_face is not None:
-                    projected_shapes.append(shape_face)
+        for region in _project_profile_by_extrusion(self, target_object, direction):
+            if len(region.faces()) == 1:
+                region_face = region.face()
+                if region_face is not None:
+                    projected_shapes.append(region_face)
             else:
-                projected_shapes.append(shape)
+                projected_shapes.append(region)
         return projected_shapes
 
     def without_holes(self) -> Face:
@@ -3338,6 +3310,81 @@ class Shell(Mixin2D[TopoDS_Shell]):
         # Find the closest Face and get the location from it
         face = self.faces().sort_by(lambda f: f.distance_to(surface_point))[0]
         return face.location_at(surface_point, x_dir=x_dir)
+
+
+def _project_profile_by_extrusion(
+    profile: Face, target: Shape, direction: VectorLike
+) -> ShapeList[Face | Shell]:
+    """The regions of a target's surface that a profile covers when swept along a
+    direction, nearest first.
+
+    The profile is extruded far enough to pass right through the target and the
+    extrusion is intersected with the target. The faces of the result that came
+    from the target, whether the boolean rebuilt them or left them untouched
+    inside the column, are sewn into the surfaces the column passes through, one
+    Face or Shell each, and ordered by distance along ``direction`` from the
+    profile. This is the core shared by :meth:`Face.project_to_shape` and
+    :meth:`Solid.extrude_until`.
+
+    The boolean is run directly rather than through :meth:`Shape.intersect`,
+    whose ``UnifySameDomain`` clean could merge a target fragment into a coplanar
+    face of the extrusion before the fragment is attributed.
+
+    Args:
+        profile (Face): the face swept along the direction
+        target (Shape): the shape whose surface is sampled
+        direction (VectorLike): the sweep direction; only surfaces ahead of the
+            profile are found
+
+    Raises:
+        TypeError: the target is a Vertex
+        RuntimeError: sewing returned something other than faces and shells
+
+    Returns:
+        ShapeList[Face | Shell]: the surfaces met, nearest first; empty when the
+        column misses the target
+    """
+    if isinstance(target, Vertex):
+        raise TypeError("projection to a vertex is not supported")
+    direction = Vector(direction)
+    max_dimension = find_max_dimension([profile, target])
+    extrusion = _extrude_topods_shape(profile.wrapped, direction * max_dimension)
+
+    arguments, tools = List_TopoDS_Shape(), List_TopoDS_Shape()
+    arguments.Append(target.wrapped)
+    tools.Append(extrusion)
+    operation = BRepAlgoAPI_Common()
+    operation.SetArguments(arguments)
+    operation.SetTools(tools)
+    operation.SetRunParallel(True)
+    operation.Build()
+    result = operation.Shape()
+    if result.IsNull():
+        return ShapeList()
+
+    history = ShapeHistory.from_boolean(
+        operation, before=[target.wrapped], brought=[extrusion]
+    )
+    trace = history.trace([target.wrapped])
+    target_faces = [
+        TopoDS.Face(face)
+        for face in _topods_entities(result, "Face")
+        if trace.is_modified(face) or trace.is_untouched(face)
+    ]
+    if not target_faces:
+        return ShapeList()
+
+    # Sewing can hand back a vertex or edge of a face as a free sub-shape
+    # beside the faces and shells; those carry no surface and are dropped
+    regions: ShapeList[Face | Shell] = ShapeList()
+    for region in get_top_level_topods_shapes(_sew_topods_faces(target_faces)):
+        if isinstance(region, TopoDS_Face):
+            regions.append(Face(region))
+        elif isinstance(region, TopoDS_Shell):
+            regions.append(Shell(region))
+        elif not isinstance(region, (TopoDS_Vertex, TopoDS_Edge)):
+            raise RuntimeError(f"Invalid sewn shape {type(region)}")
+    return regions.sort_by(Axis(profile.center(), direction))
 
 
 def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:

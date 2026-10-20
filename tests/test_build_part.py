@@ -563,6 +563,21 @@ class TestExtrude(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "does not cut the extrusion"):
                 extrude(cross.sketch, until=Until.NEXT, mode=Mode.PRIVATE)
 
+    def test_extrude_until_a_stepped_surface(self):
+        """A target face lying wholly inside the column, the boss top here, is
+        left untouched by the boolean and is part of the surface reached"""
+        with BuildPart() as part:
+            Box(20, 20, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            with BuildSketch(Plane.XY.offset(10)):
+                Circle(3)
+            extrude(amount=5)
+            with BuildSketch(Plane.XY.offset(20)):
+                Rectangle(10, 10)
+            column = extrude(until=Until.NEXT, dir=(0, 0, -1), mode=Mode.PRIVATE)
+        self.assertTrue(column.is_valid)
+        self.assertAlmostEqual(column.volume, 10 * 10 * 10 - pi * 3**2 * 5, 3)
+        self.assertAlmostEqual(column.bounding_box().min.Z, 10, 5)
+
     def test_extrude_until_errors(self):
         with self.assertRaises(ValueError):
             extrude(
@@ -580,7 +595,7 @@ class TestExtrude(unittest.TestCase):
         bad_shape = Box(1, 1, 1).wrapped  # not a Face or Shell → forces RuntimeError
 
         with patch(
-            "build123d.topology.three_d.get_top_level_topods_shapes",
+            "build123d.topology.two_d.get_top_level_topods_shapes",
             return_value=[bad_shape],
         ):
             with self.assertRaises(RuntimeError):
