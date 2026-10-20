@@ -1886,6 +1886,75 @@ class TestUnfoldFaceMap(unittest.TestCase):
         self.assertAlmostEqual(record.inside_radius, 2, 5)
         self.assertAlmostEqual(record.neutral_radius, 2, 5)
 
+    def test_the_bend_line_spans_the_material_and_crosses_holes(self):
+        """The bend line is one physical line: it ends where the strip's
+        material ends, square or not, and a hole across the bend interrupts
+        the strip but not the line"""
+
+        def bend_record(cutter=None, position=BendPosition.BEND_OUTSIDE, outline=None):
+            with BuildSheet(thickness=1, bend_radius=10) as bs:
+                with BuildSketch():
+                    if outline is None:
+                        Rectangle(40, 30)
+                    else:
+                        outline()
+                flange(bs.rims().sort_by(Axis.Y)[0], length=10, position=position)
+                if cutter is not None:
+                    cutter()
+                flat, face_map = unfold()
+            (strip,) = [f for f in flat.faces() if face_map[f].is_bend]
+            return strip, face_map[strip].bend_line
+
+        # the bend is on the -Y edge at y=-15, its arc centred at (x, -15, 10);
+        # a cylinder at 45 degrees through the arc cuts a hole in the 40 wide
+        # strip. It is placed a little off the arc's middle so that its own
+        # seam edge does not land on the bend's mid-line and split the face
+        def one_hole():
+            with Locations(Pos(0, -22.4, 2.6)):
+                Cylinder(3, 40, rotation=(45, 0, 0), mode=Mode.SUBTRACT)
+
+        def two_holes():
+            with Locations(Pos(-8, -22.4, 2.6), Pos(8, -22.4, 2.6)):
+                Cylinder(2.5, 40, rotation=(45, 0, 0), mode=Mode.SUBTRACT)
+
+        def end_notch():
+            with Locations(Pos(19, -22.4, 2.6)):
+                Cylinder(3, 40, rotation=(45, 0, 0), mode=Mode.SUBTRACT)
+
+        strip, line = bend_record()
+        self.assertAlmostEqual(line.length, 40, 5)
+
+        for name, cutter, holes in (
+            ("one hole", one_hole, 1),
+            ("two holes", two_holes, 2),
+        ):
+            with self.subTest(name):
+                strip, line = bend_record(cutter)
+                self.assertEqual(len(strip.inner_wires()), holes)
+                self.assertIsInstance(line, Edge)
+                # the line still runs the full width, over the holes
+                self.assertAlmostEqual(line.length, 40, 5)
+                self.assertGreater(len(line.intersect(strip).edges()), holes)
+                for t in (0, 1):
+                    self.assertLess(strip.distance_to(line.position_at(t)), 1e-6)
+
+        strip, line = bend_record(end_notch)
+        self.assertEqual(len(strip.inner_wires()), 0)
+        self.assertLess(line.length, 40 - 2)  # stops at the notch
+        for t in (0, 1):
+            self.assertLess(strip.distance_to(line.position_at(t)), 1e-6)
+
+        # a set-back bend takes its strip out of a trapezoid, so the strip's
+        # ends are oblique and the line is shorter than the cylinder's span
+        strip, line = bend_record(
+            position=BendPosition.MATERIAL_INSIDE,
+            outline=lambda: Trapezoid(40, 30, 60),
+        )
+        self.assertLess(line.length, 40)
+        self.assertGreater(line.length, 36)
+        for t in (0, 1):
+            self.assertLess(strip.distance_to(line.position_at(t)), 1e-6)
+
 
 class TestBendOutline(unittest.TestCase):
     """The strip a bend consumes rolls up with whatever the blank's outline does

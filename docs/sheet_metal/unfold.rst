@@ -72,7 +72,9 @@ pattern, and each entry is an :class:`~sheet_utils.UnfoldedFace`:
 * ``is_bend`` - whether that face was a cylinder
 * ``angle``, ``inside_radius``, ``neutral_radius`` - the bend to put back,
   and the radius its strip's width was taken at
-* ``bend_line`` - the centre line of the strip, on the pattern
+* ``bend_line`` - the centre line of the strip, on the pattern, from the first
+  point it meets material to the last; a hole across the bend does not
+  interrupt it
 * ``up`` - the bend folds toward +Z as the blank lies on ``Plane.XY``
 
 The lookup is by the face's underlying kernel shape, so it still answers

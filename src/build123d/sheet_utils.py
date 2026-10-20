@@ -132,7 +132,8 @@ class UnfoldedFace:
         neutral_radius (float): the radius the bend was developed at. 0 for
             a flat.
         bend_line (Edge | None): the centre line of the strip, on the flat
-            pattern. None for a flat.
+            pattern, spanning the material from end to end; a hole across the
+            bend does not interrupt it. None for a flat.
         up (bool): the bend folds toward +Z of the flat pattern. False for a
             flat.
     """
@@ -663,17 +664,28 @@ def _unfolded_face(
 
     # the strip was developed with x the arc length at the development radius
     # and y the distance along the bend, then placed; its centre line is the
-    # mid-angle line of the cylinder, clipped to the strip where its ends are
-    # not square
+    # mid-angle line of the cylinder. The line is one physical bend line, so
+    # it spans the material from the first point it meets to the last: ends
+    # that are not square or are notched are trimmed, while a hole across the
+    # bend interrupts the strip but not the line
     u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(source_face)
     x_middle = neutral * (u_min + u_max) / 2
     bend_line = Edge.make_line((x_middle, v_min, 0), (x_middle, v_max, 0)).moved(
         placed.placement
     )
-    clipped = bend_line.intersect(Face(placed.face))
-    pieces = clipped.edges() if clipped is not None else []
-    if len(pieces) == 1:
-        bend_line = pieces[0]
+    on_material = bend_line.intersect(Face(placed.face))
+    pieces = on_material.edges() if on_material is not None else []
+    if pieces:
+        start = bend_line.position_at(0)
+        along = (bend_line.position_at(1) - start).normalized()
+        reach = [
+            (piece.position_at(t) - start).dot(along)
+            for piece in pieces
+            for t in (0, 1)
+        ]
+        bend_line = Edge.make_line(
+            start + along * min(reach), start + along * max(reach)
+        )
 
     return UnfoldedFace(
         sheet_face=sheet_face,
