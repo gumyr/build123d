@@ -637,6 +637,103 @@ class TestEdge(unittest.TestCase):
 class TestEdgeParamAt(unittest.TestCase):
     """Edge.param_at regression tests (Issue #1095)."""
 
+    def test_param_at_point_normalized_modes_match_and_raw_is_native(self):
+        """Check normalized and native parameters on common curve types."""
+        edges = {
+            "line": Edge.make_line((0, 0, 0), (10, 0, 0)),
+            "circle": Edge.make_circle(2),
+            "ellipse": Edge.make_ellipse(5, 2, start_angle=30, end_angle=220),
+            "spline": Edge.make_spline([(0, 0, 0), (2, 3, 0), (5, 1, 0), (7, 4, 0)]),
+        }
+        for name, edge in edges.items():
+            point = edge.position_at(0.37)
+            with self.subTest(edge=name):
+                default = edge.param_at_point(point)
+                normalized = edge.param_at_point(point, normalize=True)
+                native = edge.param_at_point(point, normalize=False)
+                evaluated = Vector(edge.geom_adaptor().Value(native))
+
+                self.assertEqual(default, normalized)
+                self.assertLess((evaluated - point).length, 1e-6)
+
+    def test_param_at_point_native_endpoints_on_reversed_edges(self):
+        """Check native parameters at both endpoints and edge orientations."""
+        line = Edge.make_line((0, 0, 0), (10, 0, 0))
+        for edge in (line, line.reversed()):
+            for point in (edge.start_point(), edge.end_point()):
+                with self.subTest(edge_forward=edge.is_forward, point=point):
+                    default = edge.param_at_point(point)
+                    normalized = edge.param_at_point(point, normalize=True)
+                    native = edge.param_at_point(point, normalize=False)
+
+                    self.assertEqual(default, normalized)
+                    self.assertLess(
+                        (Vector(edge.geom_adaptor().Value(native)) - point).length,
+                        1e-6,
+                    )
+
+    def test_param_at_point_periodic_endpoint_uses_native_point(self):
+        """Check a closed curve endpoint by its evaluated native point."""
+        circle = Edge.make_circle(2)
+        point = circle.start_point()
+
+        native = circle.param_at_point(point, normalize=False)
+
+        self.assertLess(
+            (Vector(circle.geom_adaptor().Value(native)) - point).length, 1e-6
+        )
+
+    def test_param_at_point_projected_point_returns_native_parameter(self):
+        """Check projection returns the native line parameter."""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        point = Vector(7, 1e-8, 0)
+
+        normalized = edge.param_at_point(point, normalize=True)
+        native = edge.param_at_point(point, normalize=False)
+
+        self.assertAlmostEqual(normalized, 0.7, places=6)
+        self.assertAlmostEqual(native, 7.0, places=6)
+        self.assertLess(
+            (Vector(edge.geom_adaptor().Value(native)) - point).length, 1e-6
+        )
+
+    def test_param_at_point_fallback_returns_native_parameter_in_both_modes(self):
+        """Check fallback conversion after rejecting a plausible bad projection."""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0)).reversed()
+        point = edge.position_at(0.7)
+        projector = MagicMock()
+        projector.LowerDistanceParameter.return_value = 9.0
+
+        with patch(
+            "build123d.topology.one_d.GeomAPI_ProjectPointOnCurve",
+            return_value=projector,
+        ):
+            normalized = edge.param_at_point(point, normalize=True)
+            native = edge.param_at_point(point, normalize=False)
+
+        self.assertEqual(normalized, 0.7)
+        self.assertAlmostEqual(native, 3.0, places=6)
+        self.assertLess(
+            (Vector(edge.geom_adaptor().Value(native)) - point).length, 1e-6
+        )
+
+    def test_param_at_point_normalize_preserves_errors(self):
+        """Check empty-edge and off-curve errors in both modes."""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        edge.wrapped = None
+        for normalize in (True, False):
+            with self.subTest(normalize=normalize):
+                with self.assertRaisesRegex(
+                    ValueError, "Can't find param on empty edge"
+                ):
+                    edge.param_at_point((0, 0, 0), normalize=normalize)
+
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        for normalize in (True, False):
+            with self.subTest(normalize=normalize):
+                with self.assertRaisesRegex(ValueError, "is .* from edge"):
+                    edge.param_at_point((7, 1, 0), normalize=normalize)
+
     def test_param_at_point_search_fallback(self):
         """When the OCCT projection returns a bad parameter the minimization
         search takes over and still finds the point."""
