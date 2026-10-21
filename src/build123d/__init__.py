@@ -78,6 +78,7 @@ __all__ = [
     "FrameMethod",
     "GeomType",
     "HeadType",
+    "Hit",
     "HemType",
     "SheetSurface",
     "Intrinsic",

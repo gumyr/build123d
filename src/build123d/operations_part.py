@@ -34,7 +34,7 @@ from itertools import cycle, permutations, starmap
 
 from typing_extensions import deprecated
 
-from build123d.build_enums import GeomType, Mode, Until, Kind, Side
+from build123d.build_enums import GeomType, Hit, Mode, Until, Kind, Side
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Vector, VectorLike
 from build123d.sheet_utils import SheetMetalParameters, material_offsets
@@ -562,6 +562,7 @@ def project_to_shape(
     objects: Face | Edge | Wire | Iterable[Face | Edge | Wire] | None = None,
     target: Shape | None = None,
     direction: VectorLike | None = None,
+    hit: Hit = Hit.ALL,
     mode: Mode = Mode.ADD,
 ) -> Sketch | Curve | Compound:
     """Part Operation: project_to_shape
@@ -577,9 +578,13 @@ def project_to_shape(
     directly. In algebra mode the objects and target must be given, and the
     direction too unless a planar face among the objects supplies its normal.
 
-    Everything the projection passes through comes back, nearest first: a face
-    projected onto a plate lands on its near face and on its far face. The
-    direct methods :meth:`~topology.Face.project_to_shape` and
+    The projection meets every surface in its path: a face projected onto a
+    plate lands on its near face and on its far face. ``hit`` says which to
+    keep: ``Hit.ALL`` (the default) keeps them all, nearest first;
+    ``Hit.NEAREST`` and ``Hit.FARTHEST`` one end of that list; ``Hit.VISIBLE``
+    what a viewer behind the objects, looking along the direction, sees, the
+    surfaces facing the viewer with the parts hidden behind nearer surfaces
+    removed. The direct methods :meth:`~topology.Face.project_to_shape` and
     :meth:`~topology.Wire.project_to_shape` do the work.
 
     To project onto a plane, see :func:`~operations_generic.project`.
@@ -590,6 +595,8 @@ def project_to_shape(
         target (Shape, optional): shape to project onto. Defaults to the part.
         direction (VectorLike, optional): projection direction. Defaults to the
             normal of the pending sketch plane, or of the first planar face.
+        hit (Hit, optional): which of the surfaces met to keep. Defaults to
+            Hit.ALL.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
@@ -660,9 +667,9 @@ def project_to_shape(
         if toward_target and (target.center() - obj.center()).dot(obj_direction) < 0:
             obj_direction = -obj_direction
         if isinstance(obj, Face):
-            projected.extend(obj.project_to_shape(target, obj_direction).faces())
+            projected.extend(obj.project_to_shape(target, obj_direction, hit).faces())
         else:
-            projected.extend(obj.project_to_shape(target, obj_direction))
+            projected.extend(obj.project_to_shape(target, obj_direction, hit=hit))
 
     if context is not None:
         context._add_to_context(*projected, mode=mode)

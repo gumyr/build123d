@@ -921,6 +921,41 @@ class ProjectionTests(unittest.TestCase):
         curve = project(far.edges(), workplane=Plane.XY)
         self.assertEqual(len(curve.edges()), 8)
 
+    def test_a_solid_casts_its_silhouette_onto_a_sketch(self):
+        sphere, box, cylinder = Sphere(10), Box(10, 10, 10), Cylinder(5, 20)
+        with BuildSketch() as disc:
+            project(sphere)
+        self.assertEqual(len(disc.sketch.faces()), 1)
+        self.assertAlmostEqual(disc.sketch.area, pi * 100, 3)
+        with BuildSketch(Plane((0, 0, 0), z_dir=(1, 1, 1))) as hexagon:
+            project(box)
+        self.assertAlmostEqual(hexagon.sketch.area, 300 / sqrt(3), 3)
+        self.assertEqual(len(hexagon.sketch.faces()[0].outer_wire().edges()), 6)
+        with BuildSketch(Plane.XZ) as rectangle:
+            project(cylinder)
+        self.assertAlmostEqual(rectangle.sketch.area, 200, 3)
+        self.assertEqual(len(rectangle.sketch.faces()[0].edges()), 4)
+
+    def test_a_silhouette_keeps_its_holes(self):
+        holed = Box(10, 10, 10) - Cylinder(2, 20)
+        projection = project(holed, workplane=Plane.XY)
+        self.assertIsInstance(projection, Sketch)
+        self.assertAlmostEqual(projection.area, 100 - pi * 4, 3)
+        self.assertEqual(len(projection.faces()[0].inner_wires()), 1)
+        torus = Torus(10, 3)
+        projection = project(torus, workplane=Plane.XY.offset(-20))
+        self.assertAlmostEqual(projection.area, pi * (13**2 - 7**2), 3)
+        # in the workplane's own coordinates, as every projection onto a plane
+        self.assertAlmostEqual(projection.faces()[0].center().Z, 0, 5)
+
+    def test_a_solid_in_build_line_still_gives_edges(self):
+        sphere = Sphere(10)
+        with BuildLine() as outline:
+            project(sphere)
+        self.assertTrue(
+            all(edge.geom_type == GeomType.CIRCLE for edge in outline.edges())
+        )
+
     def test_objects_on_both_sides_of_the_plane(self):
         projection = project(
             [

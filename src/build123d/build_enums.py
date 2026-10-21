@@ -238,6 +238,25 @@ class HeadType(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class Hit(Enum):
+    """Which of the surfaces a projection passes through to keep
+
+    A projection onto a shape meets every surface in its path: a face cast
+    onto a plate lands on the near face and on the far face. ``ALL`` keeps
+    them all, nearest first; ``NEAREST`` and ``FARTHEST`` one end of that
+    list; ``VISIBLE`` what a viewer on the source's side sees, the surfaces
+    facing the viewer with the parts hidden behind nearer surfaces removed.
+    """
+
+    ALL = auto()
+    NEAREST = auto()
+    FARTHEST = auto()
+    VISIBLE = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class HemType(Enum):
     """Sheet metal hem styles"""
 

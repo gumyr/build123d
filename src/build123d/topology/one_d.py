@@ -203,6 +203,7 @@ from build123d.build_enums import (
     Convexity,
     FrameMethod,
     GeomType,
+    Hit,
     Kind,
     PositionMode,
     Sagitta,
@@ -254,6 +255,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from .composite import Compound, Curve, Part, Sketch  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
     from .two_d import Face, Shell  # pylint: disable=R0801
+    from .silhouette import visible_curves
 
 
 @dataclass(frozen=True)
@@ -3464,13 +3466,15 @@ class Edge(Mixin1D[TopoDS_Edge]):
         target_object: Shape,
         direction: VectorLike | None = None,
         center: VectorLike | None = None,
+        hit: Hit = Hit.ALL,
     ) -> ShapeList[Edge]:
         """Project Edge
 
-        Project an Edge onto a Shape generating new wires on the surfaces of the object
+        Project an Edge onto a Shape generating new edges on the surfaces of the object
         one and only one of `direction` or `center` must be provided. Note that one or
-        more wires may be generated depending on the topology of the target object and
-        location/direction of projection.
+        more edges may be generated depending on the topology of the target object and
+        location/direction of projection; they come back nearest first, and ``hit``
+        keeps all of them, the nearest, the farthest, or the visible ones.
 
         To avoid flipping the normal of a face built with the projected wire the orientation
         of the output wires are forced to be the same as self.
@@ -3479,9 +3483,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
           target_object: Object to project onto
           direction: Parallel projection direction. Defaults to None.
           center: Conical center of projection. Defaults to None.
-          target_object: Shape:
-          direction: VectorLike:  (Default value = None)
-          center: VectorLike:  (Default value = None)
+          hit (Hit, optional): which of the projections to keep. Defaults to Hit.ALL.
 
         Returns:
           : Projected Edge(s)
@@ -3490,7 +3492,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
           ValueError: Only one of direction or center must be provided
 
         """
-        projected_wires = Wire(self).project_to_shape(target_object, direction, center)
+        projected_wires = Wire(self).project_to_shape(
+            target_object, direction, center, hit
+        )
         return projected_wires.edges()
 
     def reversed(self, reconstruct: bool = False) -> Edge:
@@ -4658,13 +4662,16 @@ class Wire(Mixin1D[TopoDS_Wire]):
         target_object: Shape,
         direction: VectorLike | None = None,
         center: VectorLike | None = None,
+        hit: Hit = Hit.ALL,
     ) -> ShapeList[Wire]:
         """Project Wire
 
         Project a Wire onto a Shape generating new wires on the surfaces of the object
         one and only one of `direction` or `center` must be provided. Note that one or
         more wires may be generated depending on the topology of the target object and
-        location/direction of projection.
+        location/direction of projection; they come back nearest first, and ``hit``
+        keeps all of them, the nearest, the farthest, or the visible ones, what a
+        viewer behind the wire looking along the direction sees.
 
         To avoid flipping the normal of a face built with the projected wire the orientation
         of the output wires are forced to be the same as self.
@@ -4673,15 +4680,15 @@ class Wire(Mixin1D[TopoDS_Wire]):
           target_object: Object to project onto
           direction: Parallel projection direction. Defaults to None.
           center: Conical center of projection. Defaults to None.
-          target_object: Shape:
-          direction: VectorLike:  (Default value = None)
-          center: VectorLike:  (Default value = None)
+          hit (Hit, optional): which of the projections to keep. Defaults to Hit.ALL.
+              Hit.VISIBLE needs a direction.
 
         Returns:
           : Projected wire(s)
 
         Raises:
           ValueError: Only one of direction or center must be provided
+          ValueError: Hit.VISIBLE needs a direction
 
         """
         if self.is_empty or not target_object:
@@ -4695,6 +4702,14 @@ class Wire(Mixin1D[TopoDS_Wire]):
             center_point = Vector(center)
         else:
             raise ValueError("Provide exactly one of direction or center")
+
+        if hit == Hit.VISIBLE:
+            if direction_vector is None:
+                raise ValueError("Hit.VISIBLE needs a direction, not a center")
+            # pylint: disable=import-outside-toplevel
+            from .silhouette import visible_curves
+
+            return visible_curves(self, target_object, direction_vector)
 
         # Project the wire on the target object
         if direction_vector is not None:
@@ -4758,6 +4773,11 @@ class Wire(Mixin1D[TopoDS_Wire]):
                 len(output_wires_distances),
             )
             output_wires = ShapeList([w[0] for w in output_wires_distances])
+
+        if hit == Hit.NEAREST:
+            output_wires = output_wires[:1]
+        elif hit == Hit.FARTHEST:
+            output_wires = output_wires[-1:]
 
         # Clean the wires remove cases where projection artificially split edges
         cleaned_wires = ShapeList([w.clean() for w in output_wires])

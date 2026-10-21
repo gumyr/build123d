@@ -139,6 +139,7 @@ from build123d.build_enums import (
     ContinuityLevel,
     Convexity,
     GeomType,
+    Hit,
     Keep,
     SortBy,
     Transition,
@@ -198,6 +199,7 @@ from .utils import (
 from .zero_d import Vertex
 
 if TYPE_CHECKING:  # pragma: no cover
+    from .silhouette import visible_regions
     from .uv_write import UVFrame
     from .composite import Compound, Curve  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
@@ -2633,7 +2635,7 @@ class Face(Mixin2D[TopoDS_Face]):
         return _topods_face_position(self.wrapped, u, v)
 
     def project_to_shape(
-        self, target_object: Shape, direction: VectorLike
+        self, target_object: Shape, direction: VectorLike, hit: Hit = Hit.ALL
     ) -> ShapeList[Face | Shell]:
         """Project Face to target Object
 
@@ -2644,20 +2646,32 @@ class Face(Mixin2D[TopoDS_Face]):
         .. image:: flatProjection.png
             :alt: flatProjection
 
-        Note that an array of faces is returned as the projection might result in faces
-        on the "front" and "back" of the object (or even more if there are intermediate
-        surfaces in the projection path). faces "behind" the projection are not
-        returned.
+        The projection meets every surface in its path, so a face cast onto a
+        plate lands on its near face and on its far face; surfaces behind the
+        face, against the direction, are not met. ``hit`` says which to keep:
+        all of them nearest first, the nearest, the farthest, or the visible
+        ones, what a viewer behind the face looking along the direction sees.
 
         Args:
             target_object (Shape): Object to project onto
             direction (VectorLike): projection direction
+            hit (Hit, optional): which surfaces to keep. Defaults to Hit.ALL.
 
         Returns:
             ShapeList[Face]: Face(s) projected on target object ordered by distance
         """
+        if hit == Hit.VISIBLE:
+            # pylint: disable=import-outside-toplevel
+            from .silhouette import visible_regions
+
+            return ShapeList(visible_regions(self, target_object, direction))
+        regions = _project_profile_by_extrusion(self, target_object, direction)
+        if hit == Hit.NEAREST:
+            regions = regions[:1]
+        elif hit == Hit.FARTHEST:
+            regions = regions[-1:]
         projected_shapes: ShapeList[Face | Shell] = ShapeList()
-        for region in _project_profile_by_extrusion(self, target_object, direction):
+        for region in regions:
             if len(region.faces()) == 1:
                 region_face = region.face()
                 if region_face is not None:

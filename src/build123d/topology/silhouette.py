@@ -53,13 +53,23 @@ from OCP.gp import gp_Pnt, gp_Pnt2d, gp_Vec
 from OCP.TopAbs import TopAbs_State
 from OCP.TopoDS import TopoDS_Face
 
-from build123d.geometry import TOLERANCE, Matrix, Vector, VectorLike
+from build123d.geometry import (
+    TOLERANCE,
+    Axis,
+    Location,
+    Matrix,
+    Plane,
+    Vector,
+    VectorLike,
+)
 
+from .composite import Compound
 from .history import ShapeHistory
 from .one_d import Edge, Wire
 from .shape_core import Shape, ShapeList, downcast
-from .two_d import Face
-from .utils import _topods_face_normal, _topods_face_position
+from .three_d import Solid
+from .two_d import Face, _project_profile_by_extrusion
+from .utils import _topods_face_normal, _topods_face_position, find_max_dimension
 from .uv_write import UVFrame
 
 
@@ -205,7 +215,10 @@ def contours_by_face(shape: Shape, viewer: Viewer) -> list[FaceContour]:
     Raises:
         RuntimeError: a face that should carry a contour has none
     """
-    by_face = [FaceContour(face, contour_edges(face, viewer)) for face in shape.faces()]
+    by_face = [
+        FaceContour(face, _off_the_boundary(face, contour_edges(face, viewer)))
+        for face in shape.faces()
+    ]
     for index, entry in enumerate(by_face):
         if not entry.edges and _normal_turns_through(entry.face, viewer):
             raise RuntimeError(
@@ -213,6 +226,23 @@ def contours_by_face(shape: Shape, viewer: Viewer) -> list[FaceContour]:
                 "viewing direction but the kernel found no contour on it"
             )
     return by_face
+
+
+def _off_the_boundary(face: Face, edges: ShapeList[Edge]) -> ShapeList[Edge]:
+    """The contour edges that do not run along an edge the face already has,
+    as a cone's silhouette lines do when its side was built in halves; the
+    splitter has nothing to do there and mishandles the coincidence."""
+    boundary = face.edges()
+    kept: ShapeList[Edge] = ShapeList()
+    for edge in edges:
+        on_boundary = all(
+            min(bound.distance_to(edge.position_at(t)) for bound in boundary)
+            < TOLERANCE
+            for t in (0.0, 0.5, 1.0)
+        )
+        if not on_boundary:
+            kept.append(edge)
+    return kept
 
 
 def _normal_turns_through(face: Face, viewer: Viewer, samples: int = 5) -> bool:
@@ -296,3 +326,111 @@ def front_facing(faces: ShapeList[Face], viewer: Viewer) -> ShapeList[Face]:
         if normal.dot(viewer.direction_at(point)) < 0:
             kept.append(face)
     return kept
+
+
+def visible_faces(shape: Shape, viewer: Viewer) -> ShapeList[Face]:
+    """The faces of ``shape``, split along its silhouette, that look toward
+    the viewer; the surfaces a viewer could see, before one hides another."""
+    split, _ = split_by_silhouette(shape, viewer)
+    return front_facing(split.faces(), viewer)
+
+
+def _shadows(faces: ShapeList[Face], direction: Vector, reach: float) -> list[Solid]:
+    """The volume behind each face along the direction, as far as ``reach``:
+    what the face hides from a viewer looking along the direction."""
+    return [Solid.extrude(face, direction * reach) for face in faces]
+
+
+def visible_regions(
+    profile: Face, target: Shape, direction: VectorLike
+) -> ShapeList[Face]:
+    """The parts of ``target``'s surface that ``profile`` covers and that a
+    viewer behind the profile, looking along ``direction``, sees.
+
+    The target is split along its silhouette and only the faces looking back
+    at the viewer are projected onto; of the regions found, each loses what
+    lies in the shadow another casts along the direction. Nearest first.
+    """
+    viewer = Viewer.along(direction)
+    assert viewer.direction is not None
+    front = visible_faces(target, viewer)
+    if not front:
+        return ShapeList()
+    regions = _project_profile_by_extrusion(profile, Compound(front), viewer.direction)
+    faces = ShapeList(face for region in regions for face in region.faces())
+    reach = find_max_dimension([profile, target])
+    shadows = _shadows(faces, viewer.direction, reach)
+    kept: ShapeList[Face] = ShapeList()
+    for index, face in enumerate(faces):
+        others = [shadow for other, shadow in enumerate(shadows) if other != index]
+        remain: Shape = face.cut(*others) if others else face
+        kept.extend(piece for piece in remain.faces() if piece.area > TOLERANCE)
+    return kept.sort_by(Axis(profile.center(), viewer.direction))
+
+
+def visible_curves(
+    curve: Wire, target: Shape, direction: VectorLike
+) -> ShapeList[Wire]:
+    """The projection of ``curve`` onto the parts of ``target`` a viewer
+    behind the curve, looking along ``direction``, sees.
+
+    The curve is projected onto the faces of the target that look back at
+    the viewer, and each piece loses what lies in the shadow of any other
+    such face.
+    """
+    viewer = Viewer.along(direction)
+    assert viewer.direction is not None
+    front = visible_faces(target, viewer)
+    if not front:
+        return ShapeList()
+    # The kernel projects a curve both ways along the direction; only what
+    # lies ahead of the curve is in view
+    pieces = [
+        piece
+        for piece in curve.project_to_shape(Compound(front), direction=viewer.direction)
+        if (piece.center() - curve.center()).dot(viewer.direction) >= 0
+    ]
+    reach = find_max_dimension([curve, target])
+    shadows = _shadows(front, viewer.direction, reach)
+    kept_edges: list[Edge] = []
+    for edge in (edge for piece in pieces for edge in piece.edges()):
+        middle = edge.position_at(0.5)
+        distances = [face.distance_to(middle) for face in front]
+        host = distances.index(min(distances))
+        others = [shadow for index, shadow in enumerate(shadows) if index != host]
+        remain: Shape = edge.cut(*others) if others else edge
+        kept_edges.extend(piece for piece in remain.edges() if piece.length > TOLERANCE)
+    return ShapeList(Wire.combine(kept_edges)) if kept_edges else ShapeList()
+
+
+def silhouette_on_plane(shape: Shape, plane: Plane) -> ShapeList[Face]:
+    """The silhouette of ``shape`` on ``plane``, seen from the shape's side:
+    the faces that look toward the plane, projected onto it and fused.
+
+    Returns:
+        ShapeList[Face]: planar faces lying in ``plane``, holes included
+    """
+    above = plane.to_local_coords(shape.center()).Z > 0
+    direction = -plane.z_dir if above else plane.z_dir
+    front = visible_faces(shape, Viewer.along(direction))
+    if not front:
+        return ShapeList()
+    # Project onto a screen behind the whole shape, so that no part of it is
+    # already past the plane, and move the result back onto the plane
+    footprint = plane.to_local_coords(shape).bounding_box(optimal=False)
+    depth = footprint.min.Z - 1 if above else footprint.max.Z + 1
+    screen = plane.from_local_coords(
+        Face.make_rect(2 * footprint.size.X + 1, 2 * footprint.size.Y + 1).moved(
+            Location((footprint.center().X, footprint.center().Y, depth))
+        )
+    )
+    flat = [
+        face
+        for fragment in front
+        for region in _project_profile_by_extrusion(fragment, screen, direction)
+        for face in region.faces()
+    ]
+    if not flat:
+        return ShapeList()
+    union = flat[0].fuse(*flat[1:]).clean() if len(flat) > 1 else flat[0]
+    return union.moved(Location(plane.z_dir * -depth)).faces()

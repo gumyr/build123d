@@ -62,6 +62,7 @@ from build123d.objects_curve import BaseLineObject
 from build123d.objects_part import BasePartObject
 from build123d.objects_sketch import BaseSketchObject
 from build123d.operations_part import project_to_shape
+from build123d.topology.silhouette import silhouette_on_plane
 from build123d.topology import (
     Compound,
     ShapeHistory,
@@ -893,10 +894,12 @@ def project(
 
     What a builder can hold decides what is projected into it. BuildLine takes
     edges, so a face or solid given to it contributes its edges. BuildSketch
-    takes faces; a face edge-on to the plane has no area there and is skipped.
-    Edges, wires and points cannot be added to BuildSketch, nor points to
-    BuildLine, so those raise unless ``mode`` is ``Mode.PRIVATE``, which returns
-    the result without adding it.
+    takes faces: a face edge-on to the plane has no area there and is skipped,
+    and a solid, shell or compound contributes its silhouette, the outline of
+    everything a viewer on its side of the plane sees, holes included. The
+    same holds in algebra mode. Edges, wires and points cannot be added to
+    BuildSketch, nor points to BuildLine, so those raise unless ``mode`` is
+    ``Mode.PRIVATE``, which returns the result without adding it.
 
     To project onto a shape, see :func:`~operations_part.project_to_shape`.
 
@@ -990,12 +993,16 @@ def project(
                 "Edges, wires and points can only be projected into BuildSketch "
                 "in PRIVATE mode"
             )
+    # Onto a sketch or in algebra mode a solid, shell or compound casts its
+    # silhouette rather than each of its faces
+    bodies: list[Shape] = []
     if not isinstance(context, BuildLine):
-        # A solid's silhouette is not available yet; as before, only faces,
-        # edges and wires cast a shadow onto a sketch or in algebra mode
+        bodies = [obj for obj in shape_list if not isinstance(obj, (Face, Edge, Wire))]
         shape_list = [obj for obj in shape_list if isinstance(obj, (Face, Edge, Wire))]
 
     projected: list[Shape] = []
+    for body in bodies:
+        projected.extend(silhouette_on_plane(body, working_plane))
     if shape_list:
         # The plane itself is the target, as a face large enough to catch
         # every object's shadow: the objects' footprint on the plane, padded
