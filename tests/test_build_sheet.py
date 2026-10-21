@@ -3153,6 +3153,57 @@ class TestCornerRelief(unittest.TestCase):
             sheet.area - result.area, quarter * (1 + 2 * self.SCALE), 5
         )
 
+    def test_relief_carries_on_into_the_flanges(self):
+        """A relief wide enough to pass through a bend is still a hole on the
+        blank, so it carries on into the flange beyond the bend rather than
+        stopping at the bend's far tangent line."""
+        sheet = self.two_flange_sheet().sheet_local
+        walls = sheet.faces().filter_by(GeomType.PLANE).sort_by(SortBy.AREA)[:2]
+        result = corner_relief(
+            self.shared_corner(sheet),
+            ReliefType.ROUND,
+            radius=6.0,
+            sheet_parameters=self.PARAMETERS,
+        )
+        self.assertTrue(result.is_valid)
+        self.assertAlmostEqual(self.blank_removed(sheet, result), 0.75 * pi * 6**2, 4)
+        after = result.faces().filter_by(GeomType.PLANE).sort_by(SortBy.AREA)[:2]
+        for wall, cut in zip(walls, after):
+            self.assertLess(cut.area, wall.area - 1.0)
+
+    def test_bends_of_different_width(self):
+        """A shallow bend is narrower on the blank than a right-angle one, so
+        a small relief may pass through one bend and not the other; each
+        flange is cut from where its own bend ends."""
+        sheet = flange(
+            Rectangle(60, 40).edges().sort_by(Axis.X)[0],
+            length=15,
+            angle=45,
+            sheet_parameters=self.PARAMETERS,
+        )
+        sheet = flange(
+            sheet.flats().sort_by(Axis.Z)[0].edges().sort_by(Axis.Y)[0],
+            length=15,
+            angle=90,
+            sheet_parameters=self.PARAMETERS,
+        )
+        corner = min(
+            sheet.flats().sort_by(Axis.Z)[0].vertices(),
+            key=lambda vertex: (Vector(vertex) - Vector(-30, -20, 0)).length,
+        )
+        for radius in (1.0, 2.0, 3.0):
+            with self.subTest(radius=radius):
+                result = corner_relief(
+                    corner,
+                    ReliefType.ROUND,
+                    radius=radius,
+                    sheet_parameters=self.PARAMETERS,
+                )
+                self.assertTrue(result.is_valid)
+                self.assertAlmostEqual(
+                    self.blank_removed(sheet, result), 0.75 * pi * radius**2, 4
+                )
+
     def test_square_removes_three_quarters_of_a_square(self):
         sheet = self.two_flange_sheet().sheet_local
         result = corner_relief(
