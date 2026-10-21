@@ -168,7 +168,7 @@ from .history import ShapeHistory
 from .one_d import (
     Edge,
     Mixin1D,
-    ViewOutput,
+    DrawingViewOutput,
     Wire,
     _split_edge_at_vertex,
     topo_explore_connected_faces,
@@ -766,14 +766,14 @@ class Mixin2D(ABC, Shape[TOPODS]):
         self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
         return tcast(Self, result)
 
-    def view(
+    def drawing_view(
         self,
         viewpoint: VectorLike,
         up: VectorLike = (0, 0, 1),
         look_at: VectorLike | None = None,
         focus: float | None = None,
-    ) -> ViewOutput:
-        """view
+    ) -> DrawingViewOutput:
+        """drawing_view
 
         The line drawing of this shape as seen from a viewpoint: its edges,
         split into visible and hidden by hidden-line removal.
@@ -788,24 +788,24 @@ class Mixin2D(ABC, Shape[TOPODS]):
                 Defaults to None (orthographic view).
 
         Returns:
-            ViewOutput: visible and hidden edges
+            DrawingViewOutput: visible and hidden edges
         """
-        return Mixin1D.view(self, viewpoint, up, look_at, focus)
+        return Mixin1D.drawing_view(self, viewpoint, up, look_at, focus)
 
-    @deprecated("project_to_viewport is deprecated; use view instead.")
+    @deprecated("project_to_viewport is deprecated; use drawing_view instead.")
     def project_to_viewport(
         self,
         viewport_origin: VectorLike,
         viewport_up: VectorLike = (0, 0, 1),
         look_at: VectorLike | None = None,
         focus: float | None = None,
-    ) -> ViewOutput:
+    ) -> DrawingViewOutput:
         """project_to_viewport
 
         .. deprecated::
-            Use :meth:`view` instead.
+            Use :meth:`drawing_view` instead.
         """
-        return self.view(viewport_origin, viewport_up, look_at, focus)
+        return self.drawing_view(viewport_origin, viewport_up, look_at, focus)
 
 
 class Face(Mixin2D[TopoDS_Face]):

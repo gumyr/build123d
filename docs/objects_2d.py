@@ -184,7 +184,7 @@ with BuildPart() as controller:
     # Cut the display sketch through the controller
     extrude(amount=-1, mode=Mode.SUBTRACT)
 # [Ex. 14]
-visible, hidden = controller.part.view((70, -50, 120))
+visible, hidden = controller.part.drawing_view((70, -50, 120))
 max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
 exporter = ExportSVG(scale=100 / max_dimension)
 exporter.add_layer("Visible")

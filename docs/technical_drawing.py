@@ -72,7 +72,7 @@ def project_to_2d(
         tuple[ShapeList[Edge], ShapeList[Edge]]: visible & hidden edges
     """
     scaled_part = part if scale_factor == 1.0 else scale(part, scale_factor)
-    visible, hidden = scaled_part.view(viewpoint, up, look_at=(0, 0, 0))
+    visible, hidden = scaled_part.drawing_view(viewpoint, up, look_at=(0, 0, 0))
     visible = [Pos(*page_origin) * e for e in visible]
     hidden = [Pos(*page_origin) * e for e in hidden]
 

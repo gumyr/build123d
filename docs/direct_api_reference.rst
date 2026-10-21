@@ -73,7 +73,7 @@ Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~top
 .. autoclass:: Wire
 .. autoclass:: Vertex
    :special-members: __add__, __sub__
-.. autoclass:: ViewOutput
+.. autoclass:: DrawingViewOutput
 .. autoclass:: Curve
    :special-members: __matmul__, __mod__
 .. autoclass:: Part

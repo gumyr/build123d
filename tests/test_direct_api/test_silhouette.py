@@ -79,7 +79,7 @@ class TestContourEdges(unittest.TestCase):
     def test_sphere_gives_a_great_circle(self):
         face = Sphere(10).faces()[0]
         edges = contour_edges(face, Viewer.along((1, 0.3, 0.2)))
-        self.assertEqual(sum(edge.length for edge in edges), 2 * pi * 10, 5)
+        self.assertAlmostEqual(sum(edge.length for edge in edges), 2 * pi * 10, 5)
         self.assertTrue(all(edge.geom_type == GeomType.CIRCLE for edge in edges))
         for edge in edges:
             self.assertLess(face.distance_to(edge.position_at(0.3)), 1e-6)

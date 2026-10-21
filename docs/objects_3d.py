@@ -8,7 +8,7 @@ def write_svg(filename: str, view_port_origin=(-100, -50, 30)):
     """Save an image of the BuildPart object as SVG"""
     builder: BuildPart = BuildPart._get_context()
 
-    visible, hidden = builder.part.view(view_port_origin)
+    visible, hidden = builder.part.drawing_view(view_port_origin)
     max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
     exporter = ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible")

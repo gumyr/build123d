@@ -98,7 +98,7 @@ with BuildPart() as lego:
     # Extrude this base sketch to the height of the walls
     extrude(amount=base_height - wall_thickness)
     if GEN_DOCS:
-        visible, hidden = lego.part.view((-5, -30, 50))
+        visible, hidden = lego.part.drawing_view((-5, -30, 50))
         exporter = ExportSVG(scale=6)
         exporter.add_layer("Visible")
         exporter.add_layer(
@@ -117,7 +117,7 @@ with BuildPart() as lego:
             align=(Align.CENTER, Align.CENTER, Align.MIN),
         )
     if GEN_DOCS:
-        visible, hidden = lego.part.view((-5, -30, 50))
+        visible, hidden = lego.part.drawing_view((-5, -30, 50))
         exporter = ExportSVG(scale=6)
         exporter.add_layer("Visible")
         exporter.add_layer(
@@ -136,7 +136,7 @@ with BuildPart() as lego:
                 align=(Align.CENTER, Align.CENTER, Align.MIN),
             )
     if GEN_DOCS:
-        visible, hidden = lego.part.view((-100, -100, 50))
+        visible, hidden = lego.part.drawing_view((-100, -100, 50))
         exporter = ExportSVG(scale=6)
         exporter.add_layer("Visible")
         exporter.add_layer(

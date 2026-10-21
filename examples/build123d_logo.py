@@ -97,7 +97,7 @@ if True:
         except:
             counter = 1
 
-        visible, _hidden = shape.view(
+        visible, _hidden = shape.drawing_view(
             (-5, 1, 10), up=(0, 1, 0), look_at=(0, 0, 0)
         )
         if color is not None:

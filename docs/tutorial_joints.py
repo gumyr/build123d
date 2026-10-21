@@ -226,7 +226,7 @@ m6_joint = RigidJoint("head", m6_screw, Location((0, 0, 0), (0, 0, 0)))
 # [Export SVG files]
 def write_svg(part, filename: str, view_port_origin=(-100, 100, 150)):
     """Save an image of the BuildPart object as SVG"""
-    visible, hidden = part.view(view_port_origin)
+    visible, hidden = part.drawing_view(view_port_origin)
     max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
     exporter = ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible")

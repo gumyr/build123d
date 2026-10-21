@@ -586,11 +586,11 @@ def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
     raise ValueError("Filleting failed to create a closed wire.")
 
 
-class ViewOutput(NamedTuple):
-    """What :meth:`~topology.Shape.view` gives back: the edges of the shape as
+class DrawingViewOutput(NamedTuple):
+    """What :meth:`~topology.Shape.drawing_view` gives back: the edges of the shape as
     seen from the viewpoint, split by hidden-line removal.
 
-    ``visible, hidden = part.view(viewpoint)`` unpacks it, and the fields are
+    ``visible, hidden = part.drawing_view(viewpoint)`` unpacks it, and the fields are
     there by name too.
 
     Args:
@@ -1650,14 +1650,14 @@ class Mixin1D(Shape[TOPODS]):
 
         return return_value
 
-    def view(
+    def drawing_view(
         self,
         viewpoint: VectorLike,
         up: VectorLike = (0, 0, 1),
         look_at: VectorLike | None = None,
         focus: float | None = None,
-    ) -> ViewOutput:
-        """view
+    ) -> DrawingViewOutput:
+        """drawing_view
 
         The line drawing of this shape as seen from a viewpoint: its edges,
         split into visible and hidden by hidden-line removal.
@@ -1672,7 +1672,7 @@ class Mixin1D(Shape[TOPODS]):
                 Defaults to None (orthographic view).
 
         Returns:
-            ViewOutput: visible and hidden edges
+            DrawingViewOutput: visible and hidden edges
         """
 
         def extract_edges(compound):
@@ -1745,22 +1745,22 @@ class Mixin1D(Shape[TOPODS]):
         visible_edges = ShapeList(Edge(e) for e in visible_edges)
         hidden_edges = ShapeList(Edge(e) for e in hidden_edges)
 
-        return ViewOutput(visible_edges, hidden_edges)
+        return DrawingViewOutput(visible_edges, hidden_edges)
 
-    @deprecated("project_to_viewport is deprecated; use view instead.")
+    @deprecated("project_to_viewport is deprecated; use drawing_view instead.")
     def project_to_viewport(
         self,
         viewport_origin: VectorLike,
         viewport_up: VectorLike = (0, 0, 1),
         look_at: VectorLike | None = None,
         focus: float | None = None,
-    ) -> ViewOutput:
+    ) -> DrawingViewOutput:
         """project_to_viewport
 
         .. deprecated::
-            Use :meth:`view` instead.
+            Use :meth:`drawing_view` instead.
         """
-        return self.view(viewport_origin, viewport_up, look_at, focus)
+        return self.drawing_view(viewport_origin, viewport_up, look_at, focus)
 
     def start_point(self) -> Vector:
         """The start point of this edge

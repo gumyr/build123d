@@ -59,7 +59,7 @@ from build123d.topology import (
     Solid,
     Vertex,
     Wire,
-    ViewOutput,
+    DrawingViewOutput,
 )
 from build123d.topology.composite import Part
 from build123d.joints import RigidJoint
@@ -475,33 +475,33 @@ class TestShape(unittest.TestCase):
     def test_view(self):
         # Basic test
         box = Solid.make_box(10, 10, 10)
-        visible, hidden = box.view((-20, 20, 20))
+        visible, hidden = box.drawing_view((-20, 20, 20))
         self.assertEqual(len(visible), 9)
         self.assertEqual(len(hidden), 3)
 
         # Contour edges
         cyl = Solid.make_cylinder(2, 10)
-        visible, hidden = cyl.view((-20, 20, 20))
+        visible, hidden = cyl.drawing_view((-20, 20, 20))
         # Note that some edges are broken into two
         self.assertEqual(len(visible), 6)
         self.assertEqual(len(hidden), 2)
 
         # Hidden contour edges
         hole = box - cyl
-        visible, hidden = hole.view((-20, 20, 20))
+        visible, hidden = hole.drawing_view((-20, 20, 20))
         self.assertEqual(len(visible), 13)
         self.assertEqual(len(hidden), 6)
 
         # Outline edges
         sphere = Solid.make_sphere(5)
-        visible, hidden = sphere.view((-20, 20, 20))
+        visible, hidden = sphere.drawing_view((-20, 20, 20))
         self.assertEqual(len(visible), 1)
         self.assertEqual(len(hidden), 0)
 
     def test_view_output_by_name_and_by_position(self):
         box = Solid.make_box(10, 10, 10)
-        output = box.view((-20, 20, 20))
-        self.assertIsInstance(output, ViewOutput)
+        output = box.drawing_view((-20, 20, 20))
+        self.assertIsInstance(output, DrawingViewOutput)
         visible, hidden = output
         self.assertEqual(len(output.visible), 9)
         self.assertEqual(len(output.hidden), 3)
@@ -516,7 +516,7 @@ class TestShape(unittest.TestCase):
                     old = shape.project_to_viewport(
                         viewport_origin=(-20, 20, 20), viewport_up=(0, 0, 1)
                     )
-                new = shape.view((-20, 20, 20))
+                new = shape.drawing_view((-20, 20, 20))
                 self.assertEqual(len(old.visible), len(new.visible))
                 self.assertEqual(len(old.hidden), len(new.hidden))
 

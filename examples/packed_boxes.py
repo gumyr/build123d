@@ -23,7 +23,7 @@ packed = bd.pack(test_boxes, 3)
 def export_svg(parts, name):
     part = functools.reduce(operator.add, parts, bd.Part())
     view_port_origin=(0, 0, 150)
-    visible, hidden = part.view(view_port_origin)
+    visible, hidden = part.drawing_view(view_port_origin)
     max_dimension = max(*bd.Compound(children=visible + hidden).bounding_box().size)
     exporter = bd.ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible")

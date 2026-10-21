@@ -635,7 +635,7 @@ class TestMixin1D(unittest.TestCase):
         line = Edge.make_line((0, 0), (1, 0))
         line.wrapped = None
         with self.assertRaises(ValueError):
-            line.view((0, 0, 0))
+            line.drawing_view((0, 0, 0))
 
     def test_split(self):
         # nothing to split leaves nothing on either side
