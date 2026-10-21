@@ -2643,7 +2643,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
         A projection with no taper is illustrated below:
 
-        .. image:: flatProjection.png
+        .. image:: /flatProjection.png
             :alt: flatProjection
 
         The projection meets every surface in its path, so a face cast onto a
