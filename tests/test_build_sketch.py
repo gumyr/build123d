@@ -386,17 +386,39 @@ class TestBuildSketchObjects(unittest.TestCase):
             with BuildSketch():
                 RegularPolygon(1, 2)
 
-    def test_slot_arc(self):
+    def test_slot_curve(self):
         with BuildSketch() as test:
             with BuildLine(mode=Mode.PRIVATE) as l:
                 RadiusArc((0, 0), (5, 0), radius=4)
-            s = SlotArc(arc=l.edges()[0], height=1, rotation=45)
-        self.assertEqual(type(s.arc), Edge)
+            s = SlotCurve(curve=l.edges()[0], height=1, rotation=45)
+        self.assertEqual(type(s.curve), Edge)
         self.assertEqual(s.slot_height, 1)
         self.assertEqual(s.rotation, 45)
         self.assertEqual(s.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, 6.186450426893698, 5)
         self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
+
+    def test_slot_curve_along_a_polyline(self):
+        """The center line is any Edge or Wire, not only an arc."""
+        with BuildSketch() as test:
+            with BuildLine(mode=Mode.PRIVATE) as l:
+                Polyline((0, 0), (4, 0), (4, 3))
+            SlotCurve(l.wires()[0], height=1)
+        # two straight runs with round ends, less what rounding the outer
+        # corner takes off a square one
+        self.assertAlmostEqual(
+            test.sketch.area, 7 + pi * 0.5**2 - (0.5**2 - pi * 0.5**2 / 4), 5
+        )
+
+    def test_slot_arc_is_deprecated(self):
+        """SlotArc still works, as SlotCurve with the old keyword, but warns."""
+        arc = RadiusArc((0, 0), (5, 0), radius=4)
+        with self.assertWarnsRegex(DeprecationWarning, "use SlotCurve"):
+            s = SlotArc(arc=arc, height=1, rotation=45)
+        self.assertIsInstance(s, SlotCurve)
+        self.assertIs(s.arc, arc)
+        self.assertEqual(s.slot_height, 1)
+        self.assertAlmostEqual(s.area, 6.186450426893698, 5)
 
     def test_slot_center_point(self):
         with BuildSketch() as test:

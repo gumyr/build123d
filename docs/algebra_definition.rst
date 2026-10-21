@@ -32,7 +32,7 @@ of its set rather than failing. See :ref:`empty_shapes`.
 
 :math:`B^3 := \lbrace` ``Part``, ``Box``, ``Cylinder``, ``Cone``, ``Sphere``, ``Torus``, ``Wedge``, ``Hole``, ``CounterBoreHole``, ``CounterSinkHole`` :math:`\rbrace`
 
-:math:`B^2 := \lbrace` ``Sketch``, ``Rectangle``, ``Circle``, ``Ellipse``, ``Rectangle``, ``Polygon``, ``RegularPolygon``, ``Text``, ``Trapezoid``, ``SlotArc``, ``SlotCenterPoint``, ``SlotCenterToCenter``, ``SlotOverall`` :math:`\rbrace`
+:math:`B^2 := \lbrace` ``Sketch``, ``Rectangle``, ``Circle``, ``Ellipse``, ``Rectangle``, ``Polygon``, ``RegularPolygon``, ``Text``, ``Trapezoid``, ``SlotCenterPoint``, ``SlotCenterToCenter``, ``SlotCurve``, ``SlotOverall`` :math:`\rbrace`
 
 :math:`B^1 := \lbrace` ``Curve``, ``Bezier``, ``FilletPolyline``, ``PolarLine``, ``Polyline``, ``Spline``, ``Helix``, ``CenterArc``, ``EllipticalCenterArc``, ``ParabolicCenterArc``, ``HyperbolicCenterArc``, ``RadiusArc``, ``SagittaArc``, ``TangentArc``, ``ThreePointArc``, ``JernArc`` :math:`\rbrace`
 

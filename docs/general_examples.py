@@ -717,10 +717,10 @@ with BuildPart() as ex35:
         SlotCenterToCenter(width / 2, 10)
         with BuildLine(mode=Mode.PRIVATE) as ex35_ln:
             RadiusArc((-width / 2, 0), (0, width / 2), radius=width / 2)
-        SlotArc(arc=ex35_ln.edges()[0], height=thickness, rotation=0)
+        SlotCurve(ex35_ln.edges()[0], height=thickness, rotation=0)
         with BuildLine(mode=Mode.PRIVATE) as ex35_ln2:
             RadiusArc((0, -width / 2), (width / 2, 0), radius=-width / 2)
-        SlotArc(arc=ex35_ln2.edges()[0], height=thickness, rotation=0)
+        SlotCurve(ex35_ln2.edges()[0], height=thickness, rotation=0)
     extrude(amount=-thickness, mode=Mode.SUBTRACT)
     # [Ex. 35]
     write_svg()
