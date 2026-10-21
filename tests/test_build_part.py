@@ -28,7 +28,7 @@ license:
 
 import unittest
 from abc import ABC, abstractmethod
-from math import pi, sin, sqrt
+from math import pi, radians, sin, sqrt, tan
 from unittest.mock import MagicMock, patch, PropertyMock
 
 from build123d import *
@@ -457,6 +457,76 @@ class TestCounterBoreHole(unittest.TestCase):
 
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 10 * pi, 5)
 
+    def test_point_angle(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
+                CounterBoreHole(2, 3, 1, 5, point_angle=90)
+        # a 90 degree point on a radius 2 hole is a cone of height 2
+        point = pi * 2**2 * 2 / 3
+        self.assertAlmostEqual(test.part.volume, 1000 - 4 * 4 * pi - 9 * pi - point, 5)
+        cone = test.faces().filter_by(GeomType.CONE)[0]
+        self.assertAlmostEqual(cone.bounding_box().min.Z, -2, 5)
+
+
+class TestCounterDrillHole(unittest.TestCase):
+    # radius 2 under a radius 3 counter drill with a 90 degree step: a frustum of height 1
+    step = pi * 1 / 3 * (3**2 + 3 * 2 + 2**2)
+
+    def test_fixed_depth(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
+                CounterDrillHole(2, 3, 2, 6, counter_drill_angle=90)
+        self.assertAlmostEqual(
+            test.part.volume, 1000 - 9 * 2 * pi - self.step - 4 * 3 * pi, 5
+        )
+        self.assertEqual(len(test.faces().filter_by(GeomType.CONE)), 1)
+
+    def test_through_hole(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
+                CounterDrillHole(2, 3, 2, counter_drill_angle=90)
+        self.assertAlmostEqual(
+            test.part.volume, 1000 - 9 * 2 * pi - self.step - 4 * 7 * pi, 5
+        )
+
+    def test_point_angle(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
+                CounterDrillHole(2, 3, 2, 6, counter_drill_angle=90, point_angle=90)
+        point = pi * 2**2 * 2 / 3
+        self.assertAlmostEqual(
+            test.part.volume, 1000 - 9 * 2 * pi - self.step - 4 * 3 * pi - point, 5
+        )
+        self.assertEqual(len(test.faces().filter_by(GeomType.CONE)), 2)
+
+    def test_default_angle(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
+                hole = CounterDrillHole(2, 3, 2, 6)
+        self.assertEqual(hole.counter_drill_angle, 118)
+        cone = test.faces().filter_by(GeomType.CONE)[0]
+        step_height = 1 / tan(radians(59))
+        self.assertAlmostEqual(cone.bounding_box().min.Z, 3 - step_height, 5)
+
+    def test_errors(self):
+        with self.assertRaises(ValueError):
+            with BuildPart():
+                Box(10, 10, 10)
+                CounterDrillHole(3, 3, 2, 6)
+        with self.assertRaises(ValueError):
+            with BuildPart():
+                Box(10, 10, 10)
+                CounterDrillHole(2, 3, 2, 2.5, counter_drill_angle=90)
+        with self.assertRaises(ValueError):
+            with BuildPart():
+                Box(10, 10, 10)
+                CounterDrillHole(2, 3, 2, 6, counter_drill_angle=180)
+
 
 class TestCounterSinkHole(unittest.TestCase):
     def test_fixed_depth(self):
@@ -482,6 +552,16 @@ class TestCounterSinkHole(unittest.TestCase):
             CounterSinkHole(2, 4)
 
         self.assertAlmostEqual(test.part.volume, 1000 - 4 * 10 * pi, 5)
+
+    def test_point_angle(self):
+        volumes = []
+        for point_angle in (None, 90):
+            with BuildPart() as test:
+                Box(10, 10, 10)
+                with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
+                    CounterSinkHole(2, 4, 5, point_angle=point_angle)
+            volumes.append(test.part.volume)
+        self.assertAlmostEqual(volumes[0] - volumes[1], pi * 2**2 * 2 / 3, 5)
 
 
 class TestCylinder(unittest.TestCase):
@@ -657,6 +737,29 @@ class TestHole(unittest.TestCase):
         self.assertLessEqual(hole_bbox.min.Z, 95)
         self.assertGreaterEqual(hole_bbox.max.Z, 105)
         self.assertEqual(len(test.part.solids()), 1)
+
+    def test_point_angle(self):
+        with BuildPart() as test:
+            Box(10, 10, 10)
+            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
+                Hole(2, 5, point_angle=118)
+        point = pi * 2**2 * (2 / tan(radians(59))) / 3
+        self.assertAlmostEqual(test.part.volume, 1000 - 4 * 5 * pi - point, 5)
+        # the depth is to the end of the full diameter, the tip below it
+        cone = test.faces().filter_by(GeomType.CONE)[0]
+        self.assertAlmostEqual(cone.bounding_box().max.Z, 0, 5)
+        self.assertAlmostEqual(cone.bounding_box().min.Z, -2 / tan(radians(59)), 5)
+
+    def test_point_angle_errors(self):
+        with self.assertRaises(ValueError):
+            with BuildPart():
+                Box(10, 10, 10)
+                Hole(2, point_angle=118)
+        for point_angle in (0, 180):
+            with self.assertRaises(ValueError):
+                with BuildPart():
+                    Box(10, 10, 10)
+                    Hole(2, 5, point_angle=point_angle)
 
 
 class TestLoft(unittest.TestCase):

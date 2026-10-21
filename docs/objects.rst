@@ -479,6 +479,13 @@ Reference
         +++
         Counter bore hole defined by radii and depths
 
+    .. grid-item-card:: :class:`~objects_part.CounterDrillHole`
+
+        .. image:: assets/counter_drill_hole_example.svg
+
+        +++
+        Counter drill hole defined by radii, depths and drill point angles
+
     .. grid-item-card:: :class:`~objects_part.CounterSinkHole`
 
         .. image:: assets/counter_sink_hole_example.svg
@@ -531,6 +538,7 @@ Reference
 .. autoclass:: Cone
 .. autoclass:: ConvexPolyhedron
 .. autoclass:: CounterBoreHole
+.. autoclass:: CounterDrillHole
 .. autoclass:: CounterSinkHole
 .. autoclass:: Cylinder
 .. autoclass:: Hole
