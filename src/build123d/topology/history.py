@@ -46,7 +46,6 @@ from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
 from OCP.BRepTools import BRepTools_History
 from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
 from OCP.TopExp import TopExp
-from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Shape
 from OCP.collections import (
     DataMap_TopoDS_Shape_TopoDS_Shape_TopTools_ShapeMapHasher,
@@ -206,16 +205,20 @@ class ShapeHistory:
     def from_relocation(cls, before: TopoDS_Shape, after: TopoDS_Shape) -> ShapeHistory:
         """The record of moving a shape: each sub-shape modified into its moved self.
 
-        A move keeps every TShape and changes only Locations, so the pairing is
-        by TShape. Sub-shapes whose Location did not change are left untouched.
+        A move keeps every TShape and changes the root Location. Normalize each
+        child by its root Location so repeated instances keep their relative
+        placements. Sub-shapes whose Location did not change are left untouched.
         """
         history = cls(before=[before])
-        identity = TopLoc_Location()
+        before_location = before.Location()
+        after_location = after.Location()
+        before_to_local = before_location.Inverted()
+        after_to_local = after_location.Inverted()
         placed = DataMap_TopoDS_Shape_TopoDS_Shape_TopTools_ShapeMapHasher()
         for sub in tracked_subshapes([after]):
-            placed.Bind(sub.Located(identity), sub)
+            placed.Bind(sub.Moved(after_to_local), sub)
         for sub in tracked_subshapes([before]):
-            key = sub.Located(identity)
+            key = sub.Moved(before_to_local)
             if placed.IsBound(key):
                 moved = placed.Find(key)
                 if not moved.IsSame(sub):
@@ -343,7 +346,9 @@ class Trace:
     def __init__(self, history: ShapeHistory, inputs: Iterable[TopoDS_Shape]):
         self.untouched = Map_TopoDS_Shape_TopTools_ShapeMapHasher()
         self.modified_from = DataMap_TopoDS_Shape_TopoDS_Shape_TopTools_ShapeMapHasher()
-        self.generated_from = DataMap_TopoDS_Shape_TopoDS_Shape_TopTools_ShapeMapHasher()
+        self.generated_from = (
+            DataMap_TopoDS_Shape_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
         for sub in tracked_subshapes(inputs):
             self.untouched.Add(sub)
             for shape in history.modified(sub):
