@@ -109,6 +109,17 @@ What it refuses
 * No sheet: a bare ``unfold()`` outside any ``BuildSheet``.
 * Missing parameters in Algebra mode, or parameters given inside a
   ``BuildSheet``.
+* A fold with no bend in it: two faces meeting along an edge at an angle,
+  two flats at a sharp corner or a wall leaving its bend before the tangent.
+  Unfolding develops bends, and hinging such a fold would cut the pattern
+  short by the allowance a real bend consumes and record no bend for it. The
+  error names the edge and the angle; give the fold a bend radius. A sheet
+  from ``BuildSheet`` never has one, since every bend gets a radius, but a
+  bracket modelled as two boxes and taken apart with ``sheet_shells`` does.
+* A sheet closed into a loop, which has nowhere to start: a tube, or walls
+  that touch at a corner and were sewn together. It needs a cut first.
+* A surface other than a plane or a cylinder, or a sheet with no planar face
+  at all.
 
 *******
 Related

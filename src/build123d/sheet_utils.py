@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from math import degrees, radians
+from math import acos, degrees, radians
 from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 import OCP.GeomAbs as ga
@@ -168,6 +168,12 @@ class UnfoldOutput(NamedTuple):
 # on one another, which neither a surface nor a solid can represent. See the
 # hem documentation for what this looks like on the finished part.
 MIN_BEND_RADIUS = 1e-3
+
+# How far from parallel the normals of two faces may be at their shared edge
+# before the fold between them counts as a kink rather than a tangent join:
+# the length of the normals' cross product, the sine of the angle between
+# them, so about 0.006 degrees.
+TANGENT_TOLERANCE = 1e-4
 
 
 @dataclass(frozen=True)
@@ -698,6 +704,39 @@ def _unfolded_face(
     )
 
 
+def _require_tangent(edge: TopoDS_Edge, first: TopoDS_Face, second: TopoDS_Face):
+    """Refuse a fold with no bend in it.
+
+    Unfolding develops bends; two faces meeting along an edge at an angle,
+    with no cylindrical bend between them, would be hinged there and the
+    pattern would come out short by the allowance a real bend consumes, with
+    no bend recorded for the fold. The faces' normals at the edge must be
+    parallel, in either orientation: a flat meeting a flat is a sharp fold,
+    a flat leaving a bend before its tangent is the same fold hidden in a
+    bend that stops short.
+
+    Raises:
+        ValueError: the faces meet at an angle along the edge
+    """
+    from build123d.topology.two_d import Face  # pylint: disable=import-outside-toplevel
+
+    middle = Edge(edge).position_at(0.5)
+    kinds = [Face(face).geom_type for face in (first, second)]
+    normals = [Face(face).normal_at(middle) for face in (first, second)]
+    if normals[0].cross(normals[1]).length < TANGENT_TOLERANCE:
+        return
+    angle = degrees(acos(min(1.0, abs(normals[0].dot(normals[1])))))
+    at = tuple(round(coordinate, 3) for coordinate in middle)
+    if all(kind == GeomType.PLANE for kind in kinds):
+        what = f"joins two flats at {angle:.4g}\u00b0 with no bend between them"
+    else:
+        what = f"joins a flat to a bend {angle:.4g}\u00b0 off its tangent"
+    raise ValueError(
+        f"unfold develops bends, and the edge at {at} {what}: give the fold "
+        "a bend radius"
+    )
+
+
 def _unfold_shell(
     shell: TopoDS_Shell,
     sheet_parameters: SheetMetalParameters | None,
@@ -748,6 +787,7 @@ def _unfold_shell(
         if len(connected_faces) > 2:
             raise ValueError("unfold doesn't support non-manifold edges")
         if len(connected_faces) == 2:
+            _require_tangent(edge, connected_faces[0], connected_faces[1])
             first_key, second_key = (hash(face) for face in connected_faces)
             adjacency[first_key].append((second_key, edge))
             adjacency[second_key].append((first_key, edge))
