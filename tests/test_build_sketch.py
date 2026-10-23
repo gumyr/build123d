@@ -26,6 +26,8 @@ license:
 
 """
 
+import os
+import tempfile
 import unittest
 from math import atan2, degrees, gamma, pi, sqrt
 
@@ -179,6 +181,29 @@ class TestBuildOnPlanes(unittest.TestCase):
         with BuildSketch() as coplanar:
             insert([Face.make_rect(1, 1, Plane.XZ)])
         self.assertTrue(coplanar.sketch.faces()[0].is_coplanar(Plane.XY))
+
+    def test_step_profiles_keep_relative_placement(self):
+        """Issue #1543: profiles drawn on Plane.XZ, saved to STEP and read back
+        keep their placement relative to each other when inserted into sketches."""
+        profiles = [
+            Plane.XZ * Rectangle(4, 2),
+            Plane.XZ * Pos(30, 10) * Rectangle(4, 2),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            imported = []
+            for i, profile in enumerate(profiles):
+                step_file = os.path.join(tmp_dir, f"profile_{i}.step")
+                export_step(profile, step_file)
+                imported.append(import_step(step_file))
+
+        centers = []
+        for profile in imported:
+            with BuildSketch() as sketch:
+                insert(profile.face())
+            centers.append(sketch.sketch.face().center())
+
+        self.assertAlmostEqual(centers[1] - centers[0], (30, 10, 0), 5)
 
     def test_changing_geometry(self):
         with BuildSketch() as s:
