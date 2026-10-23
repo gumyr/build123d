@@ -1255,15 +1255,17 @@ class Shape(NodeMixin, Generic[TOPODS]):
             reference.wrapped.TShape(self.wrapped.TShape())
         return reference
 
-    def __deepcopy__(self, memo) -> Self:
-        """Return deepcopy of self"""
+    def _copy_with_builder(
+        self, memo: dict[int, Any]
+    ) -> tuple[Self, BRepBuilderAPI_Copy]:
         # The wrapped object is a OCCT TopoDS_Shape which can't be pickled or copied
         # with the standard python copy/deepcopy, so create a deepcopy 'memo' with this
         # value already copied which causes deepcopy to skip it.
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
-        memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
+        builder = BRepBuilderAPI_Copy(self.wrapped)
+        memo[id(self.wrapped)] = downcast(builder.Shape())
         for key, value in self.__dict__.items():
             if key in ("topo_path", "_history"):
                 # provenance points at shapes outside the copy, so it is
@@ -1274,6 +1276,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
             if key == "joints":
                 for joint in result.joints.values():
                     joint.parent = result
+        return result, builder
+
+    def __deepcopy__(self, memo) -> Self:
+        """Return deepcopy of self"""
+        result, _ = self._copy_with_builder(memo)
         return result
 
     def __getstate__(self) -> dict[str, Any]:
@@ -1910,17 +1917,39 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Returns:
             Shape: copy of Shape at location
         """
-        shape_copy = copy.deepcopy(self, None)
+        shape_copy, copy_builder = self._copy_with_builder({})
         if self.is_empty:  # nothing is nothing wherever it is put
             return shape_copy
+        copy_input = self.wrapped
+        relocation: ShapeHistory | None = None
         if isinstance(self.wrapped, TopoDS_Vertex):
             # Copying a Vertex folds its location into its point, so the copy
             # is rebuilt from the vertex without its location
-            unplaced = self.wrapped.Located(TopLoc_Location())
-            shape_copy.wrapped = tcast(
-                TOPODS, downcast(BRepBuilderAPI_Copy(unplaced).Shape())
+            copy_input = self.wrapped.Located(TopLoc_Location())
+            if self._history is not None:
+                relocation = ShapeHistory.from_relocation(self.wrapped, copy_input)
+            copy_builder = BRepBuilderAPI_Copy(copy_input)
+            shape_copy.wrapped = tcast(TOPODS, downcast(copy_builder.Shape()))
+        copy_result = shape_copy.wrapped
+        preplacement = (
+            copy_result.Located(copy_result.Location())
+            if self._history is not None
+            else None
+        )
+        if self._history is not None:
+            history = ShapeHistory(
+                before=self._history.before,
+                brought=self._history.brought,
             )
-        shape_copy.wrapped.Location(loc.wrapped)
+            history.merge(self._history)
+            history.merge(relocation)
+            history.merge(
+                ShapeHistory.from_algorithm(copy_builder, [copy_input], preplacement)
+            )
+        copy_result.Location(loc.wrapped)
+        if self._history is not None:
+            history.merge(ShapeHistory.from_relocation(preplacement, copy_result))
+            shape_copy._history = history
         return shape_copy
 
     def mesh(self, tolerance: float, angular_tolerance: float = 0.1):
@@ -1995,6 +2024,16 @@ class Shape(NodeMixin, Generic[TOPODS]):
             shape_copy.wrapped = tcast(
                 TOPODS, downcast(self.wrapped.Moved(loc.wrapped))
             )
+            if self._history is not None:
+                history = ShapeHistory(
+                    before=self._history.before,
+                    brought=self._history.brought,
+                )
+                history.merge(self._history)
+                history.merge(
+                    ShapeHistory.from_relocation(self.wrapped, shape_copy.wrapped)
+                )
+                shape_copy._history = history
         return shape_copy
 
     def oriented_bounding_box(self) -> OrientedBoundBox:
@@ -2872,12 +2911,25 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self.is_empty:
             return self
         shape_copy: Shape = copy.deepcopy(self, None)
-        transformed_shape = BRepBuilderAPI_Transform(
+        transform_builder = BRepBuilderAPI_Transform(
             self.wrapped,
             transformation,
             True,
-        ).Shape()
+        )
+        transformed_shape = transform_builder.Shape()
         shape_copy.wrapped = tcast(TOPODS, downcast(transformed_shape))
+        if self._history is not None:
+            history = ShapeHistory(
+                before=self._history.before,
+                brought=self._history.brought,
+            )
+            history.merge(self._history)
+            history.merge(
+                ShapeHistory.from_algorithm(
+                    transform_builder, [self.wrapped], transformed_shape
+                )
+            )
+            shape_copy._history = history
         return shape_copy
 
     def _bool_op(

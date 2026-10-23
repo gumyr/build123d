@@ -28,19 +28,22 @@ license:
 """
 
 import unittest
+from collections import Counter
 
-from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
+from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing, BRepBuilderAPI_Transform
 from OCP.BRepPrimAPI import BRepPrimAPI_MakePrism
 from OCP.collections import List_TopoDS_Shape
-from OCP.gp import gp_Vec
+from OCP.gp import gp_Ax2, gp_Pnt, gp_Trsf, gp_Vec
 
 from build123d.build_enums import Align, GeomType, Select
-from build123d.geometry import Axis, Plane, Pos
+from build123d.build_common import Locations
+from build123d.build_part import BuildPart
+from build123d.geometry import Axis, Plane, Pos, Rot
 from build123d.objects_curve import Line
 from build123d.objects_part import Box, Cylinder, Sphere
 from build123d.objects_sketch import Rectangle
-from build123d.operations_generic import fillet
-from build123d.topology import Curve, Edge, Face, ShapeHistory, Solid
+from build123d.operations_generic import fillet, insert
+from build123d.topology import Curve, Edge, Face, Shape, ShapeHistory, Solid, Vertex
 from build123d.topology.history import tracked_subshapes
 from build123d.topology.kernel import list_shapes
 
@@ -163,6 +166,251 @@ class TestShapeHistory(unittest.TestCase):
                 self.box.wrapped, self.box.wrapped
             ).wrapped.HasModified()
         )
+
+    def test_relocation_history_preserves_relative_locations(self):
+        motions = (Pos(13, -7, 5), Rot(17, 31, -23))
+        initial = Pos(3, -5, 7) * Rot(11, 23, 37)
+        motions += (Pos(-4, 8, 2) * Rot(-29, 7, 41),)
+        starting_shapes = (self.box, self.box, self.box.moved(initial))
+
+        for before, motion in zip(starting_shapes, motions):
+            after = before.moved(motion)
+            history = ShapeHistory.from_relocation(before.wrapped, after.wrapped)
+            for subshape in tracked_subshapes([before.wrapped]):
+                mapped = history.modified(subshape)
+                self.assertEqual(len(mapped), 1)
+                self.assertTrue(mapped[0].IsSame(subshape.Moved(motion.wrapped)))
+
+        moved_occurrences = self.box.moved(Pos(20, 0, 0)) + self.box.moved(
+            Pos(-20, 0, 0)
+        )
+        self.assertIsInstance(moved_occurrences._history, ShapeHistory)
+        motion = Pos(1, 2, 3) * Rot(19, 13, -7)
+        relocated = moved_occurrences.moved(motion)
+        history = ShapeHistory.from_relocation(
+            moved_occurrences.wrapped, relocated.wrapped
+        )
+        for subshape in tracked_subshapes([moved_occurrences.wrapped]):
+            mapped = history.modified(subshape)
+            self.assertEqual(len(mapped), 1)
+            self.assertTrue(mapped[0].IsSame(subshape.Moved(motion.wrapped)))
+
+    @staticmethod
+    def _selection_signature(shape):
+        center = tuple(round(value, 5) for value in shape.center())
+        if isinstance(shape, Face):
+            return (
+                "Face",
+                shape.geom_type.name,
+                round(shape.area, 5),
+                center,
+                len(shape.edges()),
+            )
+        if isinstance(shape, Edge):
+            return (
+                "Edge",
+                shape.geom_type.name,
+                round(shape.length, 5),
+                center,
+                len(shape.vertices()),
+            )
+        if isinstance(shape, Solid):
+            return (
+                "Solid",
+                round(shape.volume, 5),
+                center,
+                len(shape.faces()),
+                len(shape.edges()),
+            )
+        return ("Vertex", center)
+
+    def _assert_placed_selection_matches(self, original, placed, inverse):
+        for name in ("faces", "edges", "vertices", "solids"):
+            for selection in (Select.LAST, Select.NEW):
+                expected = Counter(
+                    self._selection_signature(shape)
+                    for shape in getattr(original, name)(selection)
+                )
+                actual_shapes = getattr(placed, name)(selection)
+                actual = Counter()
+                for shape in actual_shapes:
+                    restored = BRepBuilderAPI_Transform(
+                        shape.wrapped, inverse, True
+                    ).Shape()
+                    actual[self._selection_signature(Shape.cast(restored))] += 1
+                self.assertEqual(actual, expected, (name, selection))
+
+    def test_recorded_placements_preserve_last_and_new_geometry(self):
+        def snapshot(shape):
+            return shape.Located(shape.Location())
+
+        recorded = Box(10, 10, 10) - Cylinder(2, 20)
+        original_history = recorded._history
+        self.assertIsNotNone(original_history)
+        original_inputs = (
+            tuple(snapshot(shape) for shape in original_history.before),
+            tuple(snapshot(shape) for shape in original_history.brought),
+        )
+        input_subshapes = tracked_subshapes(
+            [*original_history.before, *original_history.brought]
+        )
+        raw_mappings = tuple(
+            (
+                snapshot(subshape),
+                tuple(snapshot(shape) for shape in original_history.modified(subshape)),
+                tuple(
+                    snapshot(shape) for shape in original_history.generated(subshape)
+                ),
+                original_history.is_removed(subshape),
+            )
+            for subshape in input_subshapes
+        )
+        original_answers = {
+            (name, selection): Counter(
+                self._selection_signature(shape)
+                for shape in getattr(recorded, name)(selection)
+            )
+            for name in ("faces", "edges", "vertices", "solids")
+            for selection in (Select.LAST, Select.NEW)
+        }
+        location = Pos(12, -8, 5) * Rot(13, 0, 29)
+        inverse_location = location.wrapped.Transformation().Inverted()
+        operations = (
+            ("positioning operator", location * recorded, inverse_location),
+            ("moved", recorded.moved(location), inverse_location),
+            ("located", recorded.located(location), inverse_location),
+        )
+
+        initial_location = Pos(4, -3, 8) * Rot(17, 29, -11)
+        starting = recorded.located(initial_location)
+        absolute_location = Pos(-9, 6, 13) * Rot(-23, 7, 41)
+        absolute_inverse = absolute_location.wrapped.Transformation().Inverted()
+        operations += (
+            (
+                "absolute location from placed source",
+                starting.located(absolute_location),
+                absolute_inverse,
+            ),
+        )
+
+        first_location = Pos(9, 2, -6) * Rot(5, 37, 19)
+        second_location = Pos(-7, 12, 3) * Rot(-31, 13, 2)
+        repeated = recorded.located(first_location).located(second_location)
+        second_inverse = second_location.wrapped.Transformation().Inverted()
+        operations += (
+            (
+                "repeated absolute location",
+                repeated,
+                second_inverse,
+            ),
+        )
+
+        inverse_rotation = Rot(0, 0, -31).wrapped.Transformation()
+        operations += (
+            (
+                "rotated copy",
+                recorded.rotate(Axis.Z, 31, transform=True),
+                inverse_rotation,
+            ),
+        )
+
+        mirror_transform = gp_Trsf()
+        mirror_transform.SetMirror(
+            gp_Ax2(Plane.YZ.origin.to_pnt(), Plane.YZ.z_dir.to_dir())
+        )
+        operations += (("mirror copy", recorded.mirror(Plane.YZ), mirror_transform),)
+
+        scale_inverse = gp_Trsf()
+        scale_inverse.SetScale(gp_Pnt(0, 0, 0), 0.5)
+        operations += (("scale copy", recorded.scale(2), scale_inverse),)
+
+        for name, placed, inverse in operations:
+            with self.subTest(placement=name):
+                self._assert_placed_selection_matches(recorded, placed, inverse)
+
+        with BuildPart() as plain_builder:
+            insert(recorded)
+        with BuildPart() as placed_builder:
+            with Locations(location):
+                insert(recorded)
+        self._assert_placed_selection_matches(
+            plain_builder.part, placed_builder.part, inverse_location
+        )
+
+        self.assertIs(recorded._history, original_history)
+        for current, original in zip(
+            (original_history.before, original_history.brought), original_inputs
+        ):
+            self.assertEqual(len(current), len(original))
+            self.assertTrue(
+                all(
+                    actual.IsEqual(expected)
+                    for actual, expected in zip(current, original)
+                )
+            )
+        for original, modified, generated, removed in raw_mappings:
+            current_modified = original_history.modified(original)
+            current_generated = original_history.generated(original)
+            self.assertEqual(len(current_modified), len(modified))
+            self.assertEqual(len(current_generated), len(generated))
+            self.assertTrue(
+                all(
+                    actual.IsEqual(expected)
+                    for actual, expected in zip(current_modified, modified)
+                )
+            )
+            self.assertTrue(
+                all(
+                    actual.IsEqual(expected)
+                    for actual, expected in zip(current_generated, generated)
+                )
+            )
+            self.assertEqual(original_history.is_removed(original), removed)
+        warm_answers = {
+            (name, selection): Counter(
+                self._selection_signature(shape)
+                for shape in getattr(recorded, name)(selection)
+            )
+            for name in ("faces", "edges", "vertices", "solids")
+            for selection in (Select.LAST, Select.NEW)
+        }
+        self.assertEqual(warm_answers, original_answers)
+        original_history._traces = None
+        cold_answers = {
+            (name, selection): Counter(
+                self._selection_signature(shape)
+                for shape in getattr(recorded, name)(selection)
+            )
+            for name in ("faces", "edges", "vertices", "solids")
+            for selection in (Select.LAST, Select.NEW)
+        }
+        self.assertEqual(cold_answers, original_answers)
+
+    def test_unrecorded_and_empty_placements_keep_no_history(self):
+        unrecorded = Box(2, 3, 4)
+        unrecorded_vertex = Vertex(1, 2, 3)
+        empty = Solid()
+        location = Pos(1, 2, 3)
+        for shape in (unrecorded, unrecorded_vertex, empty):
+            for placed in (shape.moved(location), shape.located(location)):
+                self.assertIsNone(placed._history)
+
+    def test_located_preserves_copied_native_alias(self):
+        shape = Box(2, 3, 4)
+        original_wrapped = shape.wrapped
+        original_location = shape.wrapped.Location()
+        original_center = tuple(shape.center())
+        shape.native_alias = shape.wrapped
+        location = Pos(11, -7, 5)
+
+        placed = shape.located(location)
+
+        self.assertIs(placed.native_alias, placed.wrapped)
+        self.assertTrue(placed.native_alias.IsSame(placed.wrapped))
+        self.assertTrue(placed.native_alias.Location().IsEqual(location.wrapped))
+        self.assertIs(shape.native_alias, original_wrapped)
+        self.assertTrue(shape.wrapped.Location().IsEqual(original_location))
+        self.assertEqual(tuple(shape.center()), original_center)
 
     def test_merge_returns_self_and_tolerates_none(self):
         history = ShapeHistory()
