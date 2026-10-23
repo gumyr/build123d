@@ -1263,7 +1263,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
-        memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
+        if isinstance(self.wrapped, TopoDS_Vertex):
+            # BRepBuilderAPI_Copy folds a Vertex's location into its point, so
+            # copy it without the location and put the location back on the copy
+            unplaced = self.wrapped.Located(TopLoc_Location())
+            copied = BRepBuilderAPI_Copy(unplaced).Shape()
+            memo[id(self.wrapped)] = downcast(copied.Located(self.wrapped.Location()))
+        else:
+            memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
         for key, value in self.__dict__.items():
             if key in ("topo_path", "_history"):
                 # provenance points at shapes outside the copy, so it is
@@ -1913,13 +1920,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
         shape_copy = copy.deepcopy(self, None)
         if self.is_empty:  # nothing is nothing wherever it is put
             return shape_copy
-        if isinstance(self.wrapped, TopoDS_Vertex):
-            # Copying a Vertex folds its location into its point, so the copy
-            # is rebuilt from the vertex without its location
-            unplaced = self.wrapped.Located(TopLoc_Location())
-            shape_copy.wrapped = tcast(
-                TOPODS, downcast(BRepBuilderAPI_Copy(unplaced).Shape())
-            )
         shape_copy.wrapped.Location(loc.wrapped)
         return shape_copy
 
