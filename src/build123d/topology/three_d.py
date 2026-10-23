@@ -93,7 +93,7 @@ from OCP.GProp import GProp_GProps
 from OCP.ShapeFix import ShapeFix_Solid
 from OCP.Standard import Standard_Failure, Standard_TypeMismatch
 from OCP.StdFail import StdFail_NotDone
-from OCP.TopExp import TopExp, TopExp_Explorer
+from OCP.TopExp import TopExp
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Compound,
@@ -109,6 +109,8 @@ from OCP.collections import (
     IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
     List_TopoDS_Shape,
 )
+
+from typing_extensions import deprecated
 
 from build123d.build_enums import (
     CenterOf,
@@ -132,13 +134,12 @@ from build123d.geometry import (
     VectorLike,
 )
 
-from .one_d import Edge, Mixin1D, Wire
+from .one_d import Edge, Mixin1D, DrawingViewOutput, Wire
 from .shape_core import (
     TOPODS,
     Joint,
     Shape,
     ShapeList,
-    _sew_topods_faces,
     downcast,
     get_top_level_topods_shapes,
     shapetype,
@@ -146,8 +147,13 @@ from .shape_core import (
     _make_topods_compound_from_shapes,
 )
 from .history import ShapeHistory
-from .kernel import list_shapes
-from .two_d import Face, Mixin2D, Shell, sort_wires_by_build_order
+from .two_d import (
+    Face,
+    Mixin2D,
+    Shell,
+    _project_profile_by_extrusion,
+    sort_wires_by_build_order,
+)
 from .utils import (
     _extrude_topods_shape,
     _make_loft,
@@ -724,32 +730,46 @@ class Mixin3D(Shape[TOPODS]):
 
         return offset_solid
 
+    def drawing_view(
+        self,
+        viewpoint: VectorLike,
+        up: VectorLike = (0, 0, 1),
+        look_at: VectorLike | None = None,
+        focus: float | None = None,
+    ) -> DrawingViewOutput:
+        """drawing_view
+
+        The line drawing of this shape as seen from a viewpoint: its edges,
+        split into visible and hidden by hidden-line removal.
+
+        Args:
+            viewpoint (VectorLike): where the view is taken from
+            up (VectorLike, optional): direction of the view's y axis.
+                Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point the view is centred on.
+                Defaults to None (center of shape).
+            focus (float, optional): the focal length for a perspective view.
+                Defaults to None (orthographic view).
+
+        Returns:
+            DrawingViewOutput: visible and hidden edges
+        """
+        return Mixin1D.drawing_view(self, viewpoint, up, look_at, focus)
+
+    @deprecated("project_to_viewport is deprecated; use drawing_view instead.")
     def project_to_viewport(
         self,
         viewport_origin: VectorLike,
         viewport_up: VectorLike = (0, 0, 1),
         look_at: VectorLike | None = None,
         focus: float | None = None,
-    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
+    ) -> DrawingViewOutput:
         """project_to_viewport
 
-        Project a shape onto a viewport returning visible and hidden Edges.
-
-        Args:
-            viewport_origin (VectorLike): location of viewport
-            viewport_up (VectorLike, optional): direction of the viewport y axis.
-                Defaults to (0, 0, 1).
-            look_at (VectorLike, optional): point to look at.
-                Defaults to None (center of shape).
-            focus (float, optional): the focal length for perspective projection
-                Defaults to None (orthographic projection)
-
-        Returns:
-            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+        .. deprecated::
+            Use :meth:`drawing_view` instead.
         """
-        return Mixin1D.project_to_viewport(
-            self, viewport_origin, viewport_up, look_at, focus
-        )
+        return self.drawing_view(viewport_origin, viewport_up, look_at, focus)
 
 
 def _fillet_failure_details(
@@ -1407,53 +1427,18 @@ class Solid(Mixin3D[TopoDS_Solid]):
             direction *= -1
             until = Until.NEXT if until == Until.PREVIOUS else Until.LAST
 
-        # 1: Create extrusion of length the maximum distance between profile and target
+        # 1: The surfaces of the target that the extruded profile passes
+        #    through, nearest first
+        surfaces = _project_profile_by_extrusion(profile, target, direction)
+        if not surfaces:
+            raise ValueError("No intersection: extrusion does not contact target")
+        limit = surfaces[0 if until == Until.NEXT else -1]
+
+        # 2: Extrude the profile far enough to pass right through the target
         max_dimension = find_max_dimension([profile, target])
         extrusion = Solid.extrude(profile, direction * max_dimension)
 
-        # 2: Intersect the extrusion with the target to find the target's modified faces
-        intersect_op = BRepAlgoAPI_Common(target.wrapped, extrusion.wrapped)
-        intersect_op.Build()
-        intersection = intersect_op.Shape()
-        face_exp = TopExp_Explorer(intersection, ta.TopAbs_FACE)
-        if not face_exp.More():
-            raise ValueError("No intersection: extrusion does not contact target")
-
-        # Find the faces from the intersection that originated on the target
-        history = intersect_op.History()
-        modified_target_faces = []
-        face_explorer = TopExp_Explorer(target.wrapped, ta.TopAbs_FACE)
-        while face_explorer.More():
-            target_face = TopoDS.Face(face_explorer.Current())
-            for modified in list_shapes(history.Modified(target_face)):
-                modified_target_faces.append(TopoDS.Face(modified))
-            face_explorer.Next()
-
-        # 3: Sew the resulting faces into shells - one for each surface the extrusion
-        #    passes through and sort by distance from the profile
-        sewed_shape = _sew_topods_faces(modified_target_faces)
-
-        # From the sewed shape extract the shells and single faces
-        top_level_shapes = get_top_level_topods_shapes(sewed_shape)
-        modified_target_surfaces: ShapeList[Face | Shell] = ShapeList()
-
-        # For each of the top level Shells and Faces
-        for top_level_shape in top_level_shapes:
-            if isinstance(top_level_shape, TopoDS_Face):
-                modified_target_surfaces.append(Face(top_level_shape))
-            elif isinstance(top_level_shape, TopoDS_Shell):
-                modified_target_surfaces.append(Shell(top_level_shape))
-            else:
-                raise RuntimeError(f"Invalid sewn shape {type(top_level_shape)}")
-
-        modified_target_surfaces = modified_target_surfaces.sort_by(
-            lambda s: s.distance_to(profile)
-        )
-        limit = modified_target_surfaces[
-            0 if until in [Until.NEXT, Until.PREVIOUS] else -1
-        ]
-
-        # 4: Split the extrusion by that surface
+        # 3: Split the extrusion by that surface
         pieces = extrusion.split(limit, keep=Keep.ALL)
         if len(pieces) < 2:
             raise ValueError(
@@ -1461,7 +1446,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 "lies in it, or only touches it"
             )
 
-        # 5: The profile is the extrusion's own base face and survives the
+        # 4: The profile is the extrusion's own base face and survives the
         #    split, so the piece to return is the one that holds it
         for piece in pieces:
             if any(face.wrapped.IsSame(profile.wrapped) for face in piece.faces()):

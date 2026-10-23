@@ -40,7 +40,7 @@ def write_svg():
 
     builder: BuildPart = BuildPart._get_context()
 
-    visible, hidden = builder.part.project_to_viewport((-100, -100, 70))
+    visible, hidden = builder.part.drawing_view((-100, -100, 70))
     max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
     exporter = ExportSVG(scale=100 / max_dimension)
     exporter.add_layer("Visible")

@@ -563,6 +563,21 @@ class TestExtrude(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "does not cut the extrusion"):
                 extrude(cross.sketch, until=Until.NEXT, mode=Mode.PRIVATE)
 
+    def test_extrude_until_a_stepped_surface(self):
+        """A target face lying wholly inside the column, the boss top here, is
+        left untouched by the boolean and is part of the surface reached"""
+        with BuildPart() as part:
+            Box(20, 20, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            with BuildSketch(Plane.XY.offset(10)):
+                Circle(3)
+            extrude(amount=5)
+            with BuildSketch(Plane.XY.offset(20)):
+                Rectangle(10, 10)
+            column = extrude(until=Until.NEXT, dir=(0, 0, -1), mode=Mode.PRIVATE)
+        self.assertTrue(column.is_valid)
+        self.assertAlmostEqual(column.volume, 10 * 10 * 10 - pi * 3**2 * 5, 3)
+        self.assertAlmostEqual(column.bounding_box().min.Z, 10, 5)
+
     def test_extrude_until_errors(self):
         with self.assertRaises(ValueError):
             extrude(
@@ -580,7 +595,7 @@ class TestExtrude(unittest.TestCase):
         bad_shape = Box(1, 1, 1).wrapped  # not a Face or Shell → forces RuntimeError
 
         with patch(
-            "build123d.topology.three_d.get_top_level_topods_shapes",
+            "build123d.topology.two_d.get_top_level_topods_shapes",
             return_value=[bad_shape],
         ):
             with self.assertRaises(RuntimeError):
@@ -799,6 +814,166 @@ class TestLoft(unittest.TestCase):
         mock_solid_class.assert_called_once()
         self.assertEqual(mock_is_valid.call_count, 2)
         mock_clean.assert_called_once()
+
+
+class TestProjectToShape(unittest.TestCase):
+    def test_pending_faces_onto_the_part(self):
+        with BuildPart() as part:
+            Box(20, 20, 5)
+            with BuildSketch(Plane.XY.offset(10)):
+                Circle(3)
+            projection = project_to_shape()
+            self.assertEqual(len(part.pending_faces), 2)
+            extrude(amount=1)
+        self.assertIsInstance(projection, Sketch)
+        self.assertEqual(
+            sorted(round(f.center().Z, 6) for f in projection.faces()), [-2.5, 2.5]
+        )
+        self.assertAlmostEqual(part.part.volume, 20 * 20 * 5 + 2 * pi * 9 * 1, 3)
+
+    def test_a_sketch_beside_the_part_projects_toward_it(self):
+        with BuildPart() as part:
+            Box(20, 20, 5)
+            with BuildSketch(Plane.XY.offset(-10)):
+                Rectangle(2, 2)
+            projection = project_to_shape()
+        self.assertEqual(len(projection.faces()), 2)
+
+    def test_pending_edges_onto_the_part(self):
+        with BuildPart() as part:
+            Cylinder(5, 10)
+            with BuildLine(Plane.XZ.offset(-10)):
+                Line((-3, -3), (3, 3))
+            projection = project_to_shape(direction=Plane.XZ.z_dir)
+            self.assertEqual(len(part.pending_edges), 2)
+        self.assertIsInstance(projection, Curve)
+        self.assertEqual(len(projection.edges()), 2)
+        self.assertTrue(all(e.geom_type != GeomType.LINE for e in projection.edges()))
+
+    def test_explicit_objects_target_and_direction(self):
+        plate = Box(10, 10, 2)
+        label = Face.make_rect(2, 2, Plane.XY.offset(5))
+        projection = project_to_shape(label, target=plate, direction=(0, 0, -1))
+        self.assertIsInstance(projection, Sketch)
+        self.assertEqual(len(projection.faces()), 2)
+        # an explicit direction is used as given, even away from the target
+        self.assertEqual(
+            project_to_shape(label, target=plate, direction=(0, 0, 1)).faces(), []
+        )
+        # a planar face supplies the direction when none is given
+        self.assertEqual(len(project_to_shape(label, target=plate).faces()), 2)
+
+    def test_text_onto_a_cylinder(self):
+        """#951: a label cast onto a curved surface"""
+        with BuildPart() as part:
+            Cylinder(10, 20)
+            with BuildSketch(Plane.XZ.offset(-15)):
+                Text("B", 8)
+            projection = project_to_shape()
+            self.assertEqual(len(part.pending_faces), 2)
+        flat_area = Compound.make_text("B", 8).area
+        for face in projection.faces():
+            self.assertGreater(face.area, flat_area)
+            self.assertEqual(face.geom_type, GeomType.CYLINDER)
+
+    def test_hit_modes_on_a_stepped_target(self):
+        """A plate with a block on it: the label lands on the block top, the
+        plate beside it, the block's underside and the plate's bottom"""
+        stepped = Box(20, 20, 2) + Pos(0, 0, 4) * Box(4, 20, 6)
+        label = Face.make_rect(10, 10, Plane.XY.offset(20))
+        areas = {
+            hit: sorted(
+                round(f.area, 6)
+                for f in project_to_shape(
+                    label, target=stepped, direction=(0, 0, -1), hit=hit
+                ).faces()
+            )
+            for hit in Hit
+        }
+        self.assertEqual(areas[Hit.ALL], [30, 30, 40, 60, 60, 100])
+        self.assertEqual(areas[Hit.NEAREST], [30, 30, 40, 60, 60])  # the stepped front
+        self.assertEqual(areas[Hit.FARTHEST], [100])
+        self.assertEqual(areas[Hit.VISIBLE], [30, 30, 40])
+
+    def test_visible_hides_what_an_overhang_covers(self):
+        shelved = Box(20, 20, 2) + Pos(0, 0, 8) * Box(20, 6, 2)
+        label = Face.make_rect(10, 10, Plane.XY.offset(20))
+        visible = project_to_shape(
+            label, target=shelved, direction=(0, 0, -1), hit=Hit.VISIBLE
+        )
+        self.assertEqual(
+            sorted(round(f.area, 6) for f in visible.faces()), [20, 20, 60]
+        )
+
+    def test_visible_regions_may_be_disconnected(self):
+        pillars = Compound([Pos(x, 0, 0) * Box(4, 4, 10) for x in (-7, 0, 7)])
+        label = Face.make_rect(20, 6, Plane.XY.offset(20))
+        visible = project_to_shape(
+            label, target=pillars, direction=(0, 0, -1), hit=Hit.VISIBLE
+        )
+        self.assertEqual([round(f.area, 6) for f in visible.faces()], [16, 16, 16])
+
+    def test_visible_onto_a_sphere_is_the_front_only(self):
+        label = Face.make_rect(6, 6, Plane.XY.offset(20))
+        visible = project_to_shape(
+            label, target=Sphere(10), direction=(0, 0, -1), hit=Hit.VISIBLE
+        )
+        self.assertEqual(len(visible.faces()), 1)
+        self.assertGreater(visible.faces()[0].center().Z, 0)
+
+    def test_hit_modes_for_an_edge(self):
+        stepped = Box(20, 20, 2) + Pos(0, 0, 4) * Box(4, 20, 6)
+        line = Edge.make_line((-5, 0, 20), (5, 0, 20))
+        lengths = {
+            hit: sorted(
+                round(e.length, 6)
+                for e in project_to_shape(
+                    line, target=stepped, direction=(0, 0, -1), hit=hit
+                ).edges()
+            )
+            for hit in Hit
+        }
+        self.assertEqual(lengths[Hit.ALL], [3, 3, 4, 6, 6, 10])
+        self.assertEqual(lengths[Hit.NEAREST], [3, 3, 4, 6, 6])
+        self.assertEqual(lengths[Hit.FARTHEST], [10])
+        self.assertEqual(lengths[Hit.VISIBLE], [3, 3, 4])
+        with self.assertRaisesRegex(ValueError, "needs a direction"):
+            Wire([line]).project_to_shape(stepped, center=(0, 0, 30), hit=Hit.VISIBLE)
+
+    def test_visible_pending_faces_in_build_part(self):
+        with BuildPart() as part:
+            Box(20, 20, 2)
+            with Locations((0, 0, 4)):
+                Box(4, 20, 6)
+            with BuildSketch(Plane.XY.offset(20)):
+                Rectangle(10, 10)
+            projection = project_to_shape(hit=Hit.VISIBLE)
+            self.assertEqual(len(part.pending_faces), 3)
+        self.assertEqual(
+            sorted(round(f.area, 6) for f in projection.faces()), [30, 30, 40]
+        )
+
+    def test_errors(self):
+        with self.assertRaisesRegex(ValueError, "No object"):
+            project_to_shape(target=Box(1, 1, 1))
+        with self.assertRaisesRegex(ValueError, "No object"):
+            with BuildPart():
+                Box(1, 1, 1)
+                project_to_shape()
+        with self.assertRaisesRegex(ValueError, "not Vertex"):
+            project_to_shape(Vertex(1, 2, 3), target=Box(1, 1, 1))
+        with self.assertRaisesRegex(ValueError, "group_by"):
+            project_to_shape(Box(1, 1, 1).faces().group_by(Axis.Z), target=Box(1, 1, 1))
+        with self.assertRaisesRegex(ValueError, "target object must be provided"):
+            project_to_shape(Face.make_rect(1, 1))
+        with self.assertRaisesRegex(ValueError, "target object could not be dete"):
+            with BuildPart():
+                project_to_shape(Face.make_rect(1, 1))
+        with self.assertRaisesRegex(ValueError, "direction must be provided"):
+            project_to_shape(Edge.make_line((0, 0, 5), (1, 0, 5)), target=Box(1, 1, 1))
+        with self.assertRaises(RuntimeError):
+            with BuildSketch():
+                project_to_shape(Face.make_rect(1, 1), target=Box(1, 1, 1))
 
 
 class TestProjectWorkplane(unittest.TestCase):

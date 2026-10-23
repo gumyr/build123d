@@ -189,8 +189,11 @@ Bicycle Tire
 
 This example demonstrates how to model a realistic bicycle tire with a
 patterned tread using build123d. The key concept showcased here is the
-use of wrap_faces to project 2D planar geometry onto a curved 3D
-surface.
+use of :meth:`~topology.Face.wrap_faces` to lay 2D planar geometry onto a
+curved 3D surface. Wrapping writes the flat tread blocks into the tire
+surface's own parameter space, so it is exact and respects the surface's
+seam; it works on one face at a time. Compare the Bracelet below, where a
+label runs over several faces of a solid and is projected instead.
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
 
@@ -223,7 +226,9 @@ Key techniques demonstrated:
 - using location_at/position_at/tangent (%) to extract local frames & tangents
 - projecting curves onto a non-planar surface to create “true” 3D guide curves
 - Gordon surfaces to build high-quality doubly-curved skins
-- projecting faces (text) onto a complex solid and thickening them
+- projecting faces (text) onto a complex solid with
+  :meth:`~topology.Shape.project_faces` and thickening them; the label spans
+  more than one face of the solid, which a wrap of a single face cannot do
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
 
