@@ -1179,6 +1179,15 @@ class Mixin1D(Shape[TOPODS]):
                 param = self.param_at(distance / self.length)
             curve = self.geom_adaptor()
 
+        return self._location_from_param(curve, param, frame_method, x_dir)
+
+    def _location_from_param(
+        self,
+        curve: BRepAdaptor_Curve | BRepAdaptor_CompCurve,
+        param: float,
+        frame_method: FrameMethod,
+        x_dir: VectorLike | None,
+    ) -> Location:
         law: GeomFill_TrihedronLaw
         if frame_method == FrameMethod.FRENET:
             law = GeomFill_Frenet()
@@ -1241,9 +1250,101 @@ class Mixin1D(Shape[TOPODS]):
             list[Location]: A list of Location objects representing local coordinate
                 systems at the specified distances.
         """
+        if self.__class__ is Wire and isinstance(distances, np.ndarray):
+            can_batch = distances.__class__ is np.ndarray
+            can_batch = can_batch and distances.ndim == 1
+            can_batch = can_batch and distances.dtype == np.dtype(np.float64)
+            can_batch = can_batch and frame_method == FrameMethod.FRENET
+            can_batch = can_batch and x_dir is None
+            can_batch = can_batch and np.geterrcall() is None
+            can_batch = can_batch and np.geterr()["under"] == "ignore"
+            if can_batch:
+                batch = self._wire_numpy_locations(distances, position_mode)
+                if batch is not None:
+                    return batch
+
         return [
             self.location_at(d, position_mode, frame_method, x_dir) for d in distances
         ]
+
+    def _wire_numpy_locations(
+        self, distances: np.ndarray, position_mode: PositionMode
+    ) -> list[Location] | None:
+        if distances.size == 0:
+            return []
+
+        valid_positions = bool(np.isfinite(distances).all())
+        if position_mode == PositionMode.PARAMETER:
+            valid_positions = (
+                valid_positions
+                and not (distances < 0).any()
+                and not (distances > 1).any()
+            )
+        elif position_mode != PositionMode.LENGTH:
+            valid_positions = False
+        if not valid_positions:
+            return None
+
+        _ = self.geom_adaptor()
+        wire_length = self.length
+        if not np.isfinite(wire_length):
+            return None
+        if position_mode == PositionMode.LENGTH and (
+            (distances < 0).any() or (distances > wire_length).any()
+        ):
+            return None
+        self_edges = self.edges()
+        edge_lengths = [edge.length for edge in self_edges]
+        cumulative_lengths = []
+        total = 0.0
+        for edge_length in edge_lengths:
+            total += edge_length
+            cumulative_lengths.append(total)
+        if (
+            not self_edges
+            or any(not np.isfinite(length) or length < 0 for length in edge_lengths)
+            or not np.isfinite(total)
+            or total <= 0
+        ):
+            return None
+
+        locations = []
+        for distance in distances:
+            if not self.is_forward:
+                if position_mode == PositionMode.PARAMETER:
+                    distance = 1 - distance
+                else:
+                    distance = wire_length - distance
+
+            if position_mode == PositionMode.PARAMETER:
+                absolute_distance = distance * wire_length
+            else:
+                absolute_distance = distance
+            if not self.is_forward:
+                absolute_distance = wire_length - absolute_distance
+
+            if absolute_distance <= 0.0:
+                edge_idx = 0
+                local_dist = 0.0
+            elif absolute_distance >= total:
+                edge_idx = len(self_edges) - 1
+                local_dist = edge_lengths[edge_idx]
+            else:
+                edge_idx = bisect_right(cumulative_lengths, absolute_distance)
+                previous = cumulative_lengths[edge_idx - 1] if edge_idx > 0 else 0.0
+                local_dist = absolute_distance - previous
+
+            target_edge = self_edges[edge_idx]
+            target_length = edge_lengths[edge_idx]
+            local_frac = 0.0 if target_length == 0 else local_dist / target_length
+            if not target_edge.is_forward:
+                local_frac = 1 - local_frac
+            param = target_edge.param_at(local_frac)
+            edge_curve = target_edge.geom_adaptor()
+            locations.append(
+                self._location_from_param(edge_curve, param, FrameMethod.FRENET, None)
+            )
+        return locations
 
     def normal(self) -> Vector:
         """Calculate the normal Vector. Only possible for planar curves.

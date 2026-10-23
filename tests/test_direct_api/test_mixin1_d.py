@@ -31,6 +31,8 @@ import math
 import unittest
 from unittest.mock import patch
 
+import numpy as np
+
 from build123d.build_enums import (
     CenterOf,
     FrameMethod,
@@ -45,6 +47,7 @@ from build123d.objects_curve import CenterArc, Line, Polyline
 from build123d.objects_part import Box, Cylinder
 from build123d.operations_part import extrude
 from build123d.operations_generic import fillet
+from OCP.TopoDS import TopoDS
 from build123d.topology import Compound, Edge, Face, Solid, Vertex, Wire
 
 
@@ -308,6 +311,300 @@ class TestMixin1D(unittest.TestCase):
         self.assertAlmostEqual(locs[2].orientation, (90, 0, 0), 5)
         self.assertAlmostEqual(locs[3].position, (0, -1, 0), 5)
         self.assertAlmostEqual(locs[3].orientation, (0, 90, 90), 5)
+
+    def test_wire_locations_numpy_batch_matches_scalar_frames(self):
+        """The batch path returns scalar-equivalent frames with one traversal."""
+        distances = np.array([1.0, 0.5, 0.0, 0.25, 0.5, 0.75])
+        batched_wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (2, 0, 0)),
+                Edge.make_line((2, 0, 0), (2, 3, 0)),
+            ]
+        )
+        scalar_wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (2, 0, 0)),
+                Edge.make_line((2, 0, 0), (2, 3, 0)),
+            ]
+        )
+
+        with patch.object(batched_wire, "edges", wraps=batched_wire.edges) as edge_call:
+            actual = batched_wire.locations(distances)
+
+        expected = [scalar_wire.location_at(distance) for distance in distances]
+        self.assertEqual(edge_call.call_count, 1)
+        self.assertEqual(len(actual), len(expected))
+        for actual_location, expected_location in zip(actual, expected):
+            self.assertAlmostEqual(
+                actual_location.position, expected_location.position, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.x_axis.direction, expected_location.x_axis.direction, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.y_axis.direction, expected_location.y_axis.direction, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.z_axis.direction, expected_location.z_axis.direction, 10
+            )
+
+    def test_wire_locations_numpy_batch_falls_back_for_other_inputs(self):
+        """Unsupported arrays retain scalar behavior, and empty arrays skip geometry."""
+        wire = Wire([Edge.make_line((0, 0, 0), (1, 0, 0))])
+        with patch.object(wire, "edges", wraps=wire.edges) as edge_call:
+            self.assertEqual(wire.locations(np.array([], dtype=np.float64)), [])
+        self.assertEqual(edge_call.call_count, 0)
+
+        for distances in (np.array([0.0, 1.5]), np.array([0.0, 1.0], dtype=np.float32)):
+            with patch.object(
+                wire, "location_at", wraps=wire.location_at
+            ) as scalar_call:
+                wire.locations(distances)
+            self.assertEqual(scalar_call.call_count, distances.size)
+
+        with self.assertRaises(IndexError):
+            wire.locations(np.array([0.0, np.nan]))
+        with self.assertRaises(ValueError):
+            wire.locations(np.array([[0.0, 1.0]]))
+
+        with patch.object(wire, "location_at", wraps=wire.location_at) as scalar_call:
+            wire.locations(np.array([0.0, 1.0]), frame_method=FrameMethod.CORRECTED)
+        self.assertEqual(scalar_call.call_count, 2)
+
+        with patch.object(wire, "location_at", wraps=wire.location_at) as scalar_call:
+            wire.locations(np.array([0.0, 1.0]), x_dir=(0, 1, 0))
+        self.assertEqual(scalar_call.call_count, 2)
+
+        class WireSubclass(Wire):
+            pass
+
+        class ArraySubclass(np.ndarray):
+            pass
+
+        subclass_wire = WireSubclass([Edge.make_line((0, 0, 0), (1, 0, 0))])
+        subclass_array = np.array([0.0, 1.0]).view(ArraySubclass)
+        with patch.object(
+            subclass_wire, "location_at", wraps=subclass_wire.location_at
+        ) as scalar_call:
+            subclass_wire.locations(np.array([0.0, 1.0]))
+        self.assertEqual(scalar_call.call_count, 2)
+
+        with patch.object(wire, "location_at", wraps=wire.location_at) as scalar_call:
+            wire.locations(subclass_array)
+        self.assertEqual(scalar_call.call_count, 2)
+
+        original_errors = np.geterr()
+        original_callback = np.geterrcall()
+        try:
+            np.seterr(under="call")
+            np.seterrcall(lambda *_: None)
+            with patch.object(wire, "edges", wraps=wire.edges) as edge_call:
+                wire.locations(np.array([0.0, 1.0]))
+            self.assertEqual(edge_call.call_count, 2)
+        finally:
+            np.seterr(**original_errors)
+            np.seterrcall(original_callback)
+
+    def test_wire_locations_numpy_batch_preserves_length_and_placement(self):
+        """The batch path matches scalar output in length mode and after placement."""
+
+        def make_wire():
+            return Wire(
+                [
+                    Edge.make_line((0, 0, 0), (2, 0, 0)),
+                    Edge.make_line((2, 0, 0), (2, 3, 0)),
+                ]
+            ).located(Location((4, -2, 7), (10, 20, 30)))
+
+        distances = np.array([3.0, 0.0, 5.0, 2.5, 1.0])
+        actual = make_wire().locations(distances, position_mode=PositionMode.LENGTH)
+        expected = [
+            make_wire().location_at(distance, position_mode=PositionMode.LENGTH)
+            for distance in distances
+        ]
+        for actual_location, expected_location in zip(actual, expected):
+            self.assertAlmostEqual(
+                actual_location.position, expected_location.position, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.x_axis.direction, expected_location.x_axis.direction, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.y_axis.direction, expected_location.y_axis.direction, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.z_axis.direction, expected_location.z_axis.direction, 10
+            )
+
+    def test_wire_locations_numpy_batch_keeps_generator_streaming(self):
+        """A generator observes wire mutation between yielded distances."""
+        wire = Wire([Edge.make_line((0, 0, 0), (1, 0, 0))])
+
+        def distances():
+            yield 0.0
+            wire.move(Location((5, 0, 0)))
+            yield 0.0
+
+        locations = wire.locations(distances())
+        self.assertAlmostEqual(locations[0].position, (0, 0, 0), 10)
+        self.assertAlmostEqual(locations[1].position, (5, 0, 0), 10)
+
+    def test_wire_locations_numpy_batch_handles_reversed_orientations(self):
+        """The batch path matches scalar results for reversed wires and edges."""
+        source = Wire.make_polygon([(0, 0), (2, 0), (2, 3), (0, 3)], close=True)
+        reversed_wire = Wire(TopoDS.Wire(source.wrapped.Reversed()))
+        reversed_edges_wire = Wire(
+            [edge.reversed() for edge in source.edges()], sequenced=True
+        )
+
+        for batched_wire, scalar_wire in (
+            (reversed_wire, Wire(TopoDS.Wire(source.wrapped.Reversed()))),
+            (
+                reversed_edges_wire,
+                Wire([edge.reversed() for edge in source.edges()], sequenced=True),
+            ),
+        ):
+            distances = np.array([1.0, 0.0, 0.4, 0.25, 0.75, 0.4])
+            actual = batched_wire.locations(distances)
+            expected = [scalar_wire.location_at(distance) for distance in distances]
+            for actual_location, expected_location in zip(actual, expected):
+                self.assertAlmostEqual(
+                    actual_location.position, expected_location.position, 10
+                )
+                self.assertAlmostEqual(
+                    actual_location.x_axis.direction,
+                    expected_location.x_axis.direction,
+                    10,
+                )
+                self.assertAlmostEqual(
+                    actual_location.y_axis.direction,
+                    expected_location.y_axis.direction,
+                    10,
+                )
+                self.assertAlmostEqual(
+                    actual_location.z_axis.direction,
+                    expected_location.z_axis.direction,
+                    10,
+                )
+
+        sharp_wire = Wire(
+            [
+                Edge.make_line((0, 0), (2, 0)),
+                Edge.make_line((2, 0), (2, 1)),
+            ],
+            sequenced=True,
+        )
+        sharp_wire = Wire(TopoDS.Wire(sharp_wire.wrapped.Reversed()))
+        boundary = np.float64(1.0 / 3.0)
+        distances = np.array(
+            [
+                np.nextafter(boundary, 0.0),
+                boundary,
+                np.nextafter(boundary, 1.0),
+            ]
+        )
+        actual = sharp_wire.locations(distances)
+        expected = [sharp_wire.location_at(distance) for distance in distances]
+        for actual_location, expected_location in zip(actual, expected):
+            self.assertAlmostEqual(
+                actual_location.position, expected_location.position, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.x_axis.direction, expected_location.x_axis.direction, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.y_axis.direction, expected_location.y_axis.direction, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.z_axis.direction, expected_location.z_axis.direction, 10
+            )
+
+    def test_wire_locations_numpy_batch_closed_curves_and_boundaries(self):
+        """Circle frames match an analytic oracle and edge boundaries match scalar."""
+        radius = 2.0
+        circle = Wire.make_circle(radius)
+        fractions = np.array(
+            [0.0, np.nextafter(0.25, 0.0), 0.25, np.nextafter(0.25, 1.0), 0.5, 1.0]
+        )
+        locations = circle.locations(fractions)
+        for fraction, location in zip(fractions, locations):
+            angle = 2 * math.pi * fraction
+            self.assertAlmostEqual(
+                location.position,
+                (radius * math.cos(angle), radius * math.sin(angle), 0),
+                10,
+            )
+            self.assertAlmostEqual(
+                location.x_axis.direction,
+                (-math.cos(angle), -math.sin(angle), 0),
+                10,
+            )
+            self.assertAlmostEqual(location.y_axis.direction, (0, 0, 1), 10)
+            self.assertAlmostEqual(
+                location.z_axis.direction,
+                (-math.sin(angle), math.cos(angle), 0),
+                10,
+            )
+
+        boundary_wire = Wire(
+            [
+                Edge.make_line((0, 0), (2, 0)),
+                Edge.make_line((2, 0), (2, 3)),
+            ]
+        )
+        boundary = 2 / boundary_wire.length
+        boundary_samples = np.array(
+            [
+                np.nextafter(boundary, 0.0),
+                boundary,
+                np.nextafter(boundary, 1.0),
+            ]
+        )
+        actual = boundary_wire.locations(boundary_samples)
+        expected = [
+            boundary_wire.location_at(distance) for distance in boundary_samples
+        ]
+        for actual_location, expected_location in zip(actual, expected):
+            self.assertAlmostEqual(
+                actual_location.position, expected_location.position, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.x_axis.direction, expected_location.x_axis.direction, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.y_axis.direction, expected_location.y_axis.direction, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.z_axis.direction, expected_location.z_axis.direction, 10
+            )
+
+        mixed_radius = Wire(
+            [
+                Edge.make_circle(2, start_angle=0, end_angle=180),
+                Edge.make_line((-2, 0), (-1, 0)),
+                Edge.make_circle(1, start_angle=180, end_angle=360),
+                Edge.make_line((1, 0), (2, 0)),
+            ],
+            sequenced=True,
+        )
+        mixed_distances = np.array([0.0, 0.1, 0.4, 0.7, 0.9, 1.0])
+        mixed_actual = mixed_radius.locations(mixed_distances)
+        mixed_expected = [
+            mixed_radius.location_at(distance) for distance in mixed_distances
+        ]
+        for actual_location, expected_location in zip(mixed_actual, mixed_expected):
+            self.assertAlmostEqual(
+                actual_location.position, expected_location.position, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.x_axis.direction, expected_location.x_axis.direction, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.y_axis.direction, expected_location.y_axis.direction, 10
+            )
+            self.assertAlmostEqual(
+                actual_location.z_axis.direction, expected_location.z_axis.direction, 10
+            )
 
     def test_location_at_corrected_frenet(self):
         # A polyline with sharp corners — problematic for classic Frenet
