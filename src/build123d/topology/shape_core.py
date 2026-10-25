@@ -1911,6 +1911,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         Apply a location in absolute sense to a copy of self
 
+        The copy shares the original's geometry, as ``moved`` does, so it keeps
+        its place in the topology it was taken from.
+
         Args:
             loc (Location): new absolute location
 
@@ -1920,7 +1923,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         shape_copy = copy.deepcopy(self, None)
         if self.is_empty:  # nothing is nothing wherever it is put
             return shape_copy
-        shape_copy.wrapped.Location(loc.wrapped)
+        shape_copy.wrapped = tcast(TOPODS, downcast(self.wrapped.Located(loc.wrapped)))
         return shape_copy
 
     def mesh(self, tolerance: float, angular_tolerance: float = 0.1):
