@@ -40,6 +40,7 @@ import unittest
 from collections.abc import Callable
 
 from build123d.geometry import Axis, Color, Location, Plane, Pos
+from build123d.joints import RigidJoint
 from build123d.objects_curve import Line
 from build123d.objects_part import Box
 from build123d.objects_sketch import Rectangle
@@ -126,6 +127,14 @@ class TestShapePlacement(unittest.TestCase):
     def assertPlacedLike(self, shape: Shape, reference: Shape):
         self.assertEqual(placement(shape), placement(reference))
 
+    def assertSharesGeometry(self, shape: Shape, original: Shape):
+        """The copy holds the original's geometry; an assembly's children do"""
+        if original.children:
+            for child, source in zip(shape.children, original.children):
+                self.assertTrue(child.wrapped.IsPartner(source.wrapped))
+        else:
+            self.assertTrue(shape.wrapped.IsPartner(original.wrapped))
+
     def assertAttributesCopied(self, shape: Shape, original: Shape):
         self.assertEqual(shape.label, original.label)
         self.assertEqual(type(shape), type(original))
@@ -146,7 +155,7 @@ class TestShapePlacement(unittest.TestCase):
                 reference = copy.copy(original)
                 self.assertPlacedLike(reference, original)
                 self.assertAttributesCopied(reference, original)
-                self.assertTrue(reference.wrapped.IsPartner(original.wrapped))
+                self.assertSharesGeometry(reference, original)
                 # the shared geometry doesn't tie the copy's location to the original
                 reference.move(ELSEWHERE)
                 self.assertEqual(placement(original), before)
@@ -183,7 +192,7 @@ class TestShapePlacement(unittest.TestCase):
                 relocated = original.located(ELSEWHERE)
                 self.assertEqual(relocated.location, ELSEWHERE)
                 self.assertPlacedLike(relocated, make(ELSEWHERE))
-                self.assertTrue(relocated.wrapped.IsPartner(original.wrapped))
+                self.assertSharesGeometry(relocated, original)
                 self.assertEqual(placement(original), before)
 
     def test_moved(self):
@@ -195,7 +204,7 @@ class TestShapePlacement(unittest.TestCase):
                 moved = original.moved(ELSEWHERE)
                 self.assertEqual(moved.location, ELSEWHERE * PLACED)
                 self.assertPlacedLike(moved, make(ELSEWHERE * PLACED))
-                self.assertTrue(moved.wrapped.IsPartner(original.wrapped))
+                self.assertSharesGeometry(moved, original)
                 self.assertEqual(placement(original), before)
 
     def test_relocated_copies_keep_their_provenance(self):
@@ -226,6 +235,58 @@ class TestShapePlacement(unittest.TestCase):
                 original = make(PLACED)
                 self.assertIs(original.move(ELSEWHERE), original)
                 self.assertPlacedLike(original, make(ELSEWHERE * PLACED))
+
+    def test_relocated_copies_stand_outside_the_assembly(self):
+        """A copy of an assembly's member is not a member; the assembly is untouched"""
+        assembly = _assembly(PLACED)
+        child = assembly.children[0]
+        for name, relocated in (
+            ("located", child.located(ELSEWHERE)),
+            ("moved", child.moved(ELSEWHERE)),
+            ("operator", ELSEWHERE * child),
+            ("copy", copy.copy(child)),
+        ):
+            with self.subTest(copy=name):
+                self.assertIsNone(relocated.parent)
+                self.assertEqual(len(assembly.children), 2)
+                self.assertIs(child.parent, assembly)
+                self.assertEqual(assembly.location, PLACED)
+
+    def test_relocated_assembly_keeps_its_tree(self):
+        """A copy of an assembly has its own children, sharing the originals' geometry"""
+        original = _assembly(PLACED)
+        for name, relocated in (
+            ("located", original.located(ELSEWHERE)),
+            ("moved", original.moved(ELSEWHERE)),
+            ("copy", copy.copy(original)),
+        ):
+            with self.subTest(copy=name):
+                self.assertEqual(len(relocated.children), 2)
+                for child, source in zip(relocated.children, original.children):
+                    self.assertIs(child.parent, relocated)
+                    self.assertIsNot(child, source)
+                    self.assertTrue(child.wrapped.IsPartner(source.wrapped))
+                    self.assertEqual(child.location, source.location)
+                    self.assertIs(source.parent, original)
+                # the copy's compound was rebuilt from its children at its location
+                self.assertEqual(
+                    _rounded(relocated.bounding_box().max),
+                    _rounded(_assembly(relocated.location).bounding_box().max),
+                )
+
+    def test_relocated_copies_get_their_own_joints(self):
+        """A relocated copy's joints belong to it; the original keeps its own"""
+        original = Solid.make_box(1, 2, 3).moved(PLACED)
+        RigidJoint("top", original, Location((0, 0, 1.5)))
+        for name, relocated in (
+            ("located", original.located(ELSEWHERE)),
+            ("moved", original.moved(ELSEWHERE)),
+            ("copy", copy.copy(original)),
+        ):
+            with self.subTest(copy=name):
+                self.assertIs(relocated.joints["top"].parent, relocated)
+                self.assertIsNot(relocated.joints["top"], original.joints["top"])
+                self.assertIs(original.joints["top"].parent, original)
 
     def test_copies_keep_the_colour(self):
         """A copied shape keeps its colour (a coloured shape can't be pickled)"""

@@ -1249,11 +1249,15 @@ class Shape(NodeMixin, Generic[TOPODS]):
         sharing the TopoDS_TShape, the memory size of such assemblies can be greatly reduced.
 
         Changes to the CAD structure of the base object will be reflected in all instances.
+
+        The copy keeps the original's location and attributes, stands outside
+        any assembly, and copies an assembly's children the same way.
         """
-        reference = copy.deepcopy(self)
-        if not self.is_empty:
-            reference.wrapped.TShape(self.wrapped.TShape())
-        return reference
+        if self.is_empty:
+            return self._placed(tcast(TOPODS, _make_topods_compound_from_shapes([])))
+        return self._placed(
+            tcast(TOPODS, downcast(self.wrapped.Located(self.wrapped.Location())))
+        )
 
     def __deepcopy__(self, memo) -> Self:
         """Return deepcopy of self"""
@@ -1281,6 +1285,41 @@ class Shape(NodeMixin, Generic[TOPODS]):
             if key == "joints":
                 for joint in result.joints.values():
                     joint.parent = result
+        return result
+
+    def _placed(self, wrapped: TOPODS) -> Self:
+        """A copy of self around an already placed kernel shape
+
+        The copy is the same class with the same attributes: label, colour,
+        material, provenance and whatever a subclass adds, all by reference
+        as a deep copy would carry them, and its own joints bound to it. It
+        holds ``wrapped`` rather than a copy of the geometry, so a shape can be
+        relocated without the kernel copying it.
+
+        The copy stands outside any assembly: it has no parent, as a new shape
+        made from a member of an assembly is not itself a member. Children are
+        copied the same way and attached, so the copy of an assembly is an
+        assembly whose children share the originals' geometry.
+        """
+        # pylint reads result.joints and result.children as attributes of self
+        # set outside __init__, which they are not
+        # pylint: disable=attribute-defined-outside-init
+        # pylint: disable=access-member-before-definition
+        cls = self.__class__
+        result = cls.__new__(cls)
+        result.__dict__.update(self.__dict__)
+        result.__dict__.pop("_NodeMixin__parent", None)
+        result.__dict__.pop("_NodeMixin__children", None)
+        result._wrapped = wrapped
+        if "joints" in result.__dict__:  # only the classes that can have joints
+            result.joints = copy.deepcopy(self.joints, {id(self): result})
+            for joint in result.joints.values():
+                joint.parent = result
+        if self.children:
+            result.children = [
+                child._placed(downcast(child.wrapped.Located(child.wrapped.Location())))
+                for child in self.children
+            ]
         return result
 
     def __getstate__(self) -> dict[str, Any]:
@@ -1920,11 +1959,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Returns:
             Shape: copy of Shape at location
         """
-        shape_copy = copy.deepcopy(self, None)
         if self.is_empty:  # nothing is nothing wherever it is put
-            return shape_copy
-        shape_copy.wrapped = tcast(TOPODS, downcast(self.wrapped.Located(loc.wrapped)))
-        return shape_copy
+            return self._placed(tcast(TOPODS, _make_topods_compound_from_shapes([])))
+        return self._placed(tcast(TOPODS, downcast(self.wrapped.Located(loc.wrapped))))
 
     def mesh(self, tolerance: float, angular_tolerance: float = 0.1):
         """Generate triangulation if none exists.
@@ -1993,12 +2030,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """
         if isinstance(loc, Plane):
             loc = loc.location
-        shape_copy: Shape = copy.deepcopy(self, None)
-        if not self.is_empty:  # nothing is nothing wherever it is put
-            shape_copy.wrapped = tcast(
-                TOPODS, downcast(self.wrapped.Moved(loc.wrapped))
-            )
-        return shape_copy
+        if self.is_empty:  # nothing is nothing wherever it is put
+            return self._placed(tcast(TOPODS, _make_topods_compound_from_shapes([])))
+        return self._placed(tcast(TOPODS, downcast(self.wrapped.Moved(loc.wrapped))))
 
     def oriented_bounding_box(self) -> OrientedBoundBox:
         """Create an oriented bounding box for this Shape.
