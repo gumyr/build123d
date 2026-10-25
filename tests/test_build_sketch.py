@@ -26,6 +26,8 @@ license:
 
 """
 
+import os
+import tempfile
 import unittest
 from math import atan2, degrees, gamma, pi, sqrt
 
@@ -179,6 +181,35 @@ class TestBuildOnPlanes(unittest.TestCase):
         with BuildSketch() as coplanar:
             insert([Face.make_rect(1, 1, Plane.XZ)])
         self.assertTrue(coplanar.sketch.faces()[0].is_coplanar(Plane.XY))
+
+    def test_step_profiles_keep_placement(self):
+        """Issue #1543: profiles drawn on Plane.XZ, saved to STEP and read back
+        keep their position and orientation when inserted into sketches: the
+        profile's X maps to sketch X and its Y (world Z) to sketch Y."""
+        # The off-center hole makes a rotation or mirror of the profile detectable
+        profile = Rectangle(4, 2) - Pos(1, 0.5) * Circle(0.3)
+        offsets = [(0, 0), (30, 10)]
+        profiles = [Plane.XZ * Pos(*offset) * profile for offset in offsets]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            imported = []
+            for i, located_profile in enumerate(profiles):
+                step_file = os.path.join(tmp_dir, f"profile_{i}.step")
+                export_step(located_profile, step_file)
+                imported.append(import_step(step_file))
+
+        for (x, y), imported_profile in zip(offsets, imported):
+            with BuildSketch() as sketch:
+                insert(imported_profile.face())
+            face = sketch.sketch.face()
+            self.assertTrue(face.is_coplanar(Plane.XY))
+            self.assertTupleAlmostEquals(face.bounding_box().size, (4, 2, 0), 5)
+            self.assertTupleAlmostEquals(
+                face.center(CenterOf.BOUNDING_BOX), (x, y, 0), 5
+            )
+            self.assertTupleAlmostEquals(
+                face.inner_wires()[0].center(CenterOf.MASS), (x + 1, y + 0.5, 0), 5
+            )
 
     def test_changing_geometry(self):
         with BuildSketch() as s:
