@@ -1184,18 +1184,23 @@ class Mixin1D(Shape[TOPODS]):
             law = GeomFill_Frenet()
         else:
             law = GeomFill_CorrectedFrenet()
-
         law.SetCurve(curve)
+        return self._frame_location(curve, param, law, x_dir)
 
+    def _frame_location(
+        self,
+        curve: BRepAdaptor_Curve | BRepAdaptor_CompCurve,
+        param: float,
+        law: GeomFill_TrihedronLaw,
+        x_dir: VectorLike | None,
+    ) -> Location:
+        """The Location at a curve parameter, framed by a trihedron law on that curve"""
         tangent, normal, binormal = gp_Vec(), gp_Vec(), gp_Vec()
-
         law.D0(param, tangent, normal, binormal)
         pnt = curve.Value(param)
-
         transformation = gp_Trsf()
         if x_dir is not None:
             try:
-
                 transformation.SetTransformation(
                     gp_Ax3(pnt, gp_Dir(tangent.XYZ()), Vector(x_dir).to_dir()), gp_Ax3()
                 )
@@ -1205,45 +1210,66 @@ class Mixin1D(Shape[TOPODS]):
                     f"x_dir must be perpendicular to shape's tangent "
                     f"{tuple(Vector(tangent))}."
                 ) from exc
-
         else:
             transformation.SetTransformation(
                 gp_Ax3(pnt, gp_Dir(tangent.XYZ()), gp_Dir(normal.XYZ())), gp_Ax3()
             )
         loc = Location(TopLoc_Location(transformation))
-
         if self.is_forward:
             return loc
         return -loc
 
     def locations(
         self,
-        distances: Iterable[float],
+        distances: Iterable[float] | None = None,
         position_mode: PositionMode = PositionMode.PARAMETER,
         frame_method: FrameMethod = FrameMethod.FRENET,
         x_dir: VectorLike | None = None,
+        deflection: float | None = None,
     ) -> list[Location]:
         """Locations along curve
 
-        Generate location along the curve
+        Generate locations along the curve, either at the given ``distances``
+        or, with ``deflection``, wherever the curve needs one for the polygon
+        through the locations to stay within that distance of it. Deflection
+        gives a wire with many edges its locations in one pass over the whole
+        curve, where each distance is located on its own.
 
         Args:
-            distances (Iterable[float]): distance or parameter values
-            position_mode (PositionMode, optional): position calculation mode.
-                Defaults to PositionMode.PARAMETER.
+            distances (Iterable[float] | None, optional): distance or parameter
+                values. Defaults to None.
+            position_mode (PositionMode, optional): position calculation mode only
+                applies when using distances. Defaults to PositionMode.PARAMETER.
             frame_method (FrameMethod, optional): moving frame calculation method.
                 Defaults to FrameMethod.FRENET.
             x_dir (VectorLike, optional): override the x_dir to help with plane
                 creation along a 1D shape. Must be perpendicular to shapes tangent.
                 Defaults to None.
+            deflection (float | None, optional): maximum deflection between the
+                curve and the polygon through the locations. Defaults to None.
+
+        Raises:
+            ValueError: neither distances nor deflection given
 
         Returns:
             list[Location]: A list of Location objects representing local coordinate
-                systems at the specified distances.
+                systems along the curve.
         """
-        return [
-            self.location_at(d, position_mode, frame_method, x_dir) for d in distances
-        ]
+        if deflection is not None:
+            curve, params = self._deflection_parameters(deflection)
+            law: GeomFill_TrihedronLaw
+            if frame_method == FrameMethod.FRENET:
+                law = GeomFill_Frenet()
+            else:
+                law = GeomFill_CorrectedFrenet()
+            law.SetCurve(curve)
+            return [self._frame_location(curve, p, law, x_dir) for p in params]
+        if distances is not None:
+            return [
+                self.location_at(d, position_mode, frame_method, x_dir)
+                for d in distances
+            ]
+        raise ValueError("Either distances or deflection must be provided")
 
     def normal(self) -> Vector:
         """Calculate the normal Vector. Only possible for planar curves.
@@ -1555,30 +1581,37 @@ class Mixin1D(Shape[TOPODS]):
             list[Vector]: positions along curve
         """
         if deflection is not None:
-            curve: BRepAdaptor_Curve | BRepAdaptor_CompCurve = self.geom_adaptor()
-            # GCPnts_UniformDeflection provides the best results but is limited
-            if curve.Continuity() in (GeomAbs_C2, GeomAbs_C3, GeomAbs_CN):
-                discretizer: (
-                    GCPnts_UniformDeflection | GCPnts_QuasiUniformDeflection
-                ) = GCPnts_UniformDeflection()
-            else:
-                discretizer = GCPnts_QuasiUniformDeflection()
-
-            discretizer.Initialize(
-                curve,
-                deflection,
-                curve.FirstParameter(),
-                curve.LastParameter(),
-            )
-            if not discretizer.IsDone() or discretizer.NbPoints() == 0:
-                raise RuntimeError("Deflection calculation failed")
-            return [
-                Vector(curve.Value(discretizer.Parameter(i + 1)))
-                for i in range(discretizer.NbPoints())
-            ]
+            curve, params = self._deflection_parameters(deflection)
+            return [Vector(curve.Value(p)) for p in params]
         if distances is not None:
             return [self.position_at(d, position_mode) for d in distances]
         raise ValueError("Either distances or deflection must be provided")
+
+    def _deflection_parameters(
+        self, deflection: float
+    ) -> tuple[BRepAdaptor_Curve | BRepAdaptor_CompCurve, list[float]]:
+        """The curve and the parameters along it that keep a polygon through
+        them within ``deflection`` of the curve"""
+        curve: BRepAdaptor_Curve | BRepAdaptor_CompCurve = self.geom_adaptor()
+        # GCPnts_UniformDeflection provides the best results but is limited
+        if curve.Continuity() in (GeomAbs_C2, GeomAbs_C3, GeomAbs_CN):
+            discretizer: GCPnts_UniformDeflection | GCPnts_QuasiUniformDeflection = (
+                GCPnts_UniformDeflection()
+            )
+        else:
+            discretizer = GCPnts_QuasiUniformDeflection()
+
+        discretizer.Initialize(
+            curve,
+            deflection,
+            curve.FirstParameter(),
+            curve.LastParameter(),
+        )
+        if not discretizer.IsDone() or discretizer.NbPoints() == 0:
+            raise RuntimeError("Deflection calculation failed")
+        return curve, [
+            discretizer.Parameter(i + 1) for i in range(discretizer.NbPoints())
+        ]
 
     def project(
         self, face: Face, direction: VectorLike, closest: bool = True
