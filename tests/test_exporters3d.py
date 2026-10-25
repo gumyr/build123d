@@ -30,6 +30,8 @@ import json
 import os
 import re
 import sys
+import struct
+from collections import Counter
 import unittest
 from datetime import datetime
 from pathlib import Path
@@ -791,6 +793,192 @@ class TestExportGltfUVs(DirectApiTestCase):
         finally:
             if os.path.exists(path):
                 os.remove(path)
+
+
+def test_step_shared_product_definitions(tmp_path):
+    from copy import copy
+
+    from OCP.STEPCAFControl import STEPCAFControl_Reader
+    from OCP.TCollection import TCollection_ExtendedString
+    from OCP.TDF import TDF_Label
+    from OCP.TDocStd import TDocStd_Document
+    from OCP.XCAFDoc import XCAFDoc_DocumentTool
+    from OCP.collections import Sequence_TDF_Label
+
+    leaf = Box(1, 2, 3)
+    leaf.label = "shared"
+    leaf.color = Color("red")
+    children = [Pos(index * 4, 0, 0) * copy(leaf) for index in range(4)]
+    children[2].color = Color("blue")
+    children[3].label = "other"
+    assembly = Compound(label="assembly", children=children)
+    path = tmp_path / "products.step"
+    export_step(assembly, path)
+
+    document = TDocStd_Document(TCollection_ExtendedString("XmlOcaf"))
+    reader = STEPCAFControl_Reader()
+    assert reader.ReadFile(str(path)) == 1
+    assert reader.Transfer(document)
+    tool = XCAFDoc_DocumentTool.ShapeTool_s(document.Main())
+    roots = Sequence_TDF_Label()
+    tool.GetFreeShapes(roots)
+    assert roots.Length() == 1
+    components = Sequence_TDF_Label()
+    tool.GetComponents_s(roots.Value(1), components)
+    assert components.Length() == 4
+    definitions = []
+    for index in range(1, 5):
+        referred = TDF_Label()
+        assert tool.GetReferredShape_s(components.Value(index), referred)
+        definitions.append(referred)
+    assert definitions[0].IsEqual(definitions[1])
+    assert not definitions[0].IsEqual(definitions[2])
+    assert not definitions[0].IsEqual(definitions[3])
+    assert len(re.findall(r"PRODUCT\(", path.read_text())) == 4
+
+
+def _gltf_accessor_data(document, path, index):
+    accessor = document["accessors"][index]
+    view = document["bufferViews"][accessor["bufferView"]]
+    formats = {5120: "b", 5121: "B", 5122: "h", 5123: "H", 5125: "I", 5126: "f"}
+    widths = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
+    encoding = "<" + formats[accessor["componentType"]] * widths[accessor["type"]]
+    stride = view.get("byteStride", struct.calcsize(encoding))
+    offset = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+    data = (path.parent / document["buffers"][view["buffer"]]["uri"]).read_bytes()
+    return [
+        struct.unpack_from(encoding, data, offset + row * stride)
+        for row in range(accessor["count"])
+    ]
+
+
+@pytest.mark.parametrize("solid", [False, True])
+def test_gltf_shared_occurrence_metadata(tmp_path, solid):
+    from copy import copy
+
+    leaf = Box(1, 2, 3)
+    if solid:
+        leaf = leaf.solid()
+    branches = []
+    for index, (name, color) in enumerate(
+        (("red", "red"), ("蓝", "blue"), ("red", "red"))
+    ):
+        child = copy(leaf)
+        child.label = name
+        child.color = Color(color)
+        branches.append(Compound(label=f"branch-{index}", children=[child]))
+    assembly = Compound(label="assembly", children=branches)
+    original_shapes = [assembly.wrapped, *[child.wrapped for child in assembly.leaves]]
+    path = tmp_path / "shared.gltf"
+    assert export_gltf(assembly, path)
+    for shape, wrapped in zip([assembly, *assembly.leaves], original_shapes):
+        assert shape.wrapped.IsEqual(wrapped)
+    gltf = json.loads(path.read_text())
+    assert Counter(node["name"] for node in gltf["nodes"]) == Counter(
+        ["assembly", "branch-0", "branch-1", "branch-2", "red", "蓝", "red"]
+    )
+    expected_colors = {"red": (1, 0, 0, 1), "蓝": (0, 0, 1, 1)}
+    reference_geometry = None
+    for node in gltf["nodes"]:
+        if node["name"] not in expected_colors:
+            continue
+        mesh = gltf["meshes"][node["mesh"]]
+        geometry = []
+        assert mesh["primitives"]
+        for primitive in mesh["primitives"]:
+            material = gltf["materials"][primitive["material"]]
+            assert material["pbrMetallicRoughness"]["baseColorFactor"] == list(
+                expected_colors[node["name"]]
+            )
+            attributes = {
+                name: _gltf_accessor_data(gltf, path, index)
+                for name, index in primitive["attributes"].items()
+            }
+            assert attributes["POSITION"]
+            assert attributes["NORMAL"]
+            assert attributes["TEXCOORD_0"]
+            indices = _gltf_accessor_data(gltf, path, primitive["indices"])
+            assert indices
+            geometry.append((attributes, indices))
+        if reference_geometry is None:
+            reference_geometry = geometry
+        else:
+            assert geometry == reference_geometry
+
+
+def test_gltf_occurrence_names_reuse_geometry_payload(tmp_path):
+    from copy import copy
+
+    leaf = Box(1, 2, 3)
+    leaf.color = Color("red")
+    scenes = []
+    for distinct in (False, True):
+        children = [Pos(index * 4, 0, 0) * copy(leaf) for index in range(6)]
+        for index, child in enumerate(children):
+            child.label = f"leaf-{index}" if distinct else "leaf"
+        assembly = Compound(label="assembly", children=children)
+        path = tmp_path / f"names-{distinct}.gltf"
+        assert export_gltf(assembly, path)
+        document = json.loads(path.read_text())
+        assert Counter(node["name"] for node in document["nodes"]) == Counter(
+            ["assembly", *[child.label for child in children]]
+        )
+        meshes = [
+            document["meshes"][node["mesh"]]
+            for node in document["nodes"]
+            if "mesh" in node
+        ]
+        assert len(meshes) == len(children)
+        payload = [
+            (
+                {
+                    name: _gltf_accessor_data(document, path, index)
+                    for name, index in primitive["attributes"].items()
+                },
+                _gltf_accessor_data(document, path, primitive["indices"]),
+            )
+            for mesh in meshes
+            for primitive in mesh["primitives"]
+        ]
+        scenes.append((document, path, payload))
+    same, distinct = scenes
+    for before, after in zip(same[0]["nodes"], distinct[0]["nodes"]):
+        for field in ("translation", "rotation", "scale", "matrix", "children"):
+            assert after.get(field) == before.get(field)
+    assert [scene.get("nodes") for scene in distinct[0]["scenes"]] == [
+        scene.get("nodes") for scene in same[0]["scenes"]
+    ]
+    assert len(distinct[0]["accessors"]) == len(same[0]["accessors"])
+    assert (
+        distinct[1].with_suffix(".bin").read_bytes()
+        == same[1].with_suffix(".bin").read_bytes()
+    )
+    assert distinct[2] == same[2]
+
+
+@pytest.mark.parametrize("difference", ["orientation", "exact_color", "wrapper"])
+def test_step_distinct_shared_products(tmp_path, difference):
+    from copy import copy
+
+    from build123d.topology import Part, Solid
+
+    first = Box(1, 2, 3).solid()
+    first.label = "shared"
+    first.color = Color(0.2, 0.4, 0.6, 0.25)
+    second = copy(first)
+    if difference == "orientation":
+        second.wrapped.Reverse()
+    elif difference == "exact_color":
+        second.color = Color(0.2, 0.4, 0.6, 0.25000002)
+        assert tuple(first.color) == tuple(second.color)
+        assert first.color.wrapped.Alpha() != second.color.wrapped.Alpha()
+    else:
+        assert isinstance(first, Solid)
+        second = Part(first.wrapped, label=first.label, color=first.color)
+    assert first.wrapped.IsPartner(second.wrapped)
+    path = tmp_path / "distinct.step"
+    export_step(Compound(label="root", children=[first, second]), path)
+    assert len(re.findall(r"PRODUCT\(", path.read_text())) == 3
 
 
 if __name__ == "__main__":
