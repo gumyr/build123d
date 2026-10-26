@@ -54,10 +54,13 @@ license:
 
 from __future__ import annotations
 
+import copy
 import warnings
 from collections.abc import Iterable
 from math import radians, tan
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, cast, overload
+
+from typing_extensions import Self
 
 from bd_materials import FinishedMaterial
 
@@ -136,6 +139,7 @@ from .one_d import Edge, Mixin1D, Wire
 from .shape_core import (
     TOPODS,
     Joint,
+    JointDict,
     Shape,
     ShapeList,
     _sew_topods_faces,
@@ -161,6 +165,57 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class Mixin3D(Shape[TOPODS]):
     """Additional methods to add to 3D Shape classes"""
+
+    joints: JointDict
+
+    # ---- Operators ----
+
+    # Only 3D shapes hold joints, so only their + accepts them. mypy refuses a
+    # wider operand type on an overloaded operator override, hence the ignore.
+    @overload  # type: ignore[override]
+    def __add__(self, other: None) -> Self: ...
+    @overload
+    def __add__(
+        self, other: Shape | Joint | Iterable[Shape | Joint]
+    ) -> Self | Compound: ...
+    def __add__(self, other):
+        """fuse shape to self operator +; joints among other are bound to the result"""
+        joints, shapes = Mixin3D._joint_operands(other)
+        result = super().__add__(shapes)
+        return result._with_joints(joints) if joints else result
+
+    @staticmethod
+    def _joint_operands(
+        other: None | Shape | Joint | Iterable[Shape | Joint],
+    ) -> tuple[list[Joint], None | Shape | list[Shape]]:
+        """Separate the joints from the shapes in a ``+`` operand"""
+        if isinstance(other, Joint):
+            return [other], None
+        if other is None or isinstance(other, Shape):
+            return [], other
+        items = list(other)
+        return (
+            [o for o in items if isinstance(o, Joint)],
+            [o for o in items if not isinstance(o, Joint)],
+        )
+
+    def _with_joints(self, joints: Iterable[Joint]) -> Self:
+        """A copy of self, sharing its geometry, with copies of ``joints`` bound to it
+
+        Raises:
+            ValueError: a joint has no label, or its label is already taken
+        """
+        result = copy.copy(self)
+        for joint in joints:
+            if not joint.label:
+                raise ValueError("A joint added to a part needs a label")
+            if joint.label in result.joints:
+                raise ValueError(
+                    f"Joint label '{joint.label}' already exists on the part; "
+                    "assign to joints[label] to replace a joint"
+                )
+            result.joints[joint.label] = copy.deepcopy(joint)
+        return result
 
     find_intersection_points = Mixin2D.find_intersection_points
 
@@ -293,6 +348,7 @@ class Mixin3D(Shape[TOPODS]):
                 "Failed creating a chamfer, try a smaller length value(s)"
             ) from err
 
+        self.copy_attributes_to(new_shape, ["wrapped", "_NodeMixin__children"])
         return new_shape._made_by(
             ShapeHistory.from_algorithm(
                 chamfer_builder, [self.wrapped], new_shape.wrapped
@@ -351,7 +407,9 @@ class Mixin3D(Shape[TOPODS]):
 
             shape = feat.Shape()
 
-        return self.__class__(shape)
+        result = self.__class__(shape)
+        self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return result
 
     def fillet(self, radius: float, edge_list: Iterable[Edge]) -> Solid | Part:
         """Fillet
@@ -391,6 +449,7 @@ class Mixin3D(Shape[TOPODS]):
                 f" radius"
             ) from err
 
+        self.copy_attributes_to(new_shape, ["wrapped", "_NodeMixin__children"])
         return new_shape._made_by(
             ShapeHistory.from_algorithm(
                 fillet_builder, [self.wrapped], new_shape.wrapped
@@ -470,6 +529,7 @@ class Mixin3D(Shape[TOPODS]):
             # fix needed for the orientations
             return_value = self.__class__.cast(sol.Shape()).fix()
 
+        self.copy_attributes_to(return_value, ["wrapped", "_NodeMixin__children"])
         return return_value
 
     def _intersect(
@@ -722,6 +782,7 @@ class Mixin3D(Shape[TOPODS]):
         if offset_solid.volume < 0:
             offset_solid.wrapped.Reverse()
 
+        self.copy_attributes_to(offset_solid, ["wrapped", "_NodeMixin__children"])
         return offset_solid
 
     def project_to_viewport(
@@ -874,7 +935,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             parent=parent,
         )
         self.material = material
-        self.joints = {} if joints is None else joints
+        self.joints = JointDict(self, joints)
 
     # ---- Properties ----
 
@@ -2018,6 +2079,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 face=None,
                 problematic_shape=draft_angle_builder.ProblematicShape(),
             ) from err
+        self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
         return result._made_by(
             ShapeHistory.from_algorithm(
                 draft_angle_builder, [self.wrapped], result.wrapped

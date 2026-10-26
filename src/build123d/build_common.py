@@ -42,6 +42,7 @@ license:
 from __future__ import annotations
 
 import contextvars
+import copy as copy_module
 import functools
 import inspect
 import logging
@@ -92,6 +93,7 @@ from build123d.topology import (
     Edge,
     Face,
     Joint,
+    JointDict,
     Part,
     Shape,
     ShapeList,
@@ -1734,8 +1736,15 @@ class _PublicationService:
             result = result_type(Compound(placed).wrapped)
         build_product.copy_attributes_to(
             result,
-            exceptions=("wrapped", "_NodeMixin__children"),
+            exceptions=("wrapped", "_NodeMixin__children", "joints"),
         )
+        # The placed copy is the local product moved, so its joints move with it,
+        # where copy_attributes_to would keep them where they are in the world
+        if isinstance(result, (Solid, Compound)) and getattr(
+            build_product, "joints", None
+        ):
+            result.joints = copy_module.deepcopy(build_product.joints)
+            JointDict._adopt(result)
         return result
 
     @classmethod

@@ -106,6 +106,7 @@ from .shape_core import (
     Shape,
     ShapeList,
     Joint,
+    JointDict,
     downcast,
     topods_dim,
     _make_topods_compound_from_shapes,
@@ -172,7 +173,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             parent=parent,
         )
         self.material = material
-        self.joints = {} if joints is None else joints
+        self.joints = JointDict(self, joints)
         self.children = [] if children is None else children
 
     # ---- Properties ----
@@ -495,12 +496,16 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
     # ---- Instance Methods ----
 
-    def __add__(self, other: None | Shape | Iterable[Shape]) -> Compound | Wire:
+    def __add__(
+        self, other: None | Shape | Joint | Iterable[Shape | Joint]
+    ) -> Compound | Wire:
         """Combine other to self `+` operator
 
         Note that if all of the objects are connected Edges/Wires the result
-        will be a Wire, otherwise a Shape.
+        will be a Wire, otherwise a Shape. Joints among other are bound to
+        the result.
         """
+        joints, other = self._joint_operands(other)
         if self._dim == 1:
             curve = Curve() if self.is_empty else Curve(self.wrapped)
             sum1d = curve + other
@@ -509,12 +514,14 @@ class Compound(Mixin3D[TopoDS_Compound]):
             else:
                 result1d = sum1d
             self.copy_attributes_to(result1d, ["wrapped", "_NodeMixin__children"])
-            return result1d
+            if joints and not isinstance(result1d, Compound):
+                raise TypeError("Joints cannot be added to a Wire")
+            return result1d._with_joints(joints) if joints else result1d
 
         summands: ShapeList[Shape] = ShapeList(Shape._operands(other))
         # If there is nothing to add return the original object
         if not summands:
-            return self
+            return self._with_joints(joints) if joints else self
 
         brought = summands
         summands = ShapeList(
@@ -537,8 +544,9 @@ class Compound(Mixin3D[TopoDS_Compound]):
                 )
             if not isinstance(result, Compound):
                 result = Shape.make_composite([result], self._dim)
+            self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
 
-        return result
+        return result._with_joints(joints) if joints else result
 
     def __and__(self, other: Shape | Iterable[Shape]) -> Compound:
         """Intersect other to self `&` operator"""
@@ -1054,7 +1062,7 @@ class Sketch(Compound):
     def _dim(self) -> int:
         return 2
 
-    def __iadd__(self, other: None | Shape | Iterable[Shape]) -> Sketch:
+    def __iadd__(self, other: None | Shape | Joint | Iterable[Shape | Joint]) -> Sketch:
         return self + other
 
 
@@ -1069,7 +1077,7 @@ class Part(Compound):
     def _dim(self) -> int:
         return 3
 
-    def __iadd__(self, other: None | Shape | Iterable[Shape]) -> Part:
+    def __iadd__(self, other: None | Shape | Joint | Iterable[Shape | Joint]) -> Part:
         return self + other
 
 
