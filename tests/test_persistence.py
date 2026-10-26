@@ -120,7 +120,8 @@ class TestPersistence(unittest.TestCase):
     def test_copy_keeps_history(self):
         result = Box(10, 5, 2) - Cylinder(1, 4)
         self.assertIs(copy.copy(result)._history, result._history)
-        self.assertIs(copy.deepcopy(result)._history, result._history)
+        # a deep copy has new kernel sub-shapes the record does not describe
+        self.assertIsNone(copy.deepcopy(result)._history)
 
 
 if __name__ == "__main__":

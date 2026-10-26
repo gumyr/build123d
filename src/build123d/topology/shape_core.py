@@ -349,6 +349,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # What the operation that made this shape did to its inputs' sub-shapes,
         # when the kernel reported it (booleans, clean, fillets and chamfers)
         self._history: ShapeHistory | None = None
+        # The root Location the record describes: the shape's Location when it
+        # was recorded. A relocated copy shares the record, so selection maps
+        # its sub-shapes back by the difference between this and its own.
+        self._history_at: TopLoc_Location | None = None
 
     # ---- Properties ----
 
@@ -524,7 +528,32 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def _made_by(self, history: ShapeHistory | None) -> Self:
         """Note the record of how this shape was made, for ``Select.LAST``/``NEW``."""
         self._history = history
+        self._history_at = None if self.wrapped is None else self.wrapped.Location()
         return self
+
+    def _history_here(self) -> ShapeHistory | None:
+        """The record, brought to where the shape is now.
+
+        A relocated shape shares the record of the shape it was placed from,
+        which names the sub-shapes where that shape was. Selection maps its
+        queries back there; an operation that extends the record (``clean``)
+        needs a copy of the record chained forward to here instead.
+        """
+        if self._history is None or self.wrapped is None:
+            return self._history
+        recorded_at = self._history_at
+        here = self.wrapped.Location()
+        if recorded_at is None or recorded_at.IsEqual(here):
+            return self._history
+        return (
+            ShapeHistory(before=self._history.before, brought=self._history.brought)
+            .merge(self._history)
+            .merge(
+                ShapeHistory.from_relocation(
+                    self.wrapped.Located(recorded_at), self.wrapped
+                )
+            )
+        )
 
     @property
     def convexity(self) -> Convexity:
@@ -1276,10 +1305,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
         else:
             memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
         for key, value in self.__dict__.items():
-            if key in ("topo_path", "_history"):
+            if key == "topo_path":
                 # provenance points at shapes outside the copy, so it is
                 # carried by reference rather than duplicated with it
                 setattr(result, key, value)
+            elif key in ("_history", "_history_at"):
+                # the record names the original's kernel sub-shapes, and the
+                # copy's are new ones; as with pickling, it is left behind
+                setattr(result, key, None)
             else:
                 setattr(result, key, copy.deepcopy(value, memo))
             if key == "joints":
@@ -1329,6 +1362,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # would describe nothing in the restored shape and it is left behind.
         state = self.__dict__.copy()
         state["_history"] = None
+        state["_history_at"] = None
         return state
 
     def __eq__(self, other) -> bool:
@@ -1494,11 +1528,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # the uncleaned shape is still usable.
         try:
             upgrader.Build()
+            record = self._history_here()
             self.wrapped = tcast(TOPODS, downcast(upgrader.Shape()))
             unified = ShapeHistory.from_unify(upgrader)
-            self._history = (
-                unified if self._history is None else self._history.merge(unified)
-            )
+            self._made_by(unified if record is None else record.merge(unified))
         except Exception:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unable to clean {self}", stacklevel=2)
         return self
@@ -1534,6 +1567,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         attrs2 = set(target.__dict__.keys())
         common_attrs = attrs1 & attrs2
         common_attrs.discard("_history")  # says how self was made, not target
+        common_attrs.discard("_history_at")
         if exceptions is not None:
             common_attrs -= set(exceptions)
 
@@ -1657,14 +1691,20 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 "and this one has none - it is the result of no recorded operation"
             )
         record = self._history
+        # The record names the sub-shapes where the shape was when it was
+        # recorded. If the shape has been relocated since, by a copy sharing
+        # the record or in place, map each sub-shape back there to look it up.
+        recorded_at = getattr(self, "_history_at", None)
+        here = self.wrapped.Location()
+        if recorded_at is None or recorded_at.IsEqual(here):
+            keys = [tcast(TopoDS_Shape, s.wrapped) for s in shapes]
+        else:
+            back = recorded_at.Multiplied(here.Inverted())
+            keys = [tcast(TopoDS_Shape, s.wrapped).Moved(back) for s in shapes]
         if select == Select.LAST:
-            return ShapeList(
-                s for s in shapes if record.is_last(tcast(TopoDS_Shape, s.wrapped))
-            )
+            return ShapeList(s for s, key in zip(shapes, keys) if record.is_last(key))
         if select == Select.NEW:
-            return ShapeList(
-                s for s in shapes if record.is_new(tcast(TopoDS_Shape, s.wrapped))
-            )
+            return ShapeList(s for s, key in zip(shapes, keys) if record.is_new(key))
         raise ValueError(f"Invalid input, must be one of {[s.name for s in Select]}")
 
     def entities(self, topo_type: Shapes) -> list[TopoDS_Shape]:
@@ -2909,12 +2949,25 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self.is_empty:
             return self
         shape_copy: Shape = copy.deepcopy(self, None)
-        transformed_shape = BRepBuilderAPI_Transform(
+        transform_builder = BRepBuilderAPI_Transform(
             self.wrapped,
             transformation,
             True,
-        ).Shape()
+        )
+        transformed_shape = transform_builder.Shape()
         shape_copy.wrapped = tcast(TOPODS, downcast(transformed_shape))
+        if self._history is not None:
+            history = ShapeHistory(
+                before=self._history.before,
+                brought=self._history.brought,
+            )
+            history.merge(self._history)
+            history.merge(
+                ShapeHistory.from_algorithm(
+                    transform_builder, [self.wrapped], transformed_shape
+                )
+            )
+            shape_copy._made_by(history)
         return shape_copy
 
     def _bool_op(
