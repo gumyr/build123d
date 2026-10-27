@@ -32,11 +32,13 @@ license:
 import os
 import re
 import unicodedata
+from io import BytesIO
 from os import PathLike, fsdecode
 from pathlib import Path
-from typing import Literal, TextIO
+from typing import BinaryIO, Literal, TextIO, cast
 
 import svgpathtools
+from OCP.BinTools import BinTools
 from OCP.Bnd import Bnd_Box
 from OCP.BRep import BRep_Builder
 from OCP.BRepBndLib import BRepBndLib
@@ -45,6 +47,7 @@ from OCP.gp import gp_Trsf
 from OCP.Quantity import Quantity_ColorRGBA
 from OCP.RWStl import RWStl
 from OCP.STEPCAFControl import STEPCAFControl_Reader
+from OCP.Storage import Storage_StreamReadError
 from OCP.TCollection import TCollection_AsciiString, TCollection_ExtendedString
 from OCP.TDataStd import TDataStd_Name
 from OCP.collections import Sequence_TDF_Label
@@ -105,11 +108,16 @@ topods_lut = {
 }
 
 
-def import_brep(file_name: PathLike | str | bytes) -> Shape:
+def import_brep(
+    file_name: PathLike | str | bytes | BytesIO | BinaryIO, binary: bool = False
+) -> Shape:
     """Import shape from a BREP file
 
     Args:
-        file_name (Union[PathLike, str, bytes]): brep file
+        file_name (Union[PathLike, str, bytes, BytesIO]): brep file path or memory
+            buffer
+        binary (bool, optional): read the binary BREP format instead of text.
+            Defaults to False.
 
     Raises:
         ValueError: file not found
@@ -118,13 +126,23 @@ def import_brep(file_name: PathLike | str | bytes) -> Shape:
         Shape: build123d object
     """
     shape = TopoDS_Shape()
-    builder = BRep_Builder()
 
-    file_name_str = fsdecode(file_name)
-    BRepTools.Read_s(shape, file_name_str, builder)
+    source: str | BytesIO
+    if isinstance(file_name, (PathLike | str | bytes)):
+        source = fsdecode(file_name)
+    else:
+        source = cast(BytesIO, file_name)
+    if binary:
+        try:
+            BinTools.Read_s(shape, source)
+        except Storage_StreamReadError:
+            pass  # leaves shape null, reported below
+    else:
+        BRepTools.Read_s(shape, source, BRep_Builder())
 
     if shape.IsNull():
-        raise ValueError(f"Could not import {file_name_str}")
+        name = source if isinstance(source, str) else "BREP stream"
+        raise ValueError(f"Could not import {name}")
 
     return Compound.cast(shape)
 
