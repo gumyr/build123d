@@ -288,6 +288,29 @@ class TestShapePlacement(unittest.TestCase):
                 self.assertIsNot(relocated.joints["top"], original.joints["top"])
                 self.assertIs(original.joints["top"].parent, original)
 
+    def test_relocated_assemblies_keep_their_connections(self):
+        """A joint connected within a copied assembly is connected within the copy"""
+        block = Solid.make_box(2, 2, 2)
+        block.label = "block"
+        cap = Solid.make_box(1, 1, 1).moved(Location((0, 0, 2)))
+        cap.label = "cap"
+        RigidJoint("top", block, Location((0, 0, 2)))
+        RigidJoint("seat", cap)
+        block.joints["top"].connect_to(cap.joints["seat"])
+        original = Compound(children=[block, cap], label="pair")
+        for name, relocated in (
+            ("located", original.located(ELSEWHERE)),
+            ("moved", original.moved(ELSEWHERE)),
+            ("copy", copy.copy(original)),
+        ):
+            with self.subTest(copy=name):
+                copied_block, copied_cap = relocated.children
+                self.assertIs(
+                    copied_block.joints["top"].connected_to, copied_cap.joints["seat"]
+                )
+                self.assertIs(copied_cap.joints["seat"].parent, copied_cap)
+                self.assertIs(block.joints["top"].connected_to, cap.joints["seat"])
+
     def test_copies_keep_the_colour(self):
         """A copied shape keeps its colour (a coloured shape can't be pickled)"""
         original = Solid.make_box(1, 2, 3).moved(PLACED)

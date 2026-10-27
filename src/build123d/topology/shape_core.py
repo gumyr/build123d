@@ -1332,28 +1332,48 @@ class Shape(NodeMixin, Generic[TOPODS]):
         The copy stands outside any assembly: it has no parent, as a new shape
         made from a member of an assembly is not itself a member. Children are
         copied the same way and attached, so the copy of an assembly is an
-        assembly whose children share the originals' geometry.
+        assembly whose children share the originals' geometry. A joint
+        connected to another joint of the assembly is connected to that
+        joint's copy.
         """
-        # pylint reads result.joints and result.children as attributes of self
-        # set outside __init__, which they are not
+        copies: dict[int, Any] = {}
+        result = self._placed_node(wrapped, copies)
+        # Every node of the copy exists before any joint is copied, so a joint
+        # that names another node of the assembly names its copy
+        for original, placed in self._placed_pairs(result):
+            if "joints" in placed.__dict__:  # only the classes that can have joints
+                placed.joints = copy.deepcopy(original.joints, copies)
+                for joint in placed.joints.values():
+                    joint.parent = placed
+        return result
+
+    def _placed_node(self, wrapped: TOPODS, copies: dict[int, Any]) -> Self:
+        """The node of ``_placed`` for self and, below it, its children's"""
+        # pylint reads result.children as an attribute of self set outside
+        # __init__, which it is not
         # pylint: disable=attribute-defined-outside-init
         # pylint: disable=access-member-before-definition
         cls = self.__class__
         result = cls.__new__(cls)
+        copies[id(self)] = result
         result.__dict__.update(self.__dict__)
         result.__dict__.pop("_NodeMixin__parent", None)
         result.__dict__.pop("_NodeMixin__children", None)
         result._wrapped = wrapped
-        if "joints" in result.__dict__:  # only the classes that can have joints
-            result.joints = copy.deepcopy(self.joints, {id(self): result})
-            for joint in result.joints.values():
-                joint.parent = result
         if self.children:
             result.children = [
-                child._placed(downcast(child.wrapped.Located(child.wrapped.Location())))
+                child._placed_node(
+                    downcast(child.wrapped.Located(child.wrapped.Location())), copies
+                )
                 for child in self.children
             ]
         return result
+
+    def _placed_pairs(self, placed: Shape) -> Iterator[tuple[Shape, Shape]]:
+        """Each node of self with its node in ``placed``, a copy of self"""
+        yield self, placed
+        for original, child in zip(self.children, placed.children):
+            yield from original._placed_pairs(child)
 
     def __getstate__(self) -> dict[str, Any]:
         """Return the state to pickle, without the history record"""
