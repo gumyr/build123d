@@ -42,6 +42,7 @@ import OCP.TopAbs as ta
 import requests
 from anytree import PreOrderIter
 from OCP.APIHeaderSection import APIHeaderSection_MakeHeader
+from OCP.BRepBuilderAPI import BRepBuilderAPI_Copy
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
 from OCP.IFSelect import IFSelect_ReturnStatus
@@ -59,11 +60,13 @@ from OCP.TCollection import (
 )
 from OCP.collections import (
     IndexedDataMap_TCollection_AsciiString_TCollection_AsciiString,
+    IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher,
 )
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
 from OCP.TopExp import TopExp_Explorer
+from OCP.TopLoc import TopLoc_Location
 from OCP.XCAFApp import XCAFApp_Application
 from OCP.XCAFDoc import XCAFDoc_ColorType, XCAFDoc_DocumentTool, XCAFDoc_ShapeTool
 from OCP.XSControl import XSControl_WorkSession
@@ -77,7 +80,10 @@ from build123d.topology import Compound, Curve, Part, Shape, Sketch
 
 
 def _create_xde(
-    to_export: Shape, unit: Unit = Unit.MM, auto_naming: bool = False
+    to_export: Shape,
+    unit: Unit = Unit.MM,
+    auto_naming: bool = False,
+    named_products: bool = True,
 ) -> TDocStd_Document:
     """create_xde
 
@@ -98,6 +104,8 @@ def _create_xde(
         unit (Unit, optional): shape units. Defaults to Unit.MM.
         auto_naming (bool, optional): whether to use ShapeTool AutoNaming.
             Defaults to False.
+        named_products (bool, optional): whether distinct names require distinct
+            product definitions. Defaults to True.
 
     Returns:
         TDocStd_Document: XDE document
@@ -122,24 +130,17 @@ def _create_xde(
     # does not seem to affect user labels.
     shape_tool.SetAutoNaming_s(auto_naming)
 
-    # Create a label map to find the appropriate label for all shapes
-    label_map: dict[Shape, TDF_Label] = {}
-
-    # Effective display name of each node: an unlabeled node inherits the name
-    # of its nearest labeled ancestor so user defined names replace the
-    # auto-generated ones (e.g. "SOLID") at every level of the assembly. That
-    # label and every node inheriting it are numbered from 0, so every
-    # product in the file has a name of its own
-    name_map: dict[Shape | None, str] = {}
+    label_map: dict[int, TDF_Label] = {}
+    name_map: dict[int, str] = {}
     numbered: dict[str, int] = {}
-
-    # the labeled nodes whose names unlabeled descendants will inherit
-    shared: set[Shape] = set()
+    geometry = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+    products: dict[tuple, TDF_Label] = {}
+    shared: set[int] = set()
     if auto_naming:
-        source: dict[Shape | None, Shape | None] = {}
+        source: dict[int, int | None] = {}
         for node in PreOrderIter(to_export):
-            above = source.get(getattr(node, "parent", None))
-            source[node] = node if node.label else above
+            above = source.get(id(getattr(node, "parent", None)))
+            source[id(node)] = id(node) if node.label else above
             if not node.label and above is not None:
                 shared.add(above)
 
@@ -161,55 +162,30 @@ def _create_xde(
                 return referred
         return label
 
-    def set_name_and_color(node: Shape, node_label: TDF_Label, name: str) -> None:
-        """Assign label/color metadata for one XDE node label.
-
-        Behavior:
-        - Sets `TDataStd_Name` to `name` on the instance label and, when
-          applicable, also on the referred shape label so STEP PRODUCT names
-          persist.
-        - Sets generic color on the instance label and referred label.
-        - For leaf `Compound` wrappers (`Part`, `Sketch`, `Curve`), propagates
-          color to relevant sub-shapes (solid/face/edge) using appropriate
-          XCAF color channels.
-        """
+    def set_name_and_color(
+        node: Shape, node_label: TDF_Label, name: str, definition: bool
+    ) -> None:
+        """Assign occurrence metadata and definition subshape colors."""
         if node_label.IsNull():
             return
-
         if name:
             TDataStd_Name.Set_s(node_label, TCollection_ExtendedString(name, True))
-            if XCAFDoc_ShapeTool.IsReference_s(node_label):
-                referred = TDF_Label()
-                if (
-                    XCAFDoc_ShapeTool.GetReferredShape_s(node_label, referred)
-                    and not referred.IsNull()
-                ):
-                    TDataStd_Name.Set_s(
-                        referred, TCollection_ExtendedString(name, True)
-                    )
-
         if node.color is not None:
-            node_color_type = XCAFDoc_ColorType.XCAFDoc_ColorGen
-            color_tool.SetColor(node_label, node.color.wrapped, node_color_type)
-
-            if XCAFDoc_ShapeTool.IsReference_s(node_label):
-                referred = TDF_Label()
-                if (
-                    XCAFDoc_ShapeTool.GetReferredShape_s(node_label, referred)
-                    and not referred.IsNull()
-                ):
-                    color_tool.SetColor(referred, node.color.wrapped, node_color_type)
+            color_tool.SetColor(
+                node_label, node.color.wrapped, XCAFDoc_ColorType.XCAFDoc_ColorGen
+            )
 
             # Sub-shape color handling for leaf Compound wrappers
-            if isinstance(node, Compound) and not node.children:
+            if definition and isinstance(node, Compound) and not node.children:
+                stored_shape = shape_tool.GetShape_s(node_label)
                 if isinstance(node, Part):
-                    explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_SOLID)
+                    explorer = TopExp_Explorer(stored_shape, ta.TopAbs_SOLID)
                     sub_color_type = XCAFDoc_ColorType.XCAFDoc_ColorSurf
                 elif isinstance(node, Sketch):
-                    explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_FACE)
+                    explorer = TopExp_Explorer(stored_shape, ta.TopAbs_FACE)
                     sub_color_type = XCAFDoc_ColorType.XCAFDoc_ColorSurf
                 elif isinstance(node, Curve):
-                    explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_EDGE)
+                    explorer = TopExp_Explorer(stored_shape, ta.TopAbs_EDGE)
                     sub_color_type = XCAFDoc_ColorType.XCAFDoc_ColorCurv
                 else:
                     explorer = TopExp_Explorer()
@@ -225,40 +201,64 @@ def _create_xde(
                         )
                     explorer.Next()
 
-    # Single preorder pass: parent labels are created before children, so we can
-    # build label_map and assign metadata without a second traversal.
     for node in PreOrderIter(to_export):
         if node.is_empty:
             continue
 
-        # Don't set parent if node is the one getting exported.
         parent = None if node is to_export else getattr(node, "parent", None)
+        inherited = name_map.get(id(parent), "")
+        name_map[id(node)] = node.label or inherited
+        node_name = node.label
+        if auto_naming and (id(node) in shared or (not node_name and inherited)):
+            index = numbered.get(name_map[id(node)], 0)
+            node_name = f"{name_map[id(node)]}-{index}"
+            numbered[name_map[id(node)]] = index + 1
+
         if parent is None:
             node_label = shape_tool.AddShape(node.wrapped, False)
+            definition_label = resolve_component_parent_label(node_label)
+            set_name_and_color(node, definition_label, node_name, True)
         else:
-            parent_label = label_map.get(parent, TDF_Label())
+            parent_label = label_map.get(id(parent), TDF_Label())
             parent_label = resolve_component_parent_label(parent_label)
             if parent_label.IsNull():
                 continue
-            node_label = shape_tool.AddComponent(parent_label, node.wrapped)
+            normalized = node.wrapped.Located(TopLoc_Location())
+            color = node.color
+            rgba = None
+            if color is not None:
+                rgb = color.wrapped.GetRGB()
+                rgba = (rgb.Red(), rgb.Green(), rgb.Blue(), color.wrapped.Alpha())
+            key = (
+                geometry.Add(normalized),
+                normalized.Orientation(),
+                node_name if named_products else "",
+                rgba,
+                type(node),
+            )
+            definition_label = products.get(key) if not node.children else None
+            if definition_label is None:
+                definition_label = shape_tool.NewShape()
+                if not node.children:
+                    # STEP transfer shares products by topology. Separate metadata
+                    # variants while retaining analytic geometry and tessellation.
+                    exported_shape = BRepBuilderAPI_Copy(
+                        normalized, False, True
+                    ).Shape()
+                    shape_tool.SetShape(definition_label, exported_shape)
+                set_name_and_color(node, definition_label, node_name, True)
+                if not node.children:
+                    products[key] = definition_label
+            node_label = shape_tool.AddComponent(
+                parent_label, definition_label, node.wrapped.Location()
+            )
 
         if node_label.IsNull():
             continue
-
-        label_map[node] = node_label
-        inherited = name_map.get(parent, "")
-        name_map[node] = node.label or inherited
-        node_name = node.label
-        if auto_naming and (node in shared or (not node_name and inherited)):
-            index = numbered.get(name_map[node], 0)
-            node_name = f"{name_map[node]}-{index}"
-            numbered[name_map[node]] = index + 1
-        if node_name or node.color is not None:
-            set_name_and_color(node, node_label, node_name)
+        label_map[id(node)] = node_label
+        set_name_and_color(node, node_label, node_name, False)
 
     shape_tool.UpdateAssemblies()
-
-    # print(f"Is document valid: {XCAFDoc_DocumentTool.IsXCAFDocument_s(doc)}")
 
     return doc
 
@@ -350,7 +350,9 @@ def export_gltf(
             node.mesh(linear_deflection, angular_deflection)
 
     # Create the XCAF document
-    doc: TDocStd_Document = _create_xde(to_export, unit, auto_naming=False)
+    doc: TDocStd_Document = _create_xde(
+        to_export, unit, auto_naming=False, named_products=False
+    )
 
     # Write the glTF file
     writer = RWGltf_CafWriter(

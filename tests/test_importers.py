@@ -483,5 +483,61 @@ class ImportSVGValidation(unittest.TestCase):
                 import_svg("unused.svg")
 
 
+@pytest.mark.parametrize("placed", [False, True])
+@pytest.mark.parametrize("named", [False, True])
+def test_step_shared_occurrence_metadata(tmp_path, placed, named):
+    from copy import copy
+
+    leaf = Solid.make_box(1, 2, 3)
+    leg = Compound(children=[leaf, Pos(3, 0, 0) * leaf])
+    branches = []
+    for index, name in enumerate(("a", "b", "c")):
+        branch = copy(leg)
+        branch.label = name
+        branch.color = Color((1, 0, 0) if index == 0 else (0, 0, 1))
+        if named:
+            branch.children[0].label = f"upper-{name}"
+            branch.children[1].label = f"lower-{name}"
+        branch.children[1].color = Color("green")
+        if placed:
+            branch.location = Location((0, index * 5, 0), (0, 0, index * 30))
+        branches.append(branch)
+    assembly = Compound(label="assembly", children=branches)
+    if placed:
+        assembly.location = Location((10, 20, 30), (10, 20, 30))
+    originals = [child for branch in branches for child in branch.children]
+    nodes = [assembly, *branches, *originals]
+    snapshots = [(node.wrapped, node.label, node.color) for node in nodes]
+    assert originals[0].wrapped.IsPartner(originals[2].wrapped)
+    path = tmp_path / "shared.step"
+    export_step(assembly, path)
+    imported = import_step(path)
+    if placed:
+        assert len(imported.children) == 1
+        imported = imported.children[0]
+
+    assert [branch.label for branch in imported.children] == [
+        name if named else f"{name}-0" for name in ("a", "b", "c")
+    ]
+    for source, result in zip(branches, imported.children):
+        assert len(result.children) == 2
+        assert [child.label for child in result.children] == (
+            [f"upper-{source.label}", f"lower-{source.label}"]
+            if named
+            else [f"{source.label}-1", f"{source.label}-2"]
+        )
+        for before, after in zip(source.children, result.children):
+            assert tuple(after.color) == pytest.approx(tuple(before.color), abs=1e-6)
+            assert after.volume == pytest.approx(before.volume)
+            expected = before.located(before.global_location)
+            actual = after.located(after.global_location)
+            assert tuple(actual.center()) == pytest.approx(tuple(expected.center()))
+    for node, (wrapped, label, color) in zip(nodes, snapshots):
+        assert node.wrapped.IsEqual(wrapped)
+        assert node.label == label
+        assert node.color == color
+    assert originals[0].wrapped.IsPartner(originals[2].wrapped)
+
+
 if __name__ == "__main__":
     unittest.main()
