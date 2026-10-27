@@ -52,9 +52,9 @@ Cheat Sheet
             | :class:`~objects_sketch.Rectangle`
             | :class:`~objects_sketch.RectangleRounded`
             | :class:`~objects_sketch.RegularPolygon`
-            | :class:`~objects_sketch.SlotArc`
             | :class:`~objects_sketch.SlotCenterPoint`
             | :class:`~objects_sketch.SlotCenterToCenter`
+            | :class:`~objects_sketch.SlotCurve`
             | :class:`~objects_sketch.SlotOverall`
             | :class:`~objects_sketch.Superellipse`
             | :class:`~objects_sketch.Text`

@@ -42,28 +42,26 @@ from build123d.topology import Compound, Shape, Solid
 class TestImportExport(unittest.TestCase):
     def test_import_export(self):
         original_box = Solid.make_box(1, 1, 1)
-        export_step(original_box, "test_box.step")
-        step_box = import_step("test_box.step")
+        export_step(original_box, self.tmp_path / "test_box.step")
+        step_box = import_step(self.tmp_path / "test_box.step")
         self.assertTrue(step_box.is_valid)
         self.assertAlmostEqual(step_box.volume, 1, 5)
-        export_brep(step_box, "test_box.brep")
-        brep_box = import_brep("test_box.brep")
+        export_brep(step_box, self.tmp_path / "test_box.brep")
+        brep_box = import_brep(self.tmp_path / "test_box.brep")
         self.assertTrue(brep_box.is_valid)
         self.assertAlmostEqual(brep_box.volume, 1, 5)
-        os.remove("test_box.step")
-        os.remove("test_box.brep")
         with self.assertRaises(FileNotFoundError):
-            step_box = import_step("test_box.step")
+            step_box = import_step(self.tmp_path / "missing.step")
 
     def test_import_stl(self):
         # export solid
         original_box = Solid.make_box(1, 2, 3)
         exporter = Mesher()
         exporter.add_shape(original_box)
-        exporter.write("test.stl")
+        exporter.write(self.tmp_path / "test.stl")
 
         # import as face
-        stl_box = import_stl("test.stl")
+        stl_box = import_stl(self.tmp_path / "test.stl")
         self.assertAlmostEqual(stl_box.position, (0, 0, 0), 5)
 
     def test_step_round_trip_preserves_assembly_child_locations(self):

@@ -87,16 +87,14 @@ class DirectApiTestCase(unittest.TestCase):
 class TestExportStep(DirectApiTestCase):
     def test_export_step_solid(self):
         b = Box(1, 1, 1).locate(Pos(-1, -2, -3))
-        self.assertTrue(export_step(b, "box.step"))
-        with open("box.step", "r") as file:
+        self.assertTrue(export_step(b, self.tmp_path / "box.step"))
+        with open(self.tmp_path / "box.step", "r") as file:
             step_data = file.read()
-        os.remove("box.step")
         self.assertEqual(step_data.count("VERTEX_POINT"), len(b.vertices()))
 
     def test_export_step_child_of_assembly(self):
         assembly = Compound(children=[Box(1, 1, 1)])
-        self.assertTrue(export_step(assembly.children[0], "box.step"))
-        os.remove("box.step")
+        self.assertTrue(export_step(assembly.children[0], self.tmp_path / "box.step"))
 
     def test_export_step_assembly(self):
         a = Sphere(1).solid()
@@ -107,10 +105,11 @@ class TestExportStep(DirectApiTestCase):
         assembly = Compound(children=[a, b])
         assembly.label = "assembly"
         assembly.color = Color(1, 0, 0)
-        self.assertTrue(export_step(assembly, "assembly.step", unit=Unit.IN))
-        with open("assembly.step", "r") as file:
+        self.assertTrue(
+            export_step(assembly, self.tmp_path / "assembly.step", unit=Unit.IN)
+        )
+        with open(self.tmp_path / "assembly.step", "r") as file:
             step_data = file.read()
-        os.remove("assembly.step")
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('red')"), -1)
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('blue')"), -1)
         # Check for inches
@@ -128,10 +127,9 @@ class TestExportStep(DirectApiTestCase):
         test_sketch = test.sketch
         test_sketch.label = "sketch"
         test_sketch.color = Color("red")
-        self.assertTrue(export_step(test_sketch, "sketch.step"))
-        with open("sketch.step", "r") as file:
+        self.assertTrue(export_step(test_sketch, self.tmp_path / "sketch.step"))
+        with open(self.tmp_path / "sketch.step", "r") as file:
             step_data = file.read()
-        os.remove("sketch.step")
         self.assertEqual(step_data.count("VERTEX_POINT"), len(test.vertices()))
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('red')"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('sketch',"), -1)
@@ -143,10 +141,9 @@ class TestExportStep(DirectApiTestCase):
         test_line = test.line
         test_line.label = "curve"
         test_line.color = Color("red")
-        self.assertTrue(export_step(test_line, "curve.step"))
-        with open("curve.step", "r") as file:
+        self.assertTrue(export_step(test_line, self.tmp_path / "curve.step"))
+        with open(self.tmp_path / "curve.step", "r") as file:
             step_data = file.read()
-        os.remove("curve.step")
         self.assertEqual(step_data.count("LINE"), len(test.edges()))
         self.assertNotEqual(step_data.find("DRAUGHTING_PRE_DEFINED_COLOUR('red')"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('curve',"), -1)
@@ -156,20 +153,20 @@ class TestExportStep(DirectApiTestCase):
     )
     def test_export_step_unknown(self):
         box = Box(1, 1, 1)
-        self.assertTrue(export_step(box, "box_read_only.step"))
-        os.chmod("box_read_only.step", 0o444)  # Make the file read only
+        self.assertTrue(export_step(box, self.tmp_path / "box_read_only.step"))
+        os.chmod(self.tmp_path / "box_read_only.step", 0o444)  # Make the file read only
         with self.assertRaises(RuntimeError):
-            export_step(box, "box_read_only.step")
-        os.chmod("box_read_only.step", 0o777)  # Make the file read/write
-        os.remove("box_read_only.step")
+            export_step(box, self.tmp_path / "box_read_only.step")
+        os.chmod(
+            self.tmp_path / "box_read_only.step", 0o777
+        )  # Make the file read/write
 
     def test_export_step_timestamp_datetime(self):
         b = Box(1, 1, 1)
         t = datetime(2025, 5, 6, 21, 30, 25)
-        self.assertTrue(export_step(b, "box.step", timestamp=t))
-        with open("box.step", "r") as file:
+        self.assertTrue(export_step(b, self.tmp_path / "box.step", timestamp=t))
+        with open(self.tmp_path / "box.step", "r") as file:
             step_data = file.read()
-        os.remove("box.step")
         self.assertEqual(
             re.findall("FILE_NAME\\('[^']*','([^']*)'", step_data),
             ["2025-05-06T21:30:25"],
@@ -177,10 +174,11 @@ class TestExportStep(DirectApiTestCase):
 
     def test_export_step_timestamp_str(self):
         b = Box(1, 1, 1)
-        self.assertTrue(export_step(b, "box.step", timestamp="0000-00-00T00:00:00"))
-        with open("box.step", "r") as file:
+        self.assertTrue(
+            export_step(b, self.tmp_path / "box.step", timestamp="0000-00-00T00:00:00")
+        )
+        with open(self.tmp_path / "box.step", "r") as file:
             step_data = file.read()
-        os.remove("box.step")
         self.assertEqual(
             re.findall("FILE_NAME\\('[^']*','([^']*)'", step_data),
             ["0000-00-00T00:00:00"],
@@ -205,10 +203,9 @@ class TestExportStep(DirectApiTestCase):
         assy = Compound(children=[root, sub])
         assy.label = "assy"
 
-        self.assertTrue(export_step(assy, "nested.step"))
-        with open("nested.step", "r") as file:
+        self.assertTrue(export_step(assy, self.tmp_path / "nested.step"))
+        with open(self.tmp_path / "nested.step", "r") as file:
             step_data = file.read()
-        os.remove("nested.step")
 
         self.assertNotEqual(step_data.find("PRODUCT('assy',"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('level1',"), -1)
@@ -231,10 +228,9 @@ class TestExportStep(DirectApiTestCase):
         part.label = "part"
         assembly = Compound(label="assembly", children=[box, sphere, part])
 
-        self.assertTrue(export_step(assembly, "named.step"))
-        with open("named.step", "r") as file:
+        self.assertTrue(export_step(assembly, self.tmp_path / "named.step"))
+        with open(self.tmp_path / "named.step", "r") as file:
             step_data = file.read()
-        os.remove("named.step")
 
         # No auto-generated names may remain in the exported STEP
         self.assertEqual(step_data.find("PRODUCT('SOLID'"), -1)
@@ -261,10 +257,9 @@ class TestExportStep(DirectApiTestCase):
         assy.label = "assy"
         assy.color = Color(0, 1, 0)  # Green
 
-        self.assertTrue(export_step(assy, "override.step"))
-        with open("override.step", "r") as file:
+        self.assertTrue(export_step(assy, self.tmp_path / "override.step"))
+        with open(self.tmp_path / "override.step", "r") as file:
             step_data = file.read()
-        os.remove("override.step")
 
         self.assertNotEqual(step_data.find("PRODUCT('child_red',"), -1)
         self.assertNotEqual(step_data.find("PRODUCT('child_blue',"), -1)
@@ -404,24 +399,22 @@ class TestExportGltf(DirectApiTestCase):
         box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
         box.color = Color(0, 0, 1)
         box.label = "box"
-        self.assertTrue(export_gltf(box, "box.gltf", binary=False))
-        with open("box.gltf", "r") as file:
+        self.assertTrue(export_gltf(box, self.tmp_path / "box.gltf", binary=False))
+        with open(self.tmp_path / "box.gltf", "r") as file:
             gltf_json_str = file.read()
         gltf_json = json.loads(gltf_json_str)
         self.assertEqual(gltf_json["meshes"][0]["name"], box.label)
         self.assertEqual(gltf_json["nodes"][0]["name"], box.label)
-        os.remove("box.gltf")
-        os.remove("box.bin")
 
     # def test_export_gltf_error(self):
     #     box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
-    #     export_gltf(box, "box.gltf")
-    #     os.chmod("box.gltf", 0o444)  # Make the file read only
+    #     export_gltf(box, self.tmp_path / "box.gltf")
+    #     os.chmod(self.tmp_path / "box.gltf", 0o444)  # Make the file read only
     #     with self.assertRaises(RuntimeError):
-    #         export_gltf(box, "box.gltf")
-    #     os.chmod("box.gltf", 0o777)  # Make the file read/write
-    #         os.remove("box.gltf")
-    #         os.remove("box.bin")
+    #         export_gltf(box, self.tmp_path / "box.gltf")
+    #     os.chmod(self.tmp_path / "box.gltf", 0o777)  # Make the file read/write
+    #         os.remove(self.tmp_path / "box.gltf")
+    #         os.remove(self.tmp_path / "box.bin")
 
 
 def test_export_unicode_labels(tmp_path):
@@ -672,74 +665,58 @@ class TestExportObj(DirectApiTestCase):
     def test_export_obj_box(self):
         """Box exports valid OBJ with matching vertex/UV/normal counts."""
         box = Box(10, 20, 30)
-        path = "test_box.obj"
-        try:
-            self.assertTrue(export_obj(box, path))
-            with open(path) as f:
-                lines = f.readlines()
-            v = sum(1 for l in lines if l.startswith("v "))
-            vt = sum(1 for l in lines if l.startswith("vt "))
-            vn = sum(1 for l in lines if l.startswith("vn "))
-            faces = sum(1 for l in lines if l.startswith("f "))
-            self.assertEqual(v, vt)
-            self.assertEqual(v, vn)
-            self.assertGreater(faces, 0)
-        finally:
-            if os.path.exists(path):
-                os.remove(path)
+        path = self.tmp_path / "test_box.obj"
+        self.assertTrue(export_obj(box, path))
+        with open(path) as f:
+            lines = f.readlines()
+        v = sum(1 for l in lines if l.startswith("v "))
+        vt = sum(1 for l in lines if l.startswith("vt "))
+        vn = sum(1 for l in lines if l.startswith("vn "))
+        faces = sum(1 for l in lines if l.startswith("f "))
+        self.assertEqual(v, vt)
+        self.assertEqual(v, vn)
+        self.assertGreater(faces, 0)
 
     def test_export_obj_indices_valid(self):
         """All face indices in OBJ are within bounds."""
         cyl = Cylinder(5, 15)
-        path = "test_cyl.obj"
-        try:
-            export_obj(cyl, path)
-            with open(path) as f:
-                lines = f.readlines()
-            nv = sum(1 for l in lines if l.startswith("v "))
-            for line in lines:
-                if not line.startswith("f "):
-                    continue
-                for part in line.strip().split()[1:]:
-                    vi, ti, ni = (int(x) for x in part.split("/"))
-                    self.assertGreaterEqual(vi, 1)
-                    self.assertLessEqual(vi, nv)
-                    self.assertGreaterEqual(ti, 1)
-                    self.assertLessEqual(ti, nv)
-        finally:
-            if os.path.exists(path):
-                os.remove(path)
+        path = self.tmp_path / "test_cyl.obj"
+        export_obj(cyl, path)
+        with open(path) as f:
+            lines = f.readlines()
+        nv = sum(1 for l in lines if l.startswith("v "))
+        for line in lines:
+            if not line.startswith("f "):
+                continue
+            for part in line.strip().split()[1:]:
+                vi, ti, ni = (int(x) for x in part.split("/"))
+                self.assertGreaterEqual(vi, 1)
+                self.assertLessEqual(vi, nv)
+                self.assertGreaterEqual(ti, 1)
+                self.assertLessEqual(ti, nv)
 
     def test_export_obj_no_atlas(self):
         """OBJ export works with atlas_packing=False."""
         box = Box(5, 5, 5)
-        path = "test_no_atlas.obj"
-        try:
-            self.assertTrue(export_obj(box, path, atlas_packing=False))
-            self.assertGreater(os.path.getsize(path), 0)
-        finally:
-            if os.path.exists(path):
-                os.remove(path)
+        path = self.tmp_path / "test_no_atlas.obj"
+        self.assertTrue(export_obj(box, path, atlas_packing=False))
+        self.assertGreater(os.path.getsize(path), 0)
 
     def test_export_obj_without_uvs(self):
         """OBJ export without UVs omits vt/vn records and uses plain face indices."""
         box = Box(5, 5, 5)
-        path = "test_no_uvs.obj"
-        try:
-            self.assertTrue(export_obj(box, path, include_uvs=False))
-            with open(path) as f:
-                lines = f.readlines()
-            vt = sum(1 for l in lines if l.startswith("vt "))
-            vn = sum(1 for l in lines if l.startswith("vn "))
-            face_lines = [l.strip() for l in lines if l.startswith("f ")]
-            self.assertEqual(vt, 0)
-            self.assertEqual(vn, 0)
-            self.assertGreater(len(face_lines), 0)
-            for line in face_lines:
-                self.assertNotIn("/", line)
-        finally:
-            if os.path.exists(path):
-                os.remove(path)
+        path = self.tmp_path / "test_no_uvs.obj"
+        self.assertTrue(export_obj(box, path, include_uvs=False))
+        with open(path) as f:
+            lines = f.readlines()
+        vt = sum(1 for l in lines if l.startswith("vt "))
+        vn = sum(1 for l in lines if l.startswith("vn "))
+        face_lines = [l.strip() for l in lines if l.startswith("f ")]
+        self.assertEqual(vt, 0)
+        self.assertEqual(vn, 0)
+        self.assertGreater(len(face_lines), 0)
+        for line in face_lines:
+            self.assertNotIn("/", line)
 
     def test_export_obj_to_bytesio(self):
         """OBJ export to BytesIO produces valid content."""
@@ -776,21 +753,17 @@ class TestExportGltfUVs(DirectApiTestCase):
     def test_gltf_with_uvs_has_texcoord(self):
         """glTF with include_uvs=True contains TEXCOORD_0."""
         box = Box(10, 20, 30)
-        path = "test_uvs.gltf"
-        try:
-            export_gltf(box, path, binary=False)
-            with open(path) as f:
-                gltf = json.load(f)
-            attrs = [
-                p.get("attributes", {})
-                for m in gltf.get("meshes", [])
-                for p in m.get("primitives", [])
-            ]
-            has_texcoord = any("TEXCOORD_0" in a for a in attrs)
-            self.assertTrue(has_texcoord)
-        finally:
-            if os.path.exists(path):
-                os.remove(path)
+        path = self.tmp_path / "test_uvs.gltf"
+        export_gltf(box, path, binary=False)
+        with open(path) as f:
+            gltf = json.load(f)
+        attrs = [
+            p.get("attributes", {})
+            for m in gltf.get("meshes", [])
+            for p in m.get("primitives", [])
+        ]
+        has_texcoord = any("TEXCOORD_0" in a for a in attrs)
+        self.assertTrue(has_texcoord)
 
 
 if __name__ == "__main__":

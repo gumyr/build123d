@@ -388,7 +388,7 @@ class Vector:
         based on this math: angle = atan2((Va × Vb) ⋅ Vn, Va ⋅ Vb)
 
         Args:
-            v (Vector): Second Vector
+            vec (Vector): Second Vector
             normal (Vector, optional): normal direction. Defaults to None.
 
         Returns:
@@ -427,13 +427,10 @@ class Vector:
         """Vector is projected onto the plane provided as input.
 
         Args:
-          args: Plane object
-
-        Returns the projected vector.
-          plane: Plane:
+            plane (Plane): plane to project onto
 
         Returns:
-
+            Vector: the projected vector
         """
         base = plane.origin
         normal = plane.z_dir

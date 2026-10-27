@@ -34,6 +34,7 @@ from os import PathLike
 from typing import cast
 
 import trianglesolver
+from typing_extensions import deprecated
 
 from build123d.build_common import BaseObject, flatten_sequence
 from build123d.build_enums import Align, FontStyle, Mode, TextAlign
@@ -68,7 +69,7 @@ class BaseSketchObject(Sketch, BaseObject):
     Base class for all BuildSketch objects
 
     Args:
-        face (Face): face to create
+        obj (Face): face to create
         rotation (float, optional): angle to rotate object. Defaults to 0
         align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
             Defaults to None
@@ -351,13 +352,14 @@ class RegularPolygon(BaseSketchObject):
         super().__init__(face, rotation=0, align=None, mode=mode)
 
 
-class SlotArc(BaseSketchObject):
-    """Sketch Object: Slot Arc
+class SlotCurve(BaseSketchObject):
+    """Sketch Object: Slot Curve
 
-    Create a slot defined by a line and height. May be an arc, stright line, spline, etc.
+    Create a slot defined by its center line and height. The center line may
+    be any Edge or Wire: an arc, a straight line, a spline, a polyline, etc.
 
     Args:
-        arc (Edge | Wire): center line of slot
+        curve (Edge | Wire): center line of slot
         height (float): diameter of end arcs
         rotation (float, optional): angle to rotate object. Defaults to 0
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
@@ -367,18 +369,47 @@ class SlotArc(BaseSketchObject):
 
     def __init__(
         self,
-        arc: Edge | Wire,
+        curve: Edge | Wire,
         height: float,
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
 
-        self.arc = arc
+        self.curve = curve
         self.slot_height = height
 
-        arc = arc if isinstance(arc, Wire) else Wire([arc])
-        face = Face(arc.offset_2d(height / 2))
+        curve = curve if isinstance(curve, Wire) else Wire([curve])
+        face = Face(curve.offset_2d(height / 2))
         super().__init__(face, rotation, None, mode)
+
+
+@deprecated("SlotArc is deprecated; use SlotCurve instead.")
+class SlotArc(SlotCurve):
+    """Sketch Object: Slot Arc
+
+    .. deprecated::
+        Use :class:`~objects_sketch.SlotCurve` instead; the center line was
+        never limited to an arc.
+
+    Create a slot defined by a line and height. May be an arc, straight line,
+    spline, etc.
+
+    Args:
+        arc (Edge | Wire): center line of slot
+        height (float): diameter of end arcs
+        rotation (float, optional): angle to rotate object. Defaults to 0
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD
+    """
+
+    def __init__(
+        self,
+        arc: Edge | Wire,
+        height: float,
+        rotation: float = 0,
+        mode: Mode = Mode.ADD,
+    ):
+        self.arc = arc
+        super().__init__(arc, height, rotation, mode)
 
 
 class SlotCenterPoint(BaseSketchObject):

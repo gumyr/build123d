@@ -1976,7 +1976,9 @@ def corner_relief(
       flange edges are parallel.
 
     The first three are cut in the flat pattern and keep their shape on the
-    developed blank. ``CONSTANT_WIDTH`` is defined by the formed part instead.
+    developed blank: one wide enough to pass through a bend carries on into
+    the flange beyond it, as it would on the blank. ``CONSTANT_WIDTH`` is
+    defined by the formed part instead.
 
     Args:
         vertices: Corner vertex or vertices to relieve.
@@ -2083,7 +2085,9 @@ def _cut_corner_relief(
         cut = shell.cut(cutter)
         result = cut if isinstance(cut, Shell) else Shell(_faces_of(cut))
     elif profile is not None:
-        result = _replace_relief_faces(shell, _trim_faces(at.frames, profile))
+        result = _replace_relief_faces(
+            shell, _trim_faces(at.frames + at.flanges, profile)
+        )
     else:
         raise ValueError(f"no profile built for {relief_type}")
 
@@ -2262,15 +2266,19 @@ def _affine_frame(
     origin: Vector,
     axes: tuple[Vector, Vector],
     scales: tuple[float, float] = (1.0, 1.0),
+    origin_at: tuple[float, float] = (0.0, 0.0),
 ) -> UVFrame:
     """The flat frame of a planar or cylindrical face whose flat point (x, y)
-    lies at ``origin + axes[0] * x + axes[1] * y``, as far as the face is flat.
+    lies at ``origin + axes[0] * (x - origin_at[0]) + axes[1] * (y - origin_at[1])``,
+    as far as the face is flat.
 
     Both surfaces develop affinely: a flat direction's rate of change of a
     parameter is its component along that parameter's derivative over the
     derivative's squared length, the same everywhere on the face. A flat axis
     that runs into a bend is measured on the blank, so it is scaled by the
-    surface radius over the neutral one.
+    surface radius over the neutral one. ``origin_at`` is where ``origin``
+    sits on the blank, for a face that starts some way from the flat origin,
+    such as the flange past a bend.
     """
     u0, v0 = face.param_at_point(origin, normalize=False)
     d_u = face.derivative_at(u0, v0, 1, 0, normalize=False)
@@ -2280,6 +2288,8 @@ def _affine_frame(
         (axis.dot(d_u) * scale, axis.dot(d_v) * scale)
         for axis, scale in zip(axes, scales)
     ]
+    u0 -= rates[0][0] * origin_at[0] + rates[1][0] * origin_at[1]
+    v0 -= rates[0][1] * origin_at[0] + rates[1][1] * origin_at[1]
     return UVFrame(
         face,
         Matrix(
@@ -2294,14 +2304,17 @@ def _affine_frame(
 
 def _corner_frames(
     shell: Shell, base: Face, corner: Vector, parameters: SheetMetalParameters
-) -> tuple[list[UVFrame], list[Vector], bool]:
+) -> tuple[list[UVFrame], list[UVFrame], list[Vector], bool]:
     """Flat frames for the faces meeting at one corner of a planar face.
 
-    All three share one flat coordinate system with its origin at ``corner``:
+    All share one flat coordinate system with its origin at ``corner``:
     ``x`` measures past the tangent line of one bend and ``y`` past the other.
-    Returns the base's frame followed by the two bends', the 3D directions of
-    the two flat axes, and whether the sheet wraps around the corner rather
-    than stopping at it.
+    Returns the base's frame followed by the two bends', then the frames of
+    the flanges past the bends - each starting where its bend's blank width
+    ends, so a relief wide enough to pass through a bend carries on into the
+    flat beyond it as it would on the blank - the 3D directions of the two
+    flat axes, and whether the sheet wraps around the corner rather than
+    stopping at it.
     """
     # The two bends whose tangent lines cross at this corner. They are found
     # by line rather than by adjacency, because a flange gap pulls a bend back
@@ -2331,7 +2344,8 @@ def _corner_frames(
     # base: x unrolls the first bend and y the second
     axis_dir = [_fold_outward(base, edge) for edge, _ in touching]
     frames = [_affine_frame(base, corner, (axis_dir[0], axis_dir[1]))]
-    for index, (_, cylinder) in enumerate(touching):
+    flanges = []
+    for index, (edge, cylinder) in enumerate(touching):
         # measured on the neutral axis, so the flat coordinates are those of
         # the blank rather than of the reference surface
         radius = cylinder.radius
@@ -2343,7 +2357,58 @@ def _corner_frames(
         frames.append(
             _affine_frame(cylinder, corner, (axis_dir[0], axis_dir[1]), scales)
         )
-    return frames, axis_dir, _corner_is_concave(base, corner, axis_dir)
+        flange_frame = _flange_frame(
+            shell, base, edge, cylinder, corner, axis_dir, index, rolling
+        )
+        if flange_frame is not None:
+            flanges.append(flange_frame)
+    return frames, flanges, axis_dir, _corner_is_concave(base, corner, axis_dir)
+
+
+def _flange_frame(
+    shell: Shell,
+    base: Face,
+    fold: Edge,
+    cylinder: Face,
+    corner: Vector,
+    axis_dir: list[Vector],
+    index: int,
+    rolling: float,
+) -> UVFrame | None:
+    """The flat frame of the flange past a bend, in the corner's coordinates.
+
+    On the blank the flange starts one bend width - the neutral radius times
+    the bend angle - past the fold line, so its frame places the corner's
+    image on its own fold line that far along the bend's unroll axis. None
+    where nothing planar follows the bend.
+    """
+    along = fold.tangent_at()
+    far = None
+    for candidate in cylinder.edges():
+        if candidate.geom_type != GeomType.LINE:
+            continue
+        if abs(candidate.tangent_at().dot(along)) < 1 - TOLERANCE:
+            continue
+        planes = [
+            f
+            for f in _neighbours(candidate, shell, GeomType.PLANE)
+            if not f.is_same(base)
+        ]
+        if planes:
+            far = (candidate, planes[0])
+            break
+    if far is None:
+        return None
+    far_edge, flat = far
+    u_min, u_max, _, _ = cylinder._uv_bounds()
+    width = rolling * (u_max - u_min)
+    start = far_edge.position_at(0)
+    offset = corner - start
+    origin = start + along * offset.dot(along)
+    into = -_fold_outward(flat, far_edge)
+    axes = (into, axis_dir[1]) if index == 0 else (axis_dir[0], into)
+    origin_at = (width, 0.0) if index == 0 else (0.0, width)
+    return _affine_frame(flat, origin, axes, origin_at=origin_at)
 
 
 def _corner_is_concave(base: Face, corner: Vector, axis_dir: list) -> bool:
@@ -2445,6 +2510,7 @@ class _Corner:
     base: Face
     point: Vector
     frames: list[UVFrame]  # the base's frame, then the two bends'
+    flanges: list[UVFrame]  # the flats past the bends, where there are any
     axes: list[Vector]  # the flat axes in 3D, each into one bend
     wrapped: bool  # the sheet wraps around the corner rather than stopping
 
@@ -2463,8 +2529,8 @@ def _corner_at(
     shell: Shell, base: Face, corner: Vector, parameters: SheetMetalParameters
 ) -> _Corner:
     """Lay a corner out flat, once, for whatever relief is cut there."""
-    frames, axes, wrapped = _corner_frames(shell, base, corner, parameters)
-    return _Corner(base, corner, frames, axes, wrapped)
+    frames, flanges, axes, wrapped = _corner_frames(shell, base, corner, parameters)
+    return _Corner(base, corner, frames, flanges, axes, wrapped)
 
 
 def _corner_faces(shell: Shell, at: _Corner) -> list:

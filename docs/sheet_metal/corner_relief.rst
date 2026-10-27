@@ -34,7 +34,8 @@ The shapes
 The shape is named by ``ReliefType``. The first three are cut in the *flat
 pattern*, so that is where they come out their own shape: a round relief is a
 circle on the blank, not on the formed part, where the parts crossing a bend
-read smaller.
+read smaller. One wide enough to pass right through a bend carries on into
+the flange beyond it, as the hole would on the blank.
 
 .. image:: ../assets/sheet_metal/corner_relief_types.svg
     :align: center

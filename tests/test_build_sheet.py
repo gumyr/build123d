@@ -1168,10 +1168,10 @@ class TestFlangeNegativeGaps(unittest.TestCase):
         self.assertEqual(len(bp.part.solids()), 1)
 
     def test_walls_that_touch_close_the_sheet(self):
-        """At exactly the radius the walls meet, are sewn together, and the
-        unfold says so"""
+        """At exactly the radius the walls meet and are sewn together into a
+        sharp corner with no bend in it, which the unfold refuses"""
         bs = self.box(gaps=-1.5)
-        with self.assertRaisesRegex(ValueError, "touching at a corner"):
+        with self.assertRaisesRegex(ValueError, "joins two flats at 90° with no bend"):
             bs.sheet.unfold(bs.sheet_parameters)
 
     def test_a_set_back_bend_still_refuses_a_negative_gap(self):
@@ -2467,6 +2467,74 @@ def sheet_parameters(surface: SheetSurface) -> SheetMetalParameters:
 
 
 class TestUnfold(unittest.TestCase):
+    def test_a_sharp_fold_is_refused(self):
+        """#1528: two flats meeting at an angle with no bend between them
+        would be hinged at their edge and the pattern cut short"""
+        base = Face.make_rect(30, 40).moved(Pos(15, 0, 0))
+        wall = Face.make_rect(40, 25, Plane.YZ).moved(Pos(0, 0, 12.5))
+        sheet = Shell([base, wall])
+        with self.assertRaisesRegex(
+            ValueError, r"edge at \(0.0, 0.0, 0.0\) joins two flats at 90° with no bend"
+        ):
+            unfold(sheet, SheetMetalParameters(thickness=1.5, k_factor=0.4))
+
+        with BuildPart() as bracket:
+            Box(30, 40, 1.5, align=(Align.MIN, Align.CENTER, Align.MIN))
+            Box(1.5, 40, 25, align=(Align.MIN, Align.CENTER, Align.MIN))
+        surface, _, thickness = sheet_shells(bracket.part)
+        with self.assertRaisesRegex(ValueError, "give the fold a bend radius"):
+            unfold(
+                surface,
+                SheetMetalParameters(
+                    thickness=thickness, sheet_surface=SheetSurface.INSIDE
+                ),
+            )
+
+    def test_a_wall_leaving_its_bend_early_is_refused(self):
+        """#1528: an L whose wall leaves the bend 15° short of its tangent
+        folds through the missing angle at the wall's edge"""
+        with BuildPart() as part:
+            with BuildSketch(Plane.XZ):
+                with BuildLine():
+                    Line((-30, 0), (0, 0))
+                    arc = CenterArc((0, 2), 2, 270, 90)
+                    turn = radians(90 - 15)
+                    Line(arc @ 1, (arc @ 1) + Vector(cos(turn), sin(turn)) * 25)
+                    offset(amount=1.5, side=Side.RIGHT)
+                make_face()
+            extrude(amount=20, both=True)
+        surface, _, thickness = sheet_shells(part.part)
+        with self.assertRaisesRegex(ValueError, "joins a flat to a bend 11.33° off"):
+            unfold(
+                surface,
+                SheetMetalParameters(
+                    thickness=thickness, k_factor=0.4, sheet_surface=SheetSurface.INSIDE
+                ),
+            )
+
+    def test_a_tangent_wall_still_unfolds(self):
+        """The same L with the wall leaving at the tangent is a plain bend"""
+        with BuildPart() as part:
+            with BuildSketch(Plane.XZ):
+                with BuildLine():
+                    Line((-30, 0), (0, 0))
+                    arc = CenterArc((0, 2), 2, 270, 90)
+                    Line(arc @ 1, (arc @ 1) + Vector(0, 25))
+                    offset(amount=1.5, side=Side.RIGHT)
+                make_face()
+            extrude(amount=20, both=True)
+        surface, _, thickness = sheet_shells(part.part)
+        flat, face_map = unfold(
+            surface,
+            SheetMetalParameters(
+                thickness=thickness, k_factor=0.4, sheet_surface=SheetSurface.INSIDE
+            ),
+        )
+        self.assertEqual(sum(face_map[f].is_bend for f in flat.faces()), 1)
+        self.assertAlmostEqual(
+            flat.bounding_box().size.X, 30 + 25 + radians(90) * 2.6, 4
+        )
+
     def test_geometric_and_neutral_axis_development(self):
         """All reference surfaces produce the same neutral development, and so
         do both bend directions: the neutral fibre is k*t from the inside of the
@@ -3084,6 +3152,57 @@ class TestCornerRelief(unittest.TestCase):
         self.assertAlmostEqual(
             sheet.area - result.area, quarter * (1 + 2 * self.SCALE), 5
         )
+
+    def test_relief_carries_on_into_the_flanges(self):
+        """A relief wide enough to pass through a bend is still a hole on the
+        blank, so it carries on into the flange beyond the bend rather than
+        stopping at the bend's far tangent line."""
+        sheet = self.two_flange_sheet().sheet_local
+        walls = sheet.faces().filter_by(GeomType.PLANE).sort_by(SortBy.AREA)[:2]
+        result = corner_relief(
+            self.shared_corner(sheet),
+            ReliefType.ROUND,
+            radius=6.0,
+            sheet_parameters=self.PARAMETERS,
+        )
+        self.assertTrue(result.is_valid)
+        self.assertAlmostEqual(self.blank_removed(sheet, result), 0.75 * pi * 6**2, 4)
+        after = result.faces().filter_by(GeomType.PLANE).sort_by(SortBy.AREA)[:2]
+        for wall, cut in zip(walls, after):
+            self.assertLess(cut.area, wall.area - 1.0)
+
+    def test_bends_of_different_width(self):
+        """A shallow bend is narrower on the blank than a right-angle one, so
+        a small relief may pass through one bend and not the other; each
+        flange is cut from where its own bend ends."""
+        sheet = flange(
+            Rectangle(60, 40).edges().sort_by(Axis.X)[0],
+            length=15,
+            angle=45,
+            sheet_parameters=self.PARAMETERS,
+        )
+        sheet = flange(
+            sheet.flats().sort_by(Axis.Z)[0].edges().sort_by(Axis.Y)[0],
+            length=15,
+            angle=90,
+            sheet_parameters=self.PARAMETERS,
+        )
+        corner = min(
+            sheet.flats().sort_by(Axis.Z)[0].vertices(),
+            key=lambda vertex: (Vector(vertex) - Vector(-30, -20, 0)).length,
+        )
+        for radius in (1.0, 2.0, 3.0):
+            with self.subTest(radius=radius):
+                result = corner_relief(
+                    corner,
+                    ReliefType.ROUND,
+                    radius=radius,
+                    sheet_parameters=self.PARAMETERS,
+                )
+                self.assertTrue(result.is_valid)
+                self.assertAlmostEqual(
+                    self.blank_removed(sheet, result), 0.75 * pi * radius**2, 4
+                )
 
     def test_square_removes_three_quarters_of_a_square(self):
         sheet = self.two_flange_sheet().sheet_local

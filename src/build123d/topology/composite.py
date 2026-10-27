@@ -960,24 +960,31 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # If there are no elements or more than one element, return self
         return self
 
-    def _post_attach(self, parent: Compound):
-        """Method call after attaching to `parent`."""
-        logger.debug("Updated parent of %s to %s", self.label, parent.label)
-        parent._wrapped = _make_topods_compound_from_shapes(
-            [c.wrapped for c in parent.children]
-        )
+    def _rebuild_from_children(self):
+        """Rebuild the OCCT compound from the children at this Compound's location.
 
-    def _post_attach_children(self, children: Iterable[Shape]):
-        """Method call after attaching `children`."""
+        The children are placed relative to this Compound, so the new compound
+        keeps this Compound's location rather than starting at the origin.
+        """
         # _wrapped is initialized by Shape.__init__; pylint doesn't track it
         # through this hierarchy, though it does for a direct Shape subclass
         # pylint: disable=attribute-defined-outside-init
+        # pylint: disable=access-member-before-definition
+        compound = _make_topods_compound_from_shapes([c.wrapped for c in self.children])
+        compound.Location(self._wrapped.Location())
+        self._wrapped = compound
+
+    def _post_attach(self, parent: Compound):
+        """Method call after attaching to `parent`."""
+        logger.debug("Updated parent of %s to %s", self.label, parent.label)
+        parent._rebuild_from_children()
+
+    def _post_attach_children(self, children: Iterable[Shape]):
+        """Method call after attaching `children`."""
         if children:
             kids = ",".join([child.label for child in children])
             logger.debug("Adding children %s to %s", kids, self.label)
-            self._wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in self.children]
-            )
+            self._rebuild_from_children()
         # else:
         #     logger.debug("Adding no children to %s", self.label)
 
@@ -985,23 +992,16 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """Method call after detaching from `parent`."""
         logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         if parent.children:
-            parent._wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in parent.children]
-            )
+            parent._rebuild_from_children()
         # else:
         #     parent.wrapped = None
 
     def _post_detach_children(self, children):
         """Method call before detaching `children`."""
-        # _wrapped is initialized by Shape.__init__; pylint doesn't track it
-        # through this hierarchy, though it does for a direct Shape subclass
-        # pylint: disable=attribute-defined-outside-init
         if children:
             kids = ",".join([child.label for child in children])
             logger.debug("Removing children %s from %s", kids, self.label)
-            self._wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in self.children]
-            )
+            self._rebuild_from_children()
         # else:
         #     logger.debug("Removing no children from %s", self.label)
 

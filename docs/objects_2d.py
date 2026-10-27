@@ -69,14 +69,14 @@ svg.write("assets/regular_polygon_example.svg")
 # [Ex. 7]
 with BuildSketch() as example_7:
     arc = Edge.make_circle(1, start_angle=0, end_angle=45)
-    SlotArc(arc, 0.25)
+    SlotCurve(arc, 0.25)
 # [Ex. 7]
 s = 100 / max(*example_7.sketch.bounding_box().size)
 svg = ExportSVG(scale=s)
 svg.add_layer("dashed", line_type=LineType.DASHED)
 svg.add_shape(example_7.sketch)
 svg.add_shape(arc, "dashed")
-svg.write("assets/slot_arc_example.svg")
+svg.write("assets/slot_curve_example.svg")
 
 # [Ex. 8]
 with BuildSketch() as example_8:

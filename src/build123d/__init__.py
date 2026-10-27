@@ -158,6 +158,7 @@ __all__ = [
     "RegularPolygon",
     "SlotArc",
     "SlotCenterPoint",
+    "SlotCurve",
     "SlotCenterToCenter",
     "SlotOverall",
     "Superellipse",

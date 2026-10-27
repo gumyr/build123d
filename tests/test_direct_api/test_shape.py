@@ -29,6 +29,7 @@ license:
 # Always equal to any other object, to test that __eq__ cooperation is working
 import unittest
 import math
+import copy
 from random import uniform
 from unittest.mock import PropertyMock, patch
 
@@ -330,6 +331,21 @@ class TestShape(unittest.TestCase):
 
         box = Solid.make_box(1, 1, 1).moved(Pos(-2.5, 0, 0))
         self.assertAlmostEqual(box.located(Pos(1, 0, 0)).bounding_box().min.X, 1, 5)
+
+    def test_copy_vertex(self):
+        """A copy of a vertex keeps its location as well as its position."""
+        moved = Vertex(1, 0, 0).moved(Pos(10, 0, 0))
+
+        reference = copy.copy(moved)
+        self.assertAlmostEqual(reference.X, 11, 5)
+        self.assertEqual(reference, moved)
+        self.assertTrue(reference.wrapped.IsPartner(moved.wrapped))
+
+        duplicate = copy.deepcopy(moved)
+        self.assertAlmostEqual(duplicate.X, 11, 5)
+        self.assertAlmostEqual(duplicate.location.position.X, 10, 5)
+        self.assertFalse(duplicate.wrapped.IsPartner(moved.wrapped))
+        self.assertAlmostEqual(duplicate.scale(2).X, moved.scale(2).X, 5)
 
     def test_is_equal(self):
         box = Solid.make_box(1, 1, 1)

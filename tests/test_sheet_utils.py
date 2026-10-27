@@ -22,6 +22,7 @@ from build123d import (
     Pos,
     Rectangle,
     Shell,
+    SlotOverall,
     Solid,
     Vector,
     Wire,
@@ -243,7 +244,14 @@ class TestSheetUtils(unittest.TestCase):
         self.assertAlmostEqual(flat.area, whole.area, 6)
 
     def test_closed_shell_requires_a_cut(self):
+        """A loop of tangent faces, a stadium tube, has no place to start"""
+        tube = Shell.extrude(SlotOverall(20, 6).face().outer_wire(), (0, 0, 5))
         with self.assertRaisesRegex(ValueError, "requires a cut"):
+            _unfold_shell(tube.wrapped, None)
+
+    def test_sharp_folds_are_refused_before_anything_else(self):
+        """A box is closed too, but its faces meet at 90° with no bend"""
+        with self.assertRaisesRegex(ValueError, "joins two flats at 90° with no bend"):
             _unfold_shell(Box(1, 1, 1).shell().wrapped, None)
 
     def test_invalid_unfold_result_is_rejected(self):

@@ -27,7 +27,6 @@ license:
 """
 
 import math
-import os
 import platform
 import random
 import unittest
@@ -616,11 +615,10 @@ class TestFace(unittest.TestCase):
         # exporter = Mesher()
         # exporter.add_shape(torus)
         # exporter.write("test_torus.stl")
-        export_stl(torus, "test_torus.stl")
-        imported_torus = import_stl("test_torus.stl")
+        export_stl(torus, self.tmp_path / "test_torus.stl")
+        imported_torus = import_stl(self.tmp_path / "test_torus.stl")
         # The torus from stl is tessellated therefore the areas will only be close
         self.assertAlmostEqual(imported_torus.area, torus.area, 0)
-        os.remove("test_torus.stl")
 
     def test_is_coplanar(self):
         square = Face.make_rect(1, 1, plane=Plane.XZ)

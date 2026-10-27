@@ -309,6 +309,93 @@ class TestMixin1D(unittest.TestCase):
         self.assertAlmostEqual(locs[3].position, (0, -1, 0), 5)
         self.assertAlmostEqual(locs[3].orientation, (0, 90, 90), 5)
 
+    def test_locations_deflection_edge(self):
+        """Deflection locations on a circle sit on it, framed by its tangent and normal"""
+        radius = 10
+        circle = Edge.make_circle(radius)
+        locs = circle.locations(deflection=0.1)
+        pts = circle.positions(deflection=0.1)
+        self.assertEqual(len(locs), len(pts))
+        for loc, pnt in zip(locs, pts):
+            self.assertAlmostEqual(loc.position, pnt, 5)
+            # z along the tangent, so perpendicular to the radius; x along the
+            # normal, into the centre
+            self.assertAlmostEqual(loc.z_axis.direction.dot(loc.position), 0, 5)
+            self.assertAlmostEqual(loc.x_axis.direction, -loc.position.normalized(), 5)
+
+    def test_locations_deflection_wire(self):
+        """A wire of many edges is located in one pass over its composite curve"""
+        radius, edge_count = 10, 64
+        wire = Wire(
+            [
+                CenterArc((0, 0), radius, 360 * i / edge_count, 360 / edge_count)
+                for i in range(edge_count)
+            ]
+        )
+        locs = wire.locations(deflection=0.1)
+        self.assertEqual(len(locs), len(wire.positions(deflection=0.1)))
+        self.assertGreater(len(locs), edge_count)
+        for loc in locs:
+            self.assertAlmostEqual(loc.position.length, radius, 5)
+            self.assertAlmostEqual(loc.z_axis.direction.dot(loc.position), 0, 5)
+            self.assertAlmostEqual(loc.x_axis.direction, -loc.position.normalized(), 5)
+
+    def test_locations_deflection_corrected_frenet(self):
+        """The corrected frame keeps a constant x direction along a planar polyline"""
+        path = Polyline((0, 0), (10, 0), (10, 10), (0, 10))
+        locs = path.locations(deflection=0.1, frame_method=FrameMethod.CORRECTED)
+        self.assertGreaterEqual(len(locs), 4)
+        for loc in locs:
+            self.assertAlmostEqual(loc.x_axis.direction, locs[0].x_axis.direction, 5)
+            self.assertAlmostEqual(loc.z_axis.direction.length, 1, 5)
+
+    def test_locations_deflection_x_dir(self):
+        line = Edge.make_line((0, 0, 0), (10, 0, 0))
+        locs = line.locations(deflection=0.1, x_dir=(0, 1, 0))
+        self.assertEqual(len(locs), 2)
+        self.assertAlmostEqual(locs[0].position, (0, 0, 0), 5)
+        self.assertAlmostEqual(locs[1].position, (10, 0, 0), 5)
+        for loc in locs:
+            self.assertAlmostEqual(loc.x_axis.direction, (0, 1, 0), 5)
+            self.assertAlmostEqual(loc.z_axis.direction, (1, 0, 0), 5)
+        with self.assertRaises(ValueError):
+            line.locations(deflection=0.1, x_dir=(1, 0, 0))
+
+    def test_locations_deflection_reversed(self):
+        """A reversed edge is framed as location_at frames it"""
+        line = Edge.make_line((0, 0, 0), (4, 0, 0)).reversed()
+        first, last = line.locations(deflection=0.1)
+        self.assertAlmostEqual(first.position, line.location_at(1).position, 5)
+        self.assertAlmostEqual(
+            first.z_axis.direction, line.location_at(1).z_axis.direction, 5
+        )
+        self.assertAlmostEqual(last.position, line.location_at(0).position, 5)
+        self.assertAlmostEqual(
+            last.z_axis.direction, line.location_at(0).z_axis.direction, 5
+        )
+
+    def test_locations_missing_arguments(self):
+        with self.assertRaises(ValueError):
+            Edge.make_line((0, 0, 0), (1, 0, 0)).locations()
+
+    def test_location_at_corrected_frenet_position(self):
+        """The CORRECTED frame is placed where position_at puts it, in both modes"""
+        path = Polyline((0, 0), (10, 0), (10, 10), (0, 10))
+        for position in (0.0, 0.25, 0.6, 1.0):
+            for mode in (PositionMode.PARAMETER, PositionMode.LENGTH):
+                value = (
+                    position
+                    if mode == PositionMode.PARAMETER
+                    else (position * path.length)
+                )
+                with self.subTest(position=position, mode=mode):
+                    location = path.location_at(
+                        value, mode, frame_method=FrameMethod.CORRECTED
+                    )
+                    self.assertAlmostEqual(
+                        location.position, path.position_at(value, mode), 5
+                    )
+
     def test_location_at_corrected_frenet(self):
         # A polyline with sharp corners — problematic for classic Frenet
         path = Polyline((0, 0), (10, 0), (10, 10), (0, 10))
