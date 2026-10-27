@@ -236,7 +236,7 @@ class RevoluteJoint(Joint):
         axis (Axis): axis of rotation
         angle_reference (VectorLike, optional): direction normal to axis defining where
             angles will be measured from. Defaults to None.
-        range (tuple[float, float], optional): (min,max) angle of joint. Defaults to (0, 360).
+        angular_range (tuple[float, float], optional): (min,max) angle of joint. Defaults to (0, 360).
 
     Attributes:
         angle (float): angle of joint
@@ -361,7 +361,7 @@ class LinearJoint(Joint):
         label (str): joint label
         to_part (Union[Solid, Compound], optional): object to attach joint to
         axis (Axis): axis of linear motion
-        range (tuple[float, float], optional): (min,max) position of joint.
+        linear_range (tuple[float, float], optional): (min,max) position of joint.
             Defaults to (0, inf).
 
     Attributes:

@@ -2373,7 +2373,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Split this shape by the provided plane or face.
 
         Args:
-            surface (Plane | Face): surface to segment shape
+            tool (Plane | Face): surface to segment shape
             keep (Keep, optional): which object(s) to save. Defaults to Keep.TOP.
 
         Returns:

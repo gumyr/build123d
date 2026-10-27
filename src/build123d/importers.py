@@ -135,7 +135,7 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
     Extract shapes from a STEP file and return them as a Compound object.
 
     Args:
-        file_name (Union[PathLike, str, bytes]): file path of STEP file to import
+        filename (Union[PathLike, str, bytes]): file path of STEP file to import
 
     Raises:
         ValueError: can't open file

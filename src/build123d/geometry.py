@@ -388,7 +388,7 @@ class Vector:
         based on this math: angle = atan2((Va × Vb) ⋅ Vn, Va ⋅ Vb)
 
         Args:
-            v (Vector): Second Vector
+            vec (Vector): Second Vector
             normal (Vector, optional): normal direction. Defaults to None.
 
         Returns:
