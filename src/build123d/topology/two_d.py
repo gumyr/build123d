@@ -460,7 +460,8 @@ class Mixin2D(ABC, Shape[TOPODS]):
         Return both the point(s) and normal(s) of the intersection of the axis and the shape
 
         Args:
-            axis (Axis): axis defining the intersection line
+            other (Axis): axis defining the intersection line
+            tolerance (float, optional): intersection tolerance. Defaults to TOLERANCE.
 
         Returns:
             list[tuple[Vector, Vector]]: Point and normal of intersection
@@ -1356,9 +1357,6 @@ class Face(Mixin2D[TopoDS_Face]):
         build123d ``Edge`` on the XY plane, where X is the surface U parameter and Y
         is the surface V parameter. The original outer/inner wire structure is kept
         so the result can be displayed with normal build123d/ocp-vscode tooling.
-
-        Args:
-            source_face: Planar or non-planar face to inspect.
 
         Returns:
             A planar ``Face`` in UV parameter space.

@@ -427,13 +427,10 @@ class Vector:
         """Vector is projected onto the plane provided as input.
 
         Args:
-          args: Plane object
-
-        Returns the projected vector.
-          plane: Plane:
+            plane (Plane): plane to project onto
 
         Returns:
-
+            Vector: the projected vector
         """
         base = plane.origin
         normal = plane.z_dir

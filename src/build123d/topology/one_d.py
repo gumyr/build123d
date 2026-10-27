@@ -2115,9 +2115,6 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 Curve tangency target or point-incidence target for the circle(s)
             radius (float): arc radius
             center_on (Axis | Edge): center must lie on this object
-            sagitta (LengthConstraint, optional): returned arc selector
-                (i.e. either the short, long or both arcs). Defaults to
-                LengthConstraint.SHORT.
 
         Returns:
             ShapeList[Edge]: tangent arcs
@@ -3741,10 +3738,10 @@ class Wire(Mixin1D[TopoDS_Wire]):
         color: Color | None = None,
         parent: Compound | None = None,
     ):
-        """Build a Wire from an Curve.
+        """Build a Wire from a Curve.
 
         Args:
-            curve (Curve): Curve to convert to a Wire
+            wire (Curve): Curve to convert to a Wire
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.

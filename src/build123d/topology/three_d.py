@@ -1923,6 +1923,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         Non-planar faces are thickened both towards and away from the center of the sphere.
 
         Args:
+            surface (Face | Shell): object to thicken
             depth (float): Amount to thicken face(s), can be positive or negative.
             normal_override (Vector, optional): Face only. The normal_override vector can be
                 used to indicate which way is 'up', potentially flipping the face normal
