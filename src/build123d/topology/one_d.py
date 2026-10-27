@@ -3308,8 +3308,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 `[0.0, 1.0]` are not validated and yield OCCT-dependent results.
 
         Returns:
-            float: OCCT parameter (for edges) **or** composite “edgeIndex + fraction”
-            parameter (for wires), as described above.
+            float: OCCT curve parameter.
 
         """
 
@@ -3320,18 +3319,20 @@ class Edge(Mixin1D[TopoDS_Edge]):
             curve, length * position, curve.FirstParameter()
         ).Parameter()
 
-    def param_at_point(self, point: VectorLike) -> float:
+    def param_at_point(self, point: VectorLike, normalize: bool = True) -> float:
         """
-        Return the normalized parameter (∈ [0.0, 1.0]) of the location on this edge
-        closest to `point`.
+        Return the parameter of the location on this edge closest to `point`.
 
-        This method always returns a **normalized** parameter across the edge's full
-        OCCT parameter range, even though the underlying OCP/OCCT queries work in
-        native (non-normalized) parameters. It is robust to several OCCT quirks:
+        With `normalize=True`, return the arc-length fraction that `position_at` uses.
+        With `normalize=False`, return the native OCCT curve parameter. The native
+        parameter is not a linear rescaling of the normalized fraction.
+
+        The method handles several OCCT quirks:
 
         1) Vertex snap (fast path)
         If `point` coincides (within tolerance) with one of the edge's vertices,
-        that vertex's OCCT parameter is used and normalized to [0, 1].
+        that vertex's OCCT parameter is used. The normalized result is an arc-length
+        fraction.
         Note: for a closed edge, a vertex may represent both start and end; the
         mapping is therefore ambiguous and either end may be chosen.
 
@@ -3339,9 +3340,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
         The OCCT projector's `LowerDistanceParameter()` can legitimately return a
         value **outside** the edge's [param_min, param_max] (e.g., periodic curves
         or implementation behavior). The result is wrapped back into range using a
-        modulo by the parameter span and then normalized to [0, 1]. The projected
-        answer is accepted only if re-evaluating the 3D point at that normalized
-        parameter is within tolerance of the input `point`.
+        modulo by the parameter span. The projected answer is accepted only if
+        re-evaluating the 3D point at the normalized parameter is within tolerance
+        of the input `point`.
 
         3) Fallback numeric search (robust path)
         If the projector fails the validation, a bounded 1D search is performed
@@ -3351,6 +3352,8 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
         Args:
             point (VectorLike): A point expected to lie on this edge (within tolerance).
+            normalize (bool): Return an arc-length fraction when True or the native
+                OCCT curve parameter when False. Defaults to True.
 
         Raises:
             ValueError: If `point` is not on the edge within tolerance.
@@ -3358,8 +3361,8 @@ class Edge(Mixin1D[TopoDS_Edge]):
             RuntimeError: If no parameter can be found (e.g., extremely pathological
                 curves or numerical failure).
         Returns:
-            float: Normalized parameter in [0.0, 1.0] corresponding to the point's
-            closest location on the edge.
+            float: Normalized arc-length fraction or native OCCT curve parameter for
+            the point's closest location on the edge.
         """
         if self.is_empty:
             raise ValueError("Can't find param on empty edge")
@@ -3383,7 +3386,8 @@ class Edge(Mixin1D[TopoDS_Edge]):
             u_value /= GCPnts_AbscissaPoint.Length_s(curve_adaptor)
             # The length is measured along the curve while position_at measures
             # a reversed edge from its other end
-            return u_value if self.is_forward else 1 - u_value
+            normalized = u_value if self.is_forward else 1 - u_value
+            return normalized if normalize else param
 
         separation = self.distance_to(pnt)
         if not isclose_b(separation, 0, abs_tol=TOLERANCE):
@@ -3410,7 +3414,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
         # Validate that GeomAPI_ProjectPointOnCurve worked correctly
         if (self.position_at(u_value) - pnt).length < TOLERANCE:
-            return u_value
+            return u_value if normalize else param
 
         # Method 3: search the edge for the point
         # Note that this search takes about 1.3ms on a complex curve while the
@@ -3450,7 +3454,10 @@ class Edge(Mixin1D[TopoDS_Edge]):
                         self @ (result.x + TOLERANCE) - self @ (result.x - TOLERANCE)
                     ).length
                 ):
-                    return round(float(result.x), TOL_DIGITS)
+                    normalized = round(float(result.x), TOL_DIGITS)
+                    return (
+                        normalized if normalize else self._occt_param_at(normalized)[1]
+                    )
 
         raise RuntimeError("Unable to find parameter, Edge is too complex")
 
@@ -4474,29 +4481,32 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
         return tcast(float, closest_param)
 
-    def param_at_point(self, point: VectorLike) -> float:
+    def param_at_point(self, point: VectorLike, normalize: bool = True) -> float:
         """
-        Return the normalized wire parameter for the point closest to this wire.
+        Return the parameter for the point closest to this wire.
 
         This method projects the given point onto the wire, finds the nearest edge,
-        and accumulates arc lengths to determine the fractional position along the
-        entire wire. The result is normalized to the interval [0.0, 1.0], where:
+        and accumulates arc lengths to determine its position along the wire. With
+        `normalize=True`, it returns an arc-length fraction in [0.0, 1.0], where:
 
         - 0.0 corresponds to the start of the wire
         - 1.0 corresponds to the end of the wire
 
-        Unlike the edge version of this method, the returned value is **not**
-        an OCCT curve parameter, but a normalized parameter across the wire as a whole.
+        With `normalize=False`, it returns the native parameter of the wire's
+        `BRepAdaptor_CompCurve`. This parameter is not a linear rescaling of the
+        normalized fraction.
 
         Args:
             point (VectorLike): The point to project onto the wire.
+            normalize (bool): Return an arc-length fraction when True or the native
+                comp-curve parameter when False. Defaults to True.
 
         Raises:
             ValueError: Can't find point on empty wire
 
         Returns:
-            float: Normalized parameter in [0.0, 1.0] representing the relative
-            position of the projected point along the wire.
+            float: Normalized arc-length fraction or native comp-curve parameter for
+            the projected point.
         """
         if self.is_empty:
             raise ValueError("Can't find point on empty wire")
@@ -4570,7 +4580,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
         # the other methods taking a position measure a reversed wire from
         # its other end, so that is where the result has to be measured from
         u_value = distance_along_wire / self.length
-        return u_value if self.is_forward else 1 - u_value
+        normalized = u_value if self.is_forward else 1 - u_value
+        return normalized if normalize else self.param_at(normalized)
 
     def _occt_param_at(
         self, position: float, position_mode: PositionMode = PositionMode.PARAMETER

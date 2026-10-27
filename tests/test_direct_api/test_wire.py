@@ -270,6 +270,50 @@ class TestWire(unittest.TestCase):
         with self.assertRaises(ValueError):
             w1.param_at_point((0, 0))
 
+    def test_param_at_point_native_parameter_on_multiedge_and_reversed_wires(self):
+        """Check native parameters on forward and reversed multi-edge wires."""
+        wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (10, 0, 0)),
+                Edge.make_line((10, 0, 0), (10, 10, 0)),
+            ],
+            sequenced=True,
+        )
+        reversed_wire = Wire(TopoDS.Wire(wire.wrapped.Reversed()))
+
+        for candidate in (wire, reversed_wire):
+            for position in (0.25, 0.5, 0.6):
+                point = candidate.position_at(position)
+                with self.subTest(forward=candidate.is_forward, position=position):
+                    default = candidate.param_at_point(point)
+                    normalized = candidate.param_at_point(point, normalize=True)
+                    native = candidate.param_at_point(point, normalize=False)
+                    evaluated = Vector(candidate.geom_adaptor().Value(native))
+
+                    self.assertEqual(default, normalized)
+                    self.assertLess((evaluated - point).length, 1e-6)
+
+    def test_param_at_point_normalize_preserves_errors(self):
+        """Check off-curve and empty-wire errors in both modes."""
+        wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (10, 0, 0)),
+                Edge.make_line((10, 0, 0), (10, 10, 0)),
+            ]
+        )
+        for normalize in (True, False):
+            with self.subTest(normalize=normalize):
+                with self.assertRaisesRegex(ValueError, "is .* from wire"):
+                    wire.param_at_point((20, 20, 20), normalize=normalize)
+
+        wire.wrapped = None
+        for normalize in (True, False):
+            with self.subTest(normalize=normalize):
+                with self.assertRaisesRegex(
+                    ValueError, "Can't find point on empty wire"
+                ):
+                    wire.param_at_point((0, 0, 0), normalize=normalize)
+
     def test_param_at_point_reversed_edges(self):
         with BuildLine(Plane.YZ) as wing_line:
             l1 = Line((0, 65), (80 / 2 + 1.526 * 4, 65))
