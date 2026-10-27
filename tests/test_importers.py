@@ -7,6 +7,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -36,6 +37,34 @@ from build123d.build_constants import UNITS_PER_METER
 from build123d.build_enums import Align, GeomType, Unit
 
 
+def download(url: str) -> bytes:
+    """Return the content at url."""
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "build123d test suite"}
+    )
+    with urllib.request.urlopen(request) as response:
+        return response.read()
+
+
+def fetch_once(destination: Path, fetch: Callable[[], bytes]) -> Path:
+    """Store the result of fetch() at destination unless it is already there.
+
+    Parallel test workers may call this for the same destination at the same time,
+    so the content is written to a unique temporary file beside it and moved into
+    place atomically: a reader only ever sees a complete file.
+    """
+    if not destination.exists():
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        data = fetch()
+        handle, temp_name = tempfile.mkstemp(
+            dir=destination.parent, prefix=f".{destination.name}."
+        )
+        with os.fdopen(handle, "wb") as file:
+            file.write(data)
+        os.replace(temp_name, destination)
+    return destination
+
+
 class ImportSVG(unittest.TestCase):
     def test_import_svg_as_buildline_code(self):
         # Create svg file
@@ -46,10 +75,12 @@ class ImportSVG(unittest.TestCase):
             l4 = EllipticalStartArc(l3 @ 1, (-1, 0), 0.5, 1, 180, start_angle=0)
         svg = ExportSVG()
         svg.add_shape(test_obj.wires()[0], "")
-        svg.write("test.svg")
+        svg.write(self.tmp_path / "test.svg")
 
         # Read the svg as code
-        buildline_code, builder_name = import_svg_as_buildline_code("test.svg")
+        buildline_code, builder_name = import_svg_as_buildline_code(
+            self.tmp_path / "test.svg"
+        )
         # Execute it and convert to Edges
         ex_locals = {}
         exec(buildline_code, None, ex_locals)
@@ -64,7 +95,6 @@ class ImportSVG(unittest.TestCase):
         self.assertEqual(
             sum(e.geom_type == GeomType.ELLIPSE for e in test_obj.edges()), 1
         )
-        os.remove("test.svg")
 
     def test_import_svg_as_buildline_code_invalid_name(self):
         # Create svg file
@@ -75,11 +105,12 @@ class ImportSVG(unittest.TestCase):
             l4 = Line(l3 @ 1, l1 @ 0)
         svg = ExportSVG()
         svg.add_shape(test_obj.wires()[0], "")
-        svg.write("test!.svg")
+        svg.write(self.tmp_path / "test!.svg")
 
         # Read the svg as code
-        buildline_code, builder_name = import_svg_as_buildline_code("test!.svg")
-        os.remove("test!.svg")
+        buildline_code, builder_name = import_svg_as_buildline_code(
+            self.tmp_path / "test!.svg"
+        )
 
         self.assertEqual(builder_name, "builder")
 
@@ -161,20 +192,18 @@ class ImportSTEP(unittest.TestCase):
         connection, or starting a server.
         """
         url = "https://raw.githubusercontent.com/tpaviot/pythonocc-demos/master/assets/models/as1-oc-214.stp"
-        temp_dir = tempfile.gettempdir()
-        file_path = os.path.join(temp_dir, "as1-oc-214.stp")
-        if not os.path.exists(file_path):
-            urllib.request.urlretrieve(url, file_path)
-        cls.large_step_file_path = file_path
+        cls.large_step_file_path = fetch_once(
+            Path(tempfile.gettempdir()) / "as1-oc-214.stp", lambda: download(url)
+        )
 
     def test_single_object(self):
-        export_step(Solid.make_box(1, 1, 1), "test.step")
-        box = import_step("test.step")
+        export_step(Solid.make_box(1, 1, 1), self.tmp_path / "test.step")
+        box = import_step(self.tmp_path / "test.step")
         self.assertTrue(isinstance(box, Solid))
 
     def test_move_single_object(self):
-        export_step(Solid.make_box(1, 1, 1), "test.step")
-        box = import_step("test.step")
+        export_step(Solid.make_box(1, 1, 1), self.tmp_path / "test.step")
+        box = import_step(self.tmp_path / "test.step")
         box_moved = Pos(X=1) * box
         self.assertEqual(tuple(box_moved.location.position), (1, 0, 0))
 
@@ -182,8 +211,8 @@ class ImportSTEP(unittest.TestCase):
         box_to_export = Solid.make_box(1, 1, 1)
         box_to_export.label = "box"
         box_to_export.color = Color("blue")
-        export_step(box_to_export, "test.step")
-        imported_box = import_step("test.step")
+        export_step(box_to_export, self.tmp_path / "test.step")
+        imported_box = import_step(self.tmp_path / "test.step")
         self.assertTrue(isinstance(imported_box, Solid))
         self.assertEqual(imported_box.label, "box")
         self.assertEqual(tuple(imported_box.color), (0, 0, 1, 1))
@@ -198,9 +227,9 @@ class ImportSTEP(unittest.TestCase):
         assembly = Compound(children=[a, b])
         assembly.label = "assembly"
         assembly.color = Color("green")
-        export_step(assembly, "test.step")
+        export_step(assembly, self.tmp_path / "test.step")
 
-        imported_assembly = import_step("test.step")
+        imported_assembly = import_step(self.tmp_path / "test.step")
         self.assertTrue(isinstance(imported_assembly, Compound))
         self.assertTrue(isinstance(imported_assembly.children[0], Solid))
         self.assertTrue(isinstance(imported_assembly.children[1], Solid))
@@ -218,17 +247,16 @@ class ImportSTEP(unittest.TestCase):
 
     def test_unnamed_component(self):
         file_name = "nist_ctc_02_asme1_ap242-e2.stp"
-        temp_dir = tempfile.gettempdir()
-        file_path = os.path.join(temp_dir, "NIST-PMI-STEP-Files", file_name)
-        if not os.path.exists(file_path):
-            request = urllib.request.Request(
-                "https://www.nist.gov/system/files/documents/noindex/2024/06/19/NIST-PMI-STEP-Files.zip",
-                headers={"User-Agent": "build123d test suite"},
-            )
-            with urllib.request.urlopen(request) as response:
-                with zipfile.ZipFile(BytesIO(response.read())) as archive:
-                    archive.extract(f"NIST-PMI-STEP-Files/{file_name}", temp_dir)
+        url = "https://www.nist.gov/system/files/documents/noindex/2024/06/19/NIST-PMI-STEP-Files.zip"
 
+        def fetch_from_archive() -> bytes:
+            with zipfile.ZipFile(BytesIO(download(url))) as archive:
+                return archive.read(f"NIST-PMI-STEP-Files/{file_name}")
+
+        file_path = fetch_once(
+            Path(tempfile.gettempdir()) / "NIST-PMI-STEP-Files" / file_name,
+            fetch_from_archive,
+        )
         imported = import_step(file_path)
 
         self.assertIsInstance(imported, Compound)
@@ -249,9 +277,8 @@ class ImportSTEP(unittest.TestCase):
         root = Compound(children=[sub])
         root.label = "assembly"
         root.color = Color(0, 1, 0)
-        export_step(root, "test.step")
-        imported = import_step("test.step")
-        os.remove("test.step")
+        export_step(root, self.tmp_path / "test.step")
+        imported = import_step(self.tmp_path / "test.step")
 
         self.assertTrue(isinstance(imported, Compound))
         self.assertEqual(imported.label, "assembly")
@@ -275,9 +302,8 @@ class ImportSTEP(unittest.TestCase):
         assy = Compound(children=[c1, c2])
         assy.label = "assy"
         assy.color = Color(0, 1, 0)
-        export_step(assy, "test.step")
-        imported = import_step("test.step")
-        os.remove("test.step")
+        export_step(assy, self.tmp_path / "test.step")
+        imported = import_step(self.tmp_path / "test.step")
 
         by_label = {c.label: c for c in imported.children}
         self.assertEqual(tuple(by_label["c1"].color), (1, 0, 0, 1))
@@ -296,9 +322,8 @@ class ImportSTEP(unittest.TestCase):
         assy = Compound(children=[fixed, moved])
         assy.label = "assy"
 
-        export_step(assy, "test.step")
-        imported = import_step("test.step")
-        os.remove("test.step")
+        export_step(assy, self.tmp_path / "test.step")
+        imported = import_step(self.tmp_path / "test.step")
 
         by_label = {c.label: c for c in imported.children}
         p = by_label["moved"].location.position
@@ -366,15 +391,13 @@ class ImportSTEP(unittest.TestCase):
         sub.label = "sub"
         root = Compound(children=[Pos(10, 0, 0) * sub])
         root.label = "root"
-        export_step(root, "test.step")
-        imported = import_step("test.step")
-        os.remove("test.step")
+        export_step(root, self.tmp_path / "test.step")
+        imported = import_step(self.tmp_path / "test.step")
 
         self.assertIsNone(imported.parent)
 
-        export_step(imported, "test.step")  # raised RuntimeError before
-        reimported = import_step("test.step")
-        os.remove("test.step")
+        export_step(imported, self.tmp_path / "test.step")  # raised RuntimeError before
+        reimported = import_step(self.tmp_path / "test.step")
 
         # geometry round-trips at the correct world position
         bb = reimported.bounding_box()

@@ -104,12 +104,14 @@ class ExportersTestCase(unittest.TestCase):
 
     def test_sketch(self):
         sketch = ExportersTestCase.create_test_sketch()
-        ExportersTestCase.basic_combo_export(sketch, "test-sketch")
+        ExportersTestCase.basic_combo_export(sketch, str(self.tmp_path / "test-sketch"))
 
     def test_drawing(self):
         part = ExportersTestCase.create_test_part()
         drawing = Drawing(part)
-        ExportersTestCase.drawing_combo_export(drawing, "test-drawing")
+        ExportersTestCase.drawing_combo_export(
+            drawing, str(self.tmp_path / "test-drawing")
+        )
 
     def test_back_section_svg(self):
         """Export a section through the bottom face.
@@ -118,7 +120,7 @@ class ExportersTestCase(unittest.TestCase):
         part = ExportersTestCase.create_test_part()
         test_section = section(part, Plane.XY, height=0)
         ExportersTestCase.basic_svg_export(
-            test_section, "test-back-section.svg", reverse=True
+            test_section, str(self.tmp_path / "test-back-section.svg"), reverse=True
         )
 
     def test_angled_section(self):
@@ -128,7 +130,9 @@ class ExportersTestCase(unittest.TestCase):
         angle = math.degrees(math.atan2(4, 8))
         section_plane = Plane.XY.rotated((angle, 0, 0))
         angled_section = section_plane.to_local_coords(section(part, section_plane))
-        ExportersTestCase.basic_combo_export(angled_section, "test-angled-section")
+        ExportersTestCase.basic_combo_export(
+            angled_section, str(self.tmp_path / "test-angled-section")
+        )
 
     def test_cam_section_svg(self):
         """Export a section through the top face, with a simple
@@ -144,7 +148,7 @@ class ExportersTestCase(unittest.TestCase):
         for f in cam_section.faces():
             svg.add_shape(f.outer_wire(), "exterior")
             svg.add_shape(f.inner_wires(), "interior")
-        svg.write("test-cam-section.svg")
+        svg.write(str(self.tmp_path / "test-cam-section.svg"))
 
     def test_conic_section(self):
         """Export a conic section.  This tests a more "exotic" geometry
@@ -152,7 +156,9 @@ class ExportersTestCase(unittest.TestCase):
         cone = Cone(8, 0, 16, align=None)
         section_plane = Plane.XZ.offset(4)
         conic_section = section_plane.to_local_coords(section(cone, section_plane))
-        ExportersTestCase.basic_combo_export(conic_section, "test-conic-section")
+        ExportersTestCase.basic_combo_export(
+            conic_section, str(self.tmp_path / "test-conic-section")
+        )
 
     def test_circle_rotation(self):
         """Export faces with circular arcs in various orientations."""
@@ -162,7 +168,9 @@ class ExportersTestCase(unittest.TestCase):
             with PolarLocations(20, 5, 90):
                 Circle(4, mode=Mode.SUBTRACT)
             mirror(about=Plane.XZ.offset(25))
-        ExportersTestCase.basic_combo_export(sketch.faces(), "test-circle-rotation")
+        ExportersTestCase.basic_combo_export(
+            sketch.faces(), str(self.tmp_path / "test-circle-rotation")
+        )
 
     def test_ellipse_rotation(self):
         """Export drawing with elliptical arcs in various orientations."""
@@ -175,7 +183,9 @@ class ExportersTestCase(unittest.TestCase):
             extrude(amount=20, both=True)
             mirror(about=Plane.YZ.offset(25))
         drawing = Drawing(part.part)
-        ExportersTestCase.drawing_combo_export(drawing, "test-ellipse-rotation")
+        ExportersTestCase.drawing_combo_export(
+            drawing, str(self.tmp_path / "test-ellipse-rotation")
+        )
 
     def test_color(self):
         """Export SVG with alpha transparency."""
@@ -186,7 +196,7 @@ class ExportersTestCase(unittest.TestCase):
             line_color=Color(0, 0, 0, 0.8),
         )
         svg.add_shape(sketch)
-        svg.write("test-colors.svg")
+        svg.write(str(self.tmp_path / "test-colors.svg"))
 
     def test_dxf_color_like(self):
         """ExportDXF accepts the standard ColorLike interface."""
