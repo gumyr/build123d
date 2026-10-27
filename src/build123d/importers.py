@@ -46,6 +46,7 @@ from OCP.BRepTools import BRepTools
 from OCP.gp import gp_Trsf
 from OCP.Quantity import Quantity_ColorRGBA
 from OCP.RWStl import RWStl
+from OCP.Standard import Standard_Failure
 from OCP.STEPCAFControl import STEPCAFControl_Reader
 from OCP.Storage import Storage_StreamReadError
 from OCP.TCollection import TCollection_AsciiString, TCollection_ExtendedString
@@ -135,7 +136,8 @@ def import_brep(
     if binary:
         try:
             BinTools.Read_s(shape, source)
-        except Storage_StreamReadError:
+        except (Storage_StreamReadError, Standard_Failure):
+            # macOS builds of OCP raise the base class instead
             pass  # leaves shape null, reported below
     else:
         BRepTools.Read_s(shape, source, BRep_Builder())
