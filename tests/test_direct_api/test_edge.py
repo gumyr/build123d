@@ -301,6 +301,23 @@ class TestEdge(unittest.TestCase):
         with self.assertRaises(ValueError):
             e1.trim_to_length(0.1, 2)
 
+    def test_trim_to_length_reversed_edge(self):
+        """A reversed edge is trimmed from its own start, in its own direction"""
+        line = Edge.make_line((0, 0, 0), (10, 0, 0)).reversed()
+        for start in (0.2, line.position_at(0.2)):
+            with self.subTest(start=start):
+                trimmed = line.trim_to_length(start, 3)
+                self.assertAlmostEqual(trimmed.length, 3, 5)
+                self.assertAlmostEqual(trimmed @ 0, (8, 0, 0), 5)
+                self.assertAlmostEqual(trimmed @ 1, (5, 0, 0), 5)
+                self.assertAlmostEqual(trimmed % 0, (-1, 0, 0), 5)
+
+        arc = Edge.make_circle(10, start_angle=0, end_angle=90).reversed()
+        trimmed = arc.trim_to_length(0.25, 5)
+        self.assertAlmostEqual(trimmed.length, 5, 5)
+        self.assertAlmostEqual(trimmed @ 0, arc.position_at(0.25), 5)
+        self.assertAlmostEqual(trimmed % 0, arc.tangent_at(0.25), 5)
+
     def test_trim_to_other(self):
         """Test trimming open and closed edges to all other objects"""
 
@@ -762,6 +779,33 @@ class TestEdgeParamAt(unittest.TestCase):
         ):
             with self.assertRaisesRegex(RuntimeError, "Edge is too complex"):
                 edge.param_at_point((7, 0, 0))
+
+    def test_param_at_reversed_edge(self):
+        """param_at measures a reversed edge from its own start, like position_at"""
+        for edge in (
+            Edge.make_line((0, 0, 0), (10, 0, 0)),
+            Edge.make_circle(10, start_angle=0, end_angle=90),
+            Edge.make_spline([(0, 0, 0), (2, 3, 0), (5, 1, 0), (7, 4, 0)]),
+        ):
+            reversed_edge = edge.reversed()
+            for position in (0.0, 0.25, 0.7, 1.0):
+                with self.subTest(edge=edge.geom_type, position=position):
+                    param = reversed_edge.param_at(position)
+                    evaluated = Vector(reversed_edge.geom_adaptor().Value(param))
+                    self.assertAlmostEqual(
+                        evaluated, reversed_edge.position_at(position), 5
+                    )
+                    self.assertAlmostEqual(
+                        param,
+                        reversed_edge.param_at_point(
+                            reversed_edge.position_at(position), normalize=False
+                        ),
+                        5,
+                    )
+        # The oriented ends are the curve's range the other way round
+        line = Edge.make_line((0, 0, 0), (10, 0, 0)).reversed()
+        self.assertAlmostEqual(line.param_at(0), 10, 5)
+        self.assertAlmostEqual(line.param_at(1), 0, 5)
 
     def test_param_at_line_midpoint(self):
         """

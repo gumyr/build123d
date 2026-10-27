@@ -378,6 +378,24 @@ class TestMixin1D(unittest.TestCase):
         with self.assertRaises(ValueError):
             Edge.make_line((0, 0, 0), (1, 0, 0)).locations()
 
+    def test_location_at_corrected_frenet_position(self):
+        """The CORRECTED frame is placed where position_at puts it, in both modes"""
+        path = Polyline((0, 0), (10, 0), (10, 10), (0, 10))
+        for position in (0.0, 0.25, 0.6, 1.0):
+            for mode in (PositionMode.PARAMETER, PositionMode.LENGTH):
+                value = (
+                    position
+                    if mode == PositionMode.PARAMETER
+                    else (position * path.length)
+                )
+                with self.subTest(position=position, mode=mode):
+                    location = path.location_at(
+                        value, mode, frame_method=FrameMethod.CORRECTED
+                    )
+                    self.assertAlmostEqual(
+                        location.position, path.position_at(value, mode), 5
+                    )
+
     def test_location_at_corrected_frenet(self):
         # A polyline with sharp corners — problematic for classic Frenet
         path = Polyline((0, 0), (10, 0), (10, 10), (0, 10))

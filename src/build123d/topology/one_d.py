@@ -1153,16 +1153,14 @@ class Mixin1D(Shape[TOPODS]):
         """
         curve = self.geom_adaptor()
 
-        if not self.is_forward:
-            if position_mode == PositionMode.PARAMETER:
-                distance = 1 - distance
-            else:
-                distance = self.length - distance
-
+        # param_at and _occt_param_at measure a reversed shape from its other end
         if isinstance(self, Wire):
             if frame_method == FrameMethod.CORRECTED:
                 # BRep_CompCurve parameter
-                param = self.param_at(distance / self.length)
+                if position_mode == PositionMode.PARAMETER:
+                    param = self.param_at(distance)
+                else:
+                    param = self.param_at(distance / self.length)
             else:
                 # A BRep_Curve parameter taken from a Edge based curve
                 if position_mode == PositionMode.PARAMETER:
@@ -3012,16 +3010,14 @@ class Edge(Mixin1D[TopoDS_Edge]):
             self.wrapped,
             edge_surface,
             TopLoc_Location(),
-            self.param_at(0),
-            self.param_at(1),
+            *BRep_Tool.Range_s(self.wrapped),
         )
         if other is not None and not other.is_empty:
             edge_2d_curve: Geom2d_Curve = BRep_Tool.CurveOnPlane_s(
                 other.wrapped,
                 edge_surface,
                 TopLoc_Location(),
-                other.param_at(0),
-                other.param_at(1),
+                *BRep_Tool.Range_s(other.wrapped),
             )
             intersector = Geom2dAPI_InterCurveCurve(
                 self_2d_curve, edge_2d_curve, tolerance
@@ -3295,8 +3291,12 @@ class Edge(Mixin1D[TopoDS_Edge]):
         """
         Map a normalized arc-length position to the underlying OCCT parameter.
 
-        Returns the native OCCT curve parameter corresponding to the
-        given normalized `position` (0.0 → start, 1.0 → end). For closed/periodic
+        Returns the native OCCT curve parameter corresponding to the given
+        normalized `position`, where 0.0 is the start of the edge and 1.0 its end
+        as the edge is oriented, the same convention as `position_at`. On a
+        reversed edge the position is therefore measured from the curve's last
+        parameter, and `param_at(0)` is larger than `param_at(1)`; use
+        `BRep_Tool.Range_s` for the curve's parameter range. For closed/periodic
         edges, OCCT may return a value **outside** the edge's nominal parameter
         range `[param_min, param_max]` (e.g., by adding/subtracting multiples of
         the period). If you require a value folded into the edge's range, apply a
@@ -3308,16 +3308,11 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 `[0.0, 1.0]` are not validated and yield OCCT-dependent results.
 
         Returns:
-            float: OCCT curve parameter.
+            float: OCCT curve parameter, the value `param_at_point` returns with
+            `normalize=False` for the point at `position`.
 
         """
-
-        curve = self.geom_adaptor()
-
-        length = GCPnts_AbscissaPoint.Length_s(curve)
-        return GCPnts_AbscissaPoint(
-            curve, length * position, curve.FirstParameter()
-        ).Parameter()
+        return self._occt_param_at(position)[1]
 
     def param_at_point(self, point: VectorLike, normalize: bool = True) -> float:
         """
@@ -3515,8 +3510,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         reversed_edge = copy.deepcopy(self)
         # pylint: disable=attribute-defined-outside-init
         if reconstruct:
-            first: float = self.param_at(0)
-            last: float = self.param_at(1)
+            first, last = BRep_Tool.Range_s(self._wrapped)
             curve = BRep_Tool.Curve_s(self._wrapped, first, last)
             first = curve.ReversedParameter(first)
             last = curve.ReversedParameter(last)
@@ -3595,28 +3589,27 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
         start_u = Mixin1D._to_param(self, start, "start")
 
-        self_copy = copy.deepcopy(self)
-        assert not self_copy.is_empty
-
-        new_curve = BRep_Tool.Curve_s(
-            self_copy.wrapped, self.param_at(0), self.param_at(1)
-        )
+        new_curve = BRep_Tool.Curve_s(self.wrapped, *BRep_Tool.Range_s(self.wrapped))
 
         # Create an adaptor for the curve
         adaptor_curve = GeomAdaptor_Curve(new_curve)
 
-        # Find the parameter corresponding to the desired length
+        # Find the parameter corresponding to the desired length, walking along
+        # the curve the way the edge is oriented
         parm_start = self.param_at(start_u)
-        abscissa_point = GCPnts_AbscissaPoint(adaptor_curve, length, parm_start)
+        abscissa_point = GCPnts_AbscissaPoint(
+            adaptor_curve, length if self.is_forward else -length, parm_start
+        )
 
         # Get the parameter at the desired length
         parm_end = abscissa_point.Parameter()
 
         # Trim the curve to the desired length
-        trimmed_curve = Geom_TrimmedCurve(new_curve, parm_start, parm_end)
+        first, last = sorted([parm_start, parm_end])
+        trimmed_curve = Geom_TrimmedCurve(new_curve, first, last)
 
-        new_edge = BRepBuilderAPI_MakeEdge(trimmed_curve).Edge()
-        return Edge(new_edge)
+        new_edge = Edge(BRepBuilderAPI_MakeEdge(trimmed_curve).Edge())
+        return new_edge if self.is_forward else new_edge.reversed(reconstruct=True)
 
     def trim_to_other(
         self: Edge,
@@ -4650,10 +4643,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
         local_frac = (
             0.0 if target_edge.length == 0 else (local_dist / target_edge.length)
         )
-        if not target_edge.is_forward:
-            local_frac = 1 - local_frac
 
-        # Use edge param_at to get native OCCT parameter
+        # The fraction is measured the way the edge is traversed, which param_at
+        # honours for a reversed edge
         occt_edge_param = target_edge.param_at(local_frac)
 
         edge_curve_adaptor = target_edge.geom_adaptor()
