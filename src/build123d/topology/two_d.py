@@ -998,6 +998,26 @@ class Face(Mixin2D[TopoDS_Face]):
                 return None
 
     @property
+    def extrusion_direction(self) -> None | Vector:
+        """The direction a surface of linear extrusion is swept along, as a unit
+        vector, or None for any other surface
+
+        The sense is that of the underlying surface, which need not match the
+        vector the face was extruded with.
+        """
+        if self.is_empty:
+            return None
+        surf: Geom_Surface = self.geom_adaptor()
+        while isinstance(surf, (Geom_RectangularTrimmedSurface, Geom_OffsetSurface)):
+            surf = surf.BasisSurface()
+        if (
+            Shape.geom_LUT_FACE[GeomAdaptor_Surface(surf).GetType()]
+            != GeomType.EXTRUSION
+        ):
+            return None
+        return Vector(surf.Direction())  # type: ignore[attr-defined]
+
+    @property
     def axes_of_symmetry(self) -> list[Axis]:
         """Computes and returns the axes of symmetry for a planar face.
 

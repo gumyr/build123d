@@ -1513,6 +1513,31 @@ class TestFace(unittest.TestCase):
         # Invalid
         self.assertIsNone(Face.make_rect(1, 1).axis_of_rotation)
 
+    def test_extrusion_direction_property(self):
+        profile = Spline((0, 0, 0), (1, 1, 0), (2, 0, 0))
+        swept = Face.extrude(profile, (0, 1, 3))
+        self.assertEqual(swept.geom_type, GeomType.EXTRUSION)
+        direction = swept.extrusion_direction
+        self.assertAlmostEqual(direction.length, 1, 5)
+        self.assertAlmostEqual(abs(direction.dot(Vector(0, 1, 3).normalized())), 1, 5)
+
+        # Geom_RectangularTrimmedSurface and Geom_OffsetSurface are unwrapped
+        trim_surf = Geom_RectangularTrimmedSurface(
+            swept.geom_adaptor(), 0.2, 0.8, 0.5, 2.5
+        )
+        trim_face = Face(BRepBuilderAPI_MakeFace(trim_surf, 1e-6).Face())
+        self.assertAlmostEqual(abs(trim_face.extrusion_direction.dot(direction)), 1, 5)
+        off_surf = Geom_OffsetSurface(swept.geom_adaptor(), 0.1)
+        off_face = Face(BRepBuilderAPI_MakeFace(off_surf, 1e-6).Face())
+        self.assertAlmostEqual(abs(off_face.extrusion_direction.dot(direction)), 1, 5)
+
+        # Other surfaces and nothing have no extrusion direction
+        self.assertIsNone(Face.make_rect(1, 1).extrusion_direction)
+        self.assertIsNone(
+            Cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0].extrusion_direction
+        )
+        self.assertIsNone(Face().extrusion_direction)
+
     def test_is_convex_concave(self):
 
         with BuildPart() as open_box:
