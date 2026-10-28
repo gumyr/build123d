@@ -1806,6 +1806,8 @@ class JernArc(BaseEdgeObject):
                 z_dir=arc_normal,
             )
             arc = Edge.make_circle(radius, circle_plane)
+            if arc.tangent_at(0).dot(start_tangent) < 0:
+                arc = arc.reversed(reconstruct=True)
             center_point2 = start + start_tangent.rotate(
                 Axis(start, arc_normal), -arc_direction * 90
             ) * abs(radius)
