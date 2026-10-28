@@ -57,7 +57,7 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from math import degrees
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 from typing import cast as tcast
@@ -2653,7 +2653,10 @@ class Face(Mixin2D[TopoDS_Face]):
         return _topods_face_position(self.wrapped, u, v)
 
     def project_to_shape(
-        self, target_object: Shape, direction: VectorLike, hit: Hit = Hit.ALL
+        self,
+        target_object: Shape,
+        direction: VectorLike,
+        hit: Hit | Callable[[ShapeList[Face]], Iterable[Face]] = Hit.ALL,
     ) -> ShapeList[Face | Shell]:
         """Project Face to target Object
 
@@ -2669,11 +2672,18 @@ class Face(Mixin2D[TopoDS_Face]):
         face, against the direction, are not met. ``hit`` says which to keep:
         all of them nearest first, the nearest, the farthest, or the visible
         ones, what a viewer behind the face looking along the direction sees.
+        The surfaces met are sewn into connected regions, so ``Hit.NEAREST``
+        is the nearest region with every face joined to it; for any other
+        selection, ``hit`` may be a callable given every face met, nearest
+        first, that returns the faces to keep, say
+        ``lambda faces: faces.filter_by(Axis.Z).sort_by(Axis.Z)[:1]``.
 
         Args:
             target_object (Shape): Object to project onto
             direction (VectorLike): projection direction
-            hit (Hit, optional): which surfaces to keep. Defaults to Hit.ALL.
+            hit (Hit | Callable, optional): which surfaces to keep, or a
+                selector called with every face met, nearest first, returning
+                the faces to keep. Defaults to Hit.ALL.
 
         Returns:
             ShapeList[Face]: Face(s) projected on target object ordered by distance
@@ -2684,6 +2694,9 @@ class Face(Mixin2D[TopoDS_Face]):
 
             return ShapeList(visible_regions(self, target_object, direction))
         regions = _project_profile_by_extrusion(self, target_object, direction)
+        if callable(hit):
+            faces = ShapeList(face for region in regions for face in region.faces())
+            return ShapeList(hit(faces.sort_by(Axis(self.center(), direction))))
         if hit == Hit.NEAREST:
             regions = regions[:1]
         elif hit == Hit.FARTHEST:
@@ -3366,8 +3379,36 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return face.location_at(surface_point, x_dir=x_dir)
 
 
+def _edge_on(face: Face, direction: VectorLike) -> bool:
+    """Whether a face casts no shadow along a direction.
+
+    Only a surface swept along the direction has its normal perpendicular to
+    it everywhere: a plane containing the direction, a cylinder with its axis
+    along it, or a linear extrusion swept along it. Every other surface tilts
+    somewhere and casts a shadow there, so it is never edge-on; a free-form
+    surface is at most edge-on within tolerance, which is not worth chasing.
+    """
+    if face.is_empty:
+        return False
+    direction = Vector(direction).normalized()
+    plane = face.is_planar
+    if plane is not None:
+        return abs(plane.z_dir.dot(direction)) < TOLERANCE
+    if face.geom_type == GeomType.CYLINDER:
+        axis = face.axis_of_rotation
+        assert axis is not None
+        along = axis.direction
+    elif face.geom_type == GeomType.EXTRUSION:
+        swept = face.extrusion_direction
+        assert swept is not None
+        along = swept
+    else:
+        return False
+    return along.cross(direction).length < TOLERANCE
+
+
 def _project_profile_by_extrusion(
-    profile: Face, target: Shape, direction: VectorLike
+    profile: Face, target: Shape, direction: VectorLike, keep_edge_on: bool = False
 ) -> ShapeList[Face | Shell]:
     """The regions of a target's surface that a profile covers when swept along a
     direction, nearest first.
@@ -3384,11 +3425,19 @@ def _project_profile_by_extrusion(
     whose ``UnifySameDomain`` clean could merge a target fragment into a coplanar
     face of the extrusion before the fragment is attributed.
 
+    A target face lying along the direction, inside the column or on its wall,
+    survives the boolean but has no area for a projection to land on, and
+    sewing joins the surfaces on either side of it into one region. Such faces
+    are dropped unless ``keep_edge_on`` asks for them: an extrusion stopping at
+    a stepped surface needs the risers to make a surface that cuts it.
+
     Args:
         profile (Face): the face swept along the direction
         target (Shape): the shape whose surface is sampled
         direction (VectorLike): the sweep direction; only surfaces ahead of the
             profile are found
+        keep_edge_on (bool, optional): keep the target faces lying along the
+            direction. Defaults to False.
 
     Raises:
         TypeError: the target is a Vertex
@@ -3423,7 +3472,8 @@ def _project_profile_by_extrusion(
     target_faces = [
         TopoDS.Face(face)
         for face in _topods_entities(result, "Face")
-        if trace.is_modified(face) or trace.is_untouched(face)
+        if (trace.is_modified(face) or trace.is_untouched(face))
+        and (keep_edge_on or not _edge_on(Face(TopoDS.Face(face)), direction))
     ]
     if not target_faces:
         return ShapeList()

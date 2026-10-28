@@ -27,11 +27,13 @@ license:
 """
 
 import unittest
+from math import pi
 
 from build123d.build_enums import Align
 from build123d.geometry import Axis, Location, Plane, Pos, Vector
 from build123d.objects_part import Box
 from build123d.topology import Compound, Edge, Face, Solid, Wire
+from build123d.topology.two_d import _edge_on
 
 
 class TestProjection(unittest.TestCase):
@@ -172,6 +174,52 @@ class TestProjectionCore(unittest.TestCase):
         self.assertEqual(len(projected), 2)
         self.assertAlmostEqual(projected[0].center().Z, -5, 5)
         self.assertLess(projected[1].center().Z, -7)
+
+    def test_edge_on_faces(self):
+        """Only a surface swept along the direction is edge-on to it"""
+        along_z = (0, 0, 1)
+        self.assertTrue(_edge_on(Face.make_rect(2, 2, Plane.XZ), along_z))
+        self.assertFalse(_edge_on(Face.make_rect(2, 2, Plane.XY), along_z))
+        self.assertFalse(
+            _edge_on(Face.make_rect(2, 2, Plane.XY.rotated((89, 0, 0))), along_z)
+        )
+        upright = Solid.make_cylinder(1, 2).faces().sort_by(Axis.Z)[1]
+        self.assertTrue(_edge_on(upright, along_z))
+        # a cylinder across the direction has a perpendicular normal somewhere
+        # on it, yet casts a full shadow
+        lying = Solid.make_cylinder(1, 2, Plane.YZ).faces().sort_by(Axis.X)[1]
+        self.assertFalse(_edge_on(lying, along_z))
+        self.assertFalse(_edge_on(lying, (0, 1, 0)))
+        swept = Face.extrude(
+            Edge.make_spline([(0, 0, 0), (1, 1, 0), (2, 0, 0)]), (0, 0, 3)
+        )
+        self.assertTrue(_edge_on(swept, along_z))
+        self.assertFalse(_edge_on(swept, (1, 0, 0)))
+        self.assertFalse(_edge_on(Solid.make_sphere(1).face(), along_z))
+        cone = Solid.make_cone(2, 1, 2).faces().sort_by(Axis.Z)[1]
+        self.assertFalse(_edge_on(cone, along_z))
+        self.assertFalse(_edge_on(Face(), along_z))
+
+    def test_faces_along_the_direction_take_no_projection(self):
+        """A ring around a cylinder's outline lands on its ends only; the side,
+        along the direction, is dropped and no longer sews the ends together"""
+        ring = Face.make_rect(4, 4, Plane.XY.offset(-5)).make_holes(
+            [Wire.make_circle(0.5, Plane.XY.offset(-5))]
+        )
+        cylinder = Solid.make_cylinder(1, 2, Plane.XY.offset(-1))
+        regions = ring.project_to_shape(cylinder, (0, 0, 1))
+        self.assertEqual([type(r).__name__ for r in regions], ["Face", "Face"])
+        self.assertEqual([round(r.center().Z, 5) for r in regions], [-1, 1])
+        for region in regions:
+            self.assertAlmostEqual(abs(region.normal_at().Z), 1, 5)
+        # extrude_until keeps the side: with a boss on a plate, the boss top,
+        # its side and the plate top make the stepped surface that stops it
+        boss = Solid.make_cylinder(1, 2) + Solid.make_box(6, 6, 1, Plane((-3, -3, -1)))
+        column = Solid.extrude_until(
+            Face.make_rect(4, 4, Plane.XY.offset(5)), boss, (0, 0, -1)
+        )
+        self.assertAlmostEqual(column.bounding_box().min.Z, 0, 5)
+        self.assertAlmostEqual(column.volume, 4 * 4 * 5 - pi * 2, 5)
 
     def test_free_vertices_from_sewing_are_ignored(self):
         """Sewing the target fragments of a glyph on a sphere hands back one

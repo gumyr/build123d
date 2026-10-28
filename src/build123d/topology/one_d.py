@@ -54,7 +54,7 @@ from __future__ import annotations
 import copy
 import warnings
 from bisect import bisect_right
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from math import atan2, ceil, copysign, cos, floor, inf, isclose, pi, radians
@@ -3498,7 +3498,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         target_object: Shape,
         direction: VectorLike | None = None,
         center: VectorLike | None = None,
-        hit: Hit = Hit.ALL,
+        hit: Hit | Callable[[ShapeList[Wire]], Iterable[Wire]] = Hit.ALL,
     ) -> ShapeList[Edge]:
         """Project Edge
 
@@ -3506,7 +3506,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
         one and only one of `direction` or `center` must be provided. Note that one or
         more edges may be generated depending on the topology of the target object and
         location/direction of projection; they come back nearest first, and ``hit``
-        keeps all of them, the nearest, the farthest, or the visible ones.
+        keeps all of them, the nearest, the farthest, or the visible ones. For any
+        other selection ``hit`` may be a callable given the projections as wires,
+        nearest first, that returns those to keep.
 
         To avoid flipping the normal of a face built with the projected wire the orientation
         of the output wires are forced to be the same as self.
@@ -3515,7 +3517,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
           target_object: Object to project onto
           direction: Parallel projection direction. Defaults to None.
           center: Conical center of projection. Defaults to None.
-          hit (Hit, optional): which of the projections to keep. Defaults to Hit.ALL.
+          hit (Hit | Callable, optional): which of the projections to keep, or a
+              selector called with the projected wires, nearest first, returning
+              those to keep. Defaults to Hit.ALL.
 
         Returns:
           : Projected Edge(s)
@@ -4695,7 +4699,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         target_object: Shape,
         direction: VectorLike | None = None,
         center: VectorLike | None = None,
-        hit: Hit = Hit.ALL,
+        hit: Hit | Callable[[ShapeList[Wire]], Iterable[Wire]] = Hit.ALL,
     ) -> ShapeList[Wire]:
         """Project Wire
 
@@ -4704,7 +4708,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
         more wires may be generated depending on the topology of the target object and
         location/direction of projection; they come back nearest first, and ``hit``
         keeps all of them, the nearest, the farthest, or the visible ones, what a
-        viewer behind the wire looking along the direction sees.
+        viewer behind the wire looking along the direction sees. For any other
+        selection ``hit`` may be a callable given the wires, nearest first, that
+        returns those to keep.
 
         To avoid flipping the normal of a face built with the projected wire the orientation
         of the output wires are forced to be the same as self.
@@ -4713,8 +4719,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
           target_object: Object to project onto
           direction: Parallel projection direction. Defaults to None.
           center: Conical center of projection. Defaults to None.
-          hit (Hit, optional): which of the projections to keep. Defaults to Hit.ALL.
-              Hit.VISIBLE needs a direction.
+          hit (Hit | Callable, optional): which of the projections to keep, or a
+              selector called with the wires, nearest first, returning those to
+              keep. Defaults to Hit.ALL. Hit.VISIBLE needs a direction.
 
         Returns:
           : Projected wire(s)
@@ -4807,7 +4814,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
             )
             output_wires = ShapeList([w[0] for w in output_wires_distances])
 
-        if hit == Hit.NEAREST:
+        if callable(hit):
+            output_wires = ShapeList(hit(output_wires))
+        elif hit == Hit.NEAREST:
             output_wires = output_wires[:1]
         elif hit == Hit.FARTHEST:
             output_wires = output_wires[-1:]

@@ -1429,7 +1429,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         # 1: The surfaces of the target that the extruded profile passes
         #    through, nearest first
-        surfaces = _project_profile_by_extrusion(profile, target, direction)
+        # The risers of a stepped target are part of the surface that stops
+        # the extrusion, though they take no projection
+        surfaces = _project_profile_by_extrusion(
+            profile, target, direction, keep_edge_on=True
+        )
         if not surfaces:
             raise ValueError("No intersection: extrusion does not contact target")
         limit = surfaces[0 if until == Until.NEXT else -1]

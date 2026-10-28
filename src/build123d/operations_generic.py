@@ -89,6 +89,7 @@ from build123d.topology import (
     Wire,
     isclose_b,
 )
+from build123d.topology.two_d import _edge_on
 
 logging.getLogger("build123d").addHandler(logging.NullHandler())
 logger = logging.getLogger("build123d")
@@ -904,7 +905,7 @@ def _face_shadow(face: Face, screen: Face, direction: Vector) -> ShapeList[Face]
     shadows = [
         piece
         for fragment in fragments
-        if abs(fragment.normal_at(fragment.center()).dot(direction)) > TOLERANCE
+        if not _edge_on(fragment, direction)
         for piece in fragment.project_to_shape(screen, direction).faces()
     ]
     if len(shadows) > 1:

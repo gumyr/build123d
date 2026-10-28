@@ -27,9 +27,9 @@ license:
 """
 
 from __future__ import annotations
-from typing import cast
+from typing import Any, cast
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from itertools import cycle, permutations, starmap
 
 from typing_extensions import deprecated
@@ -562,7 +562,11 @@ def project_to_shape(
     objects: Face | Edge | Wire | Iterable[Face | Edge | Wire] | None = None,
     target: Shape | None = None,
     direction: VectorLike | None = None,
-    hit: Hit = Hit.ALL,
+    # Any, not Face: the one selector serves both the face projection, which
+    # calls it with faces, and the edge and wire projection, which calls it
+    # with wires. A union of the two callables would stop mypy inferring the
+    # parameter of a lambda, which Any still allows.
+    hit: Hit | Callable[[ShapeList[Any]], Iterable[Any]] = Hit.ALL,
     mode: Mode = Mode.ADD,
 ) -> Sketch | Curve | Compound:
     """Part Operation: project_to_shape
@@ -584,7 +588,13 @@ def project_to_shape(
     ``Hit.NEAREST`` and ``Hit.FARTHEST`` one end of that list; ``Hit.VISIBLE``
     what a viewer behind the objects, looking along the direction, sees, the
     surfaces facing the viewer with the parts hidden behind nearer surfaces
-    removed. The direct methods :meth:`~topology.Face.project_to_shape` and
+    removed. The surfaces met are sewn into connected regions, so the nearest
+    is the nearest region with every face joined to it; for any other
+    selection ``hit`` may be a callable given every face (or wire) met,
+    nearest first, that returns those to keep, say
+    ``lambda faces: faces.filter_by(Axis.Z).sort_by(Axis.Z)[:1]`` for the
+    nearest face looking back along Z. The direct methods
+    :meth:`~topology.Face.project_to_shape` and
     :meth:`~topology.Wire.project_to_shape` do the work.
 
     To project onto a plane, see :func:`~operations_generic.project`.
@@ -595,8 +605,9 @@ def project_to_shape(
         target (Shape, optional): shape to project onto. Defaults to the part.
         direction (VectorLike, optional): projection direction. Defaults to the
             normal of the pending sketch plane, or of the first planar face.
-        hit (Hit, optional): which of the surfaces met to keep. Defaults to
-            Hit.ALL.
+        hit (Hit | Callable, optional): which of the surfaces met to keep, or
+            a selector called with every face or wire met, nearest first,
+            returning those to keep. Defaults to Hit.ALL.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:

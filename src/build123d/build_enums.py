@@ -246,6 +246,9 @@ class Hit(Enum):
     them all, nearest first; ``NEAREST`` and ``FARTHEST`` one end of that
     list; ``VISIBLE`` what a viewer on the source's side sees, the surfaces
     facing the viewer with the parts hidden behind nearer surfaces removed.
+    Where none of these fits, the projection operations also accept a
+    callable in place of a ``Hit``, given the surfaces met nearest first and
+    returning those to keep.
     """
 
     ALL = auto()

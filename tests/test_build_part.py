@@ -878,7 +878,8 @@ class TestProjectToShape(unittest.TestCase):
 
     def test_hit_modes_on_a_stepped_target(self):
         """A plate with a block on it: the label lands on the block top, the
-        plate beside it, the block's underside and the plate's bottom"""
+        plate beside it and the plate's bottom, never on the block's sides,
+        which lie along the direction and take no projection"""
         stepped = Box(20, 20, 2) + Pos(0, 0, 4) * Box(4, 20, 6)
         label = Face.make_rect(10, 10, Plane.XY.offset(20))
         areas = {
@@ -890,10 +891,55 @@ class TestProjectToShape(unittest.TestCase):
             )
             for hit in Hit
         }
-        self.assertEqual(areas[Hit.ALL], [30, 30, 40, 60, 60, 100])
-        self.assertEqual(areas[Hit.NEAREST], [30, 30, 40, 60, 60])  # the stepped front
+        self.assertEqual(areas[Hit.ALL], [30, 30, 40, 100])
+        self.assertEqual(areas[Hit.NEAREST], [40])  # the block top alone
         self.assertEqual(areas[Hit.FARTHEST], [100])
         self.assertEqual(areas[Hit.VISIBLE], [30, 30, 40])
+
+    def test_hit_selector(self):
+        """A cone sunk into a block, seen from below: the nearest region joins
+        the cone base to the cone side, so the faces looking back along the
+        direction, the cone base and the block bottom, take a selector"""
+        sunk = Cone(2, 1, 2) + Box(2, 3, 1, align=Align.MIN)
+        label = Face.make_rect(8, 8, Plane.XY.offset(-10))
+        kwargs = dict(target=sunk, direction=(0, 0, 1))
+        nearest = project_to_shape(label, hit=Hit.NEAREST, **kwargs).faces()
+        self.assertIn(GeomType.CONE, [f.geom_type for f in nearest])
+        looking_back = project_to_shape(
+            label,
+            hit=lambda faces: faces.filter_by(Axis.Z).filter_by(
+                lambda f: f.normal_at().Z < 0
+            ),
+            **kwargs,
+        ).faces()
+        self.assertEqual(
+            sorted(round(f.center().Z, 6) for f in looking_back), [-1, 0]
+        )  # cone base, block bottom
+        nearest_plane = project_to_shape(
+            label,
+            hit=lambda faces: faces.filter_by(Axis.Z).sort_by(Axis.Z)[:1],
+            **kwargs,
+        ).faces()
+        self.assertEqual(len(nearest_plane), 1)
+        self.assertAlmostEqual(nearest_plane[0].center().Z, -1, 6)
+        # a selector feeds the pending faces like any other hit
+        with BuildPart() as part:
+            Box(20, 20, 5)
+            with BuildSketch(Plane.XY.offset(10)):
+                Circle(3)
+            project_to_shape(hit=lambda faces: faces.sort_by(Axis.Z)[-1:])
+            self.assertEqual(len(part.pending_faces), 1)
+            self.assertAlmostEqual(part.pending_faces[0].center().Z, 2.5, 6)
+        # and selects among the wires of an edge or wire projection
+        with BuildPart() as part:
+            Cylinder(5, 10)
+            with BuildLine(Plane.XZ.offset(-10)):
+                Line((-3, -3), (3, 3))
+            projection = project_to_shape(
+                direction=Plane.XZ.z_dir, hit=lambda wires: wires[-1:]
+            )
+        self.assertEqual(len(projection.edges()), 1)
+        self.assertAlmostEqual(projection.edges()[0].center().Y, -5, 3)  # the far side
 
     def test_visible_hides_what_an_overhang_covers(self):
         shelved = Box(20, 20, 2) + Pos(0, 0, 8) * Box(20, 6, 2)
