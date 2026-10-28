@@ -1289,36 +1289,28 @@ class Shape(NodeMixin, Generic[TOPODS]):
         )
 
     def __deepcopy__(self, memo) -> Self:
-        """Return deepcopy of self"""
-        # The wrapped object is a OCCT TopoDS_Shape which can't be pickled or copied
-        # with the standard python copy/deepcopy, so create a deepcopy 'memo' with this
-        # value already copied which causes deepcopy to skip it.
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        if isinstance(self.wrapped, TopoDS_Vertex):
-            # BRepBuilderAPI_Copy folds a Vertex's location into its point, so
-            # copy it without the location and put the location back on the copy
-            unplaced = self.wrapped.Located(TopLoc_Location())
-            copied = BRepBuilderAPI_Copy(unplaced).Shape()
-            memo[id(self.wrapped)] = downcast(copied.Located(self.wrapped.Location()))
-        else:
-            memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
-        for key, value in self.__dict__.items():
-            if key == "topo_path":
-                # provenance points at shapes outside the copy, so it is
-                # carried by reference rather than duplicated with it
-                setattr(result, key, value)
-            elif key in ("_history", "_history_at"):
-                # the record names the original's kernel sub-shapes, and the
-                # copy's are new ones; as with pickling, it is left behind
-                setattr(result, key, None)
-            else:
-                setattr(result, key, copy.deepcopy(value, memo))
-            if key == "joints":
-                for joint in result.joints.values():
-                    joint.parent = result
-        return result
+        """A deep copy: the geometry copied in the kernel, the attributes deep
+        copied, and the joints bound to the copy and connected within it
+
+        As with ``copy.copy``, the copy stands outside any assembly, and the
+        copy of an assembly is an assembly whose compound is rebuilt from its
+        copied children, so the two share geometry. The record of how the
+        shape was made names the original's kernel sub-shapes and is left
+        behind.
+        """
+
+        def kernel_copy(node: Shape) -> TopoDS_Shape:
+            if node.children:  # rebuilt from the copied children
+                return _empty_compound_at(node.wrapped.Location())
+            if isinstance(node.wrapped, TopoDS_Vertex):
+                # BRepBuilderAPI_Copy folds a Vertex's location into its point,
+                # so copy it without the location and put the location back
+                unplaced = node.wrapped.Located(TopLoc_Location())
+                copied = BRepBuilderAPI_Copy(unplaced).Shape()
+                return copied.Located(node.wrapped.Location())
+            return BRepBuilderAPI_Copy(node.wrapped).Shape()
+
+        return self._copied(kernel_copy, memo, deep=True, keep_history=False)
 
     def _placed(self, wrapped: TOPODS) -> Self:
         """A copy of self around an already placed kernel shape
@@ -1327,7 +1319,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
         material, provenance and whatever a subclass adds, all by reference
         as a deep copy would carry them, and its own joints bound to it. It
         holds ``wrapped`` rather than a copy of the geometry, so a shape can be
-        relocated without the kernel copying it.
+        relocated without the kernel copying it, and it shares the record of
+        how the shape was made, which selection maps to the new place.
 
         The copy stands outside any assembly: it has no parent, as a new shape
         made from a member of an assembly is not itself a member. Children are
@@ -1336,19 +1329,87 @@ class Shape(NodeMixin, Generic[TOPODS]):
         connected to another joint of the assembly is connected to that
         joint's copy.
         """
-        copies: dict[int, Any] = {}
-        result = self._placed_node(wrapped, copies)
-        # Every node of the copy exists before any joint is copied, so a joint
-        # that names another node of the assembly names its copy
+        return self._copied(
+            lambda node: (
+                wrapped
+                if node is self
+                else node.wrapped.Located(node.wrapped.Location())
+            )
+        )
+
+    def _transformed(self, transform: Callable[[TopoDS_Shape], TopoDS_Shape]) -> Self:
+        """A copy of self with its geometry transformed in the kernel
+
+        The children of an assembly are placed relative to it, so each is
+        transformed where the assembly puts it; the copy's children then carry
+        their own positions and its compound, rebuilt from them, sits at the
+        origin. The record of how the shape was made is left behind, as the
+        transformed sub-shapes are new.
+        """
+
+        def kernel_copy(node: Shape) -> TopoDS_Shape:
+            if node.children:  # rebuilt from the transformed children
+                return _empty_compound_at(TopLoc_Location())
+            # where the assembly, self, places the node
+            within = TopLoc_Location()
+            ancestor = node
+            while ancestor is not self:
+                ancestor = tcast(Shape, ancestor.parent)
+                within = ancestor.wrapped.Location().Multiplied(within)
+            return transform(node.wrapped.Moved(within))
+
+        return self._copied(kernel_copy, keep_history=False)
+
+    def _copied(
+        self,
+        kernel_copy: Callable[[Shape], TopoDS_Shape],
+        copies: dict[int, Any] | None = None,
+        *,
+        deep: bool = False,
+        keep_history: bool = True,
+    ) -> Self:
+        """A copy of self, its children and its joints around new kernel shapes
+
+        The one copy routine behind relocation, transformation and deep
+        copying. Every node of self is copied: the same class, the attributes
+        shared or deep copied, the kernel shape given by ``kernel_copy``, the
+        children copied the same way and attached. A node with children is a
+        Compound whose kernel shape is rebuilt from its children as they are
+        attached, so of what ``kernel_copy`` returns for it only the Location
+        is used. The copy stands outside any assembly.
+
+        Every node is in ``copies`` before any joint is copied, so a joint
+        connected to another node's joint is connected to that node's copy.
+
+        Args:
+            kernel_copy (Callable[[Shape], TopoDS_Shape]): the copy's kernel
+                shape for each node of self
+            copies (dict[int, Any], optional): the copies made so far by id of
+                the original, as ``copy.deepcopy`` keeps its memo; grown here
+            deep (bool, optional): deep copy the attributes rather than share
+                them. Defaults to False.
+            keep_history (bool, optional): share the record of how the shape
+                was made; dropped when the copy's sub-shapes are new ones the
+                record does not describe. Defaults to True.
+        """
+        if copies is None:
+            copies = {}
+        result = self._copied_node(kernel_copy, copies, deep, keep_history)
         for original, placed in self._placed_pairs(result):
-            if "joints" in placed.__dict__:  # only the classes that can have joints
+            if "joints" in original.__dict__:  # only the classes that can have joints
                 placed.joints = copy.deepcopy(original.joints, copies)
                 for joint in placed.joints.values():
                     joint.parent = placed
         return result
 
-    def _placed_node(self, wrapped: TOPODS, copies: dict[int, Any]) -> Self:
-        """The node of ``_placed`` for self and, below it, its children's"""
+    def _copied_node(
+        self,
+        kernel_copy: Callable[[Shape], TopoDS_Shape],
+        copies: dict[int, Any],
+        deep: bool,
+        keep_history: bool,
+    ) -> Self:
+        """The node of ``_copied`` for self and, below it, its children's"""
         # pylint reads result.children as an attribute of self set outside
         # __init__, which it is not
         # pylint: disable=attribute-defined-outside-init
@@ -1356,15 +1417,22 @@ class Shape(NodeMixin, Generic[TOPODS]):
         cls = self.__class__
         result = cls.__new__(cls)
         copies[id(self)] = result
-        result.__dict__.update(self.__dict__)
-        result.__dict__.pop("_NodeMixin__parent", None)
-        result.__dict__.pop("_NodeMixin__children", None)
-        result._wrapped = wrapped
+        for key, value in self.__dict__.items():
+            if key in ("_wrapped", "_NodeMixin__parent", "_NodeMixin__children"):
+                continue
+            if key == "joints":
+                value = {}  # bound to the copy once every node exists
+            elif key in ("_history", "_history_at"):
+                value = value if keep_history else None
+            elif deep and key != "topo_path":
+                # provenance points at shapes outside the copy, so it is
+                # carried by reference rather than duplicated with it
+                value = copy.deepcopy(value, copies)
+            result.__dict__[key] = value
+        result._wrapped = tcast(TOPODS, downcast(kernel_copy(self)))
         if self.children:
             result.children = [
-                child._placed_node(
-                    downcast(child.wrapped.Located(child.wrapped.Location())), copies
-                )
+                child._copied_node(kernel_copy, copies, deep, keep_history)
                 for child in self.children
             ]
         return result
@@ -1376,14 +1444,34 @@ class Shape(NodeMixin, Generic[TOPODS]):
             yield from original._placed_pairs(child)
 
     def __getstate__(self) -> dict[str, Any]:
-        """Return the state to pickle, without the history record"""
+        """The state to pickle: without the history record, the parent, and
+        the compound an assembly rebuilds from its children"""
         # The record refers to the kernel shapes of the operation that made
         # self. Unpickling rebuilds self from new kernel shapes, so the record
         # would describe nothing in the restored shape and it is left behind.
         state = self.__dict__.copy()
         state["_history"] = None
         state["_history_at"] = None
+        # A shape pickled on its own stands outside its assembly, as a copy
+        # does; the children of a pickled assembly are reattached on loading
+        state.pop("_NodeMixin__parent", None)
+        if self.children:
+            # the compound is rebuilt from the children on loading, so their
+            # geometry is written once rather than again inside the compound
+            state["_wrapped"] = _empty_compound_at(self.wrapped.Location())
         return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore the pickled state, reattaching the children of an assembly"""
+        self.__dict__.update(state)
+        children = state.get("_NodeMixin__children")
+        if children:
+            for child in children:
+                child.__dict__["_NodeMixin__parent"] = self
+            self._rebuild_from_children()
+
+    def _rebuild_from_children(self) -> None:
+        """Rebuild the kernel shape from the children; only a Compound has any"""
 
     def __eq__(self, other) -> bool:
         """Check if two shapes are the same.
@@ -1588,6 +1676,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         common_attrs = attrs1 & attrs2
         common_attrs.discard("_history")  # says how self was made, not target
         common_attrs.discard("_history_at")
+        common_attrs.discard("_NodeMixin__parent")  # membership, not an attribute
         if exceptions is not None:
             common_attrs -= set(exceptions)
 
@@ -1595,7 +1684,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
             # Copy the attribute only if the target's attribute not set
             if attr == "joints":
                 if not getattr(target, attr):
-                    target.joints = copy.deepcopy(self.joints)
+                    # the memo maps the joints' parent, self, to the target,
+                    # so the copy does not reach into self's geometry
+                    target.joints = copy.deepcopy(self.joints, {id(self): target})
                 for joint in target.joints.values():
                     joint.parent = target
             elif not getattr(target, attr):
@@ -1790,10 +1881,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self.is_empty:
             return self
         if not self.is_valid:
-            shape_copy: Shape = copy.deepcopy(self, None)
-            shape_copy.wrapped = tcast(TOPODS, fix(self.wrapped))
-
-            return shape_copy
+            return self._copied(
+                lambda node: node.wrapped if node.children else fix(node.wrapped),
+                keep_history=False,
+            )
 
         return self
 
@@ -2854,23 +2945,22 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """
         if self.is_empty:
             return self
-        new_shape = copy.deepcopy(self, None)
         if t_matrix.wrapped.Form() == gp_TrsfForm.gp_Other:
             # a general affine transform (stretch, shear): only GTransform
             # can apply it, at the cost of converting geometry to splines
-            builder: BRepBuilderAPI_GTransform | BRepBuilderAPI_Transform = (
-                BRepBuilderAPI_GTransform(self.wrapped, t_matrix.wrapped, True)
+            return self._transformed(
+                lambda shape: BRepBuilderAPI_GTransform(
+                    shape, t_matrix.wrapped, True
+                ).Shape()
             )
-        else:
-            # a similarity: Transform applies it exactly and keeps the geometry
-            # types; GTransform would drop its scale factor, which a gp_GTrsf
-            # of any recognised form keeps apart from its matrix
-            builder = BRepBuilderAPI_Transform(
-                self.wrapped, t_matrix.wrapped.Trsf(), True
-            )
-        new_shape.wrapped = tcast(TOPODS, downcast(builder.Shape()))
-
-        return new_shape
+        # a similarity: Transform applies it exactly and keeps the geometry
+        # types; GTransform would drop its scale factor, which a gp_GTrsf
+        # of any recognised form keeps apart from its matrix
+        return self._transformed(
+            lambda shape: BRepBuilderAPI_Transform(
+                shape, t_matrix.wrapped.Trsf(), True
+            ).Shape()
+        )
 
     def transform_shape(self, t_matrix: Matrix) -> Self:
         """Apply affine transform without changing type
@@ -2887,13 +2977,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """
         if self.is_empty:
             return self
-        new_shape = copy.deepcopy(self, None)
-        transformed = downcast(
-            BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
+        return self._transformed(
+            lambda shape: BRepBuilderAPI_Transform(
+                shape, t_matrix.wrapped.Trsf()
+            ).Shape()
         )
-        new_shape.wrapped = tcast(TOPODS, transformed)
-
-        return new_shape
 
     def transformed(
         self, rotate: VectorLike = (0, 0, 0), offset: VectorLike = (0, 0, 0)
@@ -2968,15 +3056,17 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """
         if self.is_empty:
             return self
-        shape_copy: Shape = copy.deepcopy(self, None)
-        transform_builder = BRepBuilderAPI_Transform(
-            self.wrapped,
-            transformation,
-            True,
-        )
-        transformed_shape = transform_builder.Shape()
-        shape_copy.wrapped = tcast(TOPODS, downcast(transformed_shape))
-        if self._history is not None:
+        builders: list[BRepBuilderAPI_Transform] = []
+
+        def transform(shape: TopoDS_Shape) -> TopoDS_Shape:
+            builder = BRepBuilderAPI_Transform(shape, transformation, True)
+            builders.append(builder)
+            return builder.Shape()
+
+        shape_copy = self._transformed(transform)
+        if self._history is not None and not self.children:
+            # the record follows the one transform of a shape without children;
+            # an assembly's compound is rebuilt from its children instead
             history = ShapeHistory(
                 before=self._history.before,
                 brought=self._history.brought,
@@ -2984,7 +3074,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             history.merge(self._history)
             history.merge(
                 ShapeHistory.from_algorithm(
-                    transform_builder, [self.wrapped], transformed_shape
+                    builders[0], [self.wrapped], shape_copy.wrapped
                 )
             )
             shape_copy._made_by(history)
@@ -4561,6 +4651,14 @@ def unwrap_topods_compound(
         return single_element if fully else compound
 
     # If there are no elements or more than one element, return TopoDS_Compound
+    return compound
+
+
+def _empty_compound_at(location: TopLoc_Location) -> TopoDS_Compound:
+    """An empty compound at a location, for a Compound to rebuild from its
+    children"""
+    compound = _make_topods_compound_from_shapes([])
+    compound.Location(location)
     return compound
 
 

@@ -3507,18 +3507,15 @@ class Edge(Mixin1D[TopoDS_Edge]):
 
         assert isinstance(self._wrapped, TopoDS_Edge)
 
-        reversed_edge = copy.deepcopy(self)
-        # pylint: disable=attribute-defined-outside-init
         if reconstruct:
             first, last = BRep_Tool.Range_s(self._wrapped)
             curve = BRep_Tool.Curve_s(self._wrapped, first, last)
             first = curve.ReversedParameter(first)
             last = curve.ReversedParameter(last)
             topods_edge = BRepBuilderAPI_MakeEdge(curve.Reversed(), last, first).Edge()
-            reversed_edge.wrapped = topods_edge
         else:
-            reversed_edge.wrapped = TopoDS.Edge(self.wrapped.Reversed())
-        return reversed_edge
+            topods_edge = TopoDS.Edge(self.wrapped.Reversed())
+        return self._copied(lambda _: topods_edge, keep_history=False)
 
     def trim(self, start: float | VectorLike, end: float | VectorLike) -> Edge:
         """trim
