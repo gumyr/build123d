@@ -822,7 +822,7 @@ class TestProjectToShape(unittest.TestCase):
             Box(20, 20, 5)
             with BuildSketch(Plane.XY.offset(10)):
                 Circle(3)
-            projection = project_to_shape()
+            projection = project_to_shape(direction=(0, 0, -1))
             self.assertEqual(len(part.pending_faces), 2)
             extrude(amount=1)
         self.assertIsInstance(projection, Sketch)
@@ -831,10 +831,25 @@ class TestProjectToShape(unittest.TestCase):
         )
         self.assertAlmostEqual(part.part.volume, 20 * 20 * 5 + 2 * pi * 9 * 1, 3)
 
-    def test_a_sketch_beside_the_part_projects_toward_it(self):
+    def test_a_sketch_projects_along_its_plane_normal(self):
+        """The default direction is the sketch plane's normal as drawn, never
+        turned toward the part: a sketch below the part on Plane.XY faces it,
+        one above faces away"""
         with BuildPart() as part:
             Box(20, 20, 5)
             with BuildSketch(Plane.XY.offset(-10)):
+                Rectangle(2, 2)
+            projection = project_to_shape()
+        self.assertEqual(len(projection.faces()), 2)
+        with BuildPart() as part:
+            Box(20, 20, 5)
+            with BuildSketch(Plane.XY.offset(10)):
+                Rectangle(2, 2)
+            projection = project_to_shape()
+        self.assertEqual(projection.faces(), [])
+        with BuildPart() as part:
+            Box(20, 20, 5)
+            with BuildSketch(Plane((0, 0, 10), z_dir=(0, 0, -1))):
                 Rectangle(2, 2)
             projection = project_to_shape()
         self.assertEqual(len(projection.faces()), 2)
@@ -860,8 +875,17 @@ class TestProjectToShape(unittest.TestCase):
         self.assertEqual(
             project_to_shape(label, target=plate, direction=(0, 0, 1)).faces(), []
         )
-        # a planar face supplies the direction when none is given
-        self.assertEqual(len(project_to_shape(label, target=plate).faces()), 2)
+        # a planar face supplies its own normal when no direction is given
+        self.assertEqual(project_to_shape(label, target=plate).faces(), [])
+        facing = Face.make_rect(2, 2, Plane((0, 0, 5), z_dir=(0, 0, -1)))
+        self.assertEqual(len(project_to_shape(facing, target=plate).faces()), 2)
+        # nothing else does
+        with self.assertRaises(ValueError):
+            project_to_shape(label.outer_wire(), target=plate)
+        with self.assertRaises(ValueError):
+            project_to_shape(
+                Cylinder(1, 1).faces().filter_by(GeomType.CYLINDER), target=plate
+            )
 
     def test_text_onto_a_cylinder(self):
         """#951: a label cast onto a curved surface"""
@@ -927,7 +951,9 @@ class TestProjectToShape(unittest.TestCase):
             Box(20, 20, 5)
             with BuildSketch(Plane.XY.offset(10)):
                 Circle(3)
-            project_to_shape(hit=lambda faces: faces.sort_by(Axis.Z)[-1:])
+            project_to_shape(
+                direction=(0, 0, -1), hit=lambda faces: faces.sort_by(Axis.Z)[-1:]
+            )
             self.assertEqual(len(part.pending_faces), 1)
             self.assertAlmostEqual(part.pending_faces[0].center().Z, 2.5, 6)
         # and selects among the wires of an edge or wire projection
@@ -993,7 +1019,7 @@ class TestProjectToShape(unittest.TestCase):
                 Box(4, 20, 6)
             with BuildSketch(Plane.XY.offset(20)):
                 Rectangle(10, 10)
-            projection = project_to_shape(hit=Hit.VISIBLE)
+            projection = project_to_shape(direction=(0, 0, -1), hit=Hit.VISIBLE)
             self.assertEqual(len(part.pending_faces), 3)
         self.assertEqual(
             sorted(round(f.area, 6) for f in projection.faces()), [30, 30, 40]

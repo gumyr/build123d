@@ -1178,18 +1178,30 @@ def project(
             DeprecationWarning,
             stacklevel=2,
         )
-        # The old form pointed the plane's normal toward the target for each
-        # object; project_to_shape does that itself when no direction is given
-        # and a sketch plane or planar face supplies one. Only edges without a
-        # plane need the old fallback to the workplane, or to Plane.XY.
-        direction: Vector | None = None
-        if context is None or not context.pending_face_planes:
+        # The old form pointed the plane's normal toward the target;
+        # project_to_shape uses a direction as given, so that rule is applied
+        # here, from the sketch plane, the first planar face, the workplane or
+        # Plane.XY, and the first object
+        candidates: list[Shape]
+        if context is not None and context.pending_face_planes:
+            candidates = list(context.pending_faces)
+            direction = context.pending_face_planes[0].z_dir
+        else:
             candidates = flatten_sequence(objects) if objects is not None else []
-            if not any(isinstance(obj, Face) and obj.is_planar for obj in candidates):
-                direction = (workplane or Plane.XY).z_dir
-                if candidates and target is not None:
-                    toward = target.center() - candidates[0].center()
-                    direction = direction if toward.dot(direction) >= 0 else -direction
+            planar = next(
+                (obj for obj in candidates if isinstance(obj, Face) and obj.is_planar),
+                None,
+            )
+            direction = (
+                planar.normal_at()
+                if planar is not None
+                else (workplane or Plane.XY).z_dir
+            )
+        if target is None and isinstance(context, BuildPart):
+            target = context.part_local
+        if candidates and target:
+            toward = target.center() - candidates[0].center()
+            direction = direction if toward.dot(direction) >= 0 else -direction
         return project_to_shape(
             cast("Face | Edge | Wire | Iterable[Face | Edge | Wire] | None", objects),
             target=target,

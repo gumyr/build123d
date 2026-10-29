@@ -577,10 +577,13 @@ def project_to_shape(
 
     In BuildPart the objects default to the pending faces and edges, those of
     the sketches drawn since the last operation; the target to the part; and the
-    direction to the normal of the pending sketch plane, pointed toward the
-    part. The projected faces are pending in turn, so an ``extrude`` follows
-    directly. In algebra mode the objects and target must be given, and the
-    direction too unless a planar face among the objects supplies its normal.
+    direction to the normal of the pending sketch plane. The projected faces
+    are pending in turn, so an ``extrude`` follows directly. In algebra mode
+    the objects and target must be given, and the direction too unless every
+    object is a planar face, which projects along its own normal. The
+    direction is never turned toward the target: a sketch above the part on
+    ``Plane.XY.offset(10)`` faces up, so it takes ``direction=(0, 0, -1)``, or
+    a plane that faces the part.
 
     The projection meets every surface in its path: a face projected onto a
     plate lands on its near face and on its far face. ``hit`` says which to
@@ -604,7 +607,7 @@ def project_to_shape(
             Defaults to the pending faces and edges.
         target (Shape, optional): shape to project onto. Defaults to the part.
         direction (VectorLike, optional): projection direction. Defaults to the
-            normal of the pending sketch plane, or of the first planar face.
+            normal of the pending sketch plane, or of each planar face, as drawn.
         hit (Hit | Callable, optional): which of the surfaces met to keep, or
             a selector called with every face or wire met, nearest first,
             returning those to keep. Defaults to Hit.ALL.
@@ -654,29 +657,27 @@ def project_to_shape(
     if not target:
         raise ValueError("A target object could not be determined")
 
-    # An explicit direction is used as given; a defaulted one is pointed
-    # toward the target for each object, as a sketch beside the part expects
-    toward_target = direction is None
+    # The direction is used as given. Without one, each object projects along
+    # its own normal: the pending sketch plane's for a sketch, a planar face's
+    # for a face. Nothing is turned toward the target: a sketch above the part
+    # on Plane.XY.offset(10) faces up, so it takes direction=(0, 0, -1) or a
+    # plane that faces the part.
+    projection_direction: Vector | None = None
     if direction is not None:
-        projection_direction = Vector(direction)
+        projection_direction = Vector(direction).normalized()
     elif pending_plane is not None:
         projection_direction = pending_plane.z_dir
-    else:
-        face_planes = [
-            plane
-            for obj in object_list
-            if isinstance(obj, Face) and (plane := obj.is_planar)
-        ]
-        if not face_planes:
-            raise ValueError("A direction must be provided")
-        projection_direction = face_planes[0].z_dir
-    projection_direction = projection_direction.normalized()
 
     projected: list[Shape] = []
     for obj in object_list:
         obj_direction = projection_direction
-        if toward_target and (target.center() - obj.center()).dot(obj_direction) < 0:
-            obj_direction = -obj_direction
+        if obj_direction is None:
+            if not (isinstance(obj, Face) and obj.is_planar):
+                raise ValueError(
+                    "A direction must be provided: only a sketch plane or a "
+                    "planar face supplies one"
+                )
+            obj_direction = obj.normal_at()
         if isinstance(obj, Face):
             projected.extend(obj.project_to_shape(target, obj_direction, hit).faces())
         else:
