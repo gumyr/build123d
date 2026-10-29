@@ -1294,10 +1294,18 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         As with ``copy.copy``, the copy stands outside any assembly, and the
         copy of an assembly is an assembly whose compound is rebuilt from its
-        copied children, so the two share geometry. The record of how the
-        shape was made names the original's kernel sub-shapes and is left
-        behind.
+        copied children, so the two share geometry. The copy shares nothing
+        with the original, and keeps what the original's children shared
+        with each other: the halves of a split hold one cut face between
+        them, and so do their copies, so the copy counts the same vertices,
+        edges and faces as the original. The record of how the shape was
+        made names the original's kernel sub-shapes and is left behind.
         """
+        # One kernel copy of every leaf at once, so that a sub-shape two
+        # leaves share is copied once and stays shared between their copies
+        copier = BRepBuilderAPI_Copy(
+            _make_topods_compound_from_shapes(leaf.wrapped for leaf in self.leaves)
+        )
 
         def kernel_copy(node: Shape) -> TopoDS_Shape:
             if node.children:  # rebuilt from the copied children
@@ -1308,7 +1316,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 unplaced = node.wrapped.Located(TopLoc_Location())
                 copied = BRepBuilderAPI_Copy(unplaced).Shape()
                 return copied.Located(node.wrapped.Location())
-            return BRepBuilderAPI_Copy(node.wrapped).Shape()
+            return copier.ModifiedShape(node.wrapped)
 
         return self._copied(kernel_copy, memo, deep=True, keep_history=False)
 
