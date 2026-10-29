@@ -27,7 +27,7 @@ license:
 """
 
 import unittest
-from math import cos, pi, radians, sin, sqrt
+from math import atan2, cos, pi, radians, sin, sqrt
 from build123d import *
 
 
@@ -645,6 +645,130 @@ class BuildLineTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             JernArc((1, 0), (0, 1), 1, (5, 0))
+
+    def test_jern_arc_limit_direction(self):
+        limit = Axis((0, 0.25), (1, 1))
+        ccw_end = ((3 + sqrt(23)) / 8, (5 + sqrt(23)) / 8, 0)
+        cw_end = ((-5 - sqrt(7)) / 8, (-3 - sqrt(7)) / 8, 0)
+
+        with BuildLine() as default_builder:
+            JernArc((0, 0), (1, 0), 1, limit)
+        with BuildLine() as none_builder:
+            JernArc((0, 0), (1, 0), 1, limit, clockwise=None)
+        with BuildLine() as ccw_builder:
+            JernArc((0, 0), (1, 0), 1, limit, clockwise=False)
+        with BuildLine() as cw_builder:
+            JernArc((0, 0), (1, 0), 1, limit, clockwise=True)
+
+        default_edge = default_builder.line.edge()
+        none_edge = none_builder.line.edge()
+        ccw_edge = ccw_builder.line.edge()
+        cw_edge = cw_builder.line.edge()
+        ccw_travel = (atan2(ccw_end[1] - 1, ccw_end[0]) + pi / 2) % (2 * pi)
+        cw_travel = (pi / 2 - atan2(cw_end[1] + 1, cw_end[0])) % (2 * pi)
+
+        self.assertAlmostEqual(default_edge.position_at(1), ccw_end, 5)
+        self.assertAlmostEqual(none_edge.position_at(1), ccw_end, 5)
+        self.assertAlmostEqual(ccw_edge.position_at(1), ccw_end, 5)
+        self.assertAlmostEqual(cw_edge.position_at(1), cw_end, 5)
+        self.assertAlmostEqual(default_edge.arc_center, (0, 1, 0), 5)
+        self.assertAlmostEqual(none_edge.arc_center, (0, 1, 0), 5)
+        self.assertAlmostEqual(ccw_edge.arc_center, (0, 1, 0), 5)
+        self.assertAlmostEqual(cw_edge.arc_center, (0, -1, 0), 5)
+        self.assertAlmostEqual(default_edge.radius, 1, 5)
+        self.assertAlmostEqual(none_edge.radius, 1, 5)
+        self.assertAlmostEqual(ccw_edge.radius, 1, 5)
+        self.assertAlmostEqual(cw_edge.radius, 1, 5)
+        self.assertAlmostEqual(default_edge.tangent_at(0), (1, 0, 0), 5)
+        self.assertAlmostEqual(none_edge.tangent_at(0), (1, 0, 0), 5)
+        self.assertAlmostEqual(ccw_edge.tangent_at(0), (1, 0, 0), 5)
+        self.assertAlmostEqual(cw_edge.tangent_at(0), (1, 0, 0), 5)
+        self.assertAlmostEqual(
+            ccw_edge.tangent_at(1), (1 - ccw_end[1], ccw_end[0], 0), 5
+        )
+        self.assertAlmostEqual(cw_edge.tangent_at(1), (cw_end[1] + 1, -cw_end[0], 0), 5)
+        self.assertAlmostEqual(default_edge.length, ccw_travel, 5)
+        self.assertAlmostEqual(none_edge.length, ccw_travel, 5)
+        self.assertAlmostEqual(ccw_edge.length, ccw_travel, 5)
+        self.assertAlmostEqual(cw_edge.length, cw_travel, 5)
+        self.assertGreater(cw_edge.length, ccw_edge.length)
+
+    def test_jern_arc_limit_direction_mirrored_false_selects_longer_ccw(self):
+        limit = Axis((0, -0.25), (1, -1))
+        default_end = ((3 + sqrt(23)) / 8, -(5 + sqrt(23)) / 8, 0)
+        ccw_end = ((-5 - sqrt(7)) / 8, (3 + sqrt(7)) / 8, 0)
+        default_travel = (pi / 2 - atan2(default_end[1] + 1, default_end[0])) % (2 * pi)
+        ccw_travel = (atan2(ccw_end[1] - 1, ccw_end[0]) + pi / 2) % (2 * pi)
+
+        with BuildLine() as default_builder:
+            JernArc((0, 0), (1, 0), 1, limit)
+        default_edge = default_builder.line.edge()
+
+        self.assertAlmostEqual(default_edge.position_at(1), default_end, 5)
+        self.assertAlmostEqual(default_edge.arc_center, (0, -1, 0), 5)
+        self.assertAlmostEqual(default_edge.radius, 1, 5)
+        self.assertAlmostEqual(default_edge.tangent_at(0), (1, 0, 0), 5)
+        self.assertAlmostEqual(default_edge.length, default_travel, 5)
+        self.assertLess(default_edge.length, ccw_travel)
+
+        with BuildLine() as ccw_builder:
+            JernArc((0, 0), (1, 0), 1, limit, clockwise=False)
+        ccw_edge = ccw_builder.line.edge()
+
+        self.assertAlmostEqual(ccw_edge.position_at(1), ccw_end, 5)
+        self.assertAlmostEqual(ccw_edge.arc_center, (0, 1, 0), 5)
+        self.assertAlmostEqual(ccw_edge.radius, 1, 5)
+        self.assertAlmostEqual(ccw_edge.tangent_at(0), (1, 0, 0), 5)
+        self.assertAlmostEqual(ccw_edge.length, ccw_travel, 5)
+        self.assertGreater(ccw_edge.length, default_edge.length)
+
+    def test_jern_arc_limit_direction_translation_and_plane(self):
+        translated_end = (
+            3 + (-5 - sqrt(7)) / 8,
+            -2 + (-3 - sqrt(7)) / 8,
+            0,
+        )
+        translated_limit = Axis((3, -1.75), (1, 1))
+        with BuildLine() as translated_builder:
+            JernArc((3, -2), (4, 0), 1, translated_limit, clockwise=True)
+        translated_edge = translated_builder.line.edge()
+        translated_travel = (
+            pi / 2 - atan2(translated_end[1] + 3, translated_end[0] - 3)
+        ) % (2 * pi)
+
+        self.assertAlmostEqual(translated_edge.position_at(0), (3, -2, 0), 5)
+        self.assertAlmostEqual(translated_edge.position_at(1), translated_end, 5)
+        self.assertAlmostEqual(translated_edge.arc_center, (3, -3, 0), 5)
+        self.assertAlmostEqual(translated_edge.radius, 1, 5)
+        self.assertAlmostEqual(translated_edge.tangent_at(0), (1, 0, 0), 5)
+        self.assertAlmostEqual(
+            translated_edge.tangent_at(1),
+            (translated_end[1] + 3, 3 - translated_end[0], 0),
+            5,
+        )
+        self.assertAlmostEqual(translated_edge.length, translated_travel, 5)
+
+        with BuildLine(Plane.XZ) as xz_builder:
+            JernArc((0, 0), (1, 0), 1, Axis((0, 0.25), (1, 1)), clockwise=True)
+        xz_edge = xz_builder.line.edge()
+        xz_end = ((-5 - sqrt(7)) / 8, 0, (-3 - sqrt(7)) / 8)
+        self.assertAlmostEqual(xz_edge.position_at(1), xz_end, 5)
+        self.assertAlmostEqual(xz_edge.arc_center, (0, 0, -1), 5)
+        self.assertAlmostEqual(xz_edge.radius, 1, 5)
+        self.assertAlmostEqual(xz_edge.tangent_at(0), (1, 0, 0), 5)
+
+    def test_jern_arc_clockwise_limit_errors(self):
+        only_ccw_limit = Axis((0, 1.5), (1, 0))
+        with BuildLine():
+            with self.assertRaisesRegex(ValueError, "doesn't intersect"):
+                JernArc((0, 0), (1, 0), 1, only_ccw_limit, clockwise=True)
+
+        for clockwise in (True, False):
+            with self.subTest(clockwise=clockwise):
+                with self.assertRaisesRegex(
+                    ValueError, "only be used with an arc limit"
+                ):
+                    JernArc((0, 0), (1, 0), 1, 90, clockwise=clockwise)
 
     def test_polar_line(self):
         """Test 2D and 3D polar lines"""
