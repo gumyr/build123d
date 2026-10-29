@@ -30,7 +30,7 @@ of its set rather than failing. See :ref:`empty_shapes`.
 
 **Sets of predefined basic shapes:**
 
-:math:`B^3 := \lbrace` ``Part``, ``Box``, ``Cylinder``, ``Cone``, ``Sphere``, ``Torus``, ``Wedge``, ``Hole``, ``CounterBoreHole``, ``CounterSinkHole`` :math:`\rbrace`
+:math:`B^3 := \lbrace` ``Part``, ``Box``, ``Cylinder``, ``Cone``, ``Sphere``, ``Torus``, ``Wedge``, ``Hole``, ``CounterBoreHole``, ``CounterDrillHole``, ``CounterSinkHole`` :math:`\rbrace`
 
 :math:`B^2 := \lbrace` ``Sketch``, ``Rectangle``, ``Circle``, ``Ellipse``, ``Rectangle``, ``Polygon``, ``RegularPolygon``, ``Text``, ``Trapezoid``, ``SlotCenterPoint``, ``SlotCenterToCenter``, ``SlotCurve``, ``SlotOverall`` :math:`\rbrace`
 
