@@ -57,7 +57,19 @@ from bisect import bisect_right
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
-from math import atan2, ceil, copysign, cos, floor, inf, isclose, pi, radians
+from math import (
+    atan2,
+    ceil,
+    copysign,
+    cos,
+    floor,
+    inf,
+    isclose,
+    isfinite,
+    pi,
+    radians,
+    sqrt,
+)
 from typing import TYPE_CHECKING, ClassVar
 from typing import cast as tcast
 from typing import overload
@@ -92,6 +104,13 @@ from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffset
 from OCP.BRepProj import BRepProj_Projection
 from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
 from OCP.Extrema import Extrema_ExtPC
+from OCP.FairCurve import (
+    FairCurve_AnalysisCode,
+    FairCurve_Batten,
+    FairCurve_MinimalVariation,
+    FairCurve_NotConverged,
+    FairCurve_OK,
+)
 from OCP.GC import (
     GC_MakeArcOfCircle,
     GC_MakeArcOfEllipse,
@@ -132,6 +151,7 @@ from OCP.GeomAbs import (
 )
 from OCP.GeomAdaptor import GeomAdaptor_Curve
 from OCP.GeomAPI import (
+    GeomAPI,
     GeomAPI_Interpolate,
     GeomAPI_PointsToBSpline,
     GeomAPI_ProjectPointOnCurve,
@@ -2648,6 +2668,196 @@ class Edge(Mixin1D[TopoDS_Edge]):
             for i in [0, 1]
         ]
         return Edge.make_line(*pnts)
+
+    @classmethod
+    def make_batten(
+        cls,
+        start: VectorLike,
+        end: VectorLike,
+        height: float,
+        start_angle: float = 0,
+        end_angle: float = 0,
+        plane: Plane = Plane.XY,
+        tolerance: float = 1e-3,
+        max_iterations: int = 50,
+    ) -> Edge:
+        """Create a planar flexible-strip spline with constant positive height.
+
+        Start and end are world-coordinate points on plane. Angles are degrees
+        from the start-to-end chord to each forward tangent. Positive angles turn
+        counterclockwise about the plane normal. Angles must be within
+        [-180, 180] degrees. These principal tangent angles do not represent
+        additional winding. The strip has zero slope and
+        imposed sliding at the native default. The computation Boolean and
+        status must both report success before edge creation.
+
+        Args:
+            start (VectorLike): start point on plane.
+            end (VectorLike): end point on plane.
+            height (float): positive constant strip height.
+            start_angle (float): start tangent angle in degrees. Defaults to 0.
+            end_angle (float): end tangent angle in degrees. Defaults to 0.
+            plane (Plane): containing plane. Defaults to Plane.XY.
+            tolerance (float): positive solver tolerance. Defaults to 1e-3.
+            max_iterations (int): positive 32-bit Newton iteration limit per native
+                continuation step, within [1, 2147483647]. This is not a total
+                runtime limit. Defaults to 50.
+
+        Raises:
+            ValueError: Invalid inputs or unsuccessful solver status.
+
+        The local coordinates, endpoint differences, squared chord distance,
+        height/chord cubed, continuation tolerance, and its chord product must
+        remain finite. These checks cover known initial native operations.
+
+        Returns:
+            Edge: computed B-spline.
+        """
+        return cls._make_fair_curve(
+            start,
+            end,
+            height,
+            start_angle,
+            end_angle,
+            plane,
+            tolerance,
+            max_iterations,
+            False,
+        )
+
+    @classmethod
+    def make_minimal_variation(
+        cls,
+        start: VectorLike,
+        end: VectorLike,
+        height: float,
+        start_angle: float = 0,
+        end_angle: float = 0,
+        plane: Plane = Plane.XY,
+        tolerance: float = 1e-3,
+        max_iterations: int = 50,
+    ) -> Edge:
+        """Create a planar minimal-variation spline with tangent constraints.
+
+        Points use world coordinates and must lie on plane. Angles use degrees
+        from the start-to-end chord to each forward tangent, counterclockwise
+        about the plane normal. Angles must be within [-180, 180] degrees.
+        These principal tangent angles do not represent additional winding.
+        The strip has constant positive height, zero slope, imposed sliding,
+        and the native default jerk-energy ratio of zero. The computation Boolean
+        and status must both report success before edge creation.
+
+        Args:
+            start (VectorLike): start point on plane.
+            end (VectorLike): end point on plane.
+            height (float): positive constant strip height.
+            start_angle (float): start tangent angle in degrees. Defaults to 0.
+            end_angle (float): end tangent angle in degrees. Defaults to 0.
+            plane (Plane): containing plane. Defaults to Plane.XY.
+            tolerance (float): positive solver tolerance. Defaults to 1e-3.
+            max_iterations (int): positive 32-bit Newton iteration limit per native
+                continuation step, within [1, 2147483647]. This is not a total
+                runtime limit. Defaults to 50.
+
+        Raises:
+            ValueError: Invalid inputs or unsuccessful solver status.
+
+        The local coordinates, endpoint differences, squared chord distance,
+        height/chord cubed, continuation tolerance, and its chord product must
+        remain finite. These checks cover known initial native operations.
+
+        Returns:
+            Edge: computed B-spline.
+        """
+        return cls._make_fair_curve(
+            start,
+            end,
+            height,
+            start_angle,
+            end_angle,
+            plane,
+            tolerance,
+            max_iterations,
+            True,
+        )
+
+    @classmethod
+    def _make_fair_curve(
+        cls,
+        start: VectorLike,
+        end: VectorLike,
+        height: float,
+        start_angle: float,
+        end_angle: float,
+        plane: Plane,
+        tolerance: float,
+        max_iterations: int,
+        minimal_variation: bool,
+    ) -> Edge:
+        """Validate inputs and construct one native planar fair curve."""
+        points = (Vector(start), Vector(end))
+        values = [height, start_angle, end_angle, tolerance]
+        values.extend(value for point in points for value in point)
+        if not all(isfinite(value) for value in values):
+            raise ValueError("Fair curve inputs must be finite")
+        if not -180 <= start_angle <= 180 or not -180 <= end_angle <= 180:
+            raise ValueError("Fair curve angles must be between -180 and 180 degrees")
+        if height <= 0 or tolerance <= 0:
+            raise ValueError("Height and solver tolerance must be positive")
+        if (
+            isinstance(max_iterations, bool)
+            or not isinstance(max_iterations, int)
+            or not 1 <= max_iterations <= 2147483647
+        ):
+            raise ValueError(
+                "Iteration limit must be an integer within [1, 2147483647]"
+            )
+        local_points = tuple(plane.to_local_coords(point) for point in points)
+        if not all(isfinite(value) for point in local_points for value in point):
+            raise ValueError("Fair curve plane-local coordinates must be finite")
+        if any(abs(point.Z) > TOLERANCE for point in local_points):
+            raise ValueError("Fair curve endpoints must lie on plane")
+        dx = local_points[1].X - local_points[0].X
+        dy = local_points[1].Y - local_points[0].Y
+        if not isfinite(dx) or not isfinite(dy):
+            raise ValueError("Fair curve endpoint differences must be finite")
+        squared_distance = dx * dx + dy * dy
+        if not isfinite(squared_distance):
+            raise ValueError("Fair curve squared chord distance must be finite")
+        chord = sqrt(squared_distance)
+        if chord <= TOLERANCE:
+            raise ValueError("Fair curve endpoints must be distinct")
+        # Principal angles keep reference sliding length at least the chord length.
+        height_ratio = height / chord
+        continuation_tolerance = 10 * tolerance
+        if not all(
+            isfinite(value)
+            for value in (
+                height_ratio * height_ratio * height_ratio,
+                continuation_tolerance,
+                continuation_tolerance * chord,
+            )
+        ):
+            raise ValueError("Fair curve initial solver arithmetic must remain finite")
+        native_points = tuple(gp_Pnt2d(point.X, point.Y) for point in local_points)
+        solver: FairCurve_Batten
+        if minimal_variation:
+            solver = FairCurve_MinimalVariation(
+                native_points[0], native_points[1], height
+            )
+        else:
+            solver = FairCurve_Batten(native_points[0], native_points[1], height)
+        solver.SetAngle1(radians(start_angle))
+        solver.SetAngle2(-radians(end_angle))
+        status = FairCurve_AnalysisCode(int(FairCurve_NotConverged))
+        success = solver.Compute(status, max_iterations, tolerance)
+        if not success or int(status) != int(FairCurve_OK):
+            raise ValueError(f"Fair curve computation failed with status {int(status)}")
+        return cls(
+            BRepBuilderAPI_MakeEdge(
+                GeomAPI.To3d_s(solver.Curve(), plane.wrapped)
+            ).Edge()
+        )
 
     @classmethod
     def make_spline(
