@@ -294,8 +294,9 @@ class Mixin2D(ABC, Shape[TOPODS]):
         """Reverse normal operator -"""
         if self.is_empty:
             raise ValueError("Invalid Shape")
-        new_surface = copy.deepcopy(self)
-        new_surface.wrapped = tcast(TOPODS, downcast(self.wrapped.Complemented()))
+        new_surface = self._copied(
+            lambda node: node.wrapped.Complemented(), keep_history=False
+        )
 
         # As the surface has been modified, the parent is no longer valid
         new_surface.topo_parent = None
@@ -2801,14 +2802,12 @@ class Face(Mixin2D[TopoDS_Face]):
         if not (inner_wires := self.inner_wires()):
             return self
 
-        holeless = copy.deepcopy(self)
         reshaper = BRepTools_ReShape()
         for hole_wire in inner_wires:
             reshaper.Remove(hole_wire.wrapped)
-        modified_shape = downcast(reshaper.Apply(self._wrapped))
-        # pylint: disable=attribute-defined-outside-init
-        holeless.wrapped = TopoDS.Face(modified_shape)
-        return holeless
+        return self._copied(
+            lambda node: reshaper.Apply(node.wrapped), keep_history=False
+        )
 
     def silhouette_edges(
         self, direction: VectorLike | None = None, *, eye: VectorLike | None = None

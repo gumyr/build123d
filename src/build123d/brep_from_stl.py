@@ -823,7 +823,7 @@ def _detect_planes_from_clean_proxy(
     bbox_tolerance = shape_scale * bbox_tolerance_factor
     inside_tolerance = shape_scale * inside_tolerance_factor
 
-    cleaned_shape = copy.deepcopy(shape).clean()
+    cleaned_shape = copy.copy(shape).clean()
     proxy_faces = [
         face for face in cleaned_shape.faces() if len(face.edges()) >= min_proxy_edges
     ]

@@ -11,6 +11,7 @@ from typing import Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
+from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.TopoDS import TopoDS_Edge
 
 from build123d import (
@@ -180,6 +181,62 @@ class ImportBREP(unittest.TestCase):
     def test_bad_filename(self):
         with self.assertRaises(ValueError):
             import_brep("test.brep")
+
+    def test_bad_stream(self):
+        for binary in (False, True):
+            with self.subTest(binary=binary):
+                with self.assertRaises(ValueError):
+                    import_brep(BytesIO(b"not a brep"), binary=binary)
+
+    def test_stream_round_trip(self):
+        box = Solid.make_box(1, 2, 3)
+        for binary, versions in ((False, (None, 1, 2, 3)), (True, (None, 1, 2, 3, 4))):
+            for version in versions:
+                with self.subTest(binary=binary, version=version):
+                    buffer = BytesIO()
+                    export_brep(box, buffer, binary=binary, version=version)
+                    buffer.seek(0)
+                    imported = import_brep(buffer, binary=binary)
+                    self.assertAlmostEqual(imported.volume, 6, 5)
+
+    def test_binary_file_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            brep_file = os.path.join(tmp_dir, "test.bbrep")
+            export_brep(Solid.make_box(1, 2, 3), brep_file, binary=True)
+            self.assertAlmostEqual(import_brep(brep_file, binary=True).volume, 6, 5)
+            with open(brep_file, "rb") as file:
+                self.assertAlmostEqual(import_brep(file, binary=True).volume, 6, 5)
+
+    def test_version(self):
+        for binary, header in (
+            (False, b"\nCASCADE Topology V1,"),
+            (True, b"\nOpen CASCADE Topology V1 "),
+        ):
+            with self.subTest(binary=binary):
+                buffer = BytesIO()
+                export_brep(Solid.make_box(1, 1, 1), buffer, binary=binary, version=1)
+                self.assertIn(header, buffer.getvalue()[:50])
+
+    def test_unsupported_version(self):
+        for binary, version in ((False, 4), (True, 5), (False, 0)):
+            with self.subTest(binary=binary, version=version):
+                with self.assertRaises(ValueError):
+                    export_brep(
+                        Solid.make_box(1, 1, 1),
+                        BytesIO(),
+                        binary=binary,
+                        version=version,
+                    )
+
+    def test_triangulation(self):
+        sphere = Solid.make_sphere(1)
+        BRepMesh_IncrementalMesh(sphere.wrapped, 0.01)
+        sizes = {}
+        for triangulation in (True, False):
+            buffer = BytesIO()
+            export_brep(sphere, buffer, triangulation=triangulation)
+            sizes[triangulation] = len(buffer.getvalue())
+        self.assertGreater(sizes[True], 10 * sizes[False])
 
 
 class ImportSTEP(unittest.TestCase):

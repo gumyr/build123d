@@ -538,6 +538,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             if not isinstance(result, Compound):
                 result = Shape.make_composite([result], self._dim)
 
+        self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
         return result
 
     def __and__(self, other: Shape | Iterable[Shape]) -> Compound:
@@ -960,7 +961,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # If there are no elements or more than one element, return self
         return self
 
-    def _rebuild_from_children(self):
+    def _rebuild_from_children(self) -> None:
         """Rebuild the OCCT compound from the children at this Compound's location.
 
         The children are placed relative to this Compound, so the new compound
