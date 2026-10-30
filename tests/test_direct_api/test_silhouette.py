@@ -28,7 +28,7 @@ license:
 """
 
 import unittest
-from math import pi
+from math import pi, sqrt
 from unittest.mock import patch
 
 from build123d.build_enums import GeomType
@@ -44,7 +44,6 @@ from build123d.topology import Face, ShapeList, Vertex
 from build123d.topology.silhouette import (
     Viewer,
     contour_edges,
-    contours_by_face,
     front_facing,
     silhouette_on_plane,
     split_by_silhouette,
@@ -225,13 +224,54 @@ class TestSplitBySilhouette(unittest.TestCase):
             "build123d.topology.silhouette.contour_edges", return_value=ShapeList()
         ):
             with self.assertRaisesRegex(RuntimeError, "found no contour"):
-                contours_by_face(Sphere(10), Viewer.along((1, 0, 0)))
+                Sphere(10).faces()[0].silhouette_edges((1, 0, 0))
+
+    def test_a_face_whose_contour_is_its_boundary_is_not_a_failure(self):
+        """A fragment of a split shape meets the view along its edges, where
+        the normal is perpendicular to it; that is not a contour and not a
+        missing one"""
+        viewer = Viewer.along((1, 0.3, 0.2))
+        for shape in (Sphere(10), Torus(10, 3), Cone(10, 3, 15)):
+            split, _ = split_by_silhouette(shape, viewer)
+            for fragment in split.faces():
+                self.assertEqual(fragment.silhouette_edges(viewer.direction), [])
+
+
+class TestFaceSilhouetteEdges(unittest.TestCase):
+    """Face.silhouette_edges, the public form"""
+
+    def test_parallel_view(self):
+        ball = Sphere(10).faces()[0]
+        edges = ball.silhouette_edges((1, 0, 0))
+        self.assertAlmostEqual(sum(e.length for e in edges), 2 * pi * 10, 4)
+        self.assertTrue(all(abs(e.position_at(0.5).X) < 1e-6 for e in edges))
+        side = Cylinder(5, 20).faces().filter_by(GeomType.CYLINDER)[0]
+        lines = side.silhouette_edges((1, 0, 0))
+        self.assertEqual([e.geom_type for e in lines], [GeomType.LINE, GeomType.LINE])
+        self.assertAlmostEqual(sum(e.length for e in lines), 40, 5)
+        # Seen along X the seam at +X is itself a silhouette line, and is left out
+        self.assertEqual(len(side.silhouette_edges((0, 1, 0))), 1)
+        self.assertEqual(Face.make_rect(5, 5).silhouette_edges((1, 1, 1)), [])
+
+    def test_perspective_view(self):
+        ball = Sphere(10).faces()[0]
+        # Seen from nearby the silhouette is a smaller circle, nearer the eye
+        near = ball.silhouette_edges(eye=(20, 0, 0))
+        self.assertAlmostEqual(sum(e.length for e in near), 2 * pi * sqrt(75), 3)
+        self.assertTrue(all(abs(e.position_at(0.5).X - 5) < 1e-6 for e in near))
+
+    def test_one_of_direction_or_eye(self):
+        ball = Sphere(10).faces()[0]
+        with self.assertRaises(ValueError):
+            ball.silhouette_edges()
+        with self.assertRaises(ValueError):
+            ball.silhouette_edges((1, 0, 0), eye=(20, 0, 0))
 
 
 class TestFrontFacing(unittest.TestCase):
     def test_interior_point_of_a_ring(self):
-        """The parametric centre of a ring is in its hole; the grid finds a
-        point on the material"""
+        """The parametric centre of a ring is in its hole; the interior
+        point is on the material"""
         ring = Face.make_rect(10, 10) - Face.make_rect(4, 4)
         self.assertEqual(
             len(front_facing(ShapeList([ring]), Viewer.along((0, 0, -1)))), 1

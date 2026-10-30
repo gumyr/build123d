@@ -62,7 +62,7 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.offset`           | Inset or outset Shape              |    | ✓  | ✓  | ✓  | :ref:`25 <ex 25>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
-| :func:`~operations_generic.project`          | Project points, lines, Faces or a  | ✓  | ✓  | ✓  |    |                                   |
+| :func:`~operations_generic.project_to_plane` | Project points, lines, Faces or a  | ✓  | ✓  | ✓  |    |                                   |
 |                                              | solid's silhouette onto a plane    |    |    |    |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_part.project_to_shape`    | Project lines or Faces onto a      |    |    |    | ✓  |                                   |
@@ -137,6 +137,7 @@ Reference
 .. autofunction:: operations_generic.mirror
 .. autofunction:: operations_generic.offset
 .. autofunction:: operations_generic.project
+.. autofunction:: operations_generic.project_to_plane
 .. autofunction:: operations_part.project_to_shape
 .. autofunction:: operations_part.project_workplane
 .. autofunction:: operations_part.revolve

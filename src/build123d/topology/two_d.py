@@ -68,6 +68,7 @@ from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Section
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing
+from OCP.BRepClass import BRepClass_FaceClassifier
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepFill import BRepFill
@@ -100,7 +101,7 @@ from OCP.GeomAPI import (
     GeomAPI_ProjectPointOnSurf,
 )
 from OCP.GeomLib import GeomLib_IsPlanarSurface
-from OCP.gp import gp_Ax1, gp_Ax3, gp_Dir, gp_Pln, gp_Pnt, gp_Vec
+from OCP.gp import gp_Ax1, gp_Ax3, gp_Dir, gp_Pln, gp_Pnt, gp_Pnt2d, gp_Vec
 from OCP.GProp import GProp_GProps
 from OCP.Precision import Precision
 from OCP.ShapeAnalysis import ShapeAnalysis_Edge, ShapeAnalysis_Surface
@@ -120,7 +121,7 @@ from OCP.collections import (
     List_TopoDS_Shape,
     Sequence_TopoDS_Shape,
 )
-from OCP.TopAbs import TopAbs_Orientation
+from OCP.TopAbs import TopAbs_Orientation, TopAbs_State
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Edge,
@@ -2317,6 +2318,44 @@ class Face(Mixin2D[TopoDS_Face]):
             and 1 - abs(plane.z_dir.dot(Vector(normal))) < TOLERANCE
         )
 
+    def interior_point(self) -> Vector:
+        """interior_point
+
+        A point on the face's material. The parametric centre when that lies
+        on the face, which it does for most faces; otherwise a point found
+        from the boundary, since the centre of a ring is in its hole and the
+        centre of a crescent is off to its concave side. Unlike
+        :meth:`center`, the result always lies on the face.
+
+        Raises:
+            RuntimeError: the face has no interior
+
+        Returns:
+            Vector: a point on the face
+        """
+        self._needs_geometry("interior point")
+        if self.is_inside(0.5, 0.5):
+            return self.position_at(0.5, 0.5)
+        # In parameter space the face is a planar region. The point of it
+        # nearest the centre is on its boundary, with the material beyond, so
+        # the line from the centre through that point enters the face there
+        # and leaves it again at the next crossing. Halfway between is inside.
+        u_min, u_max, v_min, v_max = self._uv_bounds()
+        region = self.uv_face
+        centre = Vector((u_min + u_max) / 2, (v_min + v_max) / 2, 0)
+        _, _, nearest = Vertex(centre).distance_to_with_closest_points(region)
+        reach = Vector(u_max - u_min, v_max - v_min, 0).length
+        probe = Edge.make_line(centre, centre + (nearest - centre).normalized() * reach)
+        pieces = (probe & region).edges()
+        if not pieces:
+            raise RuntimeError("the face has no interior")
+        first = min(pieces, key=lambda piece: piece.distance_to(nearest))
+        inside = first.position_at(0.5)
+        return self.position_at(
+            (inside.X - u_min) / (u_max - u_min), (inside.Y - v_min) / (v_max - v_min)
+        )
+
+    @overload
     def is_inside(self, point: VectorLike, tolerance: float = 1.0e-6) -> bool:
         """Point inside Face
 
@@ -2324,20 +2363,57 @@ class Face(Mixin2D[TopoDS_Face]):
         Points on the edge of the Face are considered inside.
 
         Args:
-          point(VectorLike): tuple or Vector representing 3D point to be tested
-          tolerance(float): tolerance for inside determination. Defaults to 1.0e-6.
-          point: VectorLike:
-          tolerance: float:  (Default value = 1.0e-6)
+            point (VectorLike): tuple or Vector representing 3D point to be tested
+            tolerance (float): tolerance for inside determination. Defaults to 1.0e-6.
 
         Returns:
-          bool: indicating whether or not point is within Face
-
+            bool: indicating whether or not point is within Face
         """
-        return _topods_point_on_face(self.wrapped, point, tolerance)
 
-        # surface = BRep_Tool.Surface_s(self.wrapped)
-        # projector = GeomAPI_ProjectPointOnSurf(Vector(point).to_pnt(), surface)
-        # return projector.LowerDistance() <= TOLERANCE
+    @overload
+    def is_inside(self, u: float, v: float, tolerance: float = 1.0e-6) -> bool:
+        """(u, v) inside Face
+
+        Returns whether or not the point at the normalized surface parameters
+        is on the face's material. Points on the edge of the Face are considered
+        inside.
+
+        Args:
+            u (float): the horizontal coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+            v (float): the vertical coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+            tolerance (float): tolerance for inside determination. Defaults to 1.0e-6.
+
+        Returns:
+            bool: indicating whether or not the parameters are within Face
+        """
+
+    def is_inside(self, *args, **kwargs) -> bool:
+        """Point or (u, v) inside Face"""
+        point: VectorLike | None = kwargs.get("point")
+        u: float | None = kwargs.get("u")
+        v: float | None = kwargs.get("v")
+        tolerance: float = kwargs.get("tolerance", 1.0e-6)
+        positional = list(args)
+        if positional and isinstance(positional[0], (int, float)):
+            u, v = positional[0], positional[1]
+            positional = positional[2:]
+        elif positional:
+            point = positional.pop(0)
+        if positional:
+            tolerance = positional[0]
+        if point is not None:
+            return _topods_point_on_face(self.wrapped, point, tolerance)
+        if u is None or v is None:
+            raise ValueError("Either a point or both u and v must be provided")
+        u_min, u_max, v_min, v_max = self._uv_bounds()
+        classifier = BRepClass_FaceClassifier(
+            self.wrapped,
+            gp_Pnt2d(u_min + u * (u_max - u_min), v_min + v * (v_max - v_min)),
+            tolerance,
+        )
+        return classifier.State() in (TopAbs_State.TopAbs_IN, TopAbs_State.TopAbs_ON)
 
     @overload
     def location_at(
@@ -2733,6 +2809,46 @@ class Face(Mixin2D[TopoDS_Face]):
         # pylint: disable=attribute-defined-outside-init
         holeless.wrapped = TopoDS.Face(modified_shape)
         return holeless
+
+    def silhouette_edges(
+        self, direction: VectorLike | None = None, *, eye: VectorLike | None = None
+    ) -> ShapeList[Edge]:
+        """silhouette_edges
+
+        The silhouette of the face as seen along a direction or from an eye
+        point: the curves on its surface where the normal is perpendicular to
+        the line of sight, dividing the side that faces the viewer from the
+        side that does not. A sphere seen from any direction has a great
+        circle, a cylinder seen across its axis two lines, and a face that
+        never turns away from the viewer, a planar face among them, has none.
+
+        The edges lie on the surface exactly. Those along the face's own
+        boundary are left out, since the boundary already marks that turn.
+
+        Args:
+            direction (VectorLike, optional): viewing direction, toward the
+                face, for a parallel view. Defaults to None.
+            eye (VectorLike, optional): eye point for a perspective view.
+                Defaults to None.
+
+        Raises:
+            ValueError: one of direction or eye must be given
+            RuntimeError: the face turns through the line of sight but the
+                kernel found no silhouette on it
+
+        Returns:
+            ShapeList[Edge]: the silhouette edges, empty if the face has none
+        """
+        # pylint: disable=import-outside-toplevel
+        from .silhouette import Viewer, silhouette_edges
+
+        if direction is not None and eye is None:
+            viewer = Viewer.along(direction)
+        elif eye is not None and direction is None:
+            viewer = Viewer.at(eye)
+        else:
+            raise ValueError("one of direction or eye must be given")
+        return silhouette_edges(self, viewer)
 
     def uv_frame(self, location: Location, tolerance: float = 1e-4) -> UVFrame:
         """uv_frame

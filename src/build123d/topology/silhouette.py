@@ -7,9 +7,9 @@ date: October 20, 2026
 
 desc:
     The silhouette of a shape as seen along a direction or from an eye point,
-    and what follows from it: the faces split along their contours and the
-    fragments that face the viewer. Internal; the projection operations
-    build on these.
+    and what follows from it: the faces split along their contours, the
+    fragments that face the viewer, and the shadows faces and curves cast on
+    a plane. Internal; the projection operations build on these.
 
     The contour of each face comes from the kernel's Contap_Contour, the
     engine behind its hidden-line removal, as exact points carrying their
@@ -38,21 +38,22 @@ license:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from itertools import product
+from dataclasses import dataclass
 from math import pi
 
+from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
-from OCP.BRepClass import BRepClass_FaceClassifier
 from OCP.BRepFeat import BRepFeat_SplitShape
-from OCP.BRepTools import BRepTools
 from OCP.BRepTopAdaptor import BRepTopAdaptor_TopolTool
 from OCP.Contap import Contap_Contour, Contap_IType, Contap_Line
-from OCP.gp import gp_Pnt, gp_Pnt2d, gp_Vec
-from OCP.TopAbs import TopAbs_State
-from OCP.TopoDS import TopoDS_Face
+from OCP.Geom import Geom_Plane
+from OCP.GeomProjLib import GeomProjLib
+from OCP.gp import gp_Ax3, gp_Dir, gp_Pnt, gp_Pnt2d, gp_Vec
+from OCP.Standard import Standard_Failure
+from OCP.StdFail import StdFail_NotDone
 
+from build123d.build_enums import GeomType
 from build123d.geometry import (
     TOLERANCE,
     Axis,
@@ -68,8 +69,8 @@ from .history import ShapeHistory
 from .one_d import Edge, Wire
 from .shape_core import Shape, ShapeList, downcast
 from .three_d import Solid
-from .two_d import Face, _project_profile_by_extrusion
-from .utils import _topods_face_normal, _topods_face_position, find_max_dimension
+from .two_d import Face, _edge_on, _project_profile_by_extrusion
+from .utils import find_max_dimension
 from .uv_write import UVFrame
 
 
@@ -115,14 +116,6 @@ class Viewer:
             return Contap_Contour(gp_Vec(*self.direction))
         assert self.eye is not None
         return Contap_Contour(gp_Pnt(*self.eye))
-
-
-@dataclass
-class FaceContour:
-    """A face of the shape with the contour edges that lie on it."""
-
-    face: Face
-    edges: ShapeList[Edge] = field(default_factory=ShapeList)
 
 
 def contour_edges(face: Face, viewer: Viewer) -> ShapeList[Edge]:
@@ -206,8 +199,9 @@ def _analytic_edges(line: Contap_Line, kind: Contap_IType) -> list[Edge]:
     return [Edge(BRepBuilderAPI_MakeEdge(circle, start, start + span).Edge())]
 
 
-def contours_by_face(shape: Shape, viewer: Viewer) -> list[FaceContour]:
-    """Each face of ``shape`` with its contour edges.
+def silhouette_edges(face: Face, viewer: Viewer) -> ShapeList[Edge]:
+    """The silhouette of ``face`` for the view: its contour edges, less any
+    running along an edge the face already has.
 
     A face whose normal turns through the viewing direction but received no
     contour is a kernel failure the caller cannot recover from, and raises.
@@ -215,17 +209,13 @@ def contours_by_face(shape: Shape, viewer: Viewer) -> list[FaceContour]:
     Raises:
         RuntimeError: a face that should carry a contour has none
     """
-    by_face = [
-        FaceContour(face, _off_the_boundary(face, contour_edges(face, viewer)))
-        for face in shape.faces()
-    ]
-    for index, entry in enumerate(by_face):
-        if not entry.edges and _normal_turns_through(entry.face, viewer):
-            raise RuntimeError(
-                f"face {index} ({entry.face.geom_type.name}) turns through the "
-                "viewing direction but the kernel found no contour on it"
-            )
-    return by_face
+    edges = _off_the_boundary(face, contour_edges(face, viewer))
+    if not edges and _normal_turns_through(face, viewer):
+        raise RuntimeError(
+            f"a {face.geom_type.name} face turns through the viewing direction "
+            "but the kernel found no contour on it"
+        )
+    return edges
 
 
 def _off_the_boundary(face: Face, edges: ShapeList[Edge]) -> ShapeList[Edge]:
@@ -245,49 +235,39 @@ def _off_the_boundary(face: Face, edges: ShapeList[Edge]) -> ShapeList[Edge]:
     return kept
 
 
-def _normal_turns_through(face: Face, viewer: Viewer, samples: int = 5) -> bool:
-    """Does the face's normal change sign against the viewing direction
-    across a grid of interior points?"""
-    topods_face = face.wrapped
-    assert isinstance(topods_face, TopoDS_Face)
+def _normal_turns_through(face: Face, viewer: Viewer) -> bool:
+    """Does the face's normal change sign against the viewing direction?
+
+    Tested at the points the kernel itself samples the surface at, chosen
+    from its type, degree and knots and the points Contap_Contour starts
+    walking a contour from, together with the face's own vertices, edge
+    midpoints and interior point. A planar face never turns.
+    """
+    if face.is_planar is not None:
+        return False
     signs: set[bool] = set()
-    steps = [(i + 0.5) / samples for i in range(samples)]
-    for u, v in product(steps, steps):
-        if not _uv_inside(topods_face, u, v):
-            continue
-        along = _topods_face_normal(topods_face, u, v).dot(
-            viewer.direction_at(_topods_face_position(topods_face, u, v))
-        )
+
+    def note(normal: Vector, point: Vector) -> None:
+        along = normal.dot(viewer.direction_at(point))
         if abs(along) > TOLERANCE:
             signs.add(along > 0)
+
+    anchors = [face.interior_point()] + [
+        edge.position_at(t) for edge in face.edges() for t in (0.0, 0.5, 1.0)
+    ]
+    for point in anchors:
+        note(face.normal_at(point), point)
+    u_min, u_max, v_min, v_max = face._uv_bounds()
+    sampler = BRepTopAdaptor_TopolTool(BRepAdaptor_Surface(face.wrapped))
+    sampler.ComputeSamplePoints()
+    uv_sample, _ = gp_Pnt2d(), gp_Pnt()
+    for index in range(1, sampler.NbSamples() + 1):
+        sampler.SamplePoint(index, uv_sample, _)
+        u = (uv_sample.X() - u_min) / (u_max - u_min)
+        v = (uv_sample.Y() - v_min) / (v_max - v_min)
+        if face.is_inside(u, v):
+            note(face.normal_at(u, v), face.position_at(u, v))
     return len(signs) == 2
-
-
-def _uv_inside(face: TopoDS_Face, u: float, v: float) -> bool:
-    """Is the normalized (u, v) point inside the face's trimmed region?"""
-    u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(face)
-    classifier = BRepClass_FaceClassifier(
-        face,
-        gp_Pnt2d(u_min + u * (u_max - u_min), v_min + v * (v_max - v_min)),
-        TOLERANCE,
-    )
-    return classifier.State() == TopAbs_State.TopAbs_IN
-
-
-def _interior_uv(face: TopoDS_Face, samples: int = 7) -> tuple[float, float]:
-    """A normalized (u, v) inside the face: its parametric centre when that
-    is inside, else the first inside point of a grid.
-
-    Raises:
-        RuntimeError: no grid point lies inside the face
-    """
-    if _uv_inside(face, 0.5, 0.5):
-        return 0.5, 0.5
-    steps = [(i + 0.5) / samples for i in range(samples)]
-    for u, v in product(steps, steps):
-        if _uv_inside(face, u, v):
-            return u, v
-    raise RuntimeError("no interior point found on face")
 
 
 def split_by_silhouette(shape: Shape, viewer: Viewer) -> tuple[Shape, ShapeHistory]:
@@ -298,12 +278,12 @@ def split_by_silhouette(shape: Shape, viewer: Viewer) -> tuple[Shape, ShapeHisto
     """
     splitter = BRepFeat_SplitShape(shape.wrapped)
     added = 0
-    for entry in contours_by_face(shape, viewer):
+    for face in shape.faces():
         # The kernel walks a contour in pieces that meet at interior points;
         # chained into wires they share those vertices, which the splitter
         # needs to carry a cut from one piece to the next
-        for wire in Wire.combine(entry.edges):
-            splitter.Add(wire.wrapped, entry.face.wrapped)
+        for wire in Wire.combine(silhouette_edges(face, viewer)):
+            splitter.Add(wire.wrapped, face.wrapped)
             added += 1
     if added == 0:
         return shape, ShapeHistory(before=[shape.wrapped])
@@ -318,12 +298,8 @@ def front_facing(faces: ShapeList[Face], viewer: Viewer) -> ShapeList[Face]:
     has a component against the viewing direction."""
     kept: ShapeList[Face] = ShapeList()
     for face in faces:
-        topods_face = face.wrapped
-        assert isinstance(topods_face, TopoDS_Face)
-        u, v = _interior_uv(topods_face)
-        normal = _topods_face_normal(topods_face, u, v)
-        point = _topods_face_position(topods_face, u, v)
-        if normal.dot(viewer.direction_at(point)) < 0:
+        point = face.interior_point()
+        if face.normal_at(point).dot(viewer.direction_at(point)) < 0:
             kept.append(face)
     return kept
 
@@ -434,3 +410,81 @@ def silhouette_on_plane(shape: Shape, plane: Plane) -> ShapeList[Face]:
         return ShapeList()
     union = flat[0].fuse(*flat[1:]).clean() if len(flat) > 1 else flat[0]
     return union.moved(Location(plane.z_dir * -depth)).faces()
+
+
+def face_shadow(face: Face, screen: Face, direction: Vector) -> ShapeList[Face]:
+    """The shadow a face casts on a screen along a direction.
+
+    A curved face can fold back on itself along the direction, in which case
+    sweeping it as one piece self-intersects and yields nothing. The face is
+    split along its silhouette, where its normal turns through the direction,
+    each fragment is swept onto the screen, and the shadows are fused. Unlike
+    a body, a lone face has no hidden side: every fragment casts a shadow,
+    except one edge-on to the direction, which has no area to cast.
+    """
+    if face.is_planar is not None:
+        fragments: list[Face] = [face]
+    else:
+        pieces, _ = split_by_silhouette(face, Viewer.along(direction))
+        fragments = list(pieces.faces())
+    shadows = [
+        piece
+        for fragment in fragments
+        if not _edge_on(fragment, direction)
+        for piece in fragment.project_to_shape(screen, direction).faces()
+    ]
+    if len(shadows) > 1:
+        return shadows[0].fuse(*shadows[1:]).clean().faces()
+    return ShapeList(shadows)
+
+
+def _ordered_in_plane(local: Vector) -> tuple[float, float]:
+    """Sort key placing points along a plane's x then y direction, with noise
+    below the tolerance ignored."""
+    return (
+        round(local.X / TOLERANCE) * TOLERANCE,
+        round(local.Y / TOLERANCE) * TOLERANCE,
+    )
+
+
+def curve_shadow(edge: Edge, plane: Plane, direction: Vector) -> list[Edge]:
+    """The shadow an edge casts on a plane along a direction.
+
+    The curve itself is projected onto the plane, so a shadow that crosses
+    itself is no obstacle. A planar curve whose plane contains the direction
+    is edge-on and would retrace itself on the plane; its shadow is the
+    segment spanning its extent across the direction. A curve parallel to
+    the direction casts no shadow.
+    """
+    curve_plane = edge.common_plane()
+    if curve_plane is not None and abs(curve_plane.z_dir.dot(direction)) < TOLERANCE:
+        across = curve_plane.z_dir.cross(direction).normalized()
+        frame = Plane(edge.position_at(0), x_dir=across, z_dir=direction)
+        extent = frame.to_local_coords(edge).bounding_box(optimal=True)
+        if extent.size.X < TOLERANCE:
+            return []
+        edge = Edge.make_line(
+            frame.from_local_coords(Vector(extent.min.X, 0, 0)),
+            frame.from_local_coords(Vector(extent.max.X, 0, 0)),
+        )
+    first, last = BRep_Tool.Range_s(edge.wrapped)
+    curve = BRep_Tool.Curve_s(edge.wrapped, first, last)
+    geom_plane = Geom_Plane(
+        gp_Ax3(gp_Pnt(*plane.origin), gp_Dir(*plane.z_dir), gp_Dir(*plane.x_dir))
+    )
+    shadow_curve = GeomProjLib.ProjectOnPlane_s(
+        curve, geom_plane, gp_Dir(*direction), True
+    )
+    try:
+        shadow = Edge(BRepBuilderAPI_MakeEdge(shadow_curve, first, last).Edge())
+    except (Standard_Failure, StdFail_NotDone):
+        return []  # the curve collapsed to a point
+    if shadow.length < TOLERANCE:
+        return []
+    if shadow.geom_type == GeomType.LINE:
+        # Collinear shadows only fuse into one when they run the same way, so
+        # every line runs along the plane's x then y direction
+        ends = [shadow.position_at(0), shadow.position_at(1)]
+        ends.sort(key=lambda pnt: _ordered_in_plane(plane.to_local_coords(pnt)))
+        shadow = Edge.make_line(*ends)
+    return [shadow]

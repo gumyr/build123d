@@ -609,6 +609,32 @@ class TestFace(unittest.TestCase):
         square = Face.make_rect(10, 10)
         self.assertTrue(square.is_inside((1, 1)))
         self.assertFalse(square.is_inside((20, 1)))
+        # by normalized surface parameters, the boundary included
+        ring = Face.make_rect(10, 10) - Face.make_rect(4, 4)
+        self.assertTrue(ring.is_inside(0.1, 0.5))
+        self.assertFalse(ring.is_inside(0.5, 0.5))
+        self.assertTrue(ring.is_inside(0.3, 0.5))  # on the hole's edge
+        self.assertTrue(ring.is_inside(u=0.1, v=0.5, tolerance=1e-3))
+        with self.assertRaises(ValueError):
+            ring.is_inside(u=0.1)
+
+    def test_interior_point(self):
+        square = Face.make_rect(10, 10)
+        self.assertAlmostEqual(square.interior_point(), (0, 0, 0), 5)
+        # the centre of a ring is in its hole
+        ring = Face.make_rect(10, 10) - Face.make_rect(4, 4)
+        self.assertFalse(ring.is_inside(ring.center()))
+        self.assertTrue(ring.is_inside(ring.interior_point()))
+        # and of a crescent off to its concave side
+        crescent = Circle(10).face() - Pos(5, 0) * Circle(8).face()
+        self.assertTrue(crescent.is_inside(crescent.interior_point()))
+        # a curved face whose parameter range is cut away at its centre
+        top = (Box(10, 10, 10) - Cylinder(2, 20)).faces().sort_by(Axis.Z)[-1]
+        self.assertTrue(top.is_inside(top.interior_point()))
+        side = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        self.assertTrue(side.is_inside(side.interior_point()))
+        sliver = Face.make_rect(10, 0.001)
+        self.assertTrue(sliver.is_inside(sliver.interior_point()))
 
     def test_import_stl(self):
         torus = Solid.make_torus(10, 1)

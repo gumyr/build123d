@@ -27,12 +27,12 @@ license:
 """
 
 import unittest
+import warnings
 from math import pi, sqrt
 from unittest.mock import patch
 
 from build123d import *
 from build123d import Builder, LocationList
-from build123d.operations_generic import _project_to_plane
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -850,6 +850,20 @@ class PolarLocationsTests(unittest.TestCase):
 
 
 class ProjectionTests(unittest.TestCase):
+    """project is deprecated and behaves as it always did until it is removed"""
+
+    def setUp(self):
+        self._quiet = warnings.catch_warnings()
+        self._quiet.__enter__()
+        warnings.simplefilter("ignore", DeprecationWarning)
+
+    def tearDown(self):
+        self._quiet.__exit__(None, None, None)
+
+    def test_project_is_deprecated(self):
+        with self.assertWarnsRegex(DeprecationWarning, "project_to_plane"):
+            project(Face.make_rect(1, 1), Plane.XY)
+
     def test_project_to_sketch1(self):
         with BuildPart() as loaf_s:
             with BuildSketch(Plane.YZ) as profile:
@@ -866,107 +880,14 @@ class ProjectionTests(unittest.TestCase):
         self.assertAlmostEqual(projection_s.sketch.area, 104.85204601097809, 5)
         self.assertEqual(len(projection_s.edges()), 6)
 
-    def test_project_in_build_part_forwards_to_project_to_shape(self):
-        """The BuildPart form of project is deprecated and still works"""
+    def test_project_to_sketch2(self):
         with BuildPart() as test2:
             Box(4, 4, 1)
             with BuildSketch(Plane.XY.offset(0.1)) as c:
                 Rectangle(1, 1)
-            with self.assertWarns(DeprecationWarning):
-                project()
+            project()
             extrude(amount=1)
         self.assertAlmostEqual(test2.part.volume, 4 * 4 * 1 + 1 * 1 * 1, 5)
-
-    def test_project_with_a_target_forwards_to_project_to_shape(self):
-        plate = Box(10, 10, 2)
-        with self.assertWarns(DeprecationWarning):
-            projection = project(
-                Face.make_rect(2, 2, Plane.XY.offset(5)), Plane.XY, target=plate
-            )
-        self.assertEqual(len(projection.faces()), 2)
-        self.assertTrue(all(abs(f.center().Z) == 1 for f in projection.faces()))
-
-    def test_box_faces_onto_a_plane(self):
-        """#563: the faces edge-on to the plane gave the whole screen back"""
-        projection = project(Box(10, 10, 10).faces(), workplane=Plane.XY)
-        self.assertEqual(len(projection.faces()), 2)
-        self.assertTrue(all(abs(f.area - 100) < 1e-6 for f in projection.faces()))
-        self.assertEqual(
-            project(Box(10, 10, 10).faces().sort_by(Axis.X)[-1], Plane.XY).faces(), []
-        )
-
-    def test_a_face_in_build_line_contributes_its_edges(self):
-        """#951: a higher-dimension object is reduced to what the builder holds"""
-        box = Box(10, 10, 10)
-        with BuildLine() as outline:
-            project(box.faces().sort_by(Axis.Z)[-1])
-        self.assertEqual(len(outline.edges()), 4)
-        with BuildLine() as edge_on:
-            project(box.faces().sort_by(Axis.X)[-1])
-        self.assertEqual(len(edge_on.edges()), 1)  # its top and bottom edges coincide
-        with BuildLine() as whole:
-            project(box)
-        self.assertEqual(len(whole.edges()), 4)
-
-    def test_an_edge_on_face_adds_nothing_to_a_sketch(self):
-        side = Box(10, 10, 10).faces().sort_by(Axis.X)[-1]
-        with BuildSketch() as sketch:
-            project(side)
-        self.assertEqual(sketch.sketch.area, 0)
-
-    def test_objects_far_from_the_plane_origin(self):
-        far = Pos(1000, 1000, 50) * Box(10, 10, 10)
-        projection = project(far.faces().sort_by(Axis.Z)[-1], workplane=Plane.XY)
-        self.assertAlmostEqual(projection.area, 100, 5)
-        self.assertAlmostEqual(projection.center(), (1000, 1000, 0), 5)
-        curve = project(far.edges(), workplane=Plane.XY)
-        self.assertEqual(len(curve.edges()), 8)
-
-    def test_a_solid_casts_its_silhouette_onto_a_sketch(self):
-        sphere, box, cylinder = Sphere(10), Box(10, 10, 10), Cylinder(5, 20)
-        with BuildSketch() as disc:
-            project(sphere)
-        self.assertEqual(len(disc.sketch.faces()), 1)
-        self.assertAlmostEqual(disc.sketch.area, pi * 100, 3)
-        with BuildSketch(Plane((0, 0, 0), z_dir=(1, 1, 1))) as hexagon:
-            project(box)
-        self.assertAlmostEqual(hexagon.sketch.area, 300 / sqrt(3), 3)
-        self.assertEqual(len(hexagon.sketch.faces()[0].outer_wire().edges()), 6)
-        with BuildSketch(Plane.XZ) as rectangle:
-            project(cylinder)
-        self.assertAlmostEqual(rectangle.sketch.area, 200, 3)
-        self.assertEqual(len(rectangle.sketch.faces()[0].edges()), 4)
-
-    def test_a_silhouette_keeps_its_holes(self):
-        holed = Box(10, 10, 10) - Cylinder(2, 20)
-        projection = project(holed, workplane=Plane.XY)
-        self.assertIsInstance(projection, Sketch)
-        self.assertAlmostEqual(projection.area, 100 - pi * 4, 3)
-        self.assertEqual(len(projection.faces()[0].inner_wires()), 1)
-        torus = Torus(10, 3)
-        projection = project(torus, workplane=Plane.XY.offset(-20))
-        self.assertAlmostEqual(projection.area, pi * (13**2 - 7**2), 3)
-        # in the workplane's own coordinates, as every projection onto a plane
-        self.assertAlmostEqual(projection.faces()[0].center().Z, 0, 5)
-
-    def test_a_solid_in_build_line_still_gives_edges(self):
-        sphere = Sphere(10)
-        with BuildLine() as outline:
-            project(sphere)
-        self.assertTrue(
-            all(edge.geom_type == GeomType.CIRCLE for edge in outline.edges())
-        )
-
-    def test_objects_on_both_sides_of_the_plane(self):
-        projection = project(
-            [
-                Face.make_rect(2, 2, Plane.XY.offset(3)),
-                Face.make_rect(3, 3, Plane.XY.offset(-3)),
-            ],
-            workplane=Plane.XY,
-        )
-        self.assertIsInstance(projection, Sketch)
-        self.assertEqual(sorted(f.area for f in projection.faces()), [4, 9])
 
     def test_project_point(self):
         pnt: Vector = project(Vector(1, 2, 3), Plane.XY)[0]
@@ -1017,13 +938,6 @@ class ProjectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             with BuildLine():
                 pnt = project(Vertex(1, 2, 3))[0]
-
-        with self.assertRaisesRegex(ValueError, "PRIVATE"):
-            with BuildSketch():
-                project(Edge.make_line((0, 0, 1), (1, 0, 1)))
-        with BuildSketch():
-            curve = project(Edge.make_line((0, 0, 1), (1, 0, 1)), mode=Mode.PRIVATE)
-            self.assertEqual(len(curve.edges()), 1)
 
     def test_no_target(self):
         """A part builder with nothing built yet has no projection target."""
@@ -1280,7 +1194,7 @@ class TestSweep(unittest.TestCase):
 
 
 class TestProjectToPlane(unittest.TestCase):
-    """_project_to_plane: the plane form that project becomes at 1.0.0"""
+    """project_to_plane: the plane form of the deprecated project"""
 
     def setUp(self):
         # A short tube standing above the XY plane
@@ -1290,7 +1204,7 @@ class TestProjectToPlane(unittest.TestCase):
     def test_sketch_from_part_modifies_part(self):
         # The primary use: bring a part into a sketch, enhance it, cut the part
         with BuildSketch() as groove:
-            _project_to_plane(self.knob)
+            project_to_plane(self.knob)
             Rectangle(2, 20, mode=Mode.SUBTRACT)
         expected = Circle(5) - Circle(2) - Rectangle(2, 20)
         self.assertAlmostEqual(groove.sketch.area, expected.area, 5)
@@ -1303,7 +1217,7 @@ class TestProjectToPlane(unittest.TestCase):
     def test_builder_plane_is_xy(self):
         # The drawing is made on Plane.XY and placed with the sketch on exit
         with BuildSketch(Plane.XZ) as side:
-            _project_to_plane(self.knob)
+            project_to_plane(self.knob)
         local = side.sketch_local.faces()[0]
         self.assertAlmostEqual(local.center().Z, 0, 5)
         self.assertAlmostEqual(local.area, pi * 25 - pi * 4, 5)
@@ -1311,7 +1225,7 @@ class TestProjectToPlane(unittest.TestCase):
 
     def test_points_into_build_line(self):
         with BuildLine() as outline:
-            points = _project_to_plane(self.housing.vertices())
+            points = project_to_plane(self.housing.vertices())
             self.assertEqual(len(points), 8)
             self.assertTrue(all(pnt.Z == 0 for pnt in points))
             corners = [(0, -5), (20, -5), (20, 5), (0, 5)]
@@ -1321,17 +1235,17 @@ class TestProjectToPlane(unittest.TestCase):
 
     def test_face_into_build_line(self):
         with BuildLine() as outline:
-            _project_to_plane(self.housing.faces().sort_by(Axis.Z)[-1])
+            project_to_plane(self.housing.faces().sort_by(Axis.Z)[-1])
         self.assertEqual(len(outline.line.edges()), 4)
         self.assertEqual(outline.line.bounding_box().size, Vector(20, 10, 0))
 
     def test_algebra_local_coordinates(self):
-        sketch = _project_to_plane(self.knob, workplane=Plane.XY.offset(30))
+        sketch = project_to_plane(self.knob, workplane=Plane.XY.offset(30))
         self.assertIsInstance(sketch, Sketch)
         self.assertEqual(sketch.faces()[0].center(), Vector(0, 0, 0))
-        curve = _project_to_plane(self.housing.edges(), workplane=Plane.XZ)
+        curve = project_to_plane(self.housing.edges(), workplane=Plane.XZ)
         self.assertIsInstance(curve, Curve)
-        points = _project_to_plane([Vertex(5, 5, 5), (10, 0, 20)], workplane=Plane.XZ)
+        points = project_to_plane([Vertex(5, 5, 5), (10, 0, 20)], workplane=Plane.XZ)
         self.assertEqual(points, [Vector(5, 5, 0), Vector(10, 20, 0)])
 
     def test_curved_faces_cast_full_shadows(self):
@@ -1339,29 +1253,29 @@ class TestProjectToPlane(unittest.TestCase):
         # lone face has no hidden side: every part of it casts a shadow
         tube = Pos(0, 20, 0) * Cylinder(5, 10)
         side = tube.faces().filter_by(GeomType.CYLINDER)[0]
-        self.assertAlmostEqual(_project_to_plane(side, workplane=Plane.XZ).area, 100, 5)
+        self.assertAlmostEqual(project_to_plane(side, workplane=Plane.XZ).area, 100, 5)
         for half in side.split(Plane.YZ):
             self.assertAlmostEqual(
-                _project_to_plane(half, workplane=Plane.XZ).area, 50, 5
+                project_to_plane(half, workplane=Plane.XZ).area, 50, 5
             )
         ball = (Pos(0, 20, 0) * Sphere(5)).faces()[0]
         self.assertAlmostEqual(
-            _project_to_plane(ball, workplane=Plane.XY.offset(-20)).area, pi * 25, 5
+            project_to_plane(ball, workplane=Plane.XY.offset(-20)).area, pi * 25, 5
         )
         # Edge-on everywhere: no area on the plane
-        self.assertEqual(_project_to_plane(side, workplane=Plane.XY).faces(), [])
+        self.assertEqual(project_to_plane(side, workplane=Plane.XY).faces(), [])
         # An open shell has no hidden side either, whichever way it faces
         end = tube.faces().sort_by(Axis.Z)[-1]
         for half in side.split(Plane.YZ):
             shell = Shell([half, end])
             self.assertAlmostEqual(
-                _project_to_plane(shell, workplane=Plane.XZ).area, 50, 5
+                project_to_plane(shell, workplane=Plane.XZ).area, 50, 5
             )
         self.assertAlmostEqual(
-            _project_to_plane(tube.shell(), workplane=Plane.XZ).area, 100, 5
+            project_to_plane(tube.shell(), workplane=Plane.XZ).area, 100, 5
         )
         with BuildSketch() as lying:
-            _project_to_plane(Rot(90, 0, 0) * side)
+            project_to_plane(Rot(90, 0, 0) * side)
         self.assertAlmostEqual(lying.sketch.area, 100, 5)
 
     def test_curves_cast_full_shadows(self):
@@ -1377,50 +1291,89 @@ class TestProjectToPlane(unittest.TestCase):
             (at * SlotOverall(12, 4).wires()[0], 12),
         ]
         for curve, length in edge_on:
-            shadow = _project_to_plane(curve, workplane=Plane.XZ).edges()
+            shadow = project_to_plane(curve, workplane=Plane.XZ).edges()
             self.assertEqual(len(shadow), 1)
             self.assertEqual(shadow[0].geom_type, GeomType.LINE)
             self.assertAlmostEqual(shadow[0].length, length, 5)
         # A curve along the direction casts nothing
         along = at * Edge.make_line((0, 0, 0), (0, 5, 0))
-        self.assertEqual(_project_to_plane(along, workplane=Plane.XZ).edges(), [])
+        self.assertEqual(project_to_plane(along, workplane=Plane.XZ).edges(), [])
         # Curves that never turn through the direction keep their nature
-        tilted = _project_to_plane(
+        tilted = project_to_plane(
             at * Rot(30, 0, 0) * Edge.make_circle(5), workplane=Plane.XZ
         ).edges()
         self.assertEqual([e.geom_type for e in tilted], [GeomType.ELLIPSE])
         helix = at * Helix(10, 20, 5)
-        shadow = _project_to_plane(helix, workplane=Plane.XZ).edges()
+        shadow = project_to_plane(helix, workplane=Plane.XZ).edges()
         self.assertAlmostEqual(shadow[0].length, 46.098, 2)
         # Coincident shadows become one, across all the edges projected
-        outline = _project_to_plane((at * Box(4, 4, 4)).edges(), workplane=Plane.XZ)
+        outline = project_to_plane((at * Box(4, 4, 4)).edges(), workplane=Plane.XZ)
         self.assertEqual(len(outline.edges()), 4)
         self.assertAlmostEqual(sum(e.length for e in outline.edges()), 16, 5)
         tube = at * Cylinder(5, 10)
         with BuildLine() as rim:
-            _project_to_plane(tube)
+            project_to_plane(tube)
         self.assertEqual([e.geom_type for e in rim.line.edges()], [GeomType.CIRCLE])
+
+    def test_box_faces_onto_a_plane(self):
+        """#563: the faces edge-on to the plane gave the whole screen back"""
+        projection = project_to_plane(Box(10, 10, 10).faces(), workplane=Plane.XY)
+        self.assertEqual(len(projection.faces()), 2)
+        self.assertTrue(all(abs(f.area - 100) < 1e-6 for f in projection.faces()))
+
+    def test_objects_on_both_sides_of_the_plane(self):
+        projection = project_to_plane(
+            [
+                Face.make_rect(2, 2, Plane.XY.offset(3)),
+                Face.make_rect(3, 3, Plane.XY.offset(-3)),
+            ],
+            workplane=Plane.XY,
+        )
+        self.assertIsInstance(projection, Sketch)
+        self.assertEqual(sorted(f.area for f in projection.faces()), [4, 9])
+
+    def test_a_silhouette_keeps_its_holes(self):
+        holed = Box(10, 10, 10) - Cylinder(2, 20)
+        projection = project_to_plane(holed, workplane=Plane.XY)
+        self.assertIsInstance(projection, Sketch)
+        self.assertAlmostEqual(projection.area, 100 - pi * 4, 3)
+        self.assertEqual(len(projection.faces()[0].inner_wires()), 1)
+        torus = Torus(10, 3)
+        projection = project_to_plane(torus, workplane=Plane.XY.offset(-20))
+        self.assertAlmostEqual(projection.area, pi * (13**2 - 7**2), 3)
+        # in the workplane's own coordinates, as every projection onto a plane
+        self.assertAlmostEqual(projection.faces()[0].center().Z, 0, 5)
+
+    def test_objects_far_from_the_plane_origin(self):
+        far = Pos(1000, 1000, 50) * Box(10, 10, 10)
+        projection = project_to_plane(
+            far.faces().sort_by(Axis.Z)[-1], workplane=Plane.XY
+        )
+        self.assertAlmostEqual(projection.area, 100, 5)
+        self.assertAlmostEqual(projection.center(), (1000, 1000, 0), 5)
+        outline = project_to_plane(far.edges(), workplane=Plane.XY)
+        self.assertEqual(len(outline.edges()), 4)  # coincident shadows become one
 
     def test_edges_into_sketch_private_only(self):
         with BuildSketch():
             with self.assertRaises(ValueError):
-                _project_to_plane(self.housing.edges())
-            curve = _project_to_plane(self.housing.edges(), mode=Mode.PRIVATE)
+                project_to_plane(self.housing.edges())
+            curve = project_to_plane(self.housing.edges(), mode=Mode.PRIVATE)
         self.assertIsInstance(curve, Curve)
 
     def test_errors(self):
         with self.assertRaises(ValueError):
-            _project_to_plane(self.knob)
+            project_to_plane(self.knob)
         with self.assertRaises(ValueError):
-            _project_to_plane([self.knob, (1, 2, 3)], workplane=Plane.XY)
+            project_to_plane([self.knob, (1, 2, 3)], workplane=Plane.XY)
         with self.assertRaises(ValueError):
-            _project_to_plane(self.knob.faces().group_by(Axis.Z), workplane=Plane.XY)
+            project_to_plane(self.knob.faces().group_by(Axis.Z), workplane=Plane.XY)
         with BuildSketch():
             with self.assertRaises(ValueError):
-                _project_to_plane(self.knob, workplane=Plane.XZ)
+                project_to_plane(self.knob, workplane=Plane.XZ)
         with BuildPart():
             with self.assertRaises(RuntimeError):
-                _project_to_plane(self.knob)
+                project_to_plane(self.knob)
 
 
 if __name__ == "__main__":
