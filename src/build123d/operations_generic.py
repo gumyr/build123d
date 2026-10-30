@@ -48,10 +48,18 @@ from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sheet import BuildSheet
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Plane, Rotation, RotationLike, Vector, VectorLike
+from build123d.geometry import (
+    Axis,
+    Plane,
+    Rotation,
+    RotationLike,
+    Vector,
+    VectorLike,
+)
 from build123d.objects_curve import BaseLineObject
 from build123d.objects_part import BasePartObject
 from build123d.objects_sketch import BaseSketchObject
+from build123d.topology.silhouette import curve_shadow, face_shadow
 from build123d.topology import (
     Compound,
     ShapeHistory,
@@ -866,6 +874,170 @@ ProjectType: TypeAlias = Edge | Face | Wire | Vector | Vertex
 """Type of objects which can be projected"""
 
 
+def project_to_plane(
+    objects: Shape | VectorLike | Iterable[Shape | VectorLike],
+    workplane: Plane | None = None,
+    mode: Mode = Mode.ADD,
+) -> Curve | Sketch | Compound | ShapeList[Vector]:
+    """Generic Operation: project_to_plane
+
+    Applies to 0, 1, and 2 dimensional objects.
+
+    Project objects or points onto a plane along its normal, each from its own
+    side. The operation exists so that a 3D object can be brought into a
+    sketch or line, enhanced there, and the result used to modify the object.
+
+    In BuildLine and BuildSketch the plane is the builder's construction
+    plane, ``Plane.XY``; ``workplane`` must not be given. The projection is
+    drawn into the builder like any other content and placed with it on exit.
+    What a builder can hold decides what is drawn: BuildLine takes edges, so
+    a face or solid contributes its edges; BuildSketch takes faces, so a face
+    casts its shadow, whichever way it curves or faces, a face edge-on to the
+    plane is skipped and a solid, shell or compound casts its silhouette, the
+    shadows of all its faces fused, holes included. Points are projected and
+    returned, never drawn, so that lines can be built from them. Edges and
+    wires cannot be drawn into BuildSketch and raise unless ``mode`` is
+    ``Mode.PRIVATE``.
+
+    In algebra mode ``workplane`` must be given and the result lies in that
+    plane's local coordinates: a Curve of edges, a Sketch of faces, or a list
+    of points. A solid, shell or compound contributes its silhouette.
+
+    Args:
+        objects (Shape | VectorLike or Iterable of): objects or points to
+            project. Points and shapes cannot be mixed in one call.
+        workplane (Plane, optional): plane to project onto in algebra mode.
+            Defaults to None.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: project_to_plane doesn't accept group_by
+        ValueError: A workplane is required outside a builder
+        ValueError: Inside a builder the plane is always Plane.XY
+        RuntimeError: project_to_plane applies to BuildLine and BuildSketch
+        ValueError: Points and shapes cannot be projected together
+        ValueError: Edges and wires can only be projected into BuildSketch
+            in PRIVATE mode
+    """
+    context: Builder | None = Builder._get_context("project_to_plane")
+
+    if isinstance(objects, GroupBy):
+        raise ValueError("project_to_plane doesn't accept group_by, did you miss [n]?")
+
+    if context is None:
+        if workplane is None:
+            raise ValueError("A workplane is required outside a builder")
+        plane = workplane
+    else:
+        if not isinstance(context, (BuildLine, BuildSketch)):
+            raise RuntimeError(
+                "project_to_plane applies to BuildLine and BuildSketch; "
+                "use project_to_shape in BuildPart"
+            )
+        if workplane is not None:
+            raise ValueError(
+                "Inside a builder objects are projected onto its construction "
+                "plane, Plane.XY; workplane must not be given"
+            )
+        plane = Plane.XY
+    validate_inputs(context, "project_to_plane")
+
+    shape_list: list[Shape] = []
+    point_list: list[Vector] = []
+    for obj in flatten_sequence(objects):
+        if isinstance(obj, Shape) and not isinstance(obj, Vertex):
+            shape_list.append(obj)
+        else:
+            point_list.append(Vector(obj))
+    if shape_list and point_list:
+        raise ValueError("Points and shapes cannot be projected together")
+    if shape_list and all(not obj for obj in shape_list):
+        # nothing projects to nothing, of the same dimension
+        return Shape.make_composite([], shape_list[0]._dim)
+    shape_list = [obj for obj in shape_list if obj]
+
+    if point_list:
+        # A point's shadow is its local position dropped onto the plane
+        local_points = [plane.to_local_coords(pnt) for pnt in point_list]
+        return ShapeList(Vector(pnt.X, pnt.Y, 0) for pnt in local_points)
+
+    # What the builder can hold decides what is projected into it
+    if isinstance(context, BuildLine):
+        shape_list = [
+            piece
+            for obj in shape_list
+            for piece in ([obj] if isinstance(obj, (Edge, Wire)) else obj.edges())
+        ]
+    elif isinstance(context, BuildSketch) and mode != Mode.PRIVATE:
+        if any(isinstance(obj, (Edge, Wire)) for obj in shape_list):
+            raise ValueError(
+                "Edges and wires can only be projected into BuildSketch "
+                "in PRIVATE mode"
+            )
+    input_dims = {obj._dim for obj in shape_list}
+
+    projected: list[Shape] = []
+    edge_shadows: list[Shape] = []
+    with_faces = [obj for obj in shape_list if not isinstance(obj, (Edge, Wire))]
+    if with_faces:
+        # For faces the plane itself is the target, as a face large enough to
+        # catch every shadow: the objects' footprint on the plane, padded
+        footprint = plane.to_local_coords(Compound(with_faces)).bounding_box(
+            optimal=False
+        )
+        screen_center = plane.from_local_coords(
+            Vector(footprint.center().X, footprint.center().Y, 0)
+        )
+        screen = Face.make_rect(
+            2 * footprint.size.X + 1,
+            2 * footprint.size.Y + 1,
+            plane=Plane(screen_center, plane.x_dir, plane.z_dir),
+        )
+    for obj in shape_list:
+        # Each object is projected from its own side of the plane
+        above = plane.to_local_coords(obj.center()).Z > 0
+        direction = -plane.z_dir if above else plane.z_dir
+        if isinstance(obj, (Edge, Wire)):
+            edge_shadows.extend(
+                shadow
+                for edge in obj.edges()
+                for shadow in curve_shadow(edge, plane, direction)
+            )
+            continue
+        # A face-bearing object casts one silhouette: the shadows of all its
+        # faces, fused
+        shadows = [
+            shadow
+            for face in obj.faces()
+            for shadow in face_shadow(face, screen, direction)
+        ]
+        if len(shadows) > 1:
+            projected.extend(shadows[0].fuse(*shadows[1:]).clean().faces())
+        else:
+            projected.extend(shadows)
+    # Edges are a drawing: coincident shadows, from one wire or many, become one
+    if len(edge_shadows) > 1:
+        projected.extend(edge_shadows[0].fuse(*edge_shadows[1:]).clean().edges())
+    else:
+        projected.extend(edge_shadows)
+
+    local_shapes = [plane.to_local_coords(shape) for shape in projected]
+    if context is not None:
+        context._add_to_context(*local_shapes, mode=mode)
+
+    dims = {shape._dim for shape in local_shapes} or input_dims
+    result: Curve | Sketch | Compound = Compound(local_shapes)
+    if dims == {2}:
+        result = Sketch(result.wrapped)
+    elif dims == {1}:
+        result = Curve(result.wrapped)
+    return result
+
+
+@deprecated(
+    "project is deprecated; use project_to_plane for a plane and "
+    "project_to_shape for a shape."
+)
 def project(
     objects: ProjectType | Iterable[ProjectType] | None = None,
     workplane: Plane | None = None,
@@ -873,6 +1045,10 @@ def project(
     mode: Mode = Mode.ADD,
 ) -> Curve | Sketch | Compound | ShapeList[Vector]:
     """Generic Operation: project
+
+    .. deprecated::
+        Use :func:`project_to_plane` to project onto a plane and
+        :func:`~operations_part.project_to_shape` to project onto a shape.
 
     Applies to 0, 1, and 2 dimensional objects.
 

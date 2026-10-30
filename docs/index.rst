@@ -100,6 +100,7 @@ Table Of Contents
     topology_selection.rst
     builders.rst
     sheet_metal/index.rst
+    projection/index.rst
     joints.rst
     assemblies.rst
     tips.rst

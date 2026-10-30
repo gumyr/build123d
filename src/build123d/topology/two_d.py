@@ -57,7 +57,7 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from math import degrees
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 from typing import cast as tcast
@@ -68,6 +68,7 @@ from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Section
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing
+from OCP.BRepClass import BRepClass_FaceClassifier
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepFill import BRepFill
@@ -100,7 +101,7 @@ from OCP.GeomAPI import (
     GeomAPI_ProjectPointOnSurf,
 )
 from OCP.GeomLib import GeomLib_IsPlanarSurface
-from OCP.gp import gp_Ax1, gp_Ax3, gp_Dir, gp_Pln, gp_Pnt, gp_Vec
+from OCP.gp import gp_Ax1, gp_Ax3, gp_Dir, gp_Pln, gp_Pnt, gp_Pnt2d, gp_Vec
 from OCP.GProp import GProp_GProps
 from OCP.Precision import Precision
 from OCP.ShapeAnalysis import ShapeAnalysis_Edge, ShapeAnalysis_Surface
@@ -120,7 +121,7 @@ from OCP.collections import (
     List_TopoDS_Shape,
     Sequence_TopoDS_Shape,
 )
-from OCP.TopAbs import TopAbs_Orientation
+from OCP.TopAbs import TopAbs_Orientation, TopAbs_State
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Edge,
@@ -128,16 +129,18 @@ from OCP.TopoDS import (
     TopoDS_Shape,
     TopoDS_Shell,
     TopoDS_Solid,
+    TopoDS_Vertex,
 )
 from OCP.TopLoc import TopLoc_Location
 from ocp_gordon import interpolate_curve_network
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from build123d.build_enums import (
     CenterOf,
     ContinuityLevel,
     Convexity,
     GeomType,
+    Hit,
     Keep,
     SortBy,
     Transition,
@@ -166,6 +169,7 @@ from .history import ShapeHistory
 from .one_d import (
     Edge,
     Mixin1D,
+    DrawingViewOutput,
     Wire,
     _split_edge_at_vertex,
     topo_explore_connected_faces,
@@ -176,7 +180,6 @@ from .shape_core import (
     ShapeList,
     SkipClean,
     _sew_topods_faces,
-    _topods_bool_op,
     _topods_entities,
     _topods_face_normal_at,
     downcast,
@@ -197,6 +200,7 @@ from .utils import (
 from .zero_d import Vertex
 
 if TYPE_CHECKING:  # pragma: no cover
+    from .silhouette import visible_regions
     from .uv_write import UVFrame
     from .composite import Compound, Curve  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
@@ -765,32 +769,46 @@ class Mixin2D(ABC, Shape[TOPODS]):
         self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
         return tcast(Self, result)
 
+    def drawing_view(
+        self,
+        viewpoint: VectorLike,
+        up: VectorLike = (0, 0, 1),
+        look_at: VectorLike | None = None,
+        focus: float | None = None,
+    ) -> DrawingViewOutput:
+        """drawing_view
+
+        The line drawing of this shape as seen from a viewpoint: its edges,
+        split into visible and hidden by hidden-line removal.
+
+        Args:
+            viewpoint (VectorLike): where the view is taken from
+            up (VectorLike, optional): direction of the view's y axis.
+                Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point the view is centred on.
+                Defaults to None (center of shape).
+            focus (float, optional): the focal length for a perspective view.
+                Defaults to None (orthographic view).
+
+        Returns:
+            DrawingViewOutput: visible and hidden edges
+        """
+        return Mixin1D.drawing_view(self, viewpoint, up, look_at, focus)
+
+    @deprecated("project_to_viewport is deprecated; use drawing_view instead.")
     def project_to_viewport(
         self,
         viewport_origin: VectorLike,
         viewport_up: VectorLike = (0, 0, 1),
         look_at: VectorLike | None = None,
         focus: float | None = None,
-    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
+    ) -> DrawingViewOutput:
         """project_to_viewport
 
-        Project a shape onto a viewport returning visible and hidden Edges.
-
-        Args:
-            viewport_origin (VectorLike): location of viewport
-            viewport_up (VectorLike, optional): direction of the viewport y axis.
-                Defaults to (0, 0, 1).
-            look_at (VectorLike, optional): point to look at.
-                Defaults to None (center of shape).
-            focus (float, optional): the focal length for perspective projection
-                Defaults to None (orthographic projection)
-
-        Returns:
-            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+        .. deprecated::
+            Use :meth:`drawing_view` instead.
         """
-        return Mixin1D.project_to_viewport(
-            self, viewport_origin, viewport_up, look_at, focus
-        )
+        return self.drawing_view(viewport_origin, viewport_up, look_at, focus)
 
 
 class Face(Mixin2D[TopoDS_Face]):
@@ -980,6 +998,26 @@ class Face(Mixin2D[TopoDS_Face]):
                 return Axis(surf.Axis())  # type: ignore[attr-defined]
             case _:
                 return None
+
+    @property
+    def extrusion_direction(self) -> None | Vector:
+        """The direction a surface of linear extrusion is swept along, as a unit
+        vector, or None for any other surface
+
+        The sense is that of the underlying surface, which need not match the
+        vector the face was extruded with.
+        """
+        if self.is_empty:
+            return None
+        surf: Geom_Surface = self.geom_adaptor()
+        while isinstance(surf, (Geom_RectangularTrimmedSurface, Geom_OffsetSurface)):
+            surf = surf.BasisSurface()
+        if (
+            Shape.geom_LUT_FACE[GeomAdaptor_Surface(surf).GetType()]
+            != GeomType.EXTRUSION
+        ):
+            return None
+        return Vector(surf.Direction())  # type: ignore[attr-defined]
 
     @property
     def axes_of_symmetry(self) -> list[Axis]:
@@ -2281,6 +2319,44 @@ class Face(Mixin2D[TopoDS_Face]):
             and 1 - abs(plane.z_dir.dot(Vector(normal))) < TOLERANCE
         )
 
+    def interior_point(self) -> Vector:
+        """interior_point
+
+        A point on the face's material. The parametric centre when that lies
+        on the face, which it does for most faces; otherwise a point found
+        from the boundary, since the centre of a ring is in its hole and the
+        centre of a crescent is off to its concave side. Unlike
+        :meth:`center`, the result always lies on the face.
+
+        Raises:
+            RuntimeError: the face has no interior
+
+        Returns:
+            Vector: a point on the face
+        """
+        self._needs_geometry("interior point")
+        if self.is_inside(0.5, 0.5):
+            return self.position_at(0.5, 0.5)
+        # In parameter space the face is a planar region. The point of it
+        # nearest the centre is on its boundary, with the material beyond, so
+        # the line from the centre through that point enters the face there
+        # and leaves it again at the next crossing. Halfway between is inside.
+        u_min, u_max, v_min, v_max = self._uv_bounds()
+        region = self.uv_face
+        centre = Vector((u_min + u_max) / 2, (v_min + v_max) / 2, 0)
+        _, _, nearest = Vertex(centre).distance_to_with_closest_points(region)
+        reach = Vector(u_max - u_min, v_max - v_min, 0).length
+        probe = Edge.make_line(centre, centre + (nearest - centre).normalized() * reach)
+        pieces = (probe & region).edges()
+        if not pieces:
+            raise RuntimeError("the face has no interior")
+        first = min(pieces, key=lambda piece: piece.distance_to(nearest))
+        inside = first.position_at(0.5)
+        return self.position_at(
+            (inside.X - u_min) / (u_max - u_min), (inside.Y - v_min) / (v_max - v_min)
+        )
+
+    @overload
     def is_inside(self, point: VectorLike, tolerance: float = 1.0e-6) -> bool:
         """Point inside Face
 
@@ -2288,20 +2364,57 @@ class Face(Mixin2D[TopoDS_Face]):
         Points on the edge of the Face are considered inside.
 
         Args:
-          point(VectorLike): tuple or Vector representing 3D point to be tested
-          tolerance(float): tolerance for inside determination. Defaults to 1.0e-6.
-          point: VectorLike:
-          tolerance: float:  (Default value = 1.0e-6)
+            point (VectorLike): tuple or Vector representing 3D point to be tested
+            tolerance (float): tolerance for inside determination. Defaults to 1.0e-6.
 
         Returns:
-          bool: indicating whether or not point is within Face
-
+            bool: indicating whether or not point is within Face
         """
-        return _topods_point_on_face(self.wrapped, point, tolerance)
 
-        # surface = BRep_Tool.Surface_s(self.wrapped)
-        # projector = GeomAPI_ProjectPointOnSurf(Vector(point).to_pnt(), surface)
-        # return projector.LowerDistance() <= TOLERANCE
+    @overload
+    def is_inside(self, u: float, v: float, tolerance: float = 1.0e-6) -> bool:
+        """(u, v) inside Face
+
+        Returns whether or not the point at the normalized surface parameters
+        is on the face's material. Points on the edge of the Face are considered
+        inside.
+
+        Args:
+            u (float): the horizontal coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+            v (float): the vertical coordinate in the parameter space of the Face,
+                between 0.0 and 1.0
+            tolerance (float): tolerance for inside determination. Defaults to 1.0e-6.
+
+        Returns:
+            bool: indicating whether or not the parameters are within Face
+        """
+
+    def is_inside(self, *args, **kwargs) -> bool:
+        """Point or (u, v) inside Face"""
+        point: VectorLike | None = kwargs.get("point")
+        u: float | None = kwargs.get("u")
+        v: float | None = kwargs.get("v")
+        tolerance: float = kwargs.get("tolerance", 1.0e-6)
+        positional = list(args)
+        if positional and isinstance(positional[0], (int, float)):
+            u, v = positional[0], positional[1]
+            positional = positional[2:]
+        elif positional:
+            point = positional.pop(0)
+        if positional:
+            tolerance = positional[0]
+        if point is not None:
+            return _topods_point_on_face(self.wrapped, point, tolerance)
+        if u is None or v is None:
+            raise ValueError("Either a point or both u and v must be provided")
+        u_min, u_max, v_min, v_max = self._uv_bounds()
+        classifier = BRepClass_FaceClassifier(
+            self.wrapped,
+            gp_Pnt2d(u_min + u * (u_max - u_min), v_min + v * (v_max - v_min)),
+            tolerance,
+        )
+        return classifier.State() in (TopAbs_State.TopAbs_IN, TopAbs_State.TopAbs_ON)
 
     @overload
     def location_at(
@@ -2617,7 +2730,10 @@ class Face(Mixin2D[TopoDS_Face]):
         return _topods_face_position(self.wrapped, u, v)
 
     def project_to_shape(
-        self, target_object: Shape, direction: VectorLike
+        self,
+        target_object: Shape,
+        direction: VectorLike,
+        hit: Hit | Callable[[ShapeList[Face]], Iterable[Face]] = Hit.ALL,
     ) -> ShapeList[Face | Shell]:
         """Project Face to target Object
 
@@ -2625,57 +2741,51 @@ class Face(Mixin2D[TopoDS_Face]):
 
         A projection with no taper is illustrated below:
 
-        .. image:: flatProjection.png
+        .. image:: /flatProjection.png
             :alt: flatProjection
 
-        Note that an array of faces is returned as the projection might result in faces
-        on the "front" and "back" of the object (or even more if there are intermediate
-        surfaces in the projection path). faces "behind" the projection are not
-        returned.
+        The projection meets every surface in its path, so a face cast onto a
+        plate lands on its near face and on its far face; surfaces behind the
+        face, against the direction, are not met. ``hit`` says which to keep:
+        all of them nearest first, the nearest, the farthest, or the visible
+        ones, what a viewer behind the face looking along the direction sees.
+        The surfaces met are sewn into connected regions, so ``Hit.NEAREST``
+        is the nearest region with every face joined to it; for any other
+        selection, ``hit`` may be a callable given every face met, nearest
+        first, that returns the faces to keep, say
+        ``lambda faces: faces.filter_by(Axis.Z).sort_by(Axis.Z)[:1]``.
 
         Args:
             target_object (Shape): Object to project onto
             direction (VectorLike): projection direction
+            hit (Hit | Callable, optional): which surfaces to keep, or a
+                selector called with every face met, nearest first, returning
+                the faces to keep. Defaults to Hit.ALL.
 
         Returns:
             ShapeList[Face]: Face(s) projected on target object ordered by distance
         """
-        max_dimension = find_max_dimension([self, target_object])
-        extruded_topods_self = _extrude_topods_shape(
-            self.wrapped, Vector(direction) * max_dimension
-        )
+        if hit == Hit.VISIBLE:
+            # pylint: disable=import-outside-toplevel
+            from .silhouette import visible_regions
 
-        intersected_shapes: ShapeList[Face | Shell] = ShapeList()
-        if isinstance(target_object, Vertex):
-            raise TypeError("projection to a vertex is not supported")
-        if isinstance(target_object, Face):
-            topods_shape = _topods_bool_op(
-                (extruded_topods_self,), (target_object.wrapped,), BRepAlgoAPI_Common()
-            )
-            if not topods_shape.IsNull():
-                intersected_shapes.extend(
-                    Face(TopoDS.Face(topods_face))
-                    for topods_face in get_top_level_topods_shapes(topods_shape)
-                )
-        else:
-            for target_shell in target_object.shells():
-                topods_shape = _topods_bool_op(
-                    (extruded_topods_self,),
-                    (target_shell.wrapped,),
-                    BRepAlgoAPI_Common(),
-                )
-                for topods_shell in get_top_level_topods_shapes(topods_shape):
-                    intersected_shapes.append(Shell(TopoDS.Shell(topods_shell)))
-
-        intersected_shapes = intersected_shapes.sort_by(Axis(self.center(), direction))
+            return ShapeList(visible_regions(self, target_object, direction))
+        regions = _project_profile_by_extrusion(self, target_object, direction)
+        if callable(hit):
+            faces = ShapeList(face for region in regions for face in region.faces())
+            return ShapeList(hit(faces.sort_by(Axis(self.center(), direction))))
+        if hit == Hit.NEAREST:
+            regions = regions[:1]
+        elif hit == Hit.FARTHEST:
+            regions = regions[-1:]
         projected_shapes: ShapeList[Face | Shell] = ShapeList()
-        for shape in intersected_shapes:
-            if len(shape.faces()) == 1:
-                shape_face = shape.face()
-                if shape_face is not None:
-                    projected_shapes.append(shape_face)
+        for region in regions:
+            if len(region.faces()) == 1:
+                region_face = region.face()
+                if region_face is not None:
+                    projected_shapes.append(region_face)
             else:
-                projected_shapes.append(shape)
+                projected_shapes.append(region)
         return projected_shapes
 
     def without_holes(self) -> Face:
@@ -2698,6 +2808,46 @@ class Face(Mixin2D[TopoDS_Face]):
         return self._copied(
             lambda node: reshaper.Apply(node.wrapped), keep_history=False
         )
+
+    def silhouette_edges(
+        self, direction: VectorLike | None = None, *, eye: VectorLike | None = None
+    ) -> ShapeList[Edge]:
+        """silhouette_edges
+
+        The silhouette of the face as seen along a direction or from an eye
+        point: the curves on its surface where the normal is perpendicular to
+        the line of sight, dividing the side that faces the viewer from the
+        side that does not. A sphere seen from any direction has a great
+        circle, a cylinder seen across its axis two lines, and a face that
+        never turns away from the viewer, a planar face among them, has none.
+
+        The edges lie on the surface exactly. Those along the face's own
+        boundary are left out, since the boundary already marks that turn.
+
+        Args:
+            direction (VectorLike, optional): viewing direction, toward the
+                face, for a parallel view. Defaults to None.
+            eye (VectorLike, optional): eye point for a perspective view.
+                Defaults to None.
+
+        Raises:
+            ValueError: one of direction or eye must be given
+            RuntimeError: the face turns through the line of sight but the
+                kernel found no silhouette on it
+
+        Returns:
+            ShapeList[Edge]: the silhouette edges, empty if the face has none
+        """
+        # pylint: disable=import-outside-toplevel
+        from .silhouette import Viewer, silhouette_edges
+
+        if direction is not None and eye is None:
+            viewer = Viewer.along(direction)
+        elif eye is not None and direction is None:
+            viewer = Viewer.at(eye)
+        else:
+            raise ValueError("one of direction or eye must be given")
+        return silhouette_edges(self, viewer)
 
     def uv_frame(self, location: Location, tolerance: float = 1e-4) -> UVFrame:
         """uv_frame
@@ -2823,6 +2973,13 @@ class Face(Mixin2D[TopoDS_Face]):
         A face that crosses the seam of a periodic surface comes back as one
         face per period it reaches into, as :meth:`wrap` describes, so the
         result can hold more faces than were given.
+
+        The path must lie on this one face. For a path that runs over several
+        faces of a shape, a label round a filleted corner, use
+        :meth:`~topology.Shape.project_faces`, which projects each face onto the
+        whole shape and carries a face across the boundary between two target
+        faces. Wrapping is exact on a developable surface; projection is the
+        approximate alternative there and the only one for a multi-face target.
 
         Args:
             faces (Iterable[Face]): planar faces on ``Plane.XY``
@@ -3335,6 +3492,118 @@ class Shell(Mixin2D[TopoDS_Shell]):
         # Find the closest Face and get the location from it
         face = self.faces().sort_by(lambda f: f.distance_to(surface_point))[0]
         return face.location_at(surface_point, x_dir=x_dir)
+
+
+def _edge_on(face: Face, direction: VectorLike) -> bool:
+    """Whether a face casts no shadow along a direction.
+
+    Only a surface swept along the direction has its normal perpendicular to
+    it everywhere: a plane containing the direction, a cylinder with its axis
+    along it, or a linear extrusion swept along it. Every other surface tilts
+    somewhere and casts a shadow there, so it is never edge-on; a free-form
+    surface is at most edge-on within tolerance, which is not worth chasing.
+    """
+    if face.is_empty:
+        return False
+    direction = Vector(direction).normalized()
+    plane = face.is_planar
+    if plane is not None:
+        return abs(plane.z_dir.dot(direction)) < TOLERANCE
+    if face.geom_type == GeomType.CYLINDER:
+        axis = face.axis_of_rotation
+        assert axis is not None
+        along = axis.direction
+    elif face.geom_type == GeomType.EXTRUSION:
+        swept = face.extrusion_direction
+        assert swept is not None
+        along = swept
+    else:
+        return False
+    return along.cross(direction).length < TOLERANCE
+
+
+def _project_profile_by_extrusion(
+    profile: Face, target: Shape, direction: VectorLike, keep_edge_on: bool = False
+) -> ShapeList[Face | Shell]:
+    """The regions of a target's surface that a profile covers when swept along a
+    direction, nearest first.
+
+    The profile is extruded far enough to pass right through the target and the
+    extrusion is intersected with the target. The faces of the result that came
+    from the target, whether the boolean rebuilt them or left them untouched
+    inside the column, are sewn into the surfaces the column passes through, one
+    Face or Shell each, and ordered by distance along ``direction`` from the
+    profile. This is the core shared by :meth:`Face.project_to_shape` and
+    :meth:`Solid.extrude_until`.
+
+    The boolean is run directly rather than through :meth:`Shape.intersect`,
+    whose ``UnifySameDomain`` clean could merge a target fragment into a coplanar
+    face of the extrusion before the fragment is attributed.
+
+    A target face lying along the direction, inside the column or on its wall,
+    survives the boolean but has no area for a projection to land on, and
+    sewing joins the surfaces on either side of it into one region. Such faces
+    are dropped unless ``keep_edge_on`` asks for them: an extrusion stopping at
+    a stepped surface needs the risers to make a surface that cuts it.
+
+    Args:
+        profile (Face): the face swept along the direction
+        target (Shape): the shape whose surface is sampled
+        direction (VectorLike): the sweep direction; only surfaces ahead of the
+            profile are found
+        keep_edge_on (bool, optional): keep the target faces lying along the
+            direction. Defaults to False.
+
+    Raises:
+        TypeError: the target is a Vertex
+        RuntimeError: sewing returned something other than faces and shells
+
+    Returns:
+        ShapeList[Face | Shell]: the surfaces met, nearest first; empty when the
+        column misses the target
+    """
+    if isinstance(target, Vertex):
+        raise TypeError("projection to a vertex is not supported")
+    direction = Vector(direction)
+    max_dimension = find_max_dimension([profile, target])
+    extrusion = _extrude_topods_shape(profile.wrapped, direction * max_dimension)
+
+    arguments, tools = List_TopoDS_Shape(), List_TopoDS_Shape()
+    arguments.Append(target.wrapped)
+    tools.Append(extrusion)
+    operation = BRepAlgoAPI_Common()
+    operation.SetArguments(arguments)
+    operation.SetTools(tools)
+    operation.SetRunParallel(True)
+    operation.Build()
+    result = operation.Shape()
+    if result.IsNull():
+        return ShapeList()
+
+    history = ShapeHistory.from_boolean(
+        operation, before=[target.wrapped], brought=[extrusion]
+    )
+    trace = history.trace([target.wrapped])
+    target_faces = [
+        TopoDS.Face(face)
+        for face in _topods_entities(result, "Face")
+        if (trace.is_modified(face) or trace.is_untouched(face))
+        and (keep_edge_on or not _edge_on(Face(TopoDS.Face(face)), direction))
+    ]
+    if not target_faces:
+        return ShapeList()
+
+    # Sewing can hand back a vertex or edge of a face as a free sub-shape
+    # beside the faces and shells; those carry no surface and are dropped
+    regions: ShapeList[Face | Shell] = ShapeList()
+    for region in get_top_level_topods_shapes(_sew_topods_faces(target_faces)):
+        if isinstance(region, TopoDS_Face):
+            regions.append(Face(region))
+        elif isinstance(region, TopoDS_Shell):
+            regions.append(Shell(region))
+        elif not isinstance(region, (TopoDS_Vertex, TopoDS_Edge)):
+            raise RuntimeError(f"Invalid sewn shape {type(region)}")
+    return regions.sort_by(Axis(profile.center(), direction))
 
 
 def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:

@@ -54,11 +54,11 @@ from __future__ import annotations
 import copy
 import warnings
 from bisect import bisect_right
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from math import atan2, ceil, copysign, cos, floor, inf, isclose, pi, radians
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, NamedTuple
 from typing import cast as tcast
 from typing import overload
 
@@ -194,7 +194,7 @@ from OCP.TopoDS import (
 )
 from scipy.optimize import minimize_scalar
 from scipy.spatial import ConvexHull
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from build123d.build_enums import (
     AngularDirection,
@@ -203,6 +203,7 @@ from build123d.build_enums import (
     Convexity,
     FrameMethod,
     GeomType,
+    Hit,
     Kind,
     PositionMode,
     Sagitta,
@@ -254,6 +255,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from .composite import Compound, Curve, Part, Sketch  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
     from .two_d import Face, Shell  # pylint: disable=R0801
+    from .silhouette import visible_curves
 
 
 @dataclass(frozen=True)
@@ -582,6 +584,22 @@ def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
         )
 
     raise ValueError("Filleting failed to create a closed wire.")
+
+
+class DrawingViewOutput(NamedTuple):
+    """What :meth:`~topology.Shape.drawing_view` gives back: the edges of the shape as
+    seen from the viewpoint, split by hidden-line removal.
+
+    ``visible, hidden = part.drawing_view(viewpoint)`` unpacks it, and the fields are
+    there by name too.
+
+    Args:
+        visible (ShapeList[Edge]): edges in sight from the viewpoint
+        hidden (ShapeList[Edge]): edges behind the shape's own surface
+    """
+
+    visible: ShapeList[Edge]
+    hidden: ShapeList[Edge]
 
 
 class Mixin1D(Shape[TOPODS]):
@@ -1611,10 +1629,15 @@ class Mixin1D(Shape[TOPODS]):
             discretizer.Parameter(i + 1) for i in range(discretizer.NbPoints())
         ]
 
+    @deprecated("project is deprecated; use project_to_shape instead.")
     def project(
         self, face: Face, direction: VectorLike, closest: bool = True
     ) -> Edge | Wire | ShapeList[Edge | Wire]:
         """Project onto a face along the specified direction
+
+        .. deprecated::
+            Use :meth:`project_to_shape` instead; ``[0]`` of its result is the
+            nearest piece.
 
         Args:
           face: Face:
@@ -1658,28 +1681,29 @@ class Mixin1D(Shape[TOPODS]):
 
         return return_value
 
-    def project_to_viewport(
+    def drawing_view(
         self,
-        viewport_origin: VectorLike,
-        viewport_up: VectorLike = (0, 0, 1),
+        viewpoint: VectorLike,
+        up: VectorLike = (0, 0, 1),
         look_at: VectorLike | None = None,
         focus: float | None = None,
-    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
-        """project_to_viewport
+    ) -> DrawingViewOutput:
+        """drawing_view
 
-        Project a shape onto a viewport returning visible and hidden Edges.
+        The line drawing of this shape as seen from a viewpoint: its edges,
+        split into visible and hidden by hidden-line removal.
 
         Args:
-            viewport_origin (VectorLike): location of viewport
-            viewport_up (VectorLike, optional): direction of the viewport y axis.
+            viewpoint (VectorLike): where the view is taken from
+            up (VectorLike, optional): direction of the view's y axis.
                 Defaults to (0, 0, 1).
-            look_at (VectorLike, optional): point to look at.
+            look_at (VectorLike, optional): point the view is centred on.
                 Defaults to None (center of shape).
-            focus (float, optional): the focal length for perspective projection
-                Defaults to None (orthographic projection)
+            focus (float, optional): the focal length for a perspective view.
+                Defaults to None (orthographic view).
 
         Returns:
-            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+            DrawingViewOutput: visible and hidden edges
         """
 
         def extract_edges(compound):
@@ -1703,15 +1727,13 @@ class Mixin1D(Shape[TOPODS]):
         hidden_line_removal = HLRBRep_Algo()
         hidden_line_removal.Add(self.wrapped)
 
-        viewport_origin = Vector(viewport_origin)
+        eye = Vector(viewpoint)
         look_at = Vector(look_at) if look_at else self.center()
-        projection_dir: Vector = (viewport_origin - look_at).normalized()
-        viewport_up = Vector(viewport_up).normalized()
+        projection_dir: Vector = (eye - look_at).normalized()
+        up = Vector(up).normalized()
         camera_coordinate_system = gp_Ax2()
-        camera_coordinate_system.SetAxis(
-            gp_Ax1(viewport_origin.to_pnt(), projection_dir.to_dir())
-        )
-        camera_coordinate_system.SetYDirection(viewport_up.to_dir())
+        camera_coordinate_system.SetAxis(gp_Ax1(eye.to_pnt(), projection_dir.to_dir()))
+        camera_coordinate_system.SetYDirection(up.to_dir())
         projector = (
             HLRAlgo_Projector(camera_coordinate_system, focus)
             if focus
@@ -1754,7 +1776,22 @@ class Mixin1D(Shape[TOPODS]):
         visible_edges = ShapeList(Edge(e) for e in visible_edges)
         hidden_edges = ShapeList(Edge(e) for e in hidden_edges)
 
-        return (visible_edges, hidden_edges)
+        return DrawingViewOutput(visible_edges, hidden_edges)
+
+    @deprecated("project_to_viewport is deprecated; use drawing_view instead.")
+    def project_to_viewport(
+        self,
+        viewport_origin: VectorLike,
+        viewport_up: VectorLike = (0, 0, 1),
+        look_at: VectorLike | None = None,
+        focus: float | None = None,
+    ) -> DrawingViewOutput:
+        """project_to_viewport
+
+        .. deprecated::
+            Use :meth:`drawing_view` instead.
+        """
+        return self.drawing_view(viewport_origin, viewport_up, look_at, focus)
 
     def start_point(self) -> Vector:
         """The start point of this edge
@@ -3461,13 +3498,17 @@ class Edge(Mixin1D[TopoDS_Edge]):
         target_object: Shape,
         direction: VectorLike | None = None,
         center: VectorLike | None = None,
+        hit: Hit | Callable[[ShapeList[Wire]], Iterable[Wire]] = Hit.ALL,
     ) -> ShapeList[Edge]:
         """Project Edge
 
-        Project an Edge onto a Shape generating new wires on the surfaces of the object
+        Project an Edge onto a Shape generating new edges on the surfaces of the object
         one and only one of `direction` or `center` must be provided. Note that one or
-        more wires may be generated depending on the topology of the target object and
-        location/direction of projection.
+        more edges may be generated depending on the topology of the target object and
+        location/direction of projection; they come back nearest first, and ``hit``
+        keeps all of them, the nearest, the farthest, or the visible ones. For any
+        other selection ``hit`` may be a callable given the projections as wires,
+        nearest first, that returns those to keep.
 
         To avoid flipping the normal of a face built with the projected wire the orientation
         of the output wires are forced to be the same as self.
@@ -3476,9 +3517,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
           target_object: Object to project onto
           direction: Parallel projection direction. Defaults to None.
           center: Conical center of projection. Defaults to None.
-          target_object: Shape:
-          direction: VectorLike:  (Default value = None)
-          center: VectorLike:  (Default value = None)
+          hit (Hit | Callable, optional): which of the projections to keep, or a
+              selector called with the projected wires, nearest first, returning
+              those to keep. Defaults to Hit.ALL.
 
         Returns:
           : Projected Edge(s)
@@ -3487,7 +3528,9 @@ class Edge(Mixin1D[TopoDS_Edge]):
           ValueError: Only one of direction or center must be provided
 
         """
-        projected_wires = Wire(self).project_to_shape(target_object, direction, center)
+        projected_wires = Wire(self).project_to_shape(
+            target_object, direction, center, hit
+        )
         return projected_wires.edges()
 
     def reversed(self, reconstruct: bool = False) -> Edge:
@@ -4653,13 +4696,18 @@ class Wire(Mixin1D[TopoDS_Wire]):
         target_object: Shape,
         direction: VectorLike | None = None,
         center: VectorLike | None = None,
+        hit: Hit | Callable[[ShapeList[Wire]], Iterable[Wire]] = Hit.ALL,
     ) -> ShapeList[Wire]:
         """Project Wire
 
         Project a Wire onto a Shape generating new wires on the surfaces of the object
         one and only one of `direction` or `center` must be provided. Note that one or
         more wires may be generated depending on the topology of the target object and
-        location/direction of projection.
+        location/direction of projection; they come back nearest first, and ``hit``
+        keeps all of them, the nearest, the farthest, or the visible ones, what a
+        viewer behind the wire looking along the direction sees. For any other
+        selection ``hit`` may be a callable given the wires, nearest first, that
+        returns those to keep.
 
         To avoid flipping the normal of a face built with the projected wire the orientation
         of the output wires are forced to be the same as self.
@@ -4668,15 +4716,16 @@ class Wire(Mixin1D[TopoDS_Wire]):
           target_object: Object to project onto
           direction: Parallel projection direction. Defaults to None.
           center: Conical center of projection. Defaults to None.
-          target_object: Shape:
-          direction: VectorLike:  (Default value = None)
-          center: VectorLike:  (Default value = None)
+          hit (Hit | Callable, optional): which of the projections to keep, or a
+              selector called with the wires, nearest first, returning those to
+              keep. Defaults to Hit.ALL. Hit.VISIBLE needs a direction.
 
         Returns:
           : Projected wire(s)
 
         Raises:
           ValueError: Only one of direction or center must be provided
+          ValueError: Hit.VISIBLE needs a direction
 
         """
         if self.is_empty or not target_object:
@@ -4690,6 +4739,14 @@ class Wire(Mixin1D[TopoDS_Wire]):
             center_point = Vector(center)
         else:
             raise ValueError("Provide exactly one of direction or center")
+
+        if hit == Hit.VISIBLE:
+            if direction_vector is None:
+                raise ValueError("Hit.VISIBLE needs a direction, not a center")
+            # pylint: disable=import-outside-toplevel
+            from .silhouette import visible_curves
+
+            return visible_curves(self, target_object, direction_vector)
 
         # Project the wire on the target object
         if direction_vector is not None:
@@ -4753,6 +4810,13 @@ class Wire(Mixin1D[TopoDS_Wire]):
                 len(output_wires_distances),
             )
             output_wires = ShapeList([w[0] for w in output_wires_distances])
+
+        if callable(hit):
+            output_wires = ShapeList(hit(output_wires))
+        elif hit == Hit.NEAREST:
+            output_wires = output_wires[:1]
+        elif hit == Hit.FARTHEST:
+            output_wires = output_wires[-1:]
 
         # Clean the wires remove cases where projection artificially split edges
         cleaned_wires = ShapeList([w.clean() for w in output_wires])
