@@ -1753,9 +1753,14 @@ class JernArc(BaseEdgeObject):
             When a limit object is provided instead of a numeric angular size, JernArc
             constructs the valid tangent arc(s) from the given start point and tangent,
             trims them at their first intersection with the limit, and returns the one
-            requiring the shortest travel from the start. If neither valid arc intersects
-            the limit, a ValueError is raised.
+            requiring the shortest travel from the start unless clockwise selects a
+            direction. If the selected arc does not intersect the limit, a ValueError
+            is raised.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
+        clockwise (bool | None, optional): select the direction for a limit object.
+            None keeps the shortest-travel behavior. True selects clockwise and False
+            selects counterclockwise, viewed from the positive-normal side toward the
+            construction plane. This parameter is not valid with a numeric arc size.
 
     Attributes:
         start (Vector): start point
@@ -1772,6 +1777,8 @@ class JernArc(BaseEdgeObject):
         radius: float,
         arc_size: float | Shape | Axis | Location | Plane | VectorLike,
         mode: Mode = Mode.ADD,
+        *,
+        clockwise: bool | None = None,
     ):
 
         start = Vector(start)
@@ -1787,6 +1794,8 @@ class JernArc(BaseEdgeObject):
 
         arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
         if isinstance(arc_factor, (int, float)):
+            if clockwise is not None:
+                raise ValueError("clockwise can only be used with an arc limit")
             arc_direction = copysign(1.0, arc_factor)
             arc_untrimed_size = arc_factor
         else:
@@ -1822,16 +1831,22 @@ class JernArc(BaseEdgeObject):
             arc = Edge.make_tangent_arc(start, start_tangent, end_of_arc)
 
         if not isinstance(arc_factor, (int, float)):
-            trimmed_arc = arc.trim_to_other(arc_factor)
-            trimmed_arc2 = arc2.trim_to_other(arc_factor)
+            arc_candidates = (
+                [arc, arc2] if clockwise is None else [arc2 if clockwise else arc]
+            )
+            trimmed_arcs = [
+                candidate.trim_to_other(arc_factor) for candidate in arc_candidates
+            ]
+            trimmed_edges = [trimmed for trimmed in trimmed_arcs if trimmed]
 
-            if not trimmed_arc and not trimmed_arc2:
+            if not trimmed_edges:
                 raise ValueError(f"JernArc doesn't intersect arc limit {arc_size}")
 
-            arcs = ShapeList(
-                [a for a in [trimmed_arc, trimmed_arc2] if a]
-            ).sort_by(Edge.length)
-            arc = arcs[0]  # pylint: disable=no-member
+            if clockwise is None:
+                arcs = ShapeList(trimmed_edges).sort_by(Edge.length)
+                arc = arcs[0]  # pylint: disable=no-member
+            else:
+                arc = trimmed_edges[0]
         self.center_point = arc.arc_center
         self.end_of_arc = arc.position_at(1)  # pylint: disable=no-member
 
