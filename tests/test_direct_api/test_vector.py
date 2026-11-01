@@ -107,6 +107,51 @@ class TestVector(unittest.TestCase):
         self.assertAlmostEqual(d1, a * 180 / math.pi)
         self.assertAlmostEqual(d2, -a * 180 / math.pi)
 
+    def test_is_collinear(self):
+        v = Vector(1, 2, 3)
+        self.assertTrue(v.is_collinear(Vector(2, 4, 6)))
+        self.assertTrue(v.is_collinear((-0.5, -1, -1.5)))
+        self.assertTrue(Vector(1e-9, 0, 0).is_collinear((1e9, 0, 0)))
+        self.assertFalse(v.is_collinear((3, 2, 1)))
+        self.assertFalse(v.is_collinear((3, 0, -1)))
+
+    def test_is_normal(self):
+        v = Vector(1, 2, 3)
+        self.assertTrue(v.is_normal((3, 0, -1)))
+        self.assertTrue(v.is_normal(Vector(0, -3, 2)))
+        self.assertTrue(Vector(1, 1).is_normal((-1, 1)))
+        self.assertFalse(v.is_normal(v))
+        self.assertFalse(v.is_normal((3, 2, 1)))
+
+    def test_is_opposite(self):
+        v = Vector(1, 2, 3)
+        self.assertTrue(v.is_opposite((-0.5, -1, -1.5)))
+        self.assertTrue(v.is_opposite(v * -4))
+        self.assertFalse(v.is_opposite(Vector(2, 4, 6)))
+        self.assertFalse(v.is_opposite((3, 0, -1)))
+
+    def test_is_collinear_normal_opposite_tolerance(self):
+        # angular_tolerance is in degrees, as in the Axis checks
+        x_dir = Vector(1, 0, 0)
+        for check, target in (
+            (x_dir.is_collinear, Vector(1, 0, 0)),
+            (x_dir.is_normal, Vector(0, 1, 0)),
+            (x_dir.is_opposite, Vector(-1, 0, 0)),
+        ):
+            with self.subTest(check=check.__name__):
+                self.assertTrue(check(target.rotate(Axis.Z, 1e-6)))
+                self.assertFalse(check(target.rotate(Axis.Z, 1e-4)))
+                self.assertTrue(check(target.rotate(Axis.Z, 1), angular_tolerance=1.1))
+                self.assertFalse(check(target.rotate(Axis.Z, 1), angular_tolerance=0.9))
+
+    def test_is_collinear_normal_opposite_zero_vector(self):
+        for check in (Vector.is_collinear, Vector.is_normal, Vector.is_opposite):
+            with self.subTest(check=check.__name__):
+                with self.assertRaises(ValueError):
+                    check(Vector(0, 0, 0), (1, 0, 0))
+                with self.assertRaises(ValueError):
+                    check(Vector(1, 0, 0), (0, 0, 0))
+
     def test_center(self):
         v = Vector(1, 1, 1)
         self.assertAlmostEqual(v, v.center())
