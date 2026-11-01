@@ -1081,11 +1081,11 @@ class BoundBox:
         # Fill from positional args if not given via kwargs
         if args:
             first_arg = args[0]
-            topo_arg = getattr(first_arg, "_wrapped", first_arg)
+            topo_arg = getattr(first_arg, "wrapped", first_arg)
             if bounding_box is None and isinstance(args[0], Bnd_Box):
                 bounding_box = args[0]
             elif isinstance(topo_arg, TopoDS_Shape) or (
-                hasattr(first_arg, "_wrapped") and topo_arg is None
+                hasattr(first_arg, "wrapped") and topo_arg is None
             ):
                 shape = first_arg
                 if len(args) > 1:
@@ -1103,7 +1103,7 @@ class BoundBox:
                 raise TypeError(f"Invalid positional arguments: {', '.join(args)}")
 
         if shape is not None:
-            topo_shape = getattr(shape, "_wrapped", shape)
+            topo_shape = getattr(shape, "wrapped", shape)
             if topo_shape is not None and not isinstance(topo_shape, TopoDS_Shape):
                 raise TypeError(f"Invalid argument for shape: {topo_shape}")
 

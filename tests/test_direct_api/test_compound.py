@@ -33,7 +33,10 @@ from pathlib import Path
 from build123d.build_common import GridLocations, PolarLocations
 from build123d.build_enums import Align, CenterOf, Mode
 from build123d.build_part import BuildPart
+from build123d.exporters3d import export_brep, export_step
 from build123d.geometry import Location, Plane, Pos
+from build123d.importers import import_brep, import_step
+from build123d.joints import RigidJoint
 from build123d.objects_part import BasePartObject, Box
 from build123d.operations_generic import insert
 from build123d.objects_sketch import Circle
@@ -433,6 +436,111 @@ class TestCompoundTreeLocation(unittest.TestCase):
         source.children[0].parent = target
         self.assert_in_place(source, source_marker)
         self.assert_in_place(target, target_marker)
+
+
+class TestCompoundChildMoved(unittest.TestCase):
+    """Moving a child in place keeps the compound of every ancestor in step.
+
+    The assembly sits at x=10 turned by 90° about Z. A marker child is attached
+    at the origin and moved to x=4 in the assembly afterwards, so it belongs at
+    (10, 4, 0) in the world and the assembly's bounding box reaches y=4.5.
+    """
+
+    def moved_assembly(self):
+        """An assembly at x=10 turned by 90°, with a marker child still at its origin"""
+        marker = Box(1, 1, 1)
+        assembly = Compound(children=[Box(1, 1, 1), marker])
+        assembly.location = Location((10, 0, 0), (0, 0, 90))
+        return assembly, marker
+
+    def assert_in_step(self, assembly, marker):
+        """The tree, the compound and both exporters agree on where the marker is"""
+        self.assertEqual(assembly.location, Location((10, 0, 0), (0, 0, 90)))
+        self.assertAlmostEqual(marker.global_location.position, (10, 4, 0), 5)
+        for shape in (
+            assembly,
+            self.round_trip(assembly, export_brep, import_brep, "assembly.brep"),
+            self.round_trip(assembly, export_step, import_step, "assembly.step"),
+        ):
+            bbox = shape.bounding_box()
+            self.assertAlmostEqual(bbox.min.X, 9.5, 5)
+            self.assertAlmostEqual(bbox.max.X, 10.5, 5)
+            self.assertAlmostEqual(bbox.min.Y, -0.5, 5)
+            self.assertAlmostEqual(bbox.max.Y, 4.5, 5)
+
+    def round_trip(self, assembly, exporter, importer, name):
+        path = self.tmp_path / name
+        self.assertTrue(exporter(assembly, path))
+        return importer(path)
+
+    def test_setting_the_location_of_a_child(self):
+        assembly, marker = self.moved_assembly()
+        marker.location = Location((4, 0, 0))
+        self.assert_in_step(assembly, marker)
+
+    def test_setting_the_position_of_a_child(self):
+        assembly, marker = self.moved_assembly()
+        marker.position = (4, 0, 0)
+        self.assert_in_step(assembly, marker)
+
+    def test_locating_a_child(self):
+        assembly, marker = self.moved_assembly()
+        self.assertIs(marker.locate(Location((4, 0, 0))), marker)
+        self.assert_in_step(assembly, marker)
+
+    def test_moving_a_child(self):
+        assembly, marker = self.moved_assembly()
+        self.assertIs(
+            marker.move(Location((1, 0, 0))).move(Location((3, 0, 0))), marker
+        )
+        self.assert_in_step(assembly, marker)
+
+    def test_moving_a_grandchild(self):
+        marker = Box(1, 1, 1)
+        sub_assembly = Compound(children=[marker])
+        assembly = Compound(children=[Box(1, 1, 1), sub_assembly])
+        assembly.location = Location((10, 0, 0), (0, 0, 90))
+        marker.location = Location((4, 0, 0))
+        self.assertAlmostEqual(sub_assembly.bounding_box().min.X, 3.5, 5)
+        self.assert_in_step(assembly, marker)
+
+    def test_moving_a_sub_assembly(self):
+        marker = Box(1, 1, 1)
+        sub_assembly = Compound(children=[marker])
+        assembly = Compound(children=[Box(1, 1, 1), sub_assembly])
+        assembly.location = Location((10, 0, 0), (0, 0, 90))
+        sub_assembly.location = Location((4, 0, 0))
+        self.assert_in_step(assembly, marker)
+
+    def test_attaching_a_grandchild(self):
+        sub_assembly = Compound(children=[Box(1, 1, 1)])
+        assembly = Compound(children=[Box(1, 1, 1), sub_assembly])
+        assembly.location = Location((10, 0, 0), (0, 0, 90))
+        marker = Pos(4, 0, 0) * Box(1, 1, 1)
+        marker.parent = sub_assembly
+        self.assert_in_step(assembly, marker)
+
+    def test_detaching_a_grandchild(self):
+        marker = Pos(4, 0, 0) * Box(1, 1, 1)
+        sub_assembly = Compound(children=[Pos(0, 0, 9) * Box(1, 1, 1), marker])
+        assembly = Compound(children=[Box(1, 1, 1), sub_assembly])
+        assembly.location = Location((10, 0, 0), (0, 0, 90))
+        sub_assembly.children[0].parent = None
+        self.assertAlmostEqual(assembly.bounding_box().max.Z, 0.5, 5)
+        self.assert_in_step(assembly, marker)
+
+    def test_connecting_a_joint_of_a_child(self):
+        assembly, marker = self.moved_assembly()
+        base = assembly.children[0]
+        RigidJoint("socket", base, Location((4, 0, 0)))
+        RigidJoint("plug", marker)
+        base.joints["socket"].connect_to(marker.joints["plug"])
+        self.assert_in_step(assembly, marker)
+
+    def test_moving_a_shape_without_a_parent(self):
+        box = Box(1, 1, 1)
+        box.location = Location((4, 0, 0))
+        self.assertAlmostEqual(box.bounding_box().min.X, 3.5, 5)
 
 
 if __name__ == "__main__":

@@ -384,9 +384,15 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """Note that this shape was taken out of another, and how."""
         self.topo_path = source.topo_path + (source,)
 
+    # True on an assembly whose compound lags its children: a child was moved,
+    # attached or detached below it. The compound is rebuilt when it is next read.
+    _stale: bool = False
+
     @property
     def wrapped(self):
         """OCP TopoDS object"""
+        if self._stale:
+            self._rebuild_from_children()
         return self._wrapped
 
     @wrapped.setter
@@ -706,13 +712,16 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def location(self) -> Location:
         """Get this Shape's Location"""
         self._needs_geometry("location")
-        return Location(self.wrapped.Location())
+        # the location of an assembly doesn't depend on its children, so a
+        # stale compound needn't be rebuilt to read it
+        return Location(self._wrapped.Location())
 
     @location.setter
     def location(self, value: Location):
         """Set Shape's Location to value"""
         if not self.is_empty:
-            self.wrapped.Location(value.wrapped)
+            self._wrapped.Location(value.wrapped)
+            self._mark_ancestors_stale()
 
     @property
     def matrix_of_inertia(self) -> list[list[float]]:
@@ -1481,6 +1490,21 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def _rebuild_from_children(self) -> None:
         """Rebuild the kernel shape from the children; only a Compound has any"""
 
+    def _mark_ancestors_stale(self) -> None:
+        """Note that the compound of every ancestor no longer matches its children.
+
+        An assembly's compound holds a copy of each child's kernel shape, so a
+        child moved in place, or attached or detached further down, leaves it
+        behind. Each ancestor is marked and rebuilt from its live children when
+        its ``wrapped`` is next read. The walk stops at an ancestor that is
+        already marked, since everything above it is marked too. Nothing
+        happens for a shape outside an assembly.
+        """
+        ancestor = self.parent
+        while ancestor is not None and not ancestor._stale:
+            ancestor._stale = True
+            ancestor = ancestor.parent
+
     def __eq__(self, other) -> bool:
         """Check if two shapes are the same.
 
@@ -2100,7 +2124,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         """
         if not self.is_empty:  # nothing is nothing wherever it is put
-            self.wrapped.Location(loc.wrapped)
+            self._wrapped.Location(loc.wrapped)
+            self._mark_ancestors_stale()
 
         return self
 
@@ -2172,7 +2197,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         """
         if not self.is_empty:  # nothing is nothing wherever it is put
-            self.wrapped.Move(loc.wrapped)
+            self._wrapped.Move(loc.wrapped)
+            self._mark_ancestors_stale()
 
         return self
 
@@ -3122,12 +3148,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
         arg = List_TopoDS_Shape()
         for obj in args:
             if not obj.is_empty:
-                arg.Append(obj._wrapped)
+                arg.Append(obj.wrapped)
 
         tool = List_TopoDS_Shape()
         for obj in tools:
             if not obj.is_empty:
-                tool.Append(obj._wrapped)
+                tool.Append(obj.wrapped)
 
         # Handle operations with "zero" shapes
         topo_result = None
@@ -3161,8 +3187,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # The arguments were there before and the tools are brought in. An
         # empty record means every input sub-shape came through untouched,
         # which is what the shortcuts above produce
-        before = [o._wrapped for o in args if not o.is_empty]
-        brought = [o._wrapped for o in tools if not o.is_empty]
+        before = [o.wrapped for o in args if not o.is_empty]
+        brought = [o.wrapped for o in tools if not o.is_empty]
         history = ShapeHistory(before=before, brought=brought)
         if topo_result is None:
             operation.SetArguments(arg)
