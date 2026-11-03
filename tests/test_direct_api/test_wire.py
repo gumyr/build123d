@@ -37,7 +37,7 @@ import numpy as np
 from build123d.topology.shape_core import TOLERANCE
 import build123d.topology.one_d as one_d
 
-from build123d.build_enums import GeomType, PositionMode, Side
+from build123d.build_enums import FrameMethod, GeomType, PositionMode, Side
 from build123d.build_line import BuildLine
 from build123d.geometry import Axis, Color, Location, Plane, Pos, Rot, Vector
 from build123d.objects_curve import Curve, Line, JernArc, PolarLine, Polyline, Spline
@@ -269,6 +269,78 @@ class TestWire(unittest.TestCase):
         w1.wrapped = None
         with self.assertRaises(ValueError):
             w1.param_at_point((0, 0))
+
+    def test_param_at_point_native_parameter_on_multiedge_and_reversed_wires(self):
+        """Check native parameters on forward and reversed multi-edge wires."""
+        wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (10, 0, 0)),
+                Edge.make_line((10, 0, 0), (10, 10, 0)),
+            ],
+            sequenced=True,
+        )
+        reversed_wire = Wire(TopoDS.Wire(wire.wrapped.Reversed()))
+
+        for candidate in (wire, reversed_wire):
+            for position in (0.25, 0.5, 0.6):
+                point = candidate.position_at(position)
+                with self.subTest(forward=candidate.is_forward, position=position):
+                    default = candidate.param_at_point(point)
+                    normalized = candidate.param_at_point(point, normalize=True)
+                    native = candidate.param_at_point(point, normalize=False)
+                    evaluated = Vector(candidate.geom_adaptor().Value(native))
+
+                    self.assertEqual(default, normalized)
+                    self.assertLess((evaluated - point).length, 1e-6)
+
+    def test_param_at_point_normalize_preserves_errors(self):
+        """Check off-curve and empty-wire errors in both modes."""
+        wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (10, 0, 0)),
+                Edge.make_line((10, 0, 0), (10, 10, 0)),
+            ]
+        )
+        for normalize in (True, False):
+            with self.subTest(normalize=normalize):
+                with self.assertRaisesRegex(ValueError, "is .* from wire"):
+                    wire.param_at_point((20, 20, 20), normalize=normalize)
+
+        wire.wrapped = None
+        for normalize in (True, False):
+            with self.subTest(normalize=normalize):
+                with self.assertRaisesRegex(
+                    ValueError, "Can't find point on empty wire"
+                ):
+                    wire.param_at_point((0, 0, 0), normalize=normalize)
+
+    def test_location_at_reversed_wire(self):
+        """location_at agrees with position_at on a reversed wire"""
+        wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (10, 0, 0)),
+                Edge.make_circle(5, Plane((10, 5, 0)), start_angle=270, end_angle=360),
+            ],
+            sequenced=True,
+        )
+        reversed_wire = Wire(TopoDS.Wire(wire.wrapped.Reversed()))
+        self.assertFalse(reversed_wire.is_forward)
+        for position in (0.0, 0.25, 0.6, 1.0):
+            for mode in (PositionMode.PARAMETER, PositionMode.LENGTH):
+                value = (
+                    position
+                    if mode == PositionMode.PARAMETER
+                    else (position * reversed_wire.length)
+                )
+                expected = reversed_wire.position_at(value, mode)
+                with self.subTest(position=position, mode=mode):
+                    location = reversed_wire.location_at(value, mode)
+                    self.assertAlmostEqual(location.position, expected, 5)
+                    if mode == PositionMode.LENGTH:
+                        corrected = reversed_wire.location_at(
+                            value, mode, FrameMethod.CORRECTED
+                        )
+                        self.assertAlmostEqual(corrected.position, expected, 5)
 
     def test_param_at_point_reversed_edges(self):
         with BuildLine(Plane.YZ) as wing_line:

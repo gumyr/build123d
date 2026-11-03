@@ -40,6 +40,7 @@ from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Pos, Vector
 from build123d.objects_part import Box, Cylinder
 from build123d.objects_sketch import Circle, RegularPolygon
+from build123d.operations_generic import fillet
 from build123d.topology import (
     Compound,
     Edge,
@@ -153,6 +154,74 @@ class TestShapeList(unittest.TestCase):
         box2 = Box(2, 2, 2).translate((1, 1, 1))
         assert len((box1 + box2).edges().filter_by(Edge.is_interior)) == 6
         assert len((box1 - box2).edges().filter_by(Edge.is_interior)) == 3
+
+    def test_filter_by_value_exact_geometry(self):
+        box = Box(10, 20, 30)
+        edges = box.edges().filter_by_value(Edge.length, 30)
+        self.assertIsInstance(edges, ShapeList)
+        self.assertEqual(len(edges), 4)
+        self.assertTrue(all(abs(e.length - 30) < 1e-9 for e in edges))
+        self.assertEqual(len(box.faces().filter_by_value(Face.area, 600)), 2)
+        self.assertEqual(len(box.edges().filter_by_value(Edge.length, 25)), 0)
+        rest = box.edges().filter_by_value(Edge.length, 30, reverse=True)
+        self.assertEqual(sorted(round(e.length) for e in rest), [10] * 4 + [20] * 4)
+
+    def test_filter_by_value_rounding_neighbours(self):
+        # both are within 1e-6 of 30 but round to different group_by keys
+        below = Edge.make_line((0, 0), (29.9999994, 0))
+        above = Edge.make_line((0, 1), (30.0000004, 1))
+        other = Edge.make_line((0, 2), (31, 2))
+        shapes = ShapeList([below, above, other])
+        self.assertEqual(len(shapes.group_by(Edge.length)), 3)
+        self.assertEqual(shapes.filter_by_value(Edge.length, 30), [below, above])
+
+    def test_filter_by_value_tolerance(self):
+        edges = Box(10, 20, 30.001).edges()
+        self.assertEqual(len(edges.filter_by_value(Edge.length, 30)), 0)
+        self.assertEqual(len(edges.filter_by_value(Edge.length, 30, tolerance=1e-4)), 0)
+        self.assertEqual(len(edges.filter_by_value(Edge.length, 30, tolerance=1e-2)), 4)
+        edge = edges[:1]
+        # inclusive, and computed on the numbers as given rather than as floats
+        self.assertEqual(edge.filter_by_value(lambda _: 1.125, 1, 0.125), edge)
+        self.assertEqual(edge.filter_by_value(lambda _: 2**53 + 1, 2**53, 0), [])
+
+    def test_filter_by_value_callable(self):
+        top = Box(10, 20, 30).faces().filter_by_value(lambda f: f.center().Z, 15)
+        self.assertEqual(len(top), 1)
+        self.assertAlmostEqual(top[0].center().Z, 15, 5)
+        self.assertAlmostEqual(top[0].area, 200, 5)
+
+    def test_filter_by_value_non_numeric(self):
+        faces = Cylinder(1, 3).faces()
+        self.assertEqual(len(faces.filter_by_value(Face.geom_type, GeomType.PLANE)), 2)
+        self.assertEqual(
+            len(faces.filter_by_value(Face.geom_type, GeomType.CYLINDER)), 1
+        )
+        pocket = Box(20, 20, 10) - Pos(Z=5) * Box(10, 10, 10)
+        concave = pocket.edges().filter_by_value(Edge.convexity, Convexity.CONCAVE)
+        self.assertEqual(len(concave), 8)
+
+    def test_filter_by_value_radius_over_mixed_faces(self):
+        box = Box(20, 20, 10)
+        part = fillet(box.edges().filter_by(Axis.Z), 2) - Cylinder(3, 10)
+        faces = part.faces()
+        fillets = faces.filter_by_value(Face.radius, 2)
+        self.assertEqual(len(fillets), 4)
+        self.assertTrue(all(f.geom_type == GeomType.CYLINDER for f in fillets))
+        self.assertEqual(len(faces.filter_by_value(Face.radius, 3)), 1)
+        # a planar face has no radius, so it is never a match and always in the rest
+        rest = faces.filter_by_value(Face.radius, 2, reverse=True)
+        self.assertEqual(len(rest), len(faces) - 4)
+        self.assertEqual(len(rest.filter_by(GeomType.PLANE)), len(rest) - 1)
+        self.assertEqual(faces.filter_by_value(Face.radius, None), [])
+        self.assertEqual(faces.filter_by_value(Face.radius, None, reverse=True), faces)
+
+    def test_filter_by_value_empty_list(self):
+        self.assertEqual(ShapeList().filter_by_value(Edge.length, 30), [])
+
+    def test_filter_by_value_rejects_sort_by(self):
+        with self.assertRaises(ValueError):
+            Box(1, 1, 1).edges().filter_by_value(SortBy.LENGTH, 1)
 
     def test_first_last(self):
         vertices = (

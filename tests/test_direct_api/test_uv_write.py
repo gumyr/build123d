@@ -31,9 +31,10 @@ import unittest
 
 from build123d.build_enums import Align, GeomType
 from build123d.geometry import Axis, Location, Matrix, Pos, Rot, Vector
+from build123d.objects_curve import Polyline
 from build123d.objects_part import Box, Cone, Cylinder, Sphere, Torus
 from build123d.objects_sketch import Circle, Polygon, Rectangle, SlotOverall, Text
-from build123d.topology import Edge, Face, Solid, UVFrame, Wire
+from build123d.topology import Edge, Face, Shell, Solid, UVFrame, Wire
 from build123d.topology.uv_write import _affine_map, _geodesic_map, _sphere_map
 
 from OCP.BRep import BRep_Tool
@@ -259,6 +260,30 @@ class TestCylinderFrame(unittest.TestCase):
     def test_a_full_turn_is_refused(self):
         with self.assertRaisesRegex(ValueError, "whole turn"):
             self.frame.write_face(Rectangle(35, 2).face())  # circumference is 31.4
+        # exactly one turn meets itself along its own edge
+        with self.assertRaisesRegex(ValueError, "whole turn"):
+            self.frame.write_face(Rectangle(10 * math.pi, 2).face())
+        # a sheared band that is wider than a turn still overlaps itself
+        wide = Face(Polyline((0, 0), (33, 0), (43, 4), (10, 4), close=True))
+        with self.assertRaisesRegex(ValueError, "whole turn"):
+            self.frame.write_face(wide)
+
+    def test_a_sheared_band_may_span_more_than_a_turn(self):
+        """A helical band spans well over a turn in u without overlapping
+        itself, so it is cut at every seam it crosses and written whole"""
+        band = Face(Polyline((0, 0), (3, 0), (43, 4), (40, 4), close=True))
+        pieces = self.frame.write_face(band)
+        # 43 units of x is 1.37 turns: from the frame's origin half way round,
+        # that crosses the seam once
+        self.assertEqual(len(pieces), 2)
+        self.assertAlmostEqual(sum(p.area for p in pieces), band.area, 4)
+        for piece in pieces:
+            self.assertTrue(piece.is_valid)
+            u_min, u_max, _, _ = piece._uv_bounds()
+            self.assertGreaterEqual(u_min, -1e-9)
+            self.assertLessEqual(u_max, 2 * math.pi + 1e-9)
+        # the pieces sew into one open shell
+        self.assertEqual(len(Shell(pieces).faces()), 2)
 
     def test_punch_across_the_seam_is_refused(self):
         frame = self.surface.uv_frame(

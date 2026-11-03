@@ -355,12 +355,12 @@ Reference
         +++
         RegularPolygon defined by radius and number of sides
 
-    .. grid-item-card:: :class:`~objects_sketch.SlotArc`
+    .. grid-item-card:: :class:`~objects_sketch.SlotCurve`
 
-        .. image:: assets/slot_arc_example.svg
+        .. image:: assets/slot_curve_example.svg
 
         +++
-        SlotArc defined by arc and height
+        SlotCurve defined by a center line and height
 
     .. grid-item-card:: :class:`~objects_sketch.SlotCenterPoint`
 
@@ -438,6 +438,7 @@ Reference
 .. autoclass:: SlotArc
 .. autoclass:: SlotCenterPoint
 .. autoclass:: SlotCenterToCenter
+.. autoclass:: SlotCurve
 .. autoclass:: SlotOverall
 .. autoclass:: Superellipse
 .. autoclass:: drafting.TechnicalDrawing

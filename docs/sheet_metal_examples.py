@@ -79,6 +79,11 @@ def vertical(x: float, y_min: float, y_max: float) -> list[Edge]:
     return [Edge.make_line((x, y_min), (x, y_max))]
 
 
+def horizontal(y: float, x_min: float, x_max: float) -> list[Edge]:
+    """A reference line across the page, for a marker."""
+    return [Edge.make_line((x_min, y), (x_max, y))]
+
+
 def projected(
     shape: Shape,
     view: VectorLike,
@@ -90,7 +95,7 @@ def projected(
     """Shape seen from far away along view, hidden lines dotted."""
     view = Vector(view).normalized()
     up = (0, 1, 0) if abs(view.Z) > 0.99 else (0, 0, 1)
-    visible, concealed = shape.project_to_viewport(view * 1000, up, look_at=(0, 0, 0))
+    visible, concealed = shape.drawing_view(view * 1000, up, look_at=(0, 0, 0))
     return (
         clip(list(visible), window),
         clip(list(concealed), window) if hidden else [],
@@ -249,7 +254,7 @@ write_layout(
 
 
 # [flange_length]
-def wall_measured(length_mode: FlangeLength) -> Shell:
+def wall_measured(length_from: LengthFrom) -> Shell:
     """A 20 long wall, measured the way a drawing gives it."""
     with BuildSheet(thickness=1, bend_radius=2) as bracket:
         with BuildSketch():
@@ -258,7 +263,7 @@ def wall_measured(length_mode: FlangeLength) -> Shell:
             bracket.rims().sort_by(Axis.X)[-1],
             length=20,
             position=BendPosition.MATERIAL_OUTSIDE,
-            length_mode=length_mode,
+            length_from=length_from,
         )
     return bracket.sheet
 
@@ -266,10 +271,43 @@ def wall_measured(length_mode: FlangeLength) -> Shell:
 # [flange_length]
 write_layout(
     [
-        profile(wall_measured(mode), mode.name, marker=vertical(30, -3, 22))
-        for mode in FlangeLength
+        profile(wall_measured(origin), origin.name, marker=vertical(30, -3, 22))
+        for origin in LengthFrom
     ],
     "flange_length",
+)
+
+
+# [flange_length_mode]
+def wall_sized(length_mode: LengthMode) -> Shell:
+    """A 60 degree wall whose 20 is the side of its triangle the mode names."""
+    with BuildSheet(thickness=1, bend_radius=2) as bracket:
+        with BuildSketch():
+            Rectangle(60, 40)
+        flange(
+            bracket.rims().sort_by(Axis.X)[-1],
+            length=20,
+            angle=60,
+            position=BendPosition.MATERIAL_OUTSIDE,
+            length_mode=length_mode,
+            length_from=LengthFrom.OUTER_SHARP,
+        )
+    return bracket.sheet
+
+
+# [flange_length_mode]
+# the plate's outside face is at z = -1 and its corner on the edge at x = 30,
+# so the wall's height is marked 20 above the face and its run 20 past the edge
+write_layout(
+    [
+        profile(wall_sized(mode), mode.name, marker=marker)
+        for mode, marker in (
+            (LengthMode.DIAGONAL, None),
+            (LengthMode.VERTICAL, horizontal(19, 30, 48)),
+            (LengthMode.HORIZONTAL, vertical(50, -3, 22)),
+        )
+    ],
+    "flange_length_mode",
 )
 
 # ---------------------------------------------------------------------------
@@ -452,7 +490,7 @@ def relieved_blank(relief_type: ReliefType, **sizes) -> Shell:
         flange(tray.rims(), length=15, gaps=3.1)
         base = tray.flats().sort_by(Axis.Z)[0]
         corner_relief(base.vertices().filter_by(Convexity.CONVEX), relief_type, **sizes)
-        return unfold(align=Align.MIN)
+        return unfold(align=Align.MIN).flat
 
 
 round_blank = relieved_blank(ReliefType.ROUND, radius=4)
@@ -508,7 +546,7 @@ def relieved_bend(relief_type: ReliefType) -> Shell:
             Rectangle(60, 40)
         flange(bracket.rims().sort_by(Axis.X)[-1], length=15, gaps=8)
         bend_relief(bracket.bends(), relief_type)  # default shop-rule sizes
-        return unfold(align=Align.MIN)
+        return unfold(align=Align.MIN).flat
 
 
 round_blank = relieved_bend(ReliefType.ROUND)
@@ -543,7 +581,7 @@ with BuildSheet(thickness=1, bend_radius=2) as tray:
         base.vertices().filter_by(Convexity.CONVEX), ReliefType.ROUND, radius=3
     )
     # the blank the tray is cut from, cornered on the origin
-    flat_pattern = unfold(align=Align.MIN)
+    flat_pattern = unfold(align=Align.MIN).flat
 # [unfold_basic]
 write_layout([drawn(flat_pattern)], "unfold_basic")
 
@@ -660,7 +698,9 @@ with tempfile.TemporaryDirectory() as scratch:
     docs_directory = os.getcwd()
     os.chdir(scratch)
     # [tutorial_7]
-    flat_pattern = unfold(enclosure.sheet, enclosure.sheet_parameters, align=Align.MIN)
+    flat_pattern = unfold(
+        enclosure.sheet, enclosure.sheet_parameters, align=Align.MIN
+    ).flat
     exporter = ExportDXF()
     exporter.add_shape(flat_pattern)
     exporter.write("enclosure_flat_pattern.dxf")

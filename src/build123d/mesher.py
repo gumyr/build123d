@@ -112,7 +112,7 @@ from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Shell
 
 from build123d.build_enums import MeshType, Unit
-from build123d.geometry import TOLERANCE, Color
+from build123d.geometry import TOLERANCE, Color, Location
 from build123d.topology.composite import Compound
 from build123d.topology.shape_core import Shape, downcast
 from build123d.topology.three_d import Solid
@@ -286,9 +286,13 @@ class Mesher:
         ocp_mesh_vertices = []
         triangles = []
         offset = 0
+        skipped = 0  # faces the mesher produced no triangulation for
         for facet in ocp_mesh.faces():
             # Triangulate the face
             poly_triangulation = BRep_Tool.Triangulation_s(facet.wrapped, loc)
+            if poly_triangulation is None:
+                skipped += 1
+                continue
             trsf = loc.Transformation()
             # Store the vertices in the triangulated face
             node_count = poly_triangulation.NbNodes()
@@ -305,7 +309,7 @@ class Mesher:
             for tri in poly_triangulation.Triangles():
                 triangles.append([tri.Value(i) + offset - 1 for i in order])
             offset += node_count
-        return ocp_mesh_vertices, triangles
+        return ocp_mesh_vertices, triangles, skipped
 
     @staticmethod
     def _create_3mf_mesh(
@@ -391,9 +395,13 @@ class Mesher:
         Raises:
             RuntimeError: 3mf mesh is invalid
             Warning: Degenerate shape skipped
+            Warning: face(s) produced no triangulation at this deflection
             Warning: 3mf mesh is not manifold
         """
-        shapes: list[Shape] = []
+        # Each shape is meshed where its input places it. The children of an
+        # assembly are stored relative to it, so they are moved by its own
+        # location; a child that is itself an assembly is meshed whole.
+        shapes: list[tuple[Shape, Location]] = []
         input_shapes = [shape] if isinstance(shape, Shape) else list(shape)
         for input_shape in input_shapes:
             if input_shape.is_empty:
@@ -403,24 +411,36 @@ class Mesher:
                 )
             if isinstance(input_shape, Compound):
                 if input_shape.children:
-                    shapes.extend(input_shape.children)
+                    shapes.extend(
+                        (child, input_shape.location) for child in input_shape.children
+                    )
                 elif input_shape.label or input_shape.color is not None:
-                    shapes.append(input_shape)
+                    shapes.append((input_shape, Location()))
                 else:
-                    shapes.extend(list(input_shape))
+                    shapes.extend((s, Location()) for s in input_shape)
             else:
-                shapes.append(input_shape)
+                shapes.append((input_shape, Location()))
 
-        for b3d_shape in shapes:
+        for b3d_shape, placement in shapes:
             # Create a 3MF mesh object
             mesh_3mf: Lib3MF.MeshObject = self.model.AddMeshObject()
 
-            # Mesh the shape
-            ocp_mesh_vertices, triangles = Mesher._mesh_shape(
-                Shape.cast(BRepBuilderAPI_Copy(b3d_shape.wrapped).Shape()),
+            # Mesh a placed copy of the shape
+            copied = BRepBuilderAPI_Copy(b3d_shape.wrapped).Shape()
+            ocp_mesh_vertices, triangles, skipped = Mesher._mesh_shape(
+                Shape.cast(copied.Moved(placement.wrapped)),
                 linear_deflection,
                 angular_deflection,
             )
+            if skipped:
+                # A face too fine for the deflection is left out, which opens
+                # the mesh; say so before the validity check rejects it
+                warnings.warn(
+                    f"{skipped} face(s) of {b3d_shape} produced no triangulation "
+                    f"at linear_deflection={linear_deflection}; the mesh may be "
+                    "open - try a smaller linear_deflection",
+                    stacklevel=2,
+                )
 
             # Skip invalid meshes
             if len(ocp_mesh_vertices) < 3 or not triangles:

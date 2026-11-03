@@ -52,9 +52,9 @@ Cheat Sheet
             | :class:`~objects_sketch.Rectangle`
             | :class:`~objects_sketch.RectangleRounded`
             | :class:`~objects_sketch.RegularPolygon`
-            | :class:`~objects_sketch.SlotArc`
             | :class:`~objects_sketch.SlotCenterPoint`
             | :class:`~objects_sketch.SlotCenterToCenter`
+            | :class:`~objects_sketch.SlotCurve`
             | :class:`~objects_sketch.SlotOverall`
             | :class:`~objects_sketch.Superellipse`
             | :class:`~objects_sketch.Text`
@@ -87,7 +87,7 @@ Cheat Sheet
             | :func:`~operations_generic.fillet`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
-            | :func:`~operations_generic.project`
+            | :func:`~operations_generic.project_to_plane`
             | :func:`~operations_generic.scale`
             | :func:`~operations_generic.split`
 
@@ -102,7 +102,7 @@ Cheat Sheet
             | :func:`~operations_sketch.make_hull`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
-            | :func:`~operations_generic.project`
+            | :func:`~operations_generic.project_to_plane`
             | :func:`~operations_generic.scale`
             | :func:`~operations_generic.split`
             | :func:`~operations_generic.sweep`
@@ -117,11 +117,9 @@ Cheat Sheet
             | :func:`~operations_part.extrude`
             | :func:`~operations_generic.fillet`
             | :func:`~operations_part.loft`
-            | :func:`~operations_part.make_brake_formed`
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
-            | :func:`~operations_generic.project`
-            | :func:`~operations_part.project_workplane`
+            | :func:`~operations_part.project_to_shape`
             | :func:`~operations_part.revolve`
             | :func:`~operations_generic.scale`
             | :func:`~operations_part.section`
@@ -283,6 +281,8 @@ Cheat Sheet
     | :class:`~build_enums.Intrinsic`        | XYZ, XZY, YZX, YXZ, ZXY, ZYX, XYX, XZX, YZY, YXY, ZXZ, ZYZ                                                                              |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.HeadType`         | CURVED, FILLETED, STRAIGHT                                                                                                              |
+    +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
+    | :class:`~build_enums.Hit`              | ALL, NEAREST, FARTHEST, VISIBLE                                                                                                         |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.Keep`             | ALL, TOP, BOTTOM, BOTH, INSIDE, OUTSIDE                                                                                                 |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+

@@ -238,6 +238,28 @@ class HeadType(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class Hit(Enum):
+    """Which of the surfaces a projection passes through to keep
+
+    A projection onto a shape meets every surface in its path: a face cast
+    onto a plate lands on the near face and on the far face. ``ALL`` keeps
+    them all, nearest first; ``NEAREST`` and ``FARTHEST`` one end of that
+    list; ``VISIBLE`` what a viewer on the source's side sees, the surfaces
+    facing the viewer with the parts hidden behind nearer surfaces removed.
+    Where none of these fits, the projection operations also accept a
+    callable in place of a ``Hit``, given the surfaces met nearest first and
+    returning those to keep.
+    """
+
+    ALL = auto()
+    NEAREST = auto()
+    FARTHEST = auto()
+    VISIBLE = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class HemType(Enum):
     """Sheet metal hem styles"""
 
@@ -321,28 +343,6 @@ class Mode(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-class FlangeLength(Enum):
-    """Where a flange's length is measured from
-
-    A drawing gives a flange's length one of three ways, and this names which.
-    TANGENT measures from the bend's tangent line, so the length is the flat
-    wall alone. The two virtual sharps are the corners the formed part would
-    have if it were folded sharp - where the extended inner faces meet for
-    INNER_SHARP and the extended outer faces for OUTER_SHARP - so a length
-    measured from one is the overall size the drawing dimensions. The sharps
-    sit ``radius * tan(angle / 2)`` and ``(radius + thickness) * tan(angle / 2)``
-    past the tangent line, and are undefined at 180 degrees, where the faces
-    never meet.
-    """
-
-    TANGENT = auto()  # from the bend tangent line: the flat wall
-    INNER_SHARP = auto()  # from the inner virtual sharp
-    OUTER_SHARP = auto()  # from the outer virtual sharp
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}.{self.name}>"
-
-
 class FontStyle(Enum):
     """Text Font Styles"""
 
@@ -366,8 +366,38 @@ class Sagitta(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+class LengthFrom(Enum):
+    """Where a length is measured from
+
+    A drawing gives a flange's length one of three ways, and this names which.
+    TANGENT measures from the bend's tangent line, so the length is the flat
+    wall alone. The two virtual sharps are the corners the formed part would
+    have if it were folded sharp - where the extended inner faces meet for
+    INNER_SHARP and the extended outer faces for OUTER_SHARP - so a length
+    measured from one is the overall size the drawing dimensions. The sharps
+    sit ``radius * tan(angle / 2)`` and ``(radius + thickness) * tan(angle / 2)``
+    past the tangent line, and are undefined at 180 degrees, where the faces
+    never meet.
+    """
+
+    TANGENT = auto()  # from the bend tangent line: the flat wall
+    INNER_SHARP = auto()  # from the inner virtual sharp
+    OUTER_SHARP = auto()  # from the outer virtual sharp
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
 class LengthMode(Enum):
-    """Method of specifying length along PolarLine"""
+    """Which side of a right triangle a length is
+
+    A line at an angle makes a right triangle with the axis it is measured
+    against: the line is the DIAGONAL, its height the VERTICAL side and its
+    run the HORIZONTAL. A drawing dimensions whichever it likes, and this
+    names which the length is; the trigonometry is left to the operation.
+    ``PolarLine`` measures against the sketch's x axis and ``flange`` against
+    the face the wall comes from.
+    """
 
     DIAGONAL = auto()
     HORIZONTAL = auto()

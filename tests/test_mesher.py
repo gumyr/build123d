@@ -1,5 +1,5 @@
 import unittest, uuid
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from io import BytesIO
 from packaging.specifiers import SpecifierSet
 from pathlib import Path
@@ -203,8 +203,52 @@ class TestAddShape(DirectApiTestCase):
         shapes = importer.read(filename)
         self.assertEqual(importer.mesh_count, 2)
 
-    def test_add_assembly_with_joint_chain(self):
-        """An assembly of chained parts meshes, and the parts stay unmeshed."""
+    def test_add_moved_assembly(self):
+        """An assembly's children are meshed where the assembly places them."""
+        sub_assembly = Compound(children=[Solid.make_box(1, 1, 1)])
+        sub_assembly.location = Location((5, 0, 0), (0, 0, 30))
+        assembly = Compound(children=[sub_assembly, Solid.make_box(1, 1, 1)])
+        assembly.location = Location((10, 0, 0), (0, 0, 90))
+        # Like any other shape, the assembly is meshed at its own location,
+        # without that of an assembly it sits in
+        holder = Compound(children=[assembly])
+        holder.location = Location((0, 100, 0))
+        exporter = Mesher()
+        exporter.add_shape(assembly)
+        points = [v.Coordinates for mesh in exporter.meshes for v in mesh.GetVertices()]
+        # boxes mesh exactly; a curved face would make these bounds inexact
+        bbox = assembly.bounding_box()
+        for axis, (low, high) in enumerate(zip(bbox.min, bbox.max)):
+            self.assertAlmostEqual(min(p[axis] for p in points), low, 5)
+            self.assertAlmostEqual(max(p[axis] for p in points), high, 5)
+
+    def missing_first_triangulation(self):
+        """A Triangulation_s that produces nothing for the first face asked"""
+        original = BRep_Tool.Triangulation_s
+        seen = []
+
+        def missing_first(face, location):
+            seen.append(face)
+            return None if len(seen) == 1 else original(face, location)
+
+        return patch("build123d.mesher.BRep_Tool.Triangulation_s", missing_first)
+
+    def test_faces_without_triangulation_are_skipped_with_a_warning(self):
+        """A face the mesher produced nothing for is left out and reported; a
+        support mesh may be open, so the rest is exported."""
+        with self.missing_first_triangulation():
+            exporter = Mesher()
+            with self.assertWarnsRegex(UserWarning, "1 face.* no triangulation"):
+                exporter.add_shape(Solid.make_box(1, 1, 1), mesh_type=MeshType.SUPPORT)
+        self.assertEqual(exporter.meshes[0].GetTriangleCount(), 10)
+        self.assertEqual(exporter.meshes[0].GetVertexCount(), 8)  # corners merged
+
+    def test_model_mesh_with_a_skipped_face_is_invalid(self):
+        """A model mesh must be closed: the warning says why it is then rejected."""
+        with self.missing_first_triangulation():
+            with self.assertWarnsRegex(UserWarning, "smaller linear_deflection"):
+                with self.assertRaisesRegex(RuntimeError, "3mf mesh is invalid"):
+                    Mesher().add_shape(Solid.make_box(1, 1, 1))
         boxes = [Solid.make_box(1, 1, 1, Plane((2 * i, 0, 0))) for i in range(200)]
         for box in boxes:
             RigidJoint("out", box, Location((2, 0, 0)))
@@ -296,9 +340,9 @@ class TestDuplicateVertices(unittest.TestCase):
 class TestHollowImport(unittest.TestCase):
     def test_hollow_import(self):
         test_shape = Cylinder(5, 10) - Box(5, 5, 5)
-        export_stl(test_shape, "test.stl")
+        export_stl(test_shape, self.tmp_path / "test.stl")
         importer = Mesher()
-        stl = importer.read("test.stl")
+        stl = importer.read(self.tmp_path / "test.stl")
         self.assertTrue(stl[0].is_valid)
         self.assertAlmostEqual(test_shape.volume, stl[0].volume, 0)
 

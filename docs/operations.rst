@@ -54,8 +54,6 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_part.loft`                | Create 3D Shape from sections      |    |    |    | ✓  | :ref:`24 <ex 24>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
-| :func:`~operations_part.make_brake_formed`   | Create sheet metal parts           |    |    |    | ✓  |                                   |
-+----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_sketch.make_face`         | Create a Face from Edges           |    |    | ✓  |    | :ref:`4 <ex 4>`                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_sketch.make_hull`         | Create Convex Hull from Edges      |    |    | ✓  |    |                                   |
@@ -64,9 +62,11 @@ BuildPart and Algebra Part.
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.offset`           | Inset or outset Shape              |    | ✓  | ✓  | ✓  | :ref:`25 <ex 25>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
-| :func:`~operations_generic.project`          | Project points, lines or Faces     | ✓  | ✓  | ✓  |    |                                   |
+| :func:`~operations_generic.project_to_plane` | Project points, lines, Faces or a  | ✓  | ✓  | ✓  |    |                                   |
+|                                              | solid's silhouette onto a plane    |    |    |    |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
-| :func:`~operations_part.project_workplane`   | Create workplane for projection    |    |    |    |    |                                   |
+| :func:`~operations_part.project_to_shape`    | Project lines or Faces onto a      |    |    |    | ✓  |                                   |
+|                                              | Shape's surface                    |    |    |    |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_part.revolve`             | Swing 2D Shape about Axis          |    |    |    | ✓  | :ref:`23 <ex 23>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
@@ -135,6 +135,8 @@ Reference
 .. autofunction:: operations_generic.mirror
 .. autofunction:: operations_generic.offset
 .. autofunction:: operations_generic.project
+.. autofunction:: operations_generic.project_to_plane
+.. autofunction:: operations_part.project_to_shape
 .. autofunction:: operations_part.project_workplane
 .. autofunction:: operations_part.revolve
 .. autofunction:: operations_generic.scale

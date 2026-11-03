@@ -26,6 +26,8 @@ license:
 
 """
 
+import os
+import tempfile
 import unittest
 from math import atan2, degrees, gamma, pi, sqrt
 
@@ -180,19 +182,34 @@ class TestBuildOnPlanes(unittest.TestCase):
             insert([Face.make_rect(1, 1, Plane.XZ)])
         self.assertTrue(coplanar.sketch.faces()[0].is_coplanar(Plane.XY))
 
-    def test_axis_location_preserves_cutout_position(self):
-        """Realigning an Axis-located sketch must preserve its XY position."""
-        with BuildSketch() as sketch_builder:
-            Rectangle(20, 20)
-            with Locations(Axis((5, 5), (1, 1))):
-                Rectangle(1, 1, mode=Mode.SUBTRACT)
+    def test_step_profiles_keep_placement(self):
+        """Issue #1543: profiles drawn on Plane.XZ, saved to STEP and read back
+        keep their position and orientation when inserted into sketches: the
+        profile's X maps to sketch X and its Y (world Z) to sketch Y."""
+        # The off-center hole makes a rotation or mirror of the profile detectable
+        profile = Rectangle(4, 2) - Pos(1, 0.5) * Circle(0.3)
+        offsets = [(0, 0), (30, 10)]
+        profiles = [Plane.XZ * Pos(*offset) * profile for offset in offsets]
 
-        face = sketch_builder.face()
-        self.assertTupleAlmostEquals(
-            face.inner_wires()[0].center(CenterOf.MASS), (5, 5, 0), 5
-        )
-        self.assertAlmostEqual(face.area, 399)
-        self.assertTrue(face.is_coplanar(Plane.XY))
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            imported = []
+            for i, located_profile in enumerate(profiles):
+                step_file = os.path.join(tmp_dir, f"profile_{i}.step")
+                export_step(located_profile, step_file)
+                imported.append(import_step(step_file))
+
+        for (x, y), imported_profile in zip(offsets, imported):
+            with BuildSketch() as sketch:
+                insert(imported_profile.face())
+            face = sketch.sketch.face()
+            self.assertTrue(face.is_coplanar(Plane.XY))
+            self.assertTupleAlmostEquals(face.bounding_box().size, (4, 2, 0), 5)
+            self.assertTupleAlmostEquals(
+                face.center(CenterOf.BOUNDING_BOX), (x, y, 0), 5
+            )
+            self.assertTupleAlmostEquals(
+                face.inner_wires()[0].center(CenterOf.MASS), (x + 1, y + 0.5, 0), 5
+            )
 
     def test_changing_geometry(self):
         with BuildSketch() as s:
@@ -386,17 +403,39 @@ class TestBuildSketchObjects(unittest.TestCase):
             with BuildSketch():
                 RegularPolygon(1, 2)
 
-    def test_slot_arc(self):
+    def test_slot_curve(self):
         with BuildSketch() as test:
             with BuildLine(mode=Mode.PRIVATE) as l:
                 RadiusArc((0, 0), (5, 0), radius=4)
-            s = SlotArc(arc=l.edges()[0], height=1, rotation=45)
-        self.assertEqual(type(s.arc), Edge)
+            s = SlotCurve(curve=l.edges()[0], height=1, rotation=45)
+        self.assertEqual(type(s.curve), Edge)
         self.assertEqual(s.slot_height, 1)
         self.assertEqual(s.rotation, 45)
         self.assertEqual(s.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, 6.186450426893698, 5)
         self.assertEqual(s.faces()[0].normal_at(), Vector(0, 0, 1))
+
+    def test_slot_curve_along_a_polyline(self):
+        """The center line is any Edge or Wire, not only an arc."""
+        with BuildSketch() as test:
+            with BuildLine(mode=Mode.PRIVATE) as l:
+                Polyline((0, 0), (4, 0), (4, 3))
+            SlotCurve(l.wires()[0], height=1)
+        # two straight runs with round ends, less what rounding the outer
+        # corner takes off a square one
+        self.assertAlmostEqual(
+            test.sketch.area, 7 + pi * 0.5**2 - (0.5**2 - pi * 0.5**2 / 4), 5
+        )
+
+    def test_slot_arc_is_deprecated(self):
+        """SlotArc still works, as SlotCurve with the old keyword, but warns."""
+        arc = RadiusArc((0, 0), (5, 0), radius=4)
+        with self.assertWarnsRegex(DeprecationWarning, "use SlotCurve"):
+            s = SlotArc(arc=arc, height=1, rotation=45)
+        self.assertIsInstance(s, SlotCurve)
+        self.assertIs(s.arc, arc)
+        self.assertEqual(s.slot_height, 1)
+        self.assertAlmostEqual(s.area, 6.186450426893698, 5)
 
     def test_slot_center_point(self):
         with BuildSketch() as test:

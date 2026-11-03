@@ -1077,7 +1077,7 @@ progressively modify the size of each square.
 
     Here we create a :class:`~objects_sketch.SlotCenterToCenter` and then use a
     :class:`~build_line.BuildLine` and :class:`~objects_curve.RadiusArc` to create an
-    arc for two instances of :class:`~objects_sketch.SlotArc`.
+    arc for two instances of :class:`~objects_sketch.SlotCurve`.
 
     .. literalinclude:: general_examples.py
         :language: build123d
@@ -1087,7 +1087,7 @@ progressively modify the size of each square.
 * **Algebra mode**
 
     Here we create a :class:`~objects_sketch.SlotCenterToCenter` and then use
-    a :class:`~objects_curve.RadiusArc` to create an arc for two instances of :class:`~operations_sketch.SlotArc`.
+    a :class:`~objects_curve.RadiusArc` to create an arc for two instances of :class:`~objects_sketch.SlotCurve`.
 
     .. literalinclude:: general_examples_algebra.py
         :language: build123d

@@ -33,7 +33,7 @@ from pathlib import Path
 from build123d.build_common import GridLocations, PolarLocations
 from build123d.build_enums import Align, CenterOf, Mode
 from build123d.build_part import BuildPart
-from build123d.geometry import Location, Plane
+from build123d.geometry import Location, Plane, Pos
 from build123d.objects_part import BasePartObject, Box
 from build123d.operations_generic import insert
 from build123d.objects_sketch import Circle
@@ -394,6 +394,45 @@ class TestCompoundTreeValidation(unittest.TestCase):
     def test_children_must_be_shapes(self):
         with self.assertRaisesRegex(ValueError, "must be of type Shape"):
             Compound()._pre_attach_children([1, 2])
+
+
+class TestCompoundTreeLocation(unittest.TestCase):
+    """Changing the children of an assembly leaves the assembly where it is."""
+
+    def moved_assembly(self):
+        """An assembly at x=10 turned by 90°, with a marker child at x=4 in it"""
+        marker = Pos(4, 0, 0) * Box(1, 1, 1)
+        assembly = Compound(children=[Box(1, 1, 1), marker])
+        assembly.location = Location((10, 0, 0), (0, 0, 90))
+        return assembly, marker
+
+    def assert_in_place(self, assembly, marker):
+        self.assertEqual(assembly.location, Location((10, 0, 0), (0, 0, 90)))
+        self.assertAlmostEqual(marker.global_location.position, (10, 4, 0), 5)
+        self.assertAlmostEqual(assembly.bounding_box().max.Y, 4.5, 5)
+
+    def test_attaching_a_child(self):
+        assembly, marker = self.moved_assembly()
+        Box(1, 1, 1).parent = assembly
+        self.assert_in_place(assembly, marker)
+        self.assertEqual(len(assembly.children), 3)
+
+    def test_detaching_a_child(self):
+        assembly, marker = self.moved_assembly()
+        assembly.children[0].parent = None
+        self.assert_in_place(assembly, marker)
+
+    def test_replacing_the_children(self):
+        assembly, marker = self.moved_assembly()
+        assembly.children = [marker]
+        self.assert_in_place(assembly, marker)
+
+    def test_moving_a_child_to_another_assembly(self):
+        source, source_marker = self.moved_assembly()
+        target, target_marker = self.moved_assembly()
+        source.children[0].parent = target
+        self.assert_in_place(source, source_marker)
+        self.assert_in_place(target, target_marker)
 
 
 if __name__ == "__main__":

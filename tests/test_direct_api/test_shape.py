@@ -29,6 +29,7 @@ license:
 # Always equal to any other object, to test that __eq__ cooperation is working
 import unittest
 import math
+import copy
 from random import uniform
 from unittest.mock import PropertyMock, patch
 
@@ -59,6 +60,7 @@ from build123d.topology import (
     Solid,
     Vertex,
     Wire,
+    DrawingViewOutput,
 )
 from build123d.topology.composite import Part
 from build123d.joints import RigidJoint
@@ -330,6 +332,21 @@ class TestShape(unittest.TestCase):
         box = Solid.make_box(1, 1, 1).moved(Pos(-2.5, 0, 0))
         self.assertAlmostEqual(box.located(Pos(1, 0, 0)).bounding_box().min.X, 1, 5)
 
+    def test_copy_vertex(self):
+        """A copy of a vertex keeps its location as well as its position."""
+        moved = Vertex(1, 0, 0).moved(Pos(10, 0, 0))
+
+        reference = copy.copy(moved)
+        self.assertAlmostEqual(reference.X, 11, 5)
+        self.assertEqual(reference, moved)
+        self.assertTrue(reference.wrapped.IsPartner(moved.wrapped))
+
+        duplicate = copy.deepcopy(moved)
+        self.assertAlmostEqual(duplicate.X, 11, 5)
+        self.assertAlmostEqual(duplicate.location.position.X, 10, 5)
+        self.assertFalse(duplicate.wrapped.IsPartner(moved.wrapped))
+        self.assertAlmostEqual(duplicate.scale(2).X, moved.scale(2).X, 5)
+
     def test_is_equal(self):
         box = Solid.make_box(1, 1, 1)
         self.assertTrue(box.is_equal(box))
@@ -350,6 +367,14 @@ class TestShape(unittest.TestCase):
         verts, triangles = box123.tessellate(1e-6)
         self.assertEqual(len(verts), 24)
         self.assertEqual(len(triangles), 12)
+
+    def test_tessellate_missing_triangulation(self):
+        """Faces without a triangulation are skipped."""
+        with patch(
+            "build123d.topology.shape_core.BRep_Tool.Triangulation_s",
+            return_value=None,
+        ):
+            self.assertEqual(Solid.make_box(1, 1, 1).tessellate(0.1), ([], []))
 
     def test_transformed(self):
         """Validate that transformed works the same as changing location"""
@@ -463,31 +488,53 @@ class TestShape(unittest.TestCase):
     #     self.assertAlmostEqual(bbox1.min, bbox2.min, 5)
     #     self.assertAlmostEqual(bbox1.max, bbox2.max, 5)
 
-    def test_project_to_viewport(self):
+    def test_view(self):
         # Basic test
         box = Solid.make_box(10, 10, 10)
-        visible, hidden = box.project_to_viewport((-20, 20, 20))
+        visible, hidden = box.drawing_view((-20, 20, 20))
         self.assertEqual(len(visible), 9)
         self.assertEqual(len(hidden), 3)
 
         # Contour edges
         cyl = Solid.make_cylinder(2, 10)
-        visible, hidden = cyl.project_to_viewport((-20, 20, 20))
+        visible, hidden = cyl.drawing_view((-20, 20, 20))
         # Note that some edges are broken into two
         self.assertEqual(len(visible), 6)
         self.assertEqual(len(hidden), 2)
 
         # Hidden contour edges
         hole = box - cyl
-        visible, hidden = hole.project_to_viewport((-20, 20, 20))
+        visible, hidden = hole.drawing_view((-20, 20, 20))
         self.assertEqual(len(visible), 13)
         self.assertEqual(len(hidden), 6)
 
         # Outline edges
         sphere = Solid.make_sphere(5)
-        visible, hidden = sphere.project_to_viewport((-20, 20, 20))
+        visible, hidden = sphere.drawing_view((-20, 20, 20))
         self.assertEqual(len(visible), 1)
         self.assertEqual(len(hidden), 0)
+
+    def test_view_output_by_name_and_by_position(self):
+        box = Solid.make_box(10, 10, 10)
+        output = box.drawing_view((-20, 20, 20))
+        self.assertIsInstance(output, DrawingViewOutput)
+        visible, hidden = output
+        self.assertEqual(len(output.visible), 9)
+        self.assertEqual(len(output.hidden), 3)
+        self.assertEqual(output.visible, visible)
+        self.assertEqual(output.hidden, hidden)
+
+    def test_project_to_viewport_is_deprecated(self):
+        box = Solid.make_box(10, 10, 10)
+        for shape in (box, box.shell(), box.edges()[0], Compound([box])):
+            with self.subTest(shape=type(shape).__name__):
+                with self.assertWarns(DeprecationWarning):
+                    old = shape.project_to_viewport(
+                        viewport_origin=(-20, 20, 20), viewport_up=(0, 0, 1)
+                    )
+                new = shape.drawing_view((-20, 20, 20))
+                self.assertEqual(len(old.visible), len(new.visible))
+                self.assertEqual(len(old.hidden), len(new.hidden))
 
     def test_vertex(self):
         v = Edge.make_circle(1).vertex()

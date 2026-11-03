@@ -30,26 +30,29 @@ license:
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
-from math import radians
+from dataclasses import dataclass, field
+from math import acos, degrees, radians
+from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 import OCP.GeomAbs as ga
 import OCP.TopAbs as ta
 from OCP.collections import (
     IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
 )
-from OCP.BRep import BRep_Tool
+from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_GTransform,
     BRepBuilderAPI_MakeEdge,
     BRepBuilderAPI_MakeFace,
+    BRepBuilderAPI_Sewing,
 )
 from OCP.BRepCheck import BRepCheck_Analyzer
 from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
 from OCP.ShapeExtend import ShapeExtend_WireData
 from OCP.ShapeFix import ShapeFix_Face, ShapeFix_Shape, ShapeFix_Wire
 from OCP.TopExp import TopExp
+from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Edge,
@@ -58,24 +61,127 @@ from OCP.TopoDS import (
     TopoDS_Wire,
 )
 
-from build123d.build_enums import SheetSurface
+from build123d.build_enums import GeomType, SheetSurface
 from build123d.geometry import TOLERANCE, Location, Matrix, Plane, Vector
 from build123d.topology.one_d import Edge
-from build123d.topology.shape_core import _topods_area, _topods_entities
+from build123d.topology.shape_core import _topods_area, _topods_entities, downcast
 from build123d.topology.utils import (
-    _make_topods_shell,
     _topods_face_normal,
     _topods_face_position,
     _topods_material_side,
 )
 
-__all__ = ["SheetMetalParameters"]
+if TYPE_CHECKING:
+    from build123d.topology.two_d import Face, Shell
+
+__all__ = ["FaceMap", "SheetMetalParameters", "UnfoldOutput", "UnfoldedFace"]
+
+T = TypeVar("T")
+
+
+class FaceMap(dict[int, T], Generic[T]):
+    """A dict looked up by Face.
+
+    The key is the face's underlying kernel shape, so a face found again with
+    ``faces()`` matches the entry made for it, wherever the shell has been
+    moved to and whichever way the face is oriented. An operation that
+    rebuilds faces - a boolean, ``clean``, ``mirror``, ``scale`` - gives them
+    new kernel shapes, so look faces up before doing any of that. A deep copy
+    of the map keeps the keys, so it matches the shell it was made for or a
+    shallow copy of it, not a deep copy of the shell. Iterating the map gives
+    the keys; iterate ``values()`` for the entries.
+    """
+
+    @staticmethod
+    def key(face: Face) -> int:
+        """The key a face is stored under"""
+        return hash(face.wrapped.Located(TopLoc_Location()))
+
+    def __getitem__(self, face: Face) -> T:  # type: ignore[override]
+        return super().__getitem__(self.key(face))
+
+    def __setitem__(self, face: Face, value: T) -> None:  # type: ignore[override]
+        super().__setitem__(self.key(face), value)
+
+    def __contains__(self, face: object) -> bool:
+        try:
+            return super().__contains__(self.key(face))  # type: ignore[arg-type]
+        except AttributeError:
+            return False
+
+    def get(self, face: Face, default=None):  # type: ignore[override]
+        """The entry for a face, or ``default`` when it has none"""
+        return super().get(self.key(face), default)
+
+    def __reduce__(self):
+        # copy, deepcopy and pickle rebuild a dict subclass by assigning each
+        # item through __setitem__, which expects a Face, not a stored key.
+        # Rebuilding from a plain dict fills the map without going through it.
+        return (self.__class__, (dict(dict.items(self)),))
+
+
+@dataclass(frozen=True)
+class UnfoldedFace:
+    """What a face of a flat pattern developed from.
+
+    A flat is developed as it is, and only ``sheet_face`` says anything. A
+    bend is a cylinder developed into a strip, and the rest describes the
+    bend the press brake has to put back: the angle, the inside radius, the
+    neutral radius the strip's width was taken at, the bend line through the
+    middle of the strip, and which way the sheet folds as the blank lies on
+    ``Plane.XY``.
+
+    Args:
+        sheet_face (Face): the face of the folded sheet, in 3D, that this face
+            of the pattern is the development of
+        is_bend (bool): the sheet face is a cylinder
+        angle (float): bend angle in degrees. 0 for a flat.
+        inside_radius (float): physical inside radius of the bend. 0 for a flat.
+        neutral_radius (float): the radius the bend was developed at. 0 for
+            a flat.
+        bend_line (Edge | None): the centre line of the strip, on the flat
+            pattern, spanning the material from end to end; a hole across the
+            bend does not interrupt it. None for a flat.
+        up (bool): the bend folds toward +Z of the flat pattern. False for a
+            flat.
+    """
+
+    sheet_face: Face
+    is_bend: bool
+    angle: float = 0.0
+    inside_radius: float = 0.0
+    neutral_radius: float = 0.0
+    bend_line: Edge | None = None
+    up: bool = False
+
+
+class UnfoldOutput(NamedTuple):
+    """What unfolding a sheet gives back: the flat pattern and, for each of
+    its faces, what it developed from.
+
+    ``flat, face_map = sheet.unfold(parameters)`` unpacks it, and the fields
+    are there by name too.
+
+    Args:
+        flat (Shell): the flat pattern on ``Plane.XY``
+        face_map (FaceMap[UnfoldedFace]): looked up by a face of ``flat``
+    """
+
+    flat: Shell
+    face_map: FaceMap[UnfoldedFace]
+
 
 # The smallest inside radius a bend is modelled with. A fold with no gap, such
 # as a flat hem, would otherwise have an inside radius of zero and legs lying
 # on one another, which neither a surface nor a solid can represent. See the
 # hem documentation for what this looks like on the finished part.
 MIN_BEND_RADIUS = 1e-3
+
+# How far from parallel the normals of two faces may be at their shared edge
+# before the fold between them counts as a kink rather than a tangent join:
+# the length of the normals' cross product, the sine of the angle between
+# them, so about 0.006 degrees.
+TANGENT_TOLERANCE = 1e-4
 
 
 @dataclass(frozen=True)
@@ -194,10 +300,16 @@ def bend_allowance(
 
 @dataclass
 class _DevelopedFace:
-    """A developed face and its source-edge provenance."""
+    """A developed face, its source-edge provenance and where it was placed.
+
+    ``placement`` takes the face from the frame it was developed in, where a
+    cylinder's x is the arc length around it and y the distance along it, to
+    where it lies in the flat pattern.
+    """
 
     face: TopoDS_Face
     edges: dict[int, tuple[TopoDS_Edge, TopoDS_Edge]]
+    placement: Location = field(default_factory=Location)
 
 
 def _uv_topods_edge(
@@ -355,7 +467,7 @@ def _scale_developed_face(developed: _DevelopedFace, radius: float) -> _Develope
         if (Edge(scaled_edge).position_at(0) - expected_start).length > TOLERANCE:
             scaled_edge = TopoDS.Edge(scaled_edge.Reversed())
         scaled_edges[source_key] = (source_edge, scaled_edge)
-    return _DevelopedFace(scaled_face, scaled_edges)
+    return _DevelopedFace(scaled_face, scaled_edges, developed.placement)
 
 
 def is_positive_bend(face: TopoDS_Face) -> bool:
@@ -418,6 +530,7 @@ def _move_developed_face(
             )
             for source_key, (source_edge, developed_edge) in developed.edges.items()
         },
+        placement * developed.placement,
     )
 
 
@@ -477,11 +590,170 @@ def _place_adjacent_developed_face(
     return placed
 
 
+def _sew_developed_faces(
+    faces: list[TopoDS_Face],
+) -> tuple[TopoDS_Shell, list[TopoDS_Face]]:
+    """Sew the placed developments into the flat shell.
+
+    Sewing rebuilds the faces it joins, so the faces of the shell are not the
+    faces given. The second result is the face of the shell each given face
+    became, in the order given.
+    """
+    if len(faces) == 1:
+        shell = TopoDS_Shell()
+        builder = BRep_Builder()
+        builder.MakeShell(shell)
+        builder.Add(shell, faces[0])
+        return shell, faces
+    sewing = BRepBuilderAPI_Sewing(TOLERANCE)
+    for face in faces:
+        sewing.Add(face)
+    sewing.Perform()
+    sewn = downcast(sewing.SewedShape())
+    if not isinstance(sewn, TopoDS_Shell):
+        raise ValueError("the faces do not sew into one connected shell")
+    return sewn, [
+        TopoDS.Face(sewing.Modified(face)) if sewing.IsModified(face) else face
+        for face in faces
+    ]
+
+
+def _folds_up(sheet_face: Face, placed: _DevelopedFace) -> bool:
+    """Does a bend fold toward +Z as its development lies in the flat pattern?
+
+    The development keeps, for every edge, which way the edge runs and which
+    side of it the material is on, so the two together give a handedness
+    that is the same on the cylinder and on the flat. On the cylinder it is
+    read against the direction toward the axis, the side the sheet folds
+    to; on the flat it is read against +Z. The bend folds up when they agree.
+    """
+    records = list(placed.edges.values())
+    for record in records:
+        if Edge(record[0]).geom_type == GeomType.LINE:
+            break
+    else:
+        record = records[0]
+    source_edge, developed_edge = record
+    source_start = Edge(source_edge).position_at(0)
+    source_end = Edge(source_edge).position_at(1)
+    developed_start, developed_end = _ordered_developed_edge_points(record, source_edge)
+    source_hand = (source_end - source_start).cross(
+        _topods_material_side(sheet_face.wrapped, source_edge)
+    )
+    flat_hand = (developed_end - developed_start).cross(
+        _topods_material_side(placed.face, developed_edge)
+    )
+
+    axis = sheet_face.axis_of_rotation
+    assert axis is not None  # a cylinder always has one
+    edge_middle = (source_start + source_end) / 2
+    axis_point = axis.position + axis.direction * (
+        (edge_middle - axis.position).dot(axis.direction)
+    )
+    return (source_hand.dot(axis_point - edge_middle) > 0) == (flat_hand.Z > 0)
+
+
+def _unfolded_face(
+    source_face: TopoDS_Face,
+    placed: _DevelopedFace,
+    sheet_parameters: SheetMetalParameters | None,
+) -> UnfoldedFace:
+    """The record of a face of the flat pattern: a flat as it is, a bend with
+    its angle, radii, bend line and direction."""
+    # pylint: disable=import-outside-toplevel
+    from build123d.topology.two_d import Face
+
+    sheet_face = Face(source_face)
+    if sheet_face.geom_type != GeomType.CYLINDER:
+        return UnfoldedFace(sheet_face=sheet_face, is_bend=False)
+
+    radius = sheet_face.radius
+    assert radius is not None  # a cylinder always has one
+    positive = is_positive_bend(source_face)
+    if sheet_parameters is None:
+        inside_radius = neutral = radius
+    else:
+        inside_radius = radius - surface_offset(sheet_parameters, positive)
+        neutral = neutral_radius(radius, sheet_parameters, positive)
+
+    # the strip was developed with x the arc length at the development radius
+    # and y the distance along the bend, then placed; its centre line is the
+    # mid-angle line of the cylinder. The line is one physical bend line, so
+    # it spans the material from the first point it meets to the last: ends
+    # that are not square or are notched are trimmed, while a hole across the
+    # bend interrupts the strip but not the line
+    u_min, u_max, v_min, v_max = BRepTools.UVBounds_s(source_face)
+    x_middle = neutral * (u_min + u_max) / 2
+    bend_line = Edge.make_line((x_middle, v_min, 0), (x_middle, v_max, 0)).moved(
+        placed.placement
+    )
+    on_material = bend_line.intersect(Face(placed.face))
+    pieces = on_material.edges() if on_material is not None else []
+    if pieces:
+        start = bend_line.position_at(0)
+        along = (bend_line.position_at(1) - start).normalized()
+        reach = [
+            (piece.position_at(t) - start).dot(along)
+            for piece in pieces
+            for t in (0, 1)
+        ]
+        bend_line = Edge.make_line(
+            start + along * min(reach), start + along * max(reach)
+        )
+
+    return UnfoldedFace(
+        sheet_face=sheet_face,
+        is_bend=True,
+        angle=degrees(u_max - u_min),
+        inside_radius=inside_radius,
+        neutral_radius=neutral,
+        bend_line=bend_line,
+        up=_folds_up(sheet_face, placed),
+    )
+
+
+def _require_tangent(edge: TopoDS_Edge, first: TopoDS_Face, second: TopoDS_Face):
+    """Refuse a fold with no bend in it.
+
+    Unfolding develops bends; two faces meeting along an edge at an angle,
+    with no cylindrical bend between them, would be hinged there and the
+    pattern would come out short by the allowance a real bend consumes, with
+    no bend recorded for the fold. The faces' normals at the edge must be
+    parallel, in either orientation: a flat meeting a flat is a sharp fold,
+    a flat leaving a bend before its tangent is the same fold hidden in a
+    bend that stops short.
+
+    Raises:
+        ValueError: the faces meet at an angle along the edge
+    """
+    from build123d.topology.two_d import Face  # pylint: disable=import-outside-toplevel
+
+    middle = Edge(edge).position_at(0.5)
+    kinds = [Face(face).geom_type for face in (first, second)]
+    normals = [Face(face).normal_at(middle) for face in (first, second)]
+    if normals[0].cross(normals[1]).length < TANGENT_TOLERANCE:
+        return
+    angle = degrees(acos(min(1.0, abs(normals[0].dot(normals[1])))))
+    at = tuple(round(coordinate, 3) for coordinate in middle)
+    if all(kind == GeomType.PLANE for kind in kinds):
+        what = f"joins two flats at {angle:.4g}\u00b0 with no bend between them"
+    else:
+        what = f"joins a flat to a bend {angle:.4g}\u00b0 off its tangent"
+    raise ValueError(
+        f"unfold develops bends, and the edge at {at} {what}: give the fold "
+        "a bend radius"
+    )
+
+
 def _unfold_shell(
     shell: TopoDS_Shell,
     sheet_parameters: SheetMetalParameters | None,
-) -> TopoDS_Shell:
-    """Develop a planar/cylindrical shell onto the XY plane."""
+) -> tuple[TopoDS_Shell, FaceMap[UnfoldedFace]]:
+    """Develop a planar/cylindrical shell onto the XY plane.
+
+    Returns the flat shell and, for each of its faces, what it developed
+    from.
+    """
     if sheet_parameters is not None and not isinstance(
         sheet_parameters, SheetMetalParameters
     ):
@@ -523,6 +795,7 @@ def _unfold_shell(
         if len(connected_faces) > 2:
             raise ValueError("unfold doesn't support non-manifold edges")
         if len(connected_faces) == 2:
+            _require_tangent(edge, connected_faces[0], connected_faces[1])
             first_key, second_key = (hash(face) for face in connected_faces)
             adjacency[first_key].append((second_key, edge))
             adjacency[second_key].append((first_key, edge))
@@ -556,13 +829,25 @@ def _unfold_shell(
                 for parent_point, child_point in zip(parent_points, child_points)
             ):
                 raise ValueError(
-                    "The sheet contains a cycle that requires a cut before unfolding"
+                    "The sheet contains a cycle that requires a cut before "
+                    "unfolding. Faces that meet along an edge are sewn "
+                    "together, so walls touching at a corner close one."
                 )
 
     if len(placed) != len(source_faces):
         raise ValueError("The Shell contains disconnected face groups")
 
-    result = _make_topods_shell(developed.face for developed in placed.values())
+    keys = list(placed)
+    result, flat_faces = _sew_developed_faces([placed[key].face for key in keys])
     if not BRepCheck_Analyzer(result).IsValid():
         raise ValueError("Unfolding produced an invalid flat Shell")
-    return result
+
+    # pylint: disable=import-outside-toplevel
+    from build123d.topology.two_d import Face
+
+    records: FaceMap[UnfoldedFace] = FaceMap()
+    for key, flat_face in zip(keys, flat_faces):
+        records[Face(flat_face)] = _unfolded_face(
+            faces_by_key[key], placed[key], sheet_parameters
+        )
+    return result, records

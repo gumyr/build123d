@@ -137,7 +137,7 @@ dimensions less one bend deduction per bend.
 
 You rarely need to do this arithmetic. :ref:`flange <sheet_metal_flange>`
 takes a drawing's numbers directly: ``position`` puts the corner of the formed
-part on the edge the face was drawn to, and ``length_mode`` measures the wall
+part on the edge the face was drawn to, and ``length_from`` measures the wall
 from the corner at its other end. A U channel dimensioned to its outside
 faces, 60 wide, 40 high and 100 long in 2 mm sheet bent to an inside radius of
 3, is drawn with exactly those numbers:
@@ -151,11 +151,11 @@ faces, 60 wide, 40 high and 100 long in 2 mm sheet bent to an inside radius of
             channel.rims().filter_by(Axis.Y),
             length=40,  # the drawing's outside height
             position=BendPosition.MATERIAL_OUTSIDE,
-            length_mode=FlangeLength.OUTER_SHARP,
+            length_from=LengthFrom.OUTER_SHARP,
         )
 
 Thickened, the part measures 60 × 100 × 40 outside. With the default
-``BendPosition.BEND_OUTSIDE`` and ``FlangeLength.TANGENT`` the bend starts at
+``BendPosition.BEND_OUTSIDE`` and ``LengthFrom.TANGENT`` the bend starts at
 the edge and the wall is the flat beyond it, so the same channel would be
 drawn to its tangent lines: a base of ``60 - 2 × 5`` and walls of ``40 - 5``.
 Both give the same part. The default is the natural form when the flat sizes

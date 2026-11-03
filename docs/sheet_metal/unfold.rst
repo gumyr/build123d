@@ -39,8 +39,10 @@ wants.
 Exporting the blank
 *******************
 
-The pattern is a planar ``Shell``, so its outline and holes export like any
-other 2D geometry. A DXF for the cutter:
+``unfold`` returns two things: the pattern, a planar ``Shell`` whose outline
+and holes export like any other 2D geometry, and a record of what each of
+its faces developed from. A DXF with the outline for the cutter and a bend
+line per bend for the brake operator:
 
 .. code-block:: build123d
 
@@ -48,16 +50,36 @@ other 2D geometry. A DXF for the cutter:
         with BuildSketch():
             Rectangle(60, 40)
         flange(tray.rims(), length=15, gaps=3.1)
-        flat = unfold(align=Align.MIN)
+        flat, face_map = unfold(align=Align.MIN)
 
     exporter = ExportDXF(unit=Unit.MM)
     exporter.add_layer("cut")
+    exporter.add_layer("bend_up", line_type=LineType.DASHED)
+    exporter.add_layer("bend_down", line_type=LineType.DASHED)
     exporter.add_shape(flat, layer="cut")
+    for face in flat.faces():
+        record = face_map[face]
+        if record.is_bend:
+            layer = "bend_up" if record.up else "bend_down"
+            exporter.add_shape(record.bend_line, layer=layer)
     exporter.write("tray_blank.dxf")
 
-Bend lines are the boundaries between the developed bends and the flats, so
-the developed bend faces of the pattern can go on a separate layer for the
-brake operator.
+``face_map`` is a :class:`~sheet_utils.FaceMap`, looked up by any face of the
+pattern, and each entry is an :class:`~sheet_utils.UnfoldedFace`:
+
+* ``sheet_face`` - the face of the folded sheet it developed from, for every
+  face
+* ``is_bend`` - whether that face was a cylinder
+* ``angle``, ``inside_radius``, ``neutral_radius`` - the bend to put back,
+  and the radius its strip's width was taken at
+* ``bend_line`` - the centre line of the strip, on the pattern, from the first
+  point it meets material to the last; a hole across the bend does not
+  interrupt it
+* ``up`` - the bend folds toward +Z as the blank lies on ``Plane.XY``
+
+The lookup is by the face's underlying kernel shape, so it still answers
+after the pattern has been moved for nesting, but not after an operation
+that rebuilds its faces, such as a boolean or ``clean``.
 
 ****************
 The Shell method
@@ -78,7 +100,7 @@ Algebra mode
     parameters = SheetMetalParameters(thickness=1, bend_radius=2)
     blank = Rectangle(60, 40)
     sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
-    flat = unfold(sheet, sheet_parameters=parameters, align=Align.MIN)
+    flat, face_map = unfold(sheet, sheet_parameters=parameters, align=Align.MIN)
 
 ***************
 What it refuses
@@ -87,6 +109,17 @@ What it refuses
 * No sheet: a bare ``unfold()`` outside any ``BuildSheet``.
 * Missing parameters in Algebra mode, or parameters given inside a
   ``BuildSheet``.
+* A fold with no bend in it: two faces meeting along an edge at an angle,
+  two flats at a sharp corner or a wall leaving its bend before the tangent.
+  Unfolding develops bends, and hinging such a fold would cut the pattern
+  short by the allowance a real bend consumes and record no bend for it. The
+  error names the edge and the angle; give the fold a bend radius. A sheet
+  from ``BuildSheet`` never has one, since every bend gets a radius, but a
+  bracket modelled as two boxes and taken apart with ``sheet_shells`` does.
+* A sheet closed into a loop, which has nowhere to start: a tube, or walls
+  that touch at a corner and were sewn together. It needs a cut first.
+* A surface other than a plane or a cylinder, or a sheet with no planar face
+  at all.
 
 *******
 Related
