@@ -1049,17 +1049,19 @@ class TestProjectToShape(unittest.TestCase):
 
 
 class TestProjectWorkplane(unittest.TestCase):
+    """project_workplane is deprecated: the Plane constructor does its job"""
+
+    def test_is_deprecated_and_matches_plane(self):
+        with self.assertWarnsRegex(DeprecationWarning, "Plane"):
+            workplane = project_workplane((3, 4, 5), (1, 0, 1), (0, 0, 1), 10)
+        plane = Plane((3, 4, 15), x_dir=(1, 0, 1), z_dir=(0, 0, 1))
+        self.assertAlmostEqual(workplane.origin, plane.origin, 5)
+        self.assertAlmostEqual(workplane.x_dir, plane.x_dir, 5)
+        self.assertAlmostEqual(workplane.z_dir, plane.z_dir, 5)
+
     def test_invalid_context(self):
         with self.assertRaisesRegex(RuntimeError, "only be used from a BuildPart"):
             with BuildSketch():
-                project_workplane((0, 0, 0), (1, 0, 0), (0, 0, 1), 10)
-
-    def test_x_dir_perpendicular_to_projection_dir(self):
-        screen = MagicMock()
-        screen.find_intersection_points.return_value = []
-        with patch("build123d.operations_part.Face") as mock_face:
-            mock_face.make_rect.return_value = screen
-            with self.assertRaisesRegex(ValueError, "x_dir perpendicular"):
                 project_workplane((0, 0, 0), (1, 0, 0), (0, 0, 1), 10)
 
 

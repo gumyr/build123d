@@ -68,8 +68,6 @@ BuildPart and Algebra Part.
 | :func:`~operations_part.project_to_shape`    | Project lines or Faces onto a      |    |    |    | ✓  |                                   |
 |                                              | Shape's surface                    |    |    |    |    |                                   |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
-| :func:`~operations_part.project_workplane`   | Create workplane for projection    |    |    |    |    |                                   |
-+----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_part.revolve`             | Swing 2D Shape about Axis          |    |    |    | ✓  | :ref:`23 <ex 23>`                 |
 +----------------------------------------------+------------------------------------+----+----+----+----+-----------------------------------+
 | :func:`~operations_generic.scale`            | Change size of Shape               |    | ✓  | ✓  | ✓  |                                   |

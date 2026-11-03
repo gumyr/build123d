@@ -1214,6 +1214,37 @@ class TestProjectToPlane(unittest.TestCase):
             extrude(amount=50, mode=Mode.INTERSECT)
         self.assertLess(grooved.part.volume, self.knob.volume)
 
+    def test_no_objects_projects_the_enclosing_part(self):
+        # Nested in a BuildPart, a sketch or line projects the part by default
+        with BuildPart() as grooved:
+            add(self.knob)
+            with BuildSketch() as groove:
+                project_to_plane()
+                Rectangle(2, 20, mode=Mode.SUBTRACT)
+            extrude(amount=50, mode=Mode.INTERSECT)
+        expected = Circle(5) - Circle(2) - Rectangle(2, 20)
+        self.assertAlmostEqual(groove.sketch.area, expected.area, 5)
+        self.assertLess(grooved.part.volume, self.knob.volume)
+
+        with BuildPart() as housed:
+            add(self.housing)
+            with BuildLine() as outline:
+                project_to_plane()
+        self.assertEqual(len(outline.line.edges()), 4)
+        self.assertAlmostEqual(outline.line.bounding_box().size.X, 20, 5)
+        self.assertAlmostEqual(outline.line.bounding_box().size.Y, 10, 5)
+        del housed
+
+    def test_no_objects_needs_an_enclosing_builder(self):
+        with self.assertRaises(ValueError):
+            with BuildSketch():
+                project_to_plane()
+        with self.assertRaises(ValueError):
+            with BuildLine():
+                project_to_plane()
+        with self.assertRaises(ValueError):
+            project_to_plane(workplane=Plane.XY)
+
     def test_builder_plane_is_xy(self):
         # The drawing is made on Plane.XY and placed with the sketch on exit
         with BuildSketch(Plane.XZ) as side:

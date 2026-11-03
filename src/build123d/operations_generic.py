@@ -875,7 +875,7 @@ ProjectType: TypeAlias = Edge | Face | Wire | Vector | Vertex
 
 
 def project_to_plane(
-    objects: Shape | VectorLike | Iterable[Shape | VectorLike],
+    objects: Shape | VectorLike | Iterable[Shape | VectorLike] | None = None,
     workplane: Plane | None = None,
     mode: Mode = Mode.ADD,
 ) -> Curve | Sketch | Compound | ShapeList[Vector]:
@@ -887,9 +887,14 @@ def project_to_plane(
     side. The operation exists so that a 3D object can be brought into a
     sketch or line, enhanced there, and the result used to modify the object.
 
-    In BuildLine and BuildSketch the plane is the builder's construction
-    plane, ``Plane.XY``; ``workplane`` must not be given. The projection is
-    drawn into the builder like any other content and placed with it on exit.
+    In BuildLine and BuildSketch the objects are projected onto the builder's
+    construction plane, ``Plane.XY``; ``workplane`` must not be given. A sketch
+    may be placed on many workplanes at once, so there is no one plane to
+    project onto: the projection is drawn in the builder's own coordinates
+    like any other content and placed with it on exit. With no ``objects``
+    the enclosing builder's object is projected, the part of a BuildPart the
+    sketch or line is nested in, so that it can be brought into the sketch,
+    enhanced there, and the result used to modify it.
     What a builder can hold decides what is drawn: BuildLine takes edges, so
     a face or solid contributes its edges; BuildSketch takes faces, so a face
     casts its shadow, whichever way it curves or faces, a face edge-on to the
@@ -904,8 +909,9 @@ def project_to_plane(
     of points. A solid, shell or compound contributes its silhouette.
 
     Args:
-        objects (Shape | VectorLike or Iterable of): objects or points to
-            project. Points and shapes cannot be mixed in one call.
+        objects (Shape | VectorLike or Iterable of, optional): objects or points
+            to project. Points and shapes cannot be mixed in one call. Defaults
+            to the object of the builder the sketch or line is nested in.
         workplane (Plane, optional): plane to project onto in algebra mode.
             Defaults to None.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
@@ -915,6 +921,7 @@ def project_to_plane(
         ValueError: A workplane is required outside a builder
         ValueError: Inside a builder the plane is always Plane.XY
         RuntimeError: project_to_plane applies to BuildLine and BuildSketch
+        ValueError: objects are required unless the builder is nested in another
         ValueError: Points and shapes cannot be projected together
         ValueError: Edges and wires can only be projected into BuildSketch
             in PRIVATE mode
@@ -941,6 +948,17 @@ def project_to_plane(
             )
         plane = Plane.XY
     validate_inputs(context, "project_to_plane")
+
+    if objects is None:
+        # The enclosing builder's object, so that a part can be brought into a
+        # sketch or line nested in its BuildPart
+        parent = context.builder_parent if context is not None else None
+        if parent is None:
+            raise ValueError(
+                "project_to_plane needs objects unless the builder is nested in "
+                "another, whose object is then projected"
+            )
+        objects = parent._obj
 
     shape_list: list[Shape] = []
     point_list: list[Vector] = []

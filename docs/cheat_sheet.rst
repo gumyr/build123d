@@ -120,7 +120,6 @@ Cheat Sheet
             | :func:`~operations_generic.mirror`
             | :func:`~operations_generic.offset`
             | :func:`~operations_part.project_to_shape`
-            | :func:`~operations_part.project_workplane`
             | :func:`~operations_part.revolve`
             | :func:`~operations_generic.scale`
             | :func:`~operations_part.section`

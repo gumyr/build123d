@@ -503,6 +503,10 @@ def make_brake_formed(
     return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
 
 
+@deprecated(
+    "project_workplane is deprecated; use "
+    "Plane(origin + direction * distance, x_dir=x_dir, z_dir=direction) instead."
+)
 def project_workplane(
     origin: VectorLike | Vertex,
     x_dir: VectorLike | Vertex,
@@ -510,6 +514,11 @@ def project_workplane(
     distance: float,
 ) -> Plane:
     """Part Operation: project_workplane
+
+    .. deprecated::
+        The :class:`~geometry.Plane` constructor does the same: it projects
+        ``x_dir`` onto the plane itself, so use
+        ``Plane(origin + projection_dir * distance, x_dir=x_dir, z_dir=projection_dir)``.
 
     Return a plane to be used as a BuildSketch or BuildLine workplane
     with a known origin and x direction. The plane's origin will be
