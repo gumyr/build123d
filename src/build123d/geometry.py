@@ -400,6 +400,74 @@ class Vector:
             gp_normal = normal.wrapped
         return self.wrapped.AngleWithRef(vec.wrapped, gp_normal) * RAD2DEG
 
+    def is_normal(self, other: VectorLike, angular_tolerance: float = 1e-5) -> bool:
+        """are vectors normal
+
+        Returns True if this and another vector are normal to each other. That is, if
+        the angle between the two vectors is equal to 90° within the angular_tolerance.
+
+        Args:
+            other (VectorLike): vector to compare to
+            angular_tolerance (float, optional): max angular deviation in degrees.
+                Defaults to 1e-5.
+
+        Raises:
+            ValueError: vectors must be non null
+
+        Returns:
+            bool: vectors are normal
+        """
+        other = Vector(other)
+        if self.length == 0 or other.length == 0:
+            raise ValueError("vectors must be non null")
+        return self.wrapped.IsNormal(other.wrapped, radians(angular_tolerance))
+
+    def is_opposite(self, other: VectorLike, angular_tolerance: float = 1e-5) -> bool:
+        """are vectors opposite
+
+        Returns True if this and another vector are parallel with opposite directions.
+        That is, if the angle between the two vectors is equal to 180° within the
+        angular_tolerance.
+
+        Args:
+            other (VectorLike): vector to compare to
+            angular_tolerance (float, optional): max angular deviation in degrees.
+                Defaults to 1e-5.
+
+        Raises:
+            ValueError: vectors must be non null
+
+        Returns:
+            bool: vectors are opposite
+        """
+        other = Vector(other)
+        if self.length == 0 or other.length == 0:
+            raise ValueError("vectors must be non null")
+        return self.wrapped.IsOpposite(other.wrapped, radians(angular_tolerance))
+
+    def is_parallel(self, other: VectorLike, angular_tolerance: float = 1e-5) -> bool:
+        """are vectors parallel
+
+        Returns True if this and another vector are parallel with same orientation or
+        opposite orientation. That is, if the angle between the two vectors is equal
+        to 0° or 180° within the angular_tolerance.
+
+        Args:
+            other (VectorLike): vector to compare to
+            angular_tolerance (float, optional): max angular deviation in degrees.
+                Defaults to 1e-5.
+
+        Raises:
+            ValueError: vectors must be non null
+
+        Returns:
+            bool: vectors are parallel
+        """
+        other = Vector(other)
+        if self.length == 0 or other.length == 0:
+            raise ValueError("vectors must be non null")
+        return self.wrapped.IsParallel(other.wrapped, radians(angular_tolerance))
+
     def project_to_line(self, line: Vector) -> Vector:
         """Returns a new vector equal to the projection of this Vector onto the line
         represented by Vector <line>

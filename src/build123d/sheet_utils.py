@@ -86,8 +86,10 @@ class FaceMap(dict[int, T], Generic[T]):
     ``faces()`` matches the entry made for it, wherever the shell has been
     moved to and whichever way the face is oriented. An operation that
     rebuilds faces - a boolean, ``clean``, ``mirror``, ``scale`` - gives them
-    new kernel shapes, so look faces up before doing any of that. Iterating
-    the map gives the keys; iterate ``values()`` for the entries.
+    new kernel shapes, so look faces up before doing any of that. A deep copy
+    of the map keeps the keys, so it matches the shell it was made for or a
+    shallow copy of it, not a deep copy of the shell. Iterating the map gives
+    the keys; iterate ``values()`` for the entries.
     """
 
     @staticmethod
@@ -110,6 +112,12 @@ class FaceMap(dict[int, T], Generic[T]):
     def get(self, face: Face, default=None):  # type: ignore[override]
         """The entry for a face, or ``default`` when it has none"""
         return super().get(self.key(face), default)
+
+    def __reduce__(self):
+        # copy, deepcopy and pickle rebuild a dict subclass by assigning each
+        # item through __setitem__, which expects a Face, not a stored key.
+        # Rebuilding from a plain dict fills the map without going through it.
+        return (self.__class__, (dict(dict.items(self)),))
 
 
 @dataclass(frozen=True)
