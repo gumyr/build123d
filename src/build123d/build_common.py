@@ -164,7 +164,10 @@ operations_apply_to = {
     "mirror": ["BuildPart", "BuildSketch", "BuildLine", "BuildSheet"],
     "miter": ["BuildSheet"],
     "offset": ["BuildPart", "BuildSketch", "BuildLine"],
+    # project is deprecated in favour of project_to_plane and project_to_shape
     "project": ["BuildPart", "BuildSketch", "BuildLine"],
+    "project_to_plane": ["BuildSketch", "BuildLine"],
+    "project_to_shape": ["BuildPart"],
     "project_workplane": ["BuildPart"],
     "revolve": ["BuildPart"],
     "scale": ["BuildPart", "BuildSketch", "BuildLine"],

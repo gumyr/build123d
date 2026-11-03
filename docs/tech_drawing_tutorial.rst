@@ -24,7 +24,7 @@ Each view is aligned to a position on the page and optionally scaled or annotate
 How It Works
 ------------
 
-The script uses the `project_to_viewport` method to project the 3D part geometry into 2D.
+The script uses the `drawing_view` method to project the 3D part geometry into 2D.
 A helper function, `project_to_2d`, sets up the viewport (camera origin and up direction)
 and places the result onto a virtual drawing sheet.
 

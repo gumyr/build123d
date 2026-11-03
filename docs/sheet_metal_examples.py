@@ -95,7 +95,7 @@ def projected(
     """Shape seen from far away along view, hidden lines dotted."""
     view = Vector(view).normalized()
     up = (0, 1, 0) if abs(view.Z) > 0.99 else (0, 0, 1)
-    visible, concealed = shape.project_to_viewport(view * 1000, up, look_at=(0, 0, 0))
+    visible, concealed = shape.drawing_view(view * 1000, up, look_at=(0, 0, 0))
     return (
         clip(list(visible), window),
         clip(list(concealed), window) if hidden else [],
