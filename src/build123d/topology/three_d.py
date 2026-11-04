@@ -60,7 +60,7 @@ from collections.abc import Iterable
 from math import radians, tan
 from typing import TYPE_CHECKING, ClassVar, cast, overload
 
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from bd_materials import FinishedMaterial
 
@@ -112,8 +112,6 @@ from OCP.collections import (
     IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
     List_TopoDS_Shape,
 )
-
-from typing_extensions import deprecated
 
 from build123d.build_enums import (
     CenterOf,
@@ -206,20 +204,20 @@ class Mixin3D(Shape[TOPODS]):
         )
 
     def _with_joints(self, joints: Iterable[Joint]) -> Self:
-        """A copy of self, sharing its geometry, with copies of ``joints`` bound to it
+        """A copy of self, sharing its geometry, with copies of ``joints`` bound to
+        it. A joint under a label self already has replaces that joint in the copy.
 
         Raises:
-            ValueError: a joint has no label, or its label is already taken
+            ValueError: a joint has no label, or two of the joints share a label
         """
+        joints = list(joints)
+        labels = [joint.label for joint in joints]
+        if len(set(labels)) != len(labels):
+            raise ValueError(f"Joint labels must be unique, got {labels}")
         result = copy.copy(self)
         for joint in joints:
             if not joint.label:
                 raise ValueError("A joint added to a part needs a label")
-            if joint.label in result.joints:
-                raise ValueError(
-                    f"Joint label '{joint.label}' already exists on the part; "
-                    "assign to joints[label] to replace a joint"
-                )
             result.joints[joint.label] = copy.deepcopy(joint)
         return result
 

@@ -31,7 +31,8 @@ has built-in support for displaying joints).
 .. note::
     If joints are created within the scope of a :class:`~build_part.BuildPart` builder, the ``to_part``
     parameter need not be specified as the builder will, on exit, automatically transfer the joints created in its
-    scope to the part created.
+    scope to the part created. The same holds inside a :class:`~build_sheet.BuildSheet` nested in a
+    ``BuildPart``: its joints, placed with the sheet, become the part's.
 
 The following sections provide more detail on the available joints and describes how they are used.
 
@@ -55,16 +56,20 @@ label, or added to a part with ``+``:
 
 ``part.joints`` is a dictionary of the part's joints by label. Assigning a joint to it
 binds the joint where it is in the world, so a joint can also be moved from one part
-to another this way, and deleting a joint frees it again. The ``+`` form follows the
-algebra rules: the operand is untouched and the result is a new part, sharing the
-geometry, with copies of the joints.
+to another this way, and deleting a joint frees it again. ``part.joints |= joints``
+binds several at once, from a mapping of label to joint or from labelled joints such
+as ``locations * joint`` gives, and is the form for a part that must stay the same
+object, as ``self`` in a subclass's ``__init__``. The ``+`` form follows the algebra
+rules: the operand is untouched and the result is a new part, sharing the geometry,
+with copies of the joints.
 
 A free joint can be placed with ``*`` like a shape, which is how joints are made in
 bulk in algebra mode: a :class:`~build_common.GridLocations` (or any iterable of
 locations) gives one copy per location, with the label suffixed by the location's
-index: ``"mount"`` becomes ``mount0``, ``mount1``, ``mount2``, ``mount3``. A label a
-part already has raises ``ValueError``; assign to ``part.joints[label]`` to replace a
-joint deliberately.
+index: ``"mount"`` becomes ``mount0``, ``mount1``, ``mount2``, ``mount3``. A joint made
+under a label the part already has replaces the earlier joint, as does assigning to
+``part.joints[label]``; the labels a context generates or a sequence lists must be new,
+and one the part already has raises ``ValueError``.
 
 .. code-block:: build123d
 
@@ -73,6 +78,7 @@ joint deliberately.
     plate -= Plane(top) * GridLocations(60, 60, 2, 2) * Cylinder(5, 10)
     plate += Plane(top) * GridLocations(60, 60, 2, 2) * RigidJoint("mount")
     plate.joints["mount0"]  # ... mount3
+    plate.joints |= Plane(top) * GridLocations(60, 60, 2, 2) * RigidJoint("pin")  # in place
 
 In builder mode the same comes from constructing the joint inside a locations
 context, alongside the geometry it belongs to:

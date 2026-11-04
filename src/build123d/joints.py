@@ -32,9 +32,10 @@ from collections.abc import Iterable
 from math import inf
 from typing import overload
 
-from build123d.build_common import LocationList, validate_inputs
+from build123d.build_common import Builder, LocationList, validate_inputs
 from build123d.build_enums import Align
 from build123d.build_part import BuildPart
+from build123d.build_sheet import BuildSheet
 from build123d.geometry import (
     Axis,
     Location,
@@ -62,15 +63,19 @@ def _bind(
 ) -> None:
     """Bind a newly made joint to ``to_part``, or failing that to the active
     BuildPart, once at each location of the active Locations context. With
-    neither the joint is free.
+    neither the joint is free. In a BuildSheet nested in a BuildPart the joint
+    binds to the sheet, which hands it to the part on exit.
 
     A single label is used as given for one location and suffixed with the
     location's index, ``label0``, ``label1``, ..., for several; a sequence of
-    labels is used as given and must have one label per location.
+    labels is used as given and must have one label per location. A joint
+    made under a label the part already has replaces the earlier joint, which
+    is freed where it is; the generated and listed labels must be new.
 
     Raises:
-        ValueError: a bound joint has no label, or the labels don't match the
-            locations
+        ValueError: a bound joint has no label, the labels don't match the
+            locations, a generated or listed label is taken, or the builder is
+            one that cannot hold joints
     """
     owner = to_part if to_part is not None else context
     if owner is None:
@@ -78,6 +83,18 @@ def _bind(
             raise ValueError("A free joint has a single label")
         joint.label = label or ""
         return
+    if isinstance(owner, Builder) and not isinstance(owner, (BuildPart, BuildSheet)):
+        raise ValueError(
+            f"{type(owner).__name__} doesn't take joints; a joint binds to a "
+            "BuildPart, or to a BuildSheet nested in one"
+        )
+    if isinstance(owner, BuildSheet) and not isinstance(
+        owner.builder_parent, BuildPart
+    ):
+        raise ValueError(
+            "A joint in a BuildSheet binds to the enclosing BuildPart, and there is "
+            "none - a sheet on its own is a shell, which holds no joints"
+        )
 
     location_context = LocationList._get_context()
     locations = (
@@ -102,12 +119,15 @@ def _bind(
 
     if len(set(labels)) != len(labels):
         raise ValueError(f"Joint labels must be unique, got {labels}")
-    taken = [name for name in labels if name in owner.joints]
-    if taken:
-        raise ValueError(
-            f"Joint label(s) {taken} already exist on the part; assign to "
-            "joints[label] to replace a joint"
-        )
+    if not (isinstance(label, str) and len(labels) == 1):
+        # the one label given replaces; a label expanded by a Locations
+        # context or listed among others is more likely a collision
+        taken = [name for name in labels if name in owner.joints]
+        if taken:
+            raise ValueError(
+                f"Joint label(s) {taken} already exist on the part; assign to "
+                "joints[label] to replace a joint"
+            )
 
     copies = [joint.moved(location) for location in locations[1:]]
     joint._move(locations[0])

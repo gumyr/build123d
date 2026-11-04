@@ -31,6 +31,7 @@ license:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import ClassVar, cast
 
 from typing_extensions import deprecated
@@ -89,12 +90,17 @@ class BuildPart(Builder[Part]):
         super().__init__(*placements, mode=mode)
 
     def _accept_publication(
-        self, build_product: Shape, source: Builder | None, mode: Mode
+        self,
+        build_product: Shape,
+        source: Builder | None,
+        mode: Mode,
+        placements: Sequence[Location] = (Location(),),
     ) -> None:
-        """Capture a nested BuildSheet's shell as pending sheet-metal input.
+        """Capture a nested BuildSheet's shell as pending sheet-metal input,
+        and its joints as this part's.
 
-        The sheet parameters are read from the producing BuildSheet so that
-        construction metadata never has to ride on the published Shell.
+        The sheet parameters and joints are read from the producing BuildSheet
+        so that construction metadata never has to ride on the published Shell.
         """
         if isinstance(source, BuildSheet):
             shells = (
@@ -106,8 +112,34 @@ class BuildPart(Builder[Part]):
                 self.pending_sheets.extend(
                     (shell, source.sheet_parameters) for shell in shells
                 )
+                self._adopt_sheet_joints(source, placements)
                 return
-        super()._accept_publication(build_product, source, mode)
+        super()._accept_publication(build_product, source, mode, placements)
+
+    def _adopt_sheet_joints(
+        self, sheet: BuildSheet, placements: Sequence[Location]
+    ) -> None:
+        """Bind a nested sheet's joints to this part, one per placement of the
+        sheet, under the label given for one placement and ``label0``,
+        ``label1``, ... for several, as a Locations context labels them.
+
+        Raises:
+            ValueError: a label made for several placements is already taken
+        """
+        for label in list(sheet.joints):
+            joint = sheet.joints.pop(label)  # freed where it is, in the sheet frame
+            if len(placements) == 1:
+                labels = [label]
+            else:
+                labels = [f"{label}{index}" for index in range(len(placements))]
+                taken = [name for name in labels if name in self.joints]
+                if taken:
+                    raise ValueError(
+                        f"Joint label(s) {taken} already exist on the part; the "
+                        "sheet is placed several times"
+                    )
+            for name, placement in zip(labels, placements):
+                self.joints[name] = joint.moved(placement)
 
     @property
     def part(self) -> Part:

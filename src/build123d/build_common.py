@@ -49,7 +49,7 @@ import logging
 import sys
 import warnings
 from abc import ABC, ABCMeta, abstractmethod
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field as dataclass_field
 from itertools import product
@@ -452,7 +452,11 @@ class Builder(ABC, Generic[ShapeT]):
         return cast(B, result)
 
     def _accept_publication(
-        self, build_product: Shape, source: Builder | None, mode: Mode
+        self,
+        build_product: Shape,
+        source: Builder | None,
+        mode: Mode,
+        placements: Sequence[Location] = (Location(),),
     ) -> None:
         """Receive a product published by a nested Builder or object
 
@@ -465,8 +469,10 @@ class Builder(ABC, Generic[ShapeT]):
             build_product (Shape): the placed product being published
             source (Builder | None): Builder that produced it, None for objects
             mode (Mode): combination mode
+            placements (Sequence[Location]): where the product was placed in this
+                Builder's frame, one Location per copy of it
         """
-        del source
+        del source, placements
         self._add_to_context(build_product, mode=mode)
 
     def _add_to_context(
@@ -1700,7 +1706,18 @@ class _PublicationService:
         )
 
     @staticmethod
+    def placements(scope: BuildScope) -> list[Location]:
+        """Where a scope's product is placed in its publication target's frame:
+        every publication location combined with every output placement"""
+        return [
+            publication * output
+            for publication in scope.publication_locations
+            for output in scope.output_placements
+        ]
+
+    @classmethod
     def place(
+        cls,
         build_product: Shape | None,
         scope: BuildScope,
         *,
@@ -1715,11 +1732,7 @@ class _PublicationService:
             return build_product
 
         placement_source = _PublicationService._topology_copy(build_product)
-        placed = [
-            publication * output * placement_source
-            for publication in scope.publication_locations
-            for output in scope.output_placements
-        ]
+        placed = [placement * placement_source for placement in cls.placements(scope)]
         if not all(isinstance(placed_product, Shape) for placed_product in placed):
             return build_product
         if len(placed) == 1:
@@ -1796,7 +1809,9 @@ class _PublicationService:
                 f"Unsupported publication target {type(target).__name__}"
             )
 
-        target._accept_publication(placed, source, mode)
+        target._accept_publication(
+            placed, source, mode, placements=cls.placements(scope)
+        )
         return placed
 
 

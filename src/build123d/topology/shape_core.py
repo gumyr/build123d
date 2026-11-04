@@ -176,6 +176,7 @@ from .kernel import list_shapes
 
 if TYPE_CHECKING:  # pragma: no cover
     from build123d.build_part import BuildPart  # pylint: disable=R0801
+    from build123d.build_sheet import BuildSheet
 
     from .composite import Compound  # pylint: disable=R0801
     from .one_d import Edge, Wire  # pylint: disable=R0801
@@ -4384,7 +4385,7 @@ class Joint(ABC):
     Args:
         label (str, optional): user assigned label. A free joint takes the key
             it is assigned to. Defaults to None.
-        parent (BuildPart | Solid | Compound, optional): object the joint is
+        parent (BuildPart | BuildSheet | Solid | Compound, optional): object the joint is
             bound to. Defaults to None, a free joint.
 
     Attributes:
@@ -4402,7 +4403,7 @@ class Joint(ABC):
     def __init__(
         self,
         label: str | None = None,
-        parent: BuildPart | Solid | Compound | None = None,
+        parent: BuildPart | BuildSheet | Solid | Compound | None = None,
     ):
         self.label = "" if label is None else label
         self.parent = parent
@@ -4423,7 +4424,7 @@ class Joint(ABC):
         return result
 
     @staticmethod
-    def _frame_of(owner: BuildPart | Solid | Compound | None) -> Location:
+    def _frame_of(owner: BuildPart | BuildSheet | Solid | Compound | None) -> Location:
         """The frame a joint on ``owner`` is stored relative to: a shape's location,
         or the identity for a builder, which constructs in its own frame and places
         its joints with the part on exit, for a free joint, and for an empty shape,
@@ -4447,7 +4448,9 @@ class Joint(ABC):
         """``direction`` turned by the rotation of ``location``"""
         return (location * Location(direction)).position - location.position
 
-    def _reparent(self, parent: BuildPart | Solid | Compound | None) -> None:
+    def _reparent(
+        self, parent: BuildPart | BuildSheet | Solid | Compound | None
+    ) -> None:
         """Bind this joint to a new parent, or free it with None, without changing
         its location."""
         self._move(Joint._frame_of(parent).inverse() * Joint._frame_of(self.parent))
@@ -4582,17 +4585,21 @@ class JointDict(dict[str, Joint]):
     Assigning a joint attaches it: the joint takes the key as its label and is
     bound to the owner where it is, so ``part.joints["x"] = joint`` binds a free
     joint to the part, or moves a joint across from another part, without
-    changing its location in the world. Deleting a joint frees it where it is.
+    changing its location in the world. Deleting a joint frees it where it is,
+    as does assigning another joint under its label. ``update`` and ``|=`` take
+    a mapping of label to joint, or an iterable of joints each under its own
+    label, as ``locations * joint`` produces: ``part.joints |= locations * joint``.
 
     Args:
-        owner (BuildPart | Solid | Compound): the part or builder the joints are on
-        joints (Mapping[str, Joint], optional): joints to attach. Defaults to None.
+        owner (BuildPart | BuildSheet | Solid | Compound): the part or builder the joints are on
+        joints (Mapping[str, Joint] | Iterable[Joint], optional): joints to
+            attach. Defaults to None.
     """
 
     def __init__(
         self,
-        owner: BuildPart | Solid | Compound,
-        joints: Mapping[str, Joint] | None = None,
+        owner: BuildPart | BuildSheet | Solid | Compound,
+        joints: Mapping[str, Joint] | Iterable[Joint] | None = None,
     ):
         super().__init__()
         self.owner = owner
@@ -4641,6 +4648,9 @@ class JointDict(dict[str, Joint]):
                     if old_joint is joint:
                         dict.__delitem__(previous, old_label)
             joint._reparent(self.owner)
+        displaced = dict.get(self, label)
+        if displaced is not None and displaced is not joint:
+            displaced._reparent(None)
         super().__setitem__(label, joint)
 
     def __delitem__(self, label: str) -> None:
@@ -4653,7 +4663,22 @@ class JointDict(dict[str, Joint]):
         return self
 
     def update(self, other=(), /, **kwargs) -> None:  # type: ignore[override]
-        for label, joint in dict(other, **kwargs).items():
+        """Attach joints from a mapping of label to joint, an iterable of
+        (label, joint) pairs, or an iterable of labelled joints
+
+        Raises:
+            ValueError: a joint in an iterable has no label, or two share one
+        """
+        items = list(other.items()) if isinstance(other, Mapping) else list(other)
+        if items and all(isinstance(item, Joint) for item in items):
+            joints = [tcast(Joint, item) for item in items]
+            labels = [joint.label for joint in joints]
+            if not all(labels):
+                raise ValueError("A joint added to a part needs a label")
+            if len(set(labels)) != len(labels):
+                raise ValueError(f"Joint labels must be unique, got {labels}")
+            items = list(zip(labels, joints))
+        for label, joint in dict(items, **kwargs).items():
             self[label] = joint
 
     def setdefault(  # type: ignore[override]

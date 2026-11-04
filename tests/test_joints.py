@@ -34,7 +34,9 @@ import pickle
 
 from build123d.build_enums import Align, CenterOf, GeomType, Keep
 from build123d.build_common import GridLocations, Locations, Mode, PolarLocations
+from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
+from build123d.build_sheet import BuildSheet
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Location, Plane, Rotation, Vector, VectorLike
 from build123d.joints import (
@@ -44,8 +46,9 @@ from build123d.joints import (
     RevoluteJoint,
     RigidJoint,
 )
+from build123d.objects_curve import Line
 from build123d.objects_part import Box, Cone, Cylinder, Sphere
-from build123d.objects_sketch import Circle
+from build123d.objects_sketch import Circle, Rectangle
 from build123d.operations_generic import (
     chamfer,
     fillet,
@@ -55,7 +58,7 @@ from build123d.operations_generic import (
     scale,
     split,
 )
-from build123d.operations_part import draft, extrude
+from build123d.operations_part import draft, extrude, thicken
 from build123d.topology import Compound, Edge, JointDict, Solid
 
 
@@ -776,6 +779,32 @@ class TestFreeJoints(DirectApiTestCase):
         self.assertIsNone(b.parent)
         self.assertEqual(part.joints, {})
 
+    def test_update_takes_labelled_joints(self):
+        part = Box(20, 20, 2)
+        pins = GridLocations(10, 0, 2, 1) * RigidJoint(
+            "pin", joint_location=Location((0, 0, 1))
+        )
+        same = part
+        part.joints |= pins
+        self.assertIs(part, same)  # bound in place, no copy
+        self.assertEqual(sorted(part.joints), ["pin0", "pin1"])
+        self.assertIs(part.joints["pin0"], pins[0])
+        self.assertIs(pins[0].parent, part)
+        self.assertVectorAlmostEquals(pins[1].location.position, (5, 0, 1), 5)
+        # update, pairs and a mapping still work, and a taken label is replaced
+        replacement = RigidJoint(joint_location=Location((0, 0, -1)))
+        part.joints.update([("pin0", replacement)])
+        self.assertIs(part.joints["pin0"], replacement)
+        self.assertIsNone(pins[0].parent)
+        part.joints.update({"hole": RigidJoint()}, cap=RigidJoint())
+        self.assertEqual(sorted(part.joints), ["cap", "hole", "pin0", "pin1"])
+        # iterable rules: every joint labelled, labels distinct
+        with self.assertRaisesRegex(ValueError, "needs a label"):
+            part.joints |= [RigidJoint()]
+        with self.assertRaisesRegex(ValueError, "must be unique"):
+            part.joints |= [RigidJoint("x"), RigidJoint("x")]
+        self.assertEqual(sorted(part.joints), ["cap", "hole", "pin0", "pin1"])
+
     def test_plain_dict_joints_are_adopted_on_copy(self):
         # a part unpickled from an earlier version holds its joints in a dict
         part = Box(2, 2, 2)
@@ -945,25 +974,43 @@ class TestJointsInLocations(DirectApiTestCase):
         self.assertAlmostEqual(positions[0], 8, 5)
         self.assertAlmostEqual(positions[1], 12, 5)
 
-    def test_duplicate_labels_raise(self):
+    def test_generated_and_listed_labels_must_be_new(self):
         part = Box(10, 10, 2)
-        RigidJoint("top", part, Location((0, 0, 1)))
-        with self.assertRaisesRegex(ValueError, "already exist"):
-            RigidJoint("top", part, Location((0, 0, -1)))
         RigidJoint("pin1", part, Location())
         with GridLocations(4, 0, 2, 1):
             with self.assertRaisesRegex(ValueError, "must be unique"):
                 RigidJoint(["a", "a"], part)
             with self.assertRaisesRegex(ValueError, "already exist"):
                 RigidJoint("pin", part)  # expands to pin0, pin1
-        self.assertEqual(sorted(part.joints), ["pin1", "top"])
-        with self.assertRaisesRegex(ValueError, "already exist"):
-            part + RigidJoint("top", joint_location=Location())
-        # explicit assignment is the way to replace a joint
-        replacement = RigidJoint(joint_location=Location((0, 0, -1)))
-        part.joints["top"] = replacement
-        self.assertIs(part.joints["top"], replacement)
-        self.assertEqual(sorted(part.joints), ["pin1", "top"])
+            with self.assertRaisesRegex(ValueError, "already exist"):
+                RigidJoint(["pin0", "pin1"], part)
+        with self.assertRaisesRegex(ValueError, "must be unique"):
+            part + [RigidJoint("a"), RigidJoint("a")]
+        self.assertEqual(sorted(part.joints), ["pin1"])
+
+    def test_a_joint_made_again_under_its_label_replaces_the_earlier_one(self):
+        # as a nut turned over does with its "b" joint
+        nut = Box(10, 10, 2)
+        first = RigidJoint("b", nut, Location((0, 0, 1)))
+        second = RigidJoint("b", nut, Location((0, 0, 1), (180, 0, 0)))
+        self.assertIs(nut.joints["b"], second)
+        self.assertEqual(list(nut.joints), ["b"])
+        self.assertVectorAlmostEquals(second.location.z_axis.direction, (0, 0, -1), 5)
+        # the earlier joint is freed where it was
+        self.assertIsNone(first.parent)
+        self.assertVectorAlmostEquals(first.location.position, (0, 0, 1), 5)
+
+        # the same by assignment and by +
+        third = RigidJoint(joint_location=Location((0, 0, -1)))
+        nut.joints["b"] = third
+        self.assertIs(nut.joints["b"], third)
+        self.assertIsNone(second.parent)
+        with_fourth = nut + RigidJoint("b", joint_location=Location((1, 0, 0)))
+        self.assertEqual(list(with_fourth.joints), ["b"])
+        self.assertVectorAlmostEquals(
+            with_fourth.joints["b"].location.position, (1, 0, 0), 5
+        )
+        self.assertIs(nut.joints["b"], third)  # the original is untouched
 
     def test_algebra_constructor_in_locations(self):
         part = Box(10, 10, 2)
@@ -973,6 +1020,96 @@ class TestJointsInLocations(DirectApiTestCase):
         self.assertVectorAlmostEquals(part.joints["p1"].location.position, (2, 0, 1), 5)
         with self.assertRaisesRegex(ValueError, "single label"):
             RigidJoint(["a", "b"])
+
+
+class TestJointsInBuildSheet(DirectApiTestCase):
+    """Joints made in a BuildSheet nested in a BuildPart become the part's"""
+
+    def test_sheet_joints_become_the_parts(self):
+        sheet_plane = Plane.XZ.offset(3)
+        with BuildPart() as part:
+            with BuildSheet(sheet_plane, thickness=1) as sheet:
+                with BuildSketch():
+                    Rectangle(20, 20)
+                with Locations((5, 2)):
+                    RigidJoint("hinge")
+                    with GridLocations(4, 0, 2, 1):
+                        RigidJoint("screw")
+            self.assertEqual(dict(sheet.joints), {})  # handed to the part
+            self.assertEqual(sorted(part.joints), ["hinge", "screw0", "screw1"])
+            thicken()
+        hinge = part.part.joints["hinge"]
+        self.assertIs(hinge.parent, part.part)
+        expected = sheet_plane.location * Location((5, 2, 0))
+        self.assertVectorAlmostEquals(hinge.location.position, expected.position, 5)
+        self.assertVectorAlmostEquals(
+            hinge.location.z_axis.direction, expected.z_axis.direction, 5
+        )
+        screws = sorted(
+            (
+                part.part.joints[label].location.position
+                for label in ("screw0", "screw1")
+            ),
+            key=lambda position: position.X,
+        )
+        self.assertVectorAlmostEquals(
+            screws[0], (sheet_plane.location * Location((3, 2, 0))).position, 5
+        )
+        self.assertVectorAlmostEquals(
+            screws[1], (sheet_plane.location * Location((7, 2, 0))).position, 5
+        )
+
+    def test_a_sheet_placed_several_times_places_its_joints(self):
+        with BuildPart() as part:
+            with BuildSheet(Plane.XY, Plane.XY.offset(10), thickness=1):
+                with BuildSketch():
+                    Rectangle(20, 20)
+                RigidJoint("tab", joint_location=Location((1, 0, 0)))
+            thicken()
+        self.assertEqual(sorted(part.part.joints), ["tab0", "tab1"])
+        heights = sorted(
+            part.part.joints[label].location.position.Z for label in ("tab0", "tab1")
+        )
+        self.assertAlmostEqual(heights[0], 0, 5)
+        self.assertAlmostEqual(heights[1], 10, 5)
+        with BuildPart():
+            RigidJoint("tab0", joint_location=Location())
+            with self.assertRaisesRegex(ValueError, "already exist"):
+                with BuildSheet(Plane.XY, Plane.XY.offset(10), thickness=1):
+                    with BuildSketch():
+                        Rectangle(20, 20)
+                    RigidJoint("tab")
+
+    def test_the_part_places_the_sheets_joints_with_itself(self):
+        with BuildPart(Plane.YZ) as part:
+            with BuildSheet(thickness=1):
+                with BuildSketch():
+                    Rectangle(10, 10)
+                RigidJoint("j", joint_location=Location((1, 0, 0)))
+            thicken()
+        self.assertVectorAlmostEquals(
+            part.part.joints["j"].location.position, (0, 1, 0), 5
+        )
+
+    def test_a_sheet_joint_needs_an_enclosing_part(self):
+        with BuildSheet(thickness=1):
+            with self.assertRaisesRegex(ValueError, "enclosing BuildPart"):
+                RigidJoint("j")
+
+    def test_sketch_and_line_builders_take_no_joints(self):
+        with BuildSketch():
+            Rectangle(1, 1)
+            with self.assertRaisesRegex(ValueError, "doesn't take joints"):
+                RigidJoint("j")
+        with BuildPart():
+            with BuildSketch():
+                Rectangle(1, 1)
+                with self.assertRaisesRegex(ValueError, "doesn't take joints"):
+                    RigidJoint("j")
+            with BuildLine():
+                Line((0, 0), (1, 0))
+                with self.assertRaisesRegex(ValueError, "doesn't take joints"):
+                    RigidJoint("j")
 
 
 class TestJointTransforms(DirectApiTestCase):
