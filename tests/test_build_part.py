@@ -1227,6 +1227,13 @@ class TestSplit(unittest.TestCase):
             split(bisect_by=Plane.YZ, keep=Keep.TOP)
         self.assertAlmostEqual(test.part.volume, (2 / 3) * 1000 * pi, 5)
 
+    def test_several_planes(self):
+        with BuildPart() as test:
+            Box(2, 2, 2)
+            split(bisect_by=[Plane.XY, Plane.YZ], keep=Keep.ALL)
+        self.assertEqual(len(test.solids()), 4)
+        self.assertAlmostEqual(test.part.volume, 8, 5)
+
     def test_wrapped_object(self):
         obj = Box(1, 1, 1)
         obj = fillet(obj.edges().group_by(Axis.Z)[-1], 0.1)

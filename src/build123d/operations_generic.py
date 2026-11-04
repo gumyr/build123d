@@ -1269,7 +1269,7 @@ SplitType: TypeAlias = Edge | Wire | Face | Shell | Solid
 
 def split(
     objects: SplitType | Iterable[SplitType] | None = None,
-    bisect_by: Plane | Face | Shell = Plane.XZ,
+    bisect_by: Plane | Face | Shell | Iterable[Plane | Face | Shell] = Plane.XZ,
     keep: Keep = Keep.TOP,
     mode: Mode = Mode.REPLACE,
 ):
@@ -1277,12 +1277,14 @@ def split(
 
     Applies to 1, 2, and 3 dimensional objects.
 
-    Bisect object with plane and keep either top, bottom or both.
+    Bisect object with plane and keep either top, bottom or both. Several
+    surfaces may be given at once, in which case they are applied together
+    and all of the pieces are kept (``keep=Keep.ALL``).
 
     Args:
         objects (Edge |  Wire |  Face |  Solid or Iterable of), objects to split
-        bisect_by (Plane |  Face, optional): plane to segment part.
-            Defaults to Plane.XZ.
+        bisect_by (Plane |  Face | Shell or Iterable of, optional): surface(s) to
+            segment part. Defaults to Plane.XZ.
         keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
         mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
 
