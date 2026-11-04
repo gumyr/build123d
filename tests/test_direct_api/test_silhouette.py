@@ -31,7 +31,7 @@ import unittest
 from math import pi, sqrt
 from unittest.mock import patch
 
-from build123d.build_enums import GeomType
+from build123d.build_enums import GeomType, Keep
 from build123d.geometry import Axis, Location, Plane, Pos, Rot, Vector
 from build123d.objects_curve import Line, Spline
 from build123d.objects_part import Box, Cone, Cylinder, Sphere, Torus
@@ -235,6 +235,27 @@ class TestSplitBySilhouette(unittest.TestCase):
             split, _ = split_by_silhouette(shape, viewer)
             for fragment in split.faces():
                 self.assertEqual(fragment.silhouette_edges(viewer.direction), [])
+
+    def test_a_pole_and_a_grazing_edge_are_not_turns_of_the_normal(self):
+        """A B-spline patch of a stretched sphere's corner: at its pole the
+        surface has no normal and the kernel reads one pointing anywhere, and
+        along its equator the normal is perpendicular to the view but for the
+        noise of the fit. Neither is the normal turning through the view"""
+        egg = scale(Sphere(5), by=(1, 1, 0.8))
+        corner = (
+            egg.split(Plane.XY, keep=Keep.BOTTOM)
+            .split(Plane.XZ, keep=Keep.TOP)
+            .split(Plane.YZ, keep=Keep.TOP)
+        )
+        self.assertEqual(
+            [f.geom_type for f in corner.faces()].count(GeomType.BSPLINE), 1
+        )
+        for direction in ((0, 0, 1), (0, 0, -1), (1, 0, 0)):
+            with self.subTest(direction=direction):
+                split, _ = split_by_silhouette(corner, Viewer.along(direction))
+                self.assertAlmostEqual(
+                    sum(f.area for f in split.faces()), corner.area, 4
+                )
 
 
 class TestFaceSilhouetteEdges(unittest.TestCase):

@@ -52,6 +52,9 @@ from OCP.GeomProjLib import GeomProjLib
 from OCP.gp import gp_Ax3, gp_Dir, gp_Pnt, gp_Pnt2d, gp_Vec
 from OCP.Standard import Standard_Failure
 from OCP.StdFail import StdFail_NotDone
+from OCP.TopAbs import TopAbs_EDGE
+from OCP.TopExp import TopExp_Explorer
+from OCP.TopoDS import TopoDS
 
 from build123d.build_enums import GeomType
 from build123d.geometry import (
@@ -235,6 +238,10 @@ def _off_the_boundary(face: Face, edges: ShapeList[Edge]) -> ShapeList[Edge]:
     return kept
 
 
+_GRAZING = 1e-3
+"""A normal this nearly perpendicular to the view is taken as perpendicular"""
+
+
 def _normal_turns_through(face: Face, viewer: Viewer) -> bool:
     """Does the face's normal change sign against the viewing direction?
 
@@ -248,14 +255,23 @@ def _normal_turns_through(face: Face, viewer: Viewer) -> bool:
     signs: set[bool] = set()
 
     def note(normal: Vector, point: Vector) -> None:
+        # Along an edge that is itself the contour the normal is perpendicular
+        # to the view, up to the noise of the surface's evaluation, which on a
+        # B-spline fit runs well past the modelling tolerance
         along = normal.dot(viewer.direction_at(point))
-        if abs(along) > TOLERANCE:
+        if abs(along) > _GRAZING:
             signs.add(along > 0)
 
     anchors = [face.interior_point()] + [
         edge.position_at(t) for edge in face.edges() for t in (0.0, 0.5, 1.0)
     ]
+    # A degenerate edge is a pole of the surface, where it has no normal; the
+    # kernel evaluates one there anyway, pointing wherever its limit went, so
+    # an anchor on a pole says nothing about the face
+    poles = [Vector(v) for edge in _degenerate_edges(face) for v in edge.vertices()]
     for point in anchors:
+        if any((point - pole).length < TOLERANCE for pole in poles):
+            continue
         note(face.normal_at(point), point)
     u_min, u_max, v_min, v_max = face._uv_bounds()
     sampler = BRepTopAdaptor_TopolTool(BRepAdaptor_Surface(face.wrapped))
@@ -268,6 +284,19 @@ def _normal_turns_through(face: Face, viewer: Viewer) -> bool:
         if face.is_inside(u, v):
             note(face.normal_at(u, v), face.position_at(u, v))
     return len(signs) == 2
+
+
+def _degenerate_edges(face: Face) -> list[Edge]:
+    """The face's degenerate edges, each a side of its surface collapsed to a
+    point, as at a sphere's pole. ``Face.edges`` leaves them out."""
+    found: list[Edge] = []
+    explorer = TopExp_Explorer(face.wrapped, TopAbs_EDGE)
+    while explorer.More():
+        topods_edge = TopoDS.Edge(explorer.Current())
+        if BRep_Tool.Degenerated_s(topods_edge):
+            found.append(Edge(topods_edge))
+        explorer.Next()
+    return found
 
 
 def split_by_silhouette(shape: Shape, viewer: Viewer) -> tuple[Shape, ShapeHistory]:
