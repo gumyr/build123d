@@ -197,11 +197,11 @@ from .utils import (
     _topods_point_on_face,
     find_max_dimension,
 )
+from .uv_write import UVFrame
 from .zero_d import Vertex
 
 if TYPE_CHECKING:  # pragma: no cover
     from .silhouette import visible_regions
-    from .uv_write import UVFrame
     from .composite import Compound, Curve  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
 
@@ -2873,8 +2873,6 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             UVFrame: the frame
         """
-        from .uv_write import UVFrame  # pylint: disable=import-outside-toplevel
-
         return UVFrame.at(self, location, tolerance)
 
     @overload
