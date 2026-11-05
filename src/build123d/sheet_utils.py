@@ -41,6 +41,7 @@ from OCP.collections import (
 )
 from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Section
 from OCP.BRepBuilderAPI import (
     BRepBuilderAPI_GTransform,
     BRepBuilderAPI_MakeEdge,
@@ -62,9 +63,15 @@ from OCP.TopoDS import (
 )
 
 from build123d.build_enums import GeomType, SheetSurface
-from build123d.geometry import TOLERANCE, Location, Matrix, Plane, Vector
+from build123d.geometry import TOLERANCE, Axis, Location, Matrix, Plane, Vector
 from build123d.topology.one_d import Edge
-from build123d.topology.shape_core import _topods_area, _topods_entities, downcast
+from build123d.topology.shape_core import (
+    _topods_area,
+    _topods_bool_op,
+    _topods_entities,
+    _topods_face_normal_at,
+    downcast,
+)
 from build123d.topology.utils import (
     _topods_face_normal,
     _topods_face_position,
@@ -153,6 +160,33 @@ class UnfoldedFace:
     neutral_radius: float = 0.0
     bend_line: Edge | None = None
     up: bool = False
+
+
+@dataclass
+class _Development:
+    """An :class:`UnfoldedFace` before its sheet face is wrapped: the kernel
+    face of the folded sheet and the bend fields. Unfolding works on kernel
+    shapes throughout; :meth:`~topology.Shell.unfold` makes the Faces."""
+
+    source: TopoDS_Face
+    is_bend: bool
+    angle: float = 0.0
+    inside_radius: float = 0.0
+    neutral_radius: float = 0.0
+    bend_line: Edge | None = None
+    up: bool = False
+
+    def unfolded(self, sheet_face: Face) -> UnfoldedFace:
+        """The record for the user, with the sheet face wrapped"""
+        return UnfoldedFace(
+            sheet_face,
+            self.is_bend,
+            self.angle,
+            self.inside_radius,
+            self.neutral_radius,
+            self.bend_line,
+            self.up,
+        )
 
 
 class UnfoldOutput(NamedTuple):
@@ -618,7 +652,7 @@ def _sew_developed_faces(
     ]
 
 
-def _folds_up(sheet_face: Face, placed: _DevelopedFace) -> bool:
+def _folds_up(sheet_face: TopoDS_Face, placed: _DevelopedFace) -> bool:
     """Does a bend fold toward +Z as its development lies in the flat pattern?
 
     The development keeps, for every edge, which way the edge runs and which
@@ -638,14 +672,13 @@ def _folds_up(sheet_face: Face, placed: _DevelopedFace) -> bool:
     source_end = Edge(source_edge).position_at(1)
     developed_start, developed_end = _ordered_developed_edge_points(record, source_edge)
     source_hand = (source_end - source_start).cross(
-        _topods_material_side(sheet_face.wrapped, source_edge)
+        _topods_material_side(sheet_face, source_edge)
     )
     flat_hand = (developed_end - developed_start).cross(
         _topods_material_side(placed.face, developed_edge)
     )
 
-    axis = sheet_face.axis_of_rotation
-    assert axis is not None  # a cylinder always has one
+    axis = Axis(BRepAdaptor_Surface(sheet_face).Cylinder().Axis())
     edge_middle = (source_start + source_end) / 2
     axis_point = axis.position + axis.direction * (
         (edge_middle - axis.position).dot(axis.direction)
@@ -657,18 +690,14 @@ def _unfolded_face(
     source_face: TopoDS_Face,
     placed: _DevelopedFace,
     sheet_parameters: SheetMetalParameters | None,
-) -> UnfoldedFace:
+) -> _Development:
     """The record of a face of the flat pattern: a flat as it is, a bend with
     its angle, radii, bend line and direction."""
-    # pylint: disable=import-outside-toplevel
-    from build123d.topology.two_d import Face
+    surface = BRepAdaptor_Surface(source_face)
+    if surface.GetType() != ga.GeomAbs_Cylinder:
+        return _Development(source_face, is_bend=False)
 
-    sheet_face = Face(source_face)
-    if sheet_face.geom_type != GeomType.CYLINDER:
-        return UnfoldedFace(sheet_face=sheet_face, is_bend=False)
-
-    radius = sheet_face.radius
-    assert radius is not None  # a cylinder always has one
+    radius = surface.Cylinder().Radius()
     positive = is_positive_bend(source_face)
     if sheet_parameters is None:
         inside_radius = neutral = radius
@@ -687,8 +716,16 @@ def _unfolded_face(
     bend_line = Edge.make_line((x_middle, v_min, 0), (x_middle, v_max, 0)).moved(
         placed.placement
     )
-    on_material = bend_line.intersect(Face(placed.face))
-    pieces = on_material.edges() if on_material is not None else []
+    on_material = _topods_bool_op(
+        [placed.face], [bend_line.wrapped], BRepAlgoAPI_Section()
+    )
+    pieces = (
+        []
+        if on_material.IsNull()
+        else [
+            Edge(TopoDS.Edge(piece)) for piece in _topods_entities(on_material, "Edge")
+        ]
+    )
     if pieces:
         start = bend_line.position_at(0)
         along = (bend_line.position_at(1) - start).normalized()
@@ -701,14 +738,14 @@ def _unfolded_face(
             start + along * min(reach), start + along * max(reach)
         )
 
-    return UnfoldedFace(
-        sheet_face=sheet_face,
+    return _Development(
+        source_face,
         is_bend=True,
         angle=degrees(u_max - u_min),
         inside_radius=inside_radius,
         neutral_radius=neutral,
         bend_line=bend_line,
-        up=_folds_up(sheet_face, placed),
+        up=_folds_up(source_face, placed),
     )
 
 
@@ -726,16 +763,16 @@ def _require_tangent(edge: TopoDS_Edge, first: TopoDS_Face, second: TopoDS_Face)
     Raises:
         ValueError: the faces meet at an angle along the edge
     """
-    from build123d.topology.two_d import Face  # pylint: disable=import-outside-toplevel
-
     middle = Edge(edge).position_at(0.5)
-    kinds = [Face(face).geom_type for face in (first, second)]
-    normals = [Face(face).normal_at(middle) for face in (first, second)]
+    kinds = [BRepAdaptor_Surface(face).GetType() for face in (first, second)]
+    normals = [
+        _topods_face_normal_at(face, middle.to_pnt()) for face in (first, second)
+    ]
     if normals[0].cross(normals[1]).length < TANGENT_TOLERANCE:
         return
     angle = degrees(acos(min(1.0, abs(normals[0].dot(normals[1])))))
     at = tuple(round(coordinate, 3) for coordinate in middle)
-    if all(kind == GeomType.PLANE for kind in kinds):
+    if all(kind == ga.GeomAbs_Plane for kind in kinds):
         what = f"joins two flats at {angle:.4g}\u00b0 with no bend between them"
     else:
         what = f"joins a flat to a bend {angle:.4g}\u00b0 off its tangent"
@@ -748,11 +785,11 @@ def _require_tangent(edge: TopoDS_Edge, first: TopoDS_Face, second: TopoDS_Face)
 def _unfold_shell(
     shell: TopoDS_Shell,
     sheet_parameters: SheetMetalParameters | None,
-) -> tuple[TopoDS_Shell, FaceMap[UnfoldedFace]]:
+) -> tuple[TopoDS_Shell, list[tuple[TopoDS_Face, _Development]]]:
     """Develop a planar/cylindrical shell onto the XY plane.
 
-    Returns the flat shell and, for each of its faces, what it developed
-    from.
+    Returns the flat shell and, for each of its faces, that face with what it
+    developed from.
     """
     if sheet_parameters is not None and not isinstance(
         sheet_parameters, SheetMetalParameters
@@ -842,12 +879,8 @@ def _unfold_shell(
     if not BRepCheck_Analyzer(result).IsValid():
         raise ValueError("Unfolding produced an invalid flat Shell")
 
-    # pylint: disable=import-outside-toplevel
-    from build123d.topology.two_d import Face
-
-    records: FaceMap[UnfoldedFace] = FaceMap()
-    for key, flat_face in zip(keys, flat_faces):
-        records[Face(flat_face)] = _unfolded_face(
-            faces_by_key[key], placed[key], sheet_parameters
-        )
-    return result, records
+    unfolded = [
+        (flat_face, _unfolded_face(faces_by_key[key], placed[key], sheet_parameters))
+        for key, flat_face in zip(keys, flat_faces)
+    ]
+    return result, unfolded
