@@ -33,7 +33,7 @@ from build123d.build_enums import Align
 from build123d.geometry import Axis, Location, Plane, Pos, Vector
 from build123d.objects_part import Box
 from build123d.topology import Compound, Edge, Face, Solid, Wire
-from build123d.topology.two_d import _edge_on
+from build123d.topology.silhouette import _edge_on
 
 
 class TestProjection(unittest.TestCase):

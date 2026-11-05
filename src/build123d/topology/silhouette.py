@@ -40,21 +40,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import pi
+from typing import TYPE_CHECKING, cast
 
 from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
+from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
 from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepTopAdaptor import BRepTopAdaptor_TopolTool
 from OCP.Contap import Contap_Contour, Contap_IType, Contap_Line
 from OCP.Geom import Geom_Plane
 from OCP.GeomProjLib import GeomProjLib
-from OCP.gp import gp_Ax3, gp_Dir, gp_Pnt, gp_Pnt2d, gp_Vec
+from OCP.collections import List_TopoDS_Shape
+from OCP.gp import gp_Ax3, gp_Dir, gp_Pln, gp_Pnt, gp_Pnt2d, gp_Vec
 from OCP.Standard import Standard_Failure
 from OCP.StdFail import StdFail_NotDone
 from OCP.TopAbs import TopAbs_EDGE
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopoDS import TopoDS
+from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shell, TopoDS_Vertex
 
 from build123d.build_enums import GeomType
 from build123d.geometry import (
@@ -69,14 +72,31 @@ from build123d.geometry import (
 
 from .history import ShapeHistory
 from .one_d import Edge, Wire
-from .shape_core import Shape, ShapeList, downcast
-from .two_d import Face, _edge_on, _project_profile_by_extrusion
+from .shape_core import (
+    Shape,
+    ShapeList,
+    _sew_topods_faces,
+    _topods_entities,
+    downcast,
+    get_top_level_topods_shapes,
+)
 from .utils import (
     _extrude_topods_shape,
     _make_topods_compound_from_shapes,
     find_max_dimension,
 )
 from .uv_write import UVFrame
+from .zero_d import Vertex
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .two_d import Face, Shell
+
+
+def _as_face(obj: TopoDS_Face) -> Face:
+    """The kernel face wrapped. Faces are made through the class registry
+    rather than by importing ``Face``, so that this module sits below two_d
+    and the Face methods built on it can import it."""
+    return cast("Face", Shape.cast(obj))
 
 
 @dataclass(frozen=True)
@@ -343,6 +363,115 @@ def visible_faces(shape: Shape, viewer: Viewer) -> ShapeList[Face]:
     return front_facing(split.faces(), viewer)
 
 
+def _edge_on(face: Face, direction: VectorLike) -> bool:
+    """Whether a face casts no shadow along a direction.
+
+    Only a surface swept along the direction has its normal perpendicular to
+    it everywhere: a plane containing the direction, a cylinder with its axis
+    along it, or a linear extrusion swept along it. Every other surface tilts
+    somewhere and casts a shadow there, so it is never edge-on; a free-form
+    surface is at most edge-on within tolerance, which is not worth chasing.
+    """
+    if face.is_empty:
+        return False
+    direction = Vector(direction).normalized()
+    plane = face.is_planar
+    if plane is not None:
+        return abs(plane.z_dir.dot(direction)) < TOLERANCE
+    if face.geom_type == GeomType.CYLINDER:
+        axis = face.axis_of_rotation
+        assert axis is not None
+        along = axis.direction
+    elif face.geom_type == GeomType.EXTRUSION:
+        swept = face.extrusion_direction
+        assert swept is not None
+        along = swept
+    else:
+        return False
+    return along.cross(direction).length < TOLERANCE
+
+
+def _project_profile_by_extrusion(
+    profile: Face, target: Shape, direction: VectorLike, keep_edge_on: bool = False
+) -> ShapeList[Face | Shell]:
+    """The regions of a target's surface that a profile covers when swept along a
+    direction, nearest first.
+
+    The profile is extruded far enough to pass right through the target and the
+    extrusion is intersected with the target. The faces of the result that came
+    from the target, whether the boolean rebuilt them or left them untouched
+    inside the column, are sewn into the surfaces the column passes through, one
+    Face or Shell each, and ordered by distance along ``direction`` from the
+    profile. This is the core of :meth:`Face.project_to_shape`.
+
+    The boolean is run directly rather than through :meth:`Shape.intersect`,
+    whose ``UnifySameDomain`` clean could merge a target fragment into a coplanar
+    face of the extrusion before the fragment is attributed.
+
+    A target face lying along the direction, inside the column or on its wall,
+    survives the boolean but has no area for a projection to land on, and
+    sewing joins the surfaces on either side of it into one region. Such faces
+    are dropped unless ``keep_edge_on`` asks for them: an extrusion stopping at
+    a stepped surface needs the risers to make a surface that cuts it.
+
+    Args:
+        profile (Face): the face swept along the direction
+        target (Shape): the shape whose surface is sampled
+        direction (VectorLike): the sweep direction; only surfaces ahead of the
+            profile are found
+        keep_edge_on (bool, optional): keep the target faces lying along the
+            direction. Defaults to False.
+
+    Raises:
+        TypeError: the target is a Vertex
+        RuntimeError: sewing returned something other than faces and shells
+
+    Returns:
+        ShapeList[Face | Shell]: the surfaces met, nearest first; empty when the
+        column misses the target
+    """
+    if isinstance(target, Vertex):
+        raise TypeError("projection to a vertex is not supported")
+    direction = Vector(direction)
+    max_dimension = find_max_dimension([profile, target])
+    extrusion = _extrude_topods_shape(profile.wrapped, direction * max_dimension)
+
+    arguments, tools = List_TopoDS_Shape(), List_TopoDS_Shape()
+    arguments.Append(target.wrapped)
+    tools.Append(extrusion)
+    operation = BRepAlgoAPI_Common()
+    operation.SetArguments(arguments)
+    operation.SetTools(tools)
+    operation.SetRunParallel(True)
+    operation.Build()
+    result = operation.Shape()
+    if result.IsNull():
+        return ShapeList()
+
+    history = ShapeHistory.from_boolean(
+        operation, before=[target.wrapped], brought=[extrusion]
+    )
+    trace = history.trace([target.wrapped])
+    target_faces = [
+        TopoDS.Face(face)
+        for face in _topods_entities(result, "Face")
+        if (trace.is_modified(face) or trace.is_untouched(face))
+        and (keep_edge_on or not _edge_on(_as_face(TopoDS.Face(face)), direction))
+    ]
+    if not target_faces:
+        return ShapeList()
+
+    # Sewing can hand back a vertex or edge of a face as a free sub-shape
+    # beside the faces and shells; those carry no surface and are dropped
+    regions: ShapeList[Face | Shell] = ShapeList()
+    for region in get_top_level_topods_shapes(_sew_topods_faces(target_faces)):
+        if isinstance(region, (TopoDS_Face, TopoDS_Shell)):
+            regions.append(cast("Face | Shell", Shape.cast(region)))
+        elif not isinstance(region, (TopoDS_Vertex, TopoDS_Edge)):
+            raise RuntimeError(f"Invalid sewn shape {type(region)}")
+    return regions.sort_by(Axis(profile.center(), direction))
+
+
 def _as_one_shape(faces: ShapeList[Face]) -> Shape:
     """The faces bundled as a single shape, for operations that take one"""
     return Shape.cast(_make_topods_compound_from_shapes([f.wrapped for f in faces]))
@@ -439,10 +568,13 @@ def silhouette_on_plane(shape: Shape, plane: Plane) -> ShapeList[Face]:
     # already past the plane, and move the result back onto the plane
     footprint = plane.to_local_coords(shape).bounding_box(optimal=False)
     depth = footprint.min.Z - 1 if above else footprint.max.Z + 1
+    half_width, half_height = footprint.size.X + 0.5, footprint.size.Y + 0.5
     screen = plane.from_local_coords(
-        Face.make_rect(2 * footprint.size.X + 1, 2 * footprint.size.Y + 1).moved(
-            Location((footprint.center().X, footprint.center().Y, depth))
-        )
+        _as_face(
+            BRepBuilderAPI_MakeFace(
+                gp_Pln(), -half_width, half_width, -half_height, half_height
+            ).Face()
+        ).moved(Location((footprint.center().X, footprint.center().Y, depth)))
     )
     flat = [
         face

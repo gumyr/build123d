@@ -129,7 +129,6 @@ from OCP.TopoDS import (
     TopoDS_Shape,
     TopoDS_Shell,
     TopoDS_Solid,
-    TopoDS_Vertex,
 )
 from OCP.TopLoc import TopLoc_Location
 from ocp_gordon import interpolate_curve_network
@@ -186,6 +185,12 @@ from .shape_core import (
     get_top_level_topods_shapes,
     shapetype,
 )
+from .silhouette import (
+    Viewer,
+    _project_profile_by_extrusion,
+    silhouette_edges,
+    visible_regions,
+)
 from .utils import (
     _extrude_topods_shape,
     _make_loft,
@@ -195,13 +200,11 @@ from .utils import (
     _topods_face_center,
     _topods_face_position,
     _topods_point_on_face,
-    find_max_dimension,
 )
 from .uv_write import UVFrame
 from .zero_d import Vertex
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .silhouette import visible_regions
     from .composite import Compound, Curve  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
 
@@ -2766,9 +2769,6 @@ class Face(Mixin2D[TopoDS_Face]):
             ShapeList[Face]: Face(s) projected on target object ordered by distance
         """
         if hit == Hit.VISIBLE:
-            # pylint: disable=import-outside-toplevel
-            from .silhouette import visible_regions
-
             return ShapeList(visible_regions(self, target_object, direction))
         regions = _project_profile_by_extrusion(self, target_object, direction)
         if callable(hit):
@@ -2838,9 +2838,6 @@ class Face(Mixin2D[TopoDS_Face]):
         Returns:
             ShapeList[Edge]: the silhouette edges, empty if the face has none
         """
-        # pylint: disable=import-outside-toplevel
-        from .silhouette import Viewer, silhouette_edges
-
         if direction is not None and eye is None:
             viewer = Viewer.along(direction)
         elif eye is not None and direction is None:
@@ -3490,118 +3487,6 @@ class Shell(Mixin2D[TopoDS_Shell]):
         # Find the closest Face and get the location from it
         face = self.faces().sort_by(lambda f: f.distance_to(surface_point))[0]
         return face.location_at(surface_point, x_dir=x_dir)
-
-
-def _edge_on(face: Face, direction: VectorLike) -> bool:
-    """Whether a face casts no shadow along a direction.
-
-    Only a surface swept along the direction has its normal perpendicular to
-    it everywhere: a plane containing the direction, a cylinder with its axis
-    along it, or a linear extrusion swept along it. Every other surface tilts
-    somewhere and casts a shadow there, so it is never edge-on; a free-form
-    surface is at most edge-on within tolerance, which is not worth chasing.
-    """
-    if face.is_empty:
-        return False
-    direction = Vector(direction).normalized()
-    plane = face.is_planar
-    if plane is not None:
-        return abs(plane.z_dir.dot(direction)) < TOLERANCE
-    if face.geom_type == GeomType.CYLINDER:
-        axis = face.axis_of_rotation
-        assert axis is not None
-        along = axis.direction
-    elif face.geom_type == GeomType.EXTRUSION:
-        swept = face.extrusion_direction
-        assert swept is not None
-        along = swept
-    else:
-        return False
-    return along.cross(direction).length < TOLERANCE
-
-
-def _project_profile_by_extrusion(
-    profile: Face, target: Shape, direction: VectorLike, keep_edge_on: bool = False
-) -> ShapeList[Face | Shell]:
-    """The regions of a target's surface that a profile covers when swept along a
-    direction, nearest first.
-
-    The profile is extruded far enough to pass right through the target and the
-    extrusion is intersected with the target. The faces of the result that came
-    from the target, whether the boolean rebuilt them or left them untouched
-    inside the column, are sewn into the surfaces the column passes through, one
-    Face or Shell each, and ordered by distance along ``direction`` from the
-    profile. This is the core shared by :meth:`Face.project_to_shape` and
-    :meth:`Solid.extrude_until`.
-
-    The boolean is run directly rather than through :meth:`Shape.intersect`,
-    whose ``UnifySameDomain`` clean could merge a target fragment into a coplanar
-    face of the extrusion before the fragment is attributed.
-
-    A target face lying along the direction, inside the column or on its wall,
-    survives the boolean but has no area for a projection to land on, and
-    sewing joins the surfaces on either side of it into one region. Such faces
-    are dropped unless ``keep_edge_on`` asks for them: an extrusion stopping at
-    a stepped surface needs the risers to make a surface that cuts it.
-
-    Args:
-        profile (Face): the face swept along the direction
-        target (Shape): the shape whose surface is sampled
-        direction (VectorLike): the sweep direction; only surfaces ahead of the
-            profile are found
-        keep_edge_on (bool, optional): keep the target faces lying along the
-            direction. Defaults to False.
-
-    Raises:
-        TypeError: the target is a Vertex
-        RuntimeError: sewing returned something other than faces and shells
-
-    Returns:
-        ShapeList[Face | Shell]: the surfaces met, nearest first; empty when the
-        column misses the target
-    """
-    if isinstance(target, Vertex):
-        raise TypeError("projection to a vertex is not supported")
-    direction = Vector(direction)
-    max_dimension = find_max_dimension([profile, target])
-    extrusion = _extrude_topods_shape(profile.wrapped, direction * max_dimension)
-
-    arguments, tools = List_TopoDS_Shape(), List_TopoDS_Shape()
-    arguments.Append(target.wrapped)
-    tools.Append(extrusion)
-    operation = BRepAlgoAPI_Common()
-    operation.SetArguments(arguments)
-    operation.SetTools(tools)
-    operation.SetRunParallel(True)
-    operation.Build()
-    result = operation.Shape()
-    if result.IsNull():
-        return ShapeList()
-
-    history = ShapeHistory.from_boolean(
-        operation, before=[target.wrapped], brought=[extrusion]
-    )
-    trace = history.trace([target.wrapped])
-    target_faces = [
-        TopoDS.Face(face)
-        for face in _topods_entities(result, "Face")
-        if (trace.is_modified(face) or trace.is_untouched(face))
-        and (keep_edge_on or not _edge_on(Face(TopoDS.Face(face)), direction))
-    ]
-    if not target_faces:
-        return ShapeList()
-
-    # Sewing can hand back a vertex or edge of a face as a free sub-shape
-    # beside the faces and shells; those carry no surface and are dropped
-    regions: ShapeList[Face | Shell] = ShapeList()
-    for region in get_top_level_topods_shapes(_sew_topods_faces(target_faces)):
-        if isinstance(region, TopoDS_Face):
-            regions.append(Face(region))
-        elif isinstance(region, TopoDS_Shell):
-            regions.append(Shell(region))
-        elif not isinstance(region, (TopoDS_Vertex, TopoDS_Edge)):
-            raise RuntimeError(f"Invalid sewn shape {type(region)}")
-    return regions.sort_by(Axis(profile.center(), direction))
 
 
 def sort_wires_by_build_order(wire_list: list[Wire]) -> list[list[Wire]]:
