@@ -207,6 +207,7 @@ __all__ = [
     "Location",
     "GeomEncoder",
     "Joint",
+    "JointDict",
     "RigidJoint",
     "RevoluteJoint",
     "Sketch",

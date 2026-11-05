@@ -31,6 +31,7 @@ license:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import ClassVar, cast
 
 from typing_extensions import deprecated
@@ -40,7 +41,17 @@ from build123d.build_enums import Mode
 from build123d.build_sheet import BuildSheet
 from build123d.geometry import Location, Plane
 from build123d.sheet_utils import SheetMetalParameters
-from build123d.topology import Edge, Face, Joint, Part, Shape, Shell, Solid, Wire
+from build123d.topology import (
+    Edge,
+    Face,
+    Joint,
+    JointDict,
+    Part,
+    Shape,
+    Shell,
+    Solid,
+    Wire,
+)
 
 
 class BuildPart(Builder[Part]):
@@ -69,7 +80,7 @@ class BuildPart(Builder[Part]):
         *placements: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
-        self.joints: dict[str, Joint] = {}
+        self._joints: JointDict = JointDict(self)
         self._part: Part = Part()  # nothing yet; use a private attribute
         self.pending_faces: list[Face] = []
         self.pending_face_planes: list[Plane] = []
@@ -79,12 +90,17 @@ class BuildPart(Builder[Part]):
         super().__init__(*placements, mode=mode)
 
     def _accept_publication(
-        self, build_product: Shape, source: Builder | None, mode: Mode
+        self,
+        build_product: Shape,
+        source: Builder | None,
+        mode: Mode,
+        placements: Sequence[Location] = (Location(),),
     ) -> None:
-        """Capture a nested BuildSheet's shell as pending sheet-metal input.
+        """Capture a nested BuildSheet's shell as pending sheet-metal input,
+        and its joints as this part's.
 
-        The sheet parameters are read from the producing BuildSheet so that
-        construction metadata never has to ride on the published Shell.
+        The sheet parameters and joints are read from the producing BuildSheet
+        so that construction metadata never has to ride on the published Shell.
         """
         if isinstance(source, BuildSheet):
             shells = (
@@ -96,8 +112,34 @@ class BuildPart(Builder[Part]):
                 self.pending_sheets.extend(
                     (shell, source.sheet_parameters) for shell in shells
                 )
+                self._adopt_sheet_joints(source, placements)
                 return
-        super()._accept_publication(build_product, source, mode)
+        super()._accept_publication(build_product, source, mode, placements)
+
+    def _adopt_sheet_joints(
+        self, sheet: BuildSheet, placements: Sequence[Location]
+    ) -> None:
+        """Bind a nested sheet's joints to this part, one per placement of the
+        sheet, under the label given for one placement and ``label0``,
+        ``label1``, ... for several, as a Locations context labels them.
+
+        Raises:
+            ValueError: a label made for several placements is already taken
+        """
+        for label in list(sheet.joints):
+            joint = sheet.joints.pop(label)  # freed where it is, in the sheet frame
+            if len(placements) == 1:
+                labels = [label]
+            else:
+                labels = [f"{label}{index}" for index in range(len(placements))]
+                taken = [name for name in labels if name in self.joints]
+                if taken:
+                    raise ValueError(
+                        f"Joint label(s) {taken} already exist on the part; the "
+                        "sheet is placed several times"
+                    )
+            for name, placement in zip(labels, placements):
+                self.joints[name] = joint.moved(placement)
 
     @property
     def part(self) -> Part:
@@ -113,6 +155,22 @@ class BuildPart(Builder[Part]):
     def part_local(self) -> Part:
         """Get the part in the Builder's local construction coordinates."""
         return self._part
+
+    @property
+    def joints(self) -> dict[str, Joint]:
+        """The joints on the part: those being defined while the builder is open,
+        and the placed part's own once it has exited, so a joint read from the
+        builder is in the frame the part is in"""
+        if self._placed_obj is not None:
+            return self.part.joints
+        return self._joints
+
+    @joints.setter
+    def joints(self, value: dict[str, Joint]) -> None:
+        if self._placed_obj is not None:
+            self.part.joints = JointDict(self.part, value)
+        else:
+            self._joints = JointDict(self, value)
 
     @property
     def _obj(self) -> Part:
@@ -170,7 +228,5 @@ class BuildPart(Builder[Part]):
 
     def _exit_extras(self):
         """Transfer joints on exit"""
-        if self.joints:
-            self.part_local.joints = self.joints
-            for joint in self.part_local.joints.values():
-                joint.parent = self.part_local
+        if self._joints:
+            self.part_local.joints = JointDict(self.part_local, self._joints)

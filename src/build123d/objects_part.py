@@ -106,8 +106,6 @@ class BasePartObject(Part, BaseObject):
             parent=part.parent,
             children=part.children,
         )
-        for joint in self.joints.values():
-            joint._reparent(self)
 
 
 class Box(BasePartObject):

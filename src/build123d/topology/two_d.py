@@ -157,8 +157,10 @@ from build123d.geometry import (
     VectorLike,
 )
 from build123d.sheet_utils import (
+    FaceMap,
     SheetMetalParameters,
     UnfoldOutput,
+    UnfoldedFace,
     _unfold_shell,
     _uv_topods_edge,
     _uv_topods_face_with_map,
@@ -3456,7 +3458,10 @@ class Shell(Mixin2D[TopoDS_Shell]):
         """
         if not self:
             raise ValueError("unfold requires a non-empty Shell")
-        flat, face_map = _unfold_shell(self.wrapped, sheet_parameters)
+        flat, developments = _unfold_shell(self.wrapped, sheet_parameters)
+        face_map: FaceMap[UnfoldedFace] = FaceMap()
+        for flat_face, development in developments:
+            face_map[Face(flat_face)] = development.unfolded(Face(development.source))
         return UnfoldOutput(Shell(flat), face_map)
 
     def center(self) -> Vector:
