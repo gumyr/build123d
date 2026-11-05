@@ -4743,6 +4743,8 @@ class Wire(Mixin1D[TopoDS_Wire]):
         if hit == Hit.VISIBLE:
             if direction_vector is None:
                 raise ValueError("Hit.VISIBLE needs a direction, not a center")
+            # The silhouette module builds its results from Edge and Wire, so
+            # it sits above this one and cannot be imported at module level
             # pylint: disable=import-outside-toplevel
             from .silhouette import visible_curves
 
