@@ -2492,7 +2492,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """split and keep inside or outside"""
 
     @overload
-    def split(self, tool: TrimmingTool, keep: Literal[Keep.ALL]) -> list[Self]:
+    def split(
+        self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Literal[Keep.ALL]
+    ) -> list[Self]:
         """split and return the unordered pieces"""
 
     @overload
@@ -2509,20 +2511,39 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """invalid split"""
 
     @overload
+    def split(
+        self,
+        tool: Iterable[TrimmingTool],
+        keep: Literal[Keep.TOP, Keep.BOTTOM, Keep.BOTH, Keep.INSIDE, Keep.OUTSIDE],
+    ) -> NoReturn:
+        """several tools leave no side to keep"""
+
+    @overload
     def split(self, tool: TrimmingTool) -> Self | list[Self]:
         """split and keep inside (default)"""
 
-    def split(self, tool: TrimmingTool, keep: Keep = Keep.TOP):
+    def split(self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Keep = Keep.TOP):
         """split
 
-        Split this shape by the provided plane or face.
+        Split this shape by the provided plane, face or shell, or by several of
+        them at once.
+
+        A single tool has two sides, so the pieces can be kept by side. Several
+        tools are all applied in one operation and each is intersected with the
+        others, so faces that cross one another seal a region between them even
+        though no one of them divides the shape on its own (sewing the same faces
+        into one shell does not do this, as a shell is never intersected with
+        itself). The pieces then have no top or bottom, so several tools require
+        ``keep=Keep.ALL``.
 
         Args:
-            tool (Plane | Face): surface to segment shape
+            tool (Plane | Face | Shell | Iterable of): surface(s) to segment shape
             keep (Keep, optional): which object(s) to save. Defaults to Keep.TOP.
 
-        Returns:
-            Shape: result of split
+        Raises:
+            ValueError: no tool, an empty tool, an invalid keep, or several tools
+                with a keep other than Keep.ALL
+
         Returns:
             Self | list[Self],
             tuple[Self | list[Self]]: The result of the split operation.
@@ -2533,8 +2554,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
               the empty shape if no bottom is found.
             - **Keep.BOTH**: Returns a tuple `(inside, outside)` where each element is
               either a `Self` or `list[Self]`, or the empty shape if no corresponding part is found.
+            - **Keep.ALL**: Returns every piece as a `list[Self]`, in no particular order.
         """
-        if isinstance(tool, Shape) and tool.is_empty:
+        tools = [tool] if isinstance(tool, (Plane, Shape)) else list(tool)
+        if not tools:
+            raise ValueError("Can't split without a tool")
+        if any(isinstance(t, Shape) and t.is_empty for t in tools):
             raise ValueError("Can't split with an empty tool")
         if self.is_empty:  # nothing to split; nothing on either side
             nothing = self._zero_class()()
@@ -2544,18 +2569,38 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         if keep in [Keep.INSIDE, Keep.OUTSIDE]:
             raise ValueError(f"{keep} is invalid")
+        if len(tools) > 1 and keep != Keep.ALL:
+            raise ValueError(
+                "Several tools leave the pieces with no top or bottom; use keep=Keep.ALL"
+            )
 
         shape_list = List_TopoDS_Shape()
         shape_list.Append(self.wrapped)
 
-        # Define the splitting tool
-        trim_tool = (
-            BRepBuilderAPI_MakeFace(tool.wrapped).Face()  # gp_Pln to Face
-            if isinstance(tool, Plane)
-            else tool.wrapped
-        )
+        # Define the splitting tool(s). A lone plane becomes an unbounded face,
+        # but the kernel can't intersect two unbounded faces with each other, so
+        # with several tools each plane becomes a face that spans this shape.
+        def planar_face(plane: Plane) -> TopoDS_Face:
+            if len(tools) == 1:
+                return BRepBuilderAPI_MakeFace(plane.wrapped).Face()
+            bbox = self.bounding_box()
+            half_span = bbox.diagonal + 1.0
+            center = plane.to_local_coords(bbox.center())
+            return BRepBuilderAPI_MakeFace(
+                plane.wrapped,
+                center.X - half_span,
+                center.X + half_span,
+                center.Y - half_span,
+                center.Y + half_span,
+            ).Face()
+
+        tool = tools[0]
+        trim_tool = planar_face(tool) if isinstance(tool, Plane) else tool.wrapped
         tool_list = List_TopoDS_Shape()
-        tool_list.Append(trim_tool)
+        for a_tool in tools:
+            tool_list.Append(
+                planar_face(a_tool) if isinstance(a_tool, Plane) else a_tool.wrapped
+            )
 
         # Create the splitter algorithm
         splitter = BRepAlgoAPI_Splitter()

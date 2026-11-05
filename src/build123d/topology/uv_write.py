@@ -75,7 +75,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import cache
 from math import asin, atan2, ceil, cos, floor, hypot, pi, sin
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar, cast
 
 from scipy.integrate import solve_ivp
 
@@ -99,14 +99,17 @@ from OCP.IntTools import IntTools_FClass2d
 from OCP.gp import gp_Ax22d, gp_Dir2d, gp_Pln, gp_Pnt2d
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_State
 from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS
+from OCP.TopoDS import TopoDS, TopoDS_Face
 
 from build123d.build_enums import GeomType, Keep
 from build123d.geometry import TOLERANCE, Location, Matrix, Plane, Vector, VectorLike
 
 from .one_d import Edge, Wire
 from .shape_core import Shape, ShapeList
-from .two_d import Face
+from .utils import _make_topods_face_from_wires
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .two_d import Face
 
 PointMap = Callable[[float, float], tuple[float, float]]
 """A map from flat (x, y) to the (u, v) parameters of a surface"""
@@ -118,8 +121,15 @@ Period = tuple[Vector, float, float]
 """A periodic direction of a surface on the uv plane: its unit vector there,
 where the surface's own range starts along it, and the period"""
 
-Piece = TypeVar("Piece", Edge, Face)
+Piece = TypeVar("Piece", Edge, "Face")
 """An edge or a face of a mapped shape on the uv plane"""
+
+
+def _as_face(obj: TopoDS_Face) -> Face:
+    """The kernel face wrapped. Faces are made through the class registry
+    rather than by importing ``Face``, so that this module sits below two_d
+    and ``Face.uv_frame`` can import it."""
+    return cast("Face", Shape.cast(obj))
 
 
 class UVFrame:
@@ -320,8 +330,11 @@ class UVFrame:
         if not maker.IsDone():
             raise RuntimeError("could not build the punched face")
         punched = TopoDS.Face(maker.Face().Oriented(self.face.wrapped.Orientation()))
-        islands = [self._write_face(Face(island)) for island in lifted.inner_wires()]
-        return ShapeList([Face(punched).moved(self._placement), *islands])
+        islands = [
+            self._write_face(_as_face(_make_topods_face_from_wires(island.wrapped)))
+            for island in lifted.inner_wires()
+        ]
+        return ShapeList([_as_face(punched).moved(self._placement), *islands])
 
     # ---- the uv plane ----
 
@@ -398,9 +411,11 @@ class UVFrame:
 
     def _lift_face(self, planar: Face) -> Face:
         """The planar face's image on the uv plane, holes included"""
-        return Face(
-            self._lift_wire(planar.outer_wire()),
-            [self._lift_wire(wire) for wire in planar.inner_wires()],
+        return _as_face(
+            _make_topods_face_from_wires(
+                self._lift_wire(planar.outer_wire()).wrapped,
+                [self._lift_wire(wire).wrapped for wire in planar.inner_wires()],
+            )
         )
 
     def _point(self, uv: Vector) -> Vector:
@@ -543,7 +558,7 @@ class UVFrame:
         if not maker.IsDone():
             raise RuntimeError("could not build the written face")
         face = TopoDS.Face(maker.Face().Oriented(self.face.wrapped.Orientation()))
-        return Face(face).moved(self._placement)
+        return _as_face(face).moved(self._placement)
 
 
 # ---------------------------------------------------------------------------

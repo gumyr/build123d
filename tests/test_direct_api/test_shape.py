@@ -267,6 +267,53 @@ class TestShape(unittest.TestCase):
         with self.assertRaises(ValueError):
             Box(1, 1, 1).split(Plane.XY, keep=Keep.OUTSIDE)
 
+    def test_split_by_several_planes(self):
+        pieces = Box(2, 2, 2).split([Plane.XY, Plane.YZ, Plane.XZ], keep=Keep.ALL)
+        self.assertEqual(len(pieces), 8)
+        for piece in pieces:
+            self.assertAlmostEqual(piece.volume, 1, 5)
+
+        # the planes are bounded around the shape, wherever it is
+        far_box = Pos(100, 50, 20) * Box(2, 2, 2)
+        pieces = far_box.split(
+            [Plane.XY.offset(20), Plane.YZ.offset(100)], keep=Keep.ALL
+        )
+        self.assertEqual(len(pieces), 4)
+        self.assertAlmostEqual(sum(p.volume for p in pieces), 8, 5)
+
+    def test_split_by_faces_that_cross(self):
+        # Neither face divides the box on its own, and together they seal off
+        # the quadrant x > 0, z > 0 only because they are intersected with
+        # each other
+        box = Box(4, 4, 4)
+        horizontal = Pos(X=1) * Face.make_rect(4, 6, Plane.XY)  # z=0, x in [-1, 3]
+        vertical = Pos(Z=1) * Face.make_rect(6, 4, Plane.YZ)  # x=0, z in [-1, 3]
+        pieces = box.split([horizontal, vertical], keep=Keep.ALL)
+        self.assertEqual(len(pieces), 2)
+        self.assertAlmostEqual(min(p.volume for p in pieces), 2 * 4 * 2, 5)
+        self.assertAlmostEqual(max(p.volume for p in pieces), 64 - 16, 5)
+
+        # an edge is split by several tools too
+        edge = Edge.make_line((-2, 0, 0), (2, 0, 0))
+        lengths = sorted(
+            p.length for p in edge.split([Plane.YZ, Plane.YZ.offset(1)], keep=Keep.ALL)
+        )
+        self.assertEqual(len(lengths), 3)
+        self.assertAlmostEqual(lengths[-1], 2, 5)
+
+    def test_split_by_several_tools_needs_keep_all(self):
+        box = Box(1, 1, 1)
+        with self.assertRaises(ValueError):
+            box.split([Plane.XY, Plane.YZ])
+        with self.assertRaises(ValueError):
+            box.split([Plane.XY, Plane.YZ], keep=Keep.BOTH)
+        with self.assertRaises(ValueError):
+            box.split([], keep=Keep.ALL)
+        with self.assertRaises(ValueError):
+            box.split([Plane.XY, Face()], keep=Keep.ALL)
+        # a list holding one tool behaves as that tool
+        self.assertAlmostEqual(box.split([Plane.XY], keep=Keep.TOP).volume, 0.5, 5)
+
     def test_distance(self):
         sphere1 = Solid.make_sphere(1, Plane((-5, 0, 0)))
         sphere2 = Solid.make_sphere(1, Plane((5, 0, 0)))

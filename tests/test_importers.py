@@ -1,4 +1,5 @@
 from io import BytesIO, StringIO
+import ctypes
 import os
 from os import fsencode, fsdecode
 import unittest
@@ -187,6 +188,11 @@ class ImportBREP(unittest.TestCase):
             with self.subTest(binary=binary):
                 with self.assertRaises(ValueError):
                     import_brep(BytesIO(b"not a brep"), binary=binary)
+        # The kernel complains about the garbage on the C++ stdout, which
+        # pytest only captures if it is flushed before the test ends;
+        # otherwise the lines leak out after the run.
+        c_runtime = ctypes.cdll.msvcrt if os.name == "nt" else ctypes.CDLL(None)
+        c_runtime.fflush(None)
 
     def test_stream_round_trip(self):
         box = Solid.make_box(1, 2, 3)

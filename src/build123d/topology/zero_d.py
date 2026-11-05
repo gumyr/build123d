@@ -489,7 +489,7 @@ class Vertex(Shape[TopoDS_Vertex]):
         self._needs_geometry("center")
         return Vector(self)
 
-    def split(self, tool: TrimmingTool, keep: Keep = Keep.TOP):
+    def split(self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Keep = Keep.TOP):
         """split - not implemented"""
         raise NotImplementedError("Vertices cannot be split.")
 
