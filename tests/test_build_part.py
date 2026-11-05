@@ -543,9 +543,10 @@ class TestExtrude(unittest.TestCase):
         self.assertAlmostEqual(p.part.volume, 72.313, 2)
 
     def test_extrude_until_from_a_face_of_the_target(self):
-        """A sketch drawn on a face of the target extrudes into it: LAST
-        reaches the far side of the material, a cavity's underside here.
-        NEXT reaches the face the sketch lies in, which cuts nothing"""
+        """A sketch drawn on a face of the target extrudes into it, to the
+        far side of the material, a cavity's underside here. The face the
+        sketch lies in is no surface to stop at, so NEXT reaches the same
+        place as LAST"""
         with BuildPart() as body:
             with BuildSketch(Plane.YZ.offset(-10)):
                 Rectangle(20, 10, align=(Align.CENTER, Align.MIN))
@@ -560,8 +561,29 @@ class TestExtrude(unittest.TestCase):
             self.assertAlmostEqual(rib.bounding_box().min.Z, 0, 6)
             self.assertAlmostEqual(rib.bounding_box().max.Z, 7 - sqrt(36 - 25), 4)
             self.assertAlmostEqual(rib.volume, 72.302, 2)
-            with self.assertRaisesRegex(ValueError, "does not cut the extrusion"):
-                extrude(cross.sketch, until=Until.NEXT, mode=Mode.PRIVATE)
+            nearest = extrude(cross.sketch, until=Until.NEXT, mode=Mode.PRIVATE)
+            self.assertAlmostEqual(nearest.volume, rib.volume, 5)
+
+    def test_extrude_until_from_inside_the_material(self):
+        """A profile inside the target stops where the extrusion leaves the
+        material, at a face looking away from it"""
+        block = Box(20, 20, 20)
+        buried = Pos(Z=-5) * Circle(2)
+        column = extrude(buried, until=Until.NEXT, dir=(0, 0, 1), target=block)
+        self.assertAlmostEqual(column.volume, pi * 4 * 15, 4)
+        self.assertAlmostEqual(column.bounding_box().max.Z, 10, 5)
+
+        hollow = Box(20, 20, 20) - Box(16, 16, 16)
+        in_the_floor = Pos(Z=-9) * Circle(2)
+        for until, top in ((Until.NEXT, -8), (Until.LAST, 10)):
+            with self.subTest(until=until):
+                column = extrude(
+                    in_the_floor, until=until, dir=(0, 0, 1), target=hollow
+                )
+                self.assertAlmostEqual(column.bounding_box().max.Z, top, 5)
+        in_the_cavity = Circle(2)
+        column = extrude(in_the_cavity, until=Until.NEXT, dir=(0, 0, 1), target=hollow)
+        self.assertAlmostEqual(column.bounding_box().max.Z, 8, 5)
 
     def test_extrude_until_a_stepped_surface(self):
         """A target face lying wholly inside the column, the boss top here, is
@@ -587,31 +609,63 @@ class TestExtrude(unittest.TestCase):
                 target=Pos(Z=-10) * Box(1, 1, 1),
             )
 
-    def test_extrude_until_invalid_sewn_shape(self):
-        profile = Face.make_rect(1, 1)
-        target = Box(2, 2, 2)
-        direction = Vector(0, 0, 1)
+    def test_extrude_until_a_sphere_beside_a_box(self):
+        """The silhouette of a sphere with a box beside it spans both: under
+        the box's overhang the surface steps from the sphere's shoulder up to
+        the box, and the extrusion stops at the nearest surface everywhere"""
+        target = Pos(Z=10) * (Sphere(5) + Pos(5) * Box(5, 5, 5, rotation=(45, 45, 45)))
+        silhouette = project_to_plane(target, Plane.XY)
 
-        bad_shape = Box(1, 1, 1).wrapped  # not a Face or Shell → forces RuntimeError
+        nearest = extrude(silhouette, until=Until.NEXT, target=target)
+        self.assertTrue(nearest.is_valid)
+        self.assertEqual(len(nearest.solids()), 1)
+        self.assertAlmostEqual(nearest.volume, 692.815, 2)
+        self.assertAlmostEqual(nearest.bounding_box().max.Z, 13.018, 2)
 
-        with patch(
-            "build123d.topology.two_d.get_top_level_topods_shapes",
-            return_value=[bad_shape],
-        ):
-            with self.assertRaises(RuntimeError):
-                extrude(profile, dir=direction, until=Until.NEXT, target=target)
+        # LAST reaches the far side of both, the top of the sphere highest,
+        # and fills the void between the sphere and the box on the way
+        farthest = extrude(silhouette, until=Until.LAST, target=target)
+        self.assertTrue(farthest.is_valid)
+        self.assertEqual(len(farthest.solids()), 1)
+        self.assertAlmostEqual(farthest.bounding_box().max.Z, 15, 5)
+        self.assertGreater(farthest.volume, nearest.volume + target.volume)
+        self.assertAlmostEqual(farthest.volume, 1296.09, 1)
 
-    def test_extrude_until_invalid_split(self):
-        """The piece returned is the one holding the profile as a face; a
-        split that hands back pieces without it is a kernel failure"""
-        profile = Face.make_rect(1, 1)
-        target = Box(2, 2, 2)
-        direction = Vector(0, 0, 1)
+    def test_extrude_until_a_cylinder_from_below(self):
+        """The cylinder's wall runs along the direction: it is no part of the
+        surface reached and its edges sweep no wall"""
+        target = Pos(Z=10) * Cylinder(5, 10)
+        for until, top in ((Until.NEXT, 5), (Until.LAST, 15)):
+            with self.subTest(until=until):
+                column = extrude(
+                    Rectangle(2, 2), until=until, dir=(0, 0, 1), target=target
+                )
+                self.assertTrue(column.is_valid)
+                self.assertAlmostEqual(column.volume, 4 * top, 5)
+                self.assertAlmostEqual(column.bounding_box().max.Z, top, 5)
 
-        strangers = [Box(1, 1, 1).solid(), Box(1, 1, 1).solid()]
-        with patch("build123d.topology.three_d.Solid.split", return_value=strangers):
-            with self.assertRaises(RuntimeError):
-                extrude(profile, dir=direction, until=Until.NEXT, target=target)
+    def test_extrude_until_from_a_face_with_material_behind_it(self):
+        """A face of a plate standing on a base extrudes across to a block:
+        the plate's far face looks back toward the extrusion but lies behind
+        the profile, and is no part of the surface reached"""
+        base = Box(30, 20, 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        plate = Pos(5, 0, 7) * Box(2, 10, 10)
+        block = Pos(-9, 0, 8) * Box(2, 14, 12)
+        target = base + plate + block
+        profile = target.faces().filter_by(Axis.X).sort_by(Axis.X)[3]  # x = 4
+        self.assertAlmostEqual(profile.area, 100, 5)
+        span = extrude(profile, until=Until.NEXT, dir=(-1, 0, 0), target=target)
+        self.assertTrue(span.is_valid)
+        self.assertAlmostEqual(span.volume, 12 * 10 * 10, 4)
+        self.assertAlmostEqual(span.bounding_box().min.X, -8, 5)
+
+    def test_extrude_until_a_hole_misses(self):
+        """A profile inside a through hole reaches nothing"""
+        plate = Pos(Z=10) * Box(20, 20, 2) - Pos(Z=10) * Cylinder(2, 2)
+        for until in (Until.NEXT, Until.LAST):
+            with self.subTest(until=until):
+                with self.assertRaisesRegex(ValueError, "No intersection"):
+                    extrude(Circle(1), until=until, dir=(0, 0, 1), target=plate)
 
     def test_extrude_face(self):
         with BuildPart(Plane.XZ) as box:

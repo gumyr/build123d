@@ -62,7 +62,7 @@ from typing import TYPE_CHECKING, ClassVar, cast
 from bd_materials import FinishedMaterial
 
 import OCP.TopAbs as ta
-from OCP.BRep import BRep_Builder
+from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
 from OCP.BRepClass3d import BRepClass3d_SolidClassifier
@@ -135,6 +135,7 @@ from build123d.geometry import (
 )
 
 from .one_d import Edge, Mixin1D, DrawingViewOutput, Wire
+from .silhouette import Viewer, front_facing, split_by_silhouette
 from .shape_core import (
     TOPODS,
     Joint,
@@ -151,7 +152,6 @@ from .two_d import (
     Face,
     Mixin2D,
     Shell,
-    _project_profile_by_extrusion,
     sort_wires_by_build_order,
 )
 from .utils import (
@@ -1401,6 +1401,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
         When ``Until.PREVIOUS`` or ``Until.FIRST`` are used, the extrusion
         direction is automatically inverted before execution.
 
+        The surface reached is the nearest surface of the target along the
+        direction from every point of the profile: the faces of the target,
+        with the steps between the ones that look back at the profile closed
+        by walls swept along the direction from their silhouette. So a profile
+        that spans several heights of the target, the silhouette of a sphere
+        with a box beside it for instance, stops at the nearest surface
+        everywhere, and a profile inside the material stops where the
+        extrusion leaves it. A sketch drawn on a face of the target extrudes
+        into the material to the next surface within.
+
         Note:
             The bounding surface on the target must be large enough to
             completely cover the extruded profile at the contact region.
@@ -1415,9 +1425,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         Raises:
             ValueError: If the provided profile does not intersect the target,
-                or the surface reached does not cut the extrusion - the
-                profile lies in it, as a sketch drawn on a face of the target
-                does with ``Until.NEXT``.
+                or the target only touches the extrusion and no surface of it
+                cuts the extrusion.
 
         Returns:
             Solid: The extruded and limited solid.
@@ -1427,35 +1436,113 @@ class Solid(Mixin3D[TopoDS_Solid]):
             direction *= -1
             until = Until.NEXT if until == Until.PREVIOUS else Until.LAST
 
-        # 1: The surfaces of the target that the extruded profile passes
-        #    through, nearest first
-        # The risers of a stepped target are part of the surface that stops
-        # the extrusion, though they take no projection
-        surfaces = _project_profile_by_extrusion(
-            profile, target, direction, keep_edge_on=True
+        # Extrude the profile far enough to pass right through the target
+        reach = find_max_dimension([profile, target])
+        extrusion = Solid.extrude(profile, direction * reach)
+
+        if until == Until.NEXT:
+            return cls._extrusion_until_next(
+                extrusion, profile, target, direction, reach
+            )
+
+        # LAST: seen from the far end of the extrusion, looking back toward the
+        # profile, the last surface is the first one reached; what lies beyond
+        # it is cut away
+        far_face = extrusion.faces().sort_by(Axis(profile.center(), direction))[-1]
+        beyond = cls._extrusion_until_next(
+            extrusion, far_face, target, -direction, reach
         )
-        if not surfaces:
+        solids = extrusion.cut(beyond).solids()
+        if len(solids) != 1:  # pragma: no cover
+            raise RuntimeError("Extrusion is not a single solid")
+        return solids[0]
+
+    @classmethod
+    def _extrusion_until_next(
+        cls,
+        extrusion: Solid,
+        profile: Face,
+        target: Compound | Solid,
+        direction: Vector,
+        reach: float,
+    ) -> Solid:
+        """The part of ``extrusion``, from its ``profile`` face along
+        ``direction``, that lies before the first surface of ``target``"""
+        # 1: The faces of the target, split where they turn away from the
+        #    profile. Every one is a surface the extrusion may stop at: the
+        #    ones looking back at the profile when it starts outside the
+        #    target, the ones looking away when it starts inside the material.
+        #    A face beyond the first surface only cuts what is discarded anyway
+        viewer = Viewer.along(direction)
+        split, _ = split_by_silhouette(target, viewer)
+        # Only what lies ahead of the profile can stop the extrusion; a face
+        # wholly behind it belongs to geometry the extrusion never meets, and
+        # a wall swept from one of its edges would run through the profile
+        ahead = Plane(profile.center(), z_dir=direction)
+        faces = ShapeList(
+            face
+            for face in split.faces()
+            if ahead.to_local_coords(face.bounding_box()).max.Z > -TOLERANCE
+        )
+        facing = front_facing(faces, viewer)
+
+        # 2: Where a face looking back at the profile ends and the surface
+        #    steps to another depth, a wall swept along the direction from the
+        #    edge closes the step. Every edge owned by one such face is such an
+        #    edge, a seam excepted
+        edge_face_map = (
+            IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher()
+        )
+        TopExp.MapShapesAndAncestors_s(
+            _make_topods_compound_from_shapes([f.wrapped for f in facing]),
+            ta.TopAbs_EDGE,
+            ta.TopAbs_FACE,
+            edge_face_map,
+        )
+        seams = [seam for face in facing for seam in face.seams]
+        walls: list[Face] = []
+        for i in range(1, edge_face_map.Extent() + 1):
+            topods_edge = TopoDS.Edge(edge_face_map.FindKey(i))
+            if edge_face_map.FindFromIndex(i).Size() != 1 or BRep_Tool.Degenerated_s(
+                topods_edge
+            ):
+                continue
+            edge = Edge(topods_edge)
+            if any(edge.is_same(seam) for seam in seams):
+                continue
+            wall = Face.extrude(edge, direction * reach)
+            if wall.area < TOLERANCE:  # an edge along the direction sweeps nothing
+                continue
+            clipped = wall.split(ahead, keep=Keep.TOP)  # the part ahead of the profile
+            walls.extend(
+                piece
+                for piece in (clipped if isinstance(clipped, list) else [clipped])
+                if piece
+            )
+
+        # 3: Split the extrusion by the faces and walls together. The walls
+        #    run the whole way, so beyond the surface they cut the remainder
+        #    into pieces, which doesn't matter: only the piece holding the
+        #    profile is wanted
+        pieces = extrusion.split([*faces, *walls], keep=Keep.ALL)
+
+        # 4: The profile is the extrusion's own base face and survives the
+        #    split, so the piece to return is the one that holds it. A target
+        #    the extrusion never reaches leaves it in one piece; so does one
+        #    that only touches it
+        holders = [
+            piece
+            for piece in pieces
+            if any(face.wrapped.IsSame(profile.wrapped) for face in piece.faces())
+        ]
+        if len(pieces) == 1 and extrusion.distance(target) > TOLERANCE:
             raise ValueError("No intersection: extrusion does not contact target")
-        limit = surfaces[0 if until == Until.NEXT else -1]
-
-        # 2: Extrude the profile far enough to pass right through the target
-        max_dimension = find_max_dimension([profile, target])
-        extrusion = Solid.extrude(profile, direction * max_dimension)
-
-        # 3: Split the extrusion by that surface
-        pieces = extrusion.split(limit, keep=Keep.ALL)
-        if len(pieces) < 2:
+        if len(pieces) == 1 or not holders:
             raise ValueError(
                 "the surface reached does not cut the extrusion - the profile "
                 "lies in it, or only touches it"
             )
-
-        # 4: The profile is the extrusion's own base face and survives the
-        #    split, so the piece to return is the one that holds it
-        for piece in pieces:
-            if any(face.wrapped.IsSame(profile.wrapped) for face in piece.faces()):
-                return piece
-        raise RuntimeError("Extrusion is None")  # None isn't an option here
+        return holders[0]
 
     @classmethod
     def from_bounding_box(cls, bbox: BoundBox | OrientedBoundBox) -> Solid:

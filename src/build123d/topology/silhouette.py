@@ -67,13 +67,15 @@ from build123d.geometry import (
     VectorLike,
 )
 
-from .composite import Compound
 from .history import ShapeHistory
 from .one_d import Edge, Wire
 from .shape_core import Shape, ShapeList, downcast
-from .three_d import Solid
 from .two_d import Face, _edge_on, _project_profile_by_extrusion
-from .utils import find_max_dimension
+from .utils import (
+    _extrude_topods_shape,
+    _make_topods_compound_from_shapes,
+    find_max_dimension,
+)
 from .uv_write import UVFrame
 
 
@@ -324,11 +326,12 @@ def split_by_silhouette(shape: Shape, viewer: Viewer) -> tuple[Shape, ShapeHisto
 
 def front_facing(faces: ShapeList[Face], viewer: Viewer) -> ShapeList[Face]:
     """The faces that look toward the viewer: the normal at an interior point
-    has a component against the viewing direction."""
+    has a component against the viewing direction. A face seen edge-on, its
+    normal perpendicular to the view but for noise, looks neither way."""
     kept: ShapeList[Face] = ShapeList()
     for face in faces:
         point = face.interior_point()
-        if face.normal_at(point).dot(viewer.direction_at(point)) < 0:
+        if face.normal_at(point).dot(viewer.direction_at(point)) < -_GRAZING:
             kept.append(face)
     return kept
 
@@ -340,10 +343,18 @@ def visible_faces(shape: Shape, viewer: Viewer) -> ShapeList[Face]:
     return front_facing(split.faces(), viewer)
 
 
-def _shadows(faces: ShapeList[Face], direction: Vector, reach: float) -> list[Solid]:
+def _as_one_shape(faces: ShapeList[Face]) -> Shape:
+    """The faces bundled as a single shape, for operations that take one"""
+    return Shape.cast(_make_topods_compound_from_shapes([f.wrapped for f in faces]))
+
+
+def _shadows(faces: ShapeList[Face], direction: Vector, reach: float) -> list[Shape]:
     """The volume behind each face along the direction, as far as ``reach``:
     what the face hides from a viewer looking along the direction."""
-    return [Solid.extrude(face, direction * reach) for face in faces]
+    return [
+        Shape.cast(_extrude_topods_shape(face.wrapped, direction * reach))
+        for face in faces
+    ]
 
 
 def visible_regions(
@@ -361,7 +372,9 @@ def visible_regions(
     front = visible_faces(target, viewer)
     if not front:
         return ShapeList()
-    regions = _project_profile_by_extrusion(profile, Compound(front), viewer.direction)
+    regions = _project_profile_by_extrusion(
+        profile, _as_one_shape(front), viewer.direction
+    )
     faces = ShapeList(face for region in regions for face in region.faces())
     reach = find_max_dimension([profile, target])
     shadows = _shadows(faces, viewer.direction, reach)
@@ -392,7 +405,9 @@ def visible_curves(
     # lies ahead of the curve is in view
     pieces = [
         piece
-        for piece in curve.project_to_shape(Compound(front), direction=viewer.direction)
+        for piece in curve.project_to_shape(
+            _as_one_shape(front), direction=viewer.direction
+        )
         if (piece.center() - curve.center()).dot(viewer.direction) >= 0
     ]
     reach = find_max_dimension([curve, target])
