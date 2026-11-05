@@ -34,7 +34,7 @@ from collections.abc import Iterable
 from scipy.spatial import Voronoi
 
 from build123d.build_common import flatten_sequence, validate_inputs
-from build123d.build_enums import Mode, SortBy, Transition
+from build123d.build_enums import Mode, Transition
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Plane, Vector
 from build123d.topology import (
@@ -180,7 +180,7 @@ def full_round(
     # Note that the longest wire must be the perimeter and others holes
     face_wires = Wire.combine(
         typed_trimmed_connected_edges + [new_arc] + other_edges
-    ).sort_by(SortBy.LENGTH, reverse=True)
+    ).sort_by(Wire.length, reverse=True)
     pending_face = Face(face_wires[0], face_wires[1:])
 
     # Flip the face to match the original parent

@@ -141,7 +141,6 @@ from build123d.build_enums import (
     GeomType,
     Hit,
     Keep,
-    SortBy,
     Transition,
     Unit,
 )
@@ -1186,7 +1185,7 @@ class Face(Mixin2D[TopoDS_Face]):
                         for edge_directions in edge_pair_directions
                     ):
                         result = "RECTANGLE"
-                        if len(flat_face_edges.group_by(SortBy.LENGTH)) == 1:
+                        if len(flat_face_edges.group_by(Edge.length)) == 1:
                             result = "SQUARE"
 
         return result
