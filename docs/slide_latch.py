@@ -52,7 +52,7 @@ with BuildPart() as slide:
     RigidJoint("slide", joint_location=Location(-Plane.ZY))
 
 # Position the slide in the latch: -12 >= position <= 12
-latch.part.joints["latch"].connect_to(slide.part.joints["slide"], position=12)
+latch.part.joints["latch"].attach(slide.part.joints["slide"], position=12)
 
 # show(latch.part, render_joints=True)
 # show(slide.part, render_joints=True)

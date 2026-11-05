@@ -4573,8 +4573,18 @@ class Joint(ABC):
     # ---- Instance Methods ----
 
     @abstractmethod
+    def attach(self, *args, **kwargs):
+        """All derived classes must provide an attach method"""
+
+    @deprecated("Joint.connect_to is deprecated; use attach instead.")
     def connect_to(self, *args, **kwargs):
-        """All derived classes must provide a connect_to method"""
+        """Attach another joint's part to this one
+
+        .. deprecated::
+            Use :meth:`attach`, which reads the way it behaves: this joint's
+            part stays where it is and the other joint's part is moved.
+        """
+        return self.attach(*args, **kwargs)
 
     @abstractmethod
     def relative_to(self, *args, **kwargs) -> Location:
@@ -4608,8 +4618,8 @@ class Joint(ABC):
                 joint.label = f"{self.label}{index}"
         return placed
 
-    def _connect_to(self, other: Joint, **kwargs):  # pragma: no cover
-        """Connect Joint self by repositioning other"""
+    def _attach(self, other: Joint, **kwargs):  # pragma: no cover
+        """Attach other to this joint by repositioning other's part"""
 
         if not isinstance(other, Joint):
             raise TypeError(f"other must of type Joint not {type(other)}")

@@ -254,7 +254,7 @@ class TestAddShape(DirectApiTestCase):
             RigidJoint("out", box, Location((2, 0, 0)))
             RigidJoint("in", box, Location())
         for box, following in zip(boxes, boxes[1:]):
-            box.joints["out"].connect_to(following.joints["in"])
+            box.joints["out"].attach(following.joints["in"])
         exporter = Mesher()
         exporter.add_shape(Compound(children=boxes))
         self.assertEqual(exporter.mesh_count, 200)

@@ -156,7 +156,7 @@ class TestBasePartObjectFirewall(unittest.TestCase):
 
         target = Box(1, 1, 1)
         RigidJoint("target", target, Location((10, 0, 0)))
-        target.joints["target"].connect_to(custom_part.joints["rigid"])
+        target.joints["target"].attach(custom_part.joints["rigid"])
         self.assertTupleAlmostEquals((10, 0, 1), custom_part.location.position, 5)
 
     def test_inherited_joints_follow_bare_solid_alignment(self):

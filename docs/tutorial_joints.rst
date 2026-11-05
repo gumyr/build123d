@@ -292,7 +292,7 @@ Conclusion
 **********
 
 Use a :class:`~topology.Joint` to locate two objects relative to each other with some degree of motion.
-Keep in mind that when using the ``connect_to`` method, ``self`` is always fixed
+Keep in mind that when using the ``attach`` method, ``self`` is always fixed
 and ``other`` will move to the appropriate :class:`~geometry.Location`.
 
 .. note::

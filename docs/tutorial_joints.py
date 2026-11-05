@@ -287,7 +287,7 @@ write_svg(
 )
 
 # [Connect Box to Outer Hinge]
-box.joints["hinge_attachment"].connect_to(hinge_outer.joints["leaf"])
+box.joints["hinge_attachment"].attach(hinge_outer.joints["leaf"])
 # [Connect Box to Outer Hinge]
 write_svg(
     Compound([box, hinge_outer]),
@@ -295,7 +295,7 @@ write_svg(
     (-100, -100, 50),
 )
 # [Connect Hinge Leaves]
-hinge_outer.joints["hinge_axis"].connect_to(hinge_inner.joints["hinge_axis"], angle=120)
+hinge_outer.joints["hinge_axis"].attach(hinge_inner.joints["hinge_axis"], angle=120)
 # [Connect Hinge Leaves]
 write_svg(
     Compound([box, hinge_outer, hinge_inner]),
@@ -303,7 +303,7 @@ write_svg(
     (-100, -100, 50),
 )
 # [Connect Hinge to Lid]
-hinge_inner.joints["leaf"].connect_to(lid.joints["hinge_attachment"])
+hinge_inner.joints["leaf"].attach(lid.joints["hinge_attachment"])
 # [Connect Hinge to Lid]
 write_svg(
     Compound([box, hinge_outer, hinge_inner, lid]),
@@ -311,7 +311,7 @@ write_svg(
     (-100, -100, 50),
 )
 # [Connect Screw to Hole]
-hinge_outer.joints["hole2"].connect_to(m6_joint, position=5 * MM, angle=30)
+hinge_outer.joints["hole2"].attach(m6_joint, position=5 * MM, angle=30)
 # [Connect Screw to Hole]
 
 # [Add labels]

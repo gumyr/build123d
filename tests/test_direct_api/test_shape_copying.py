@@ -179,7 +179,7 @@ class TestDeepCopiesAndPickles(unittest.TestCase):
         cap = Solid.make_box(1, 1, 1).moved(Location((0, 0, 2)))
         RigidJoint("top", block, Location((0, 0, 2)))
         RigidJoint("seat", cap)
-        block.joints["top"].connect_to(cap.joints["seat"])
+        block.joints["top"].attach(cap.joints["seat"])
         original = Compound(children=[block, cap])
         for name, copier in self.copiers():
             with self.subTest(copy=name):

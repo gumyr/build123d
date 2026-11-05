@@ -48,7 +48,7 @@ from build123d.geometry import (
 from build123d.topology import Compound, Edge, Joint, Solid
 
 # pylint can't cope with the combination of explicit and implicit kwargs on
-# connect_to and relative_to methods
+# attach and relative_to methods
 # pylint: disable=arguments-differ
 
 
@@ -172,45 +172,46 @@ class RigidJoint(Joint):
         _bind(self, label, to_part, context)
 
     @overload
-    def connect_to(
-        self, other: BallJoint, *, angles: RotationLike | None = None, **kwargs
-    ):
-        """Connect RigidJoint and BallJoint"""
+    def attach(self, other: BallJoint, *, angles: RotationLike | None = None, **kwargs):
+        """Attach a BallJoint's part to this RigidJoint"""
 
     @overload
-    def connect_to(
+    def attach(
         self,
         other: CylindricalJoint,
         *,
         position: float | None = None,
         angle: float | None = None,
     ):
-        """Connect RigidJoint and CylindricalJoint"""
+        """Attach a CylindricalJoint's part to this RigidJoint"""
 
     @overload
-    def connect_to(self, other: LinearJoint, *, position: float | None = None):
-        """Connect RigidJoint and LinearJoint"""
+    def attach(self, other: LinearJoint, *, position: float | None = None):
+        """Attach a LinearJoint's part to this RigidJoint"""
 
     @overload
-    def connect_to(self, other: RevoluteJoint, *, angle: float | None = None):
-        """Connect RigidJoint and RevoluteJoint"""
+    def attach(self, other: RevoluteJoint, *, angle: float | None = None):
+        """Attach a RevoluteJoint's part to this RigidJoint"""
 
     @overload
-    def connect_to(self, other: RigidJoint):
-        """Connect two RigidJoints together"""
+    def attach(self, other: RigidJoint):
+        """Attach another RigidJoint's part to this RigidJoint"""
 
-    def connect_to(self, other: Joint, **kwargs):
-        """Connect the RigidJoint to another Joint
+    def attach(self, other: Joint, **kwargs):
+        """Attach another joint's part to this RigidJoint
+
+        This joint's part stays where it is; ``other``'s part is moved so the
+        two joints line up.
 
         Args:
-            other (Joint): joint to connect to
+            other (Joint): joint whose part is moved
             angle (float, optional): angle in degrees. Defaults to range min.
             angles (RotationLike, optional): angles about axes in degrees. Defaults to
                 range minimums.
             position (float, optional): linear position. Defaults to linear range min.
 
         """
-        return super()._connect_to(other, **kwargs)
+        return super()._attach(other, **kwargs)
 
     @overload
     def relative_to(self, other: BallJoint, *, angles: RotationLike | None = None):
@@ -236,7 +237,7 @@ class RigidJoint(Joint):
 
     @overload
     def relative_to(self, other: RigidJoint):
-        """Connect two RigidJoints together"""
+        """RigidJoint relative to RigidJoint"""
 
     def relative_to(self, other: Joint, **kwargs) -> Location:
         """Relative location of RigidJoint to another Joint
@@ -360,18 +361,21 @@ class RevoluteJoint(Joint):
         super()._move(location)
         self.angle_reference = Joint._rotated_direction(self.angle_reference, location)
 
-    def connect_to(self, other: RigidJoint, *, angle: float | None = None):
-        """Connect RevoluteJoint and RigidJoint
+    def attach(self, other: RigidJoint, *, angle: float | None = None):
+        """Attach a RigidJoint's part to this RevoluteJoint
+
+        This joint's part stays where it is; ``other``'s part is moved so the
+        two joints line up.
 
         Args:
-            other (RigidJoint): relative to joint
+            other (RigidJoint): joint whose part is moved
             angle (float, optional): angle in degrees. Defaults to range min.
 
         Returns:
             TypeError: other must of type RigidJoint
             ValueError: angle out of range
         """
-        return super()._connect_to(other, angle=angle)
+        return super()._attach(other, angle=angle)
 
     def relative_to(self, other: RigidJoint, *, angle: float | None = None):
         """Relative location of RevoluteJoint to RigidJoint
@@ -467,24 +471,27 @@ class LinearJoint(Joint):
         _bind(self, label, to_part, context)
 
     @overload
-    def connect_to(
+    def attach(
         self,
         other: RevoluteJoint,
         *,
         position: float | None = None,
         angle: float | None = None,
     ):
-        """Connect LinearJoint and RevoluteJoint"""
+        """Attach a RevoluteJoint's part to this LinearJoint"""
 
     @overload
-    def connect_to(self, other: RigidJoint, *, position: float | None = None):
-        """Connect LinearJoint and RigidJoint"""
+    def attach(self, other: RigidJoint, *, position: float | None = None):
+        """Attach a RigidJoint's part to this LinearJoint"""
 
-    def connect_to(self, other: Joint, **kwargs):
-        """Connect LinearJoint to another Joint
+    def attach(self, other: Joint, **kwargs):
+        """Attach another joint's part to this LinearJoint
+
+        This joint's part stays where it is; ``other``'s part is moved so the
+        two joints line up.
 
         Args:
-            other (Joint): joint to connect to
+            other (Joint): joint whose part is moved
             angle (float, optional): angle in degrees. Defaults to range min.
             position (float, optional): linear position. Defaults to linear range min.
 
@@ -493,7 +500,7 @@ class LinearJoint(Joint):
             ValueError: position out of range
             ValueError: angle out of range
         """
-        return super()._connect_to(other, **kwargs)
+        return super()._attach(other, **kwargs)
 
     @overload
     def relative_to(self, other: RigidJoint, *, position: float | None = None):
@@ -657,17 +664,20 @@ class CylindricalJoint(Joint):
         super()._move(location)
         self.angle_reference = Joint._rotated_direction(self.angle_reference, location)
 
-    def connect_to(
+    def attach(
         self,
         other: RigidJoint,
         *,
         position: float | None = None,
         angle: float | None = None,
     ):
-        """Connect CylindricalJoint and RigidJoint"
+        """Attach a RigidJoint's part to this CylindricalJoint
+
+        This joint's part stays where it is; ``other``'s part is moved so the
+        two joints line up.
 
         Args:
-            other (Joint): joint to connect to
+            other (RigidJoint): joint whose part is moved
             position (float, optional): linear position. Defaults to linear range min.
             angle (float, optional): angle in degrees. Defaults to range min.
 
@@ -676,7 +686,7 @@ class CylindricalJoint(Joint):
             ValueError: position out of range
             ValueError: angle out of range
         """
-        return super()._connect_to(other, position=position, angle=angle)
+        return super()._attach(other, position=position, angle=angle)
 
     def relative_to(
         self,
@@ -799,11 +809,14 @@ class BallJoint(Joint):
     # angle_reference is applied within the joint's own frame (see relative_to),
     # so it rides along unchanged when the joint is moved or transformed
 
-    def connect_to(self, other: RigidJoint, *, angles: RotationLike | None = None):
-        """Connect BallJoint and RigidJoint
+    def attach(self, other: RigidJoint, *, angles: RotationLike | None = None):
+        """Attach a RigidJoint's part to this BallJoint
+
+        This joint's part stays where it is; ``other``'s part is moved so the
+        two joints line up.
 
         Args:
-            other (RigidJoint): joint to connect to
+            other (RigidJoint): joint whose part is moved
             angles (RotationLike, optional): angles about axes in degrees. Defaults to
                 range minimums.
 
@@ -811,7 +824,7 @@ class BallJoint(Joint):
             TypeError: invalid other joint type
             ValueError: angles out of range
         """
-        return super()._connect_to(other, angles=angles)
+        return super()._attach(other, angles=angles)
 
     def relative_to(self, other: RigidJoint, *, angles: RotationLike | None = None):
         """relative_to - BallJoint

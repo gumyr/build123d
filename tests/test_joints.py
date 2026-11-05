@@ -90,13 +90,23 @@ class TestRigidJoint(DirectApiTestCase):
         j1 = RigidJoint("top", base, Location(Vector(0.5, 0.5, 1)))
         fixed_top = Solid.make_box(1, 1, 1)
         j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.5, 0)))
-        j1.connect_to(j2)
+        j1.attach(j2)
         bbox = fixed_top.bounding_box()
         self.assertVectorAlmostEquals(bbox.min, (0, 0, 1), 5)
         self.assertVectorAlmostEquals(bbox.max, (1, 1, 2), 5)
 
         self.assertVectorAlmostEquals(j2.symbol.location.position, (0.5, 0.5, 1), 6)
         self.assertVectorAlmostEquals(j2.symbol.location.orientation, (0, 0, 0), 6)
+
+    def test_connect_to_is_deprecated(self):
+        base = Solid.make_box(1, 1, 1)
+        j1 = RigidJoint("top", base, Location(Vector(0.5, 0.5, 1)))
+        other = Solid.make_box(1, 1, 1)
+        j2 = RigidJoint("bottom", other, Location((0.5, 0.5, 0)))
+        with self.assertWarnsRegex(DeprecationWarning, "use attach"):
+            j1.connect_to(j2)
+        self.assertVectorAlmostEquals(other.bounding_box().min, (0, 0, 1), 5)
+        self.assertIs(j1.connected_to, j2)
 
     def test_builder(self):
         with BuildPart() as test:
@@ -113,7 +123,7 @@ class TestRigidJoint(DirectApiTestCase):
     def test_error_handling(self):
         j1 = RigidJoint("one", Box(1, 1, 1))
         with self.assertRaises(TypeError):
-            j1.connect_to(Solid.make_box(1, 1, 1))
+            j1.attach(Solid.make_box(1, 1, 1))
 
         with self.assertRaises(TypeError):
             j1.relative_to(Solid.make_box(1, 1, 1))
@@ -132,7 +142,7 @@ class TestRevoluteJoint(DirectApiTestCase):
         fixed_top = Solid.make_box(1, 0.5, 1)
         j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.25, 0)))
 
-        j1.connect_to(j2, angle=90)
+        j1.attach(j2, angle=90)
         bbox = fixed_top.bounding_box()
         self.assertVectorAlmostEquals(bbox.min, (-0.25, -0.5, 1), 5)
         self.assertVectorAlmostEquals(bbox.max, (0.25, 0.5, 2), 5)
@@ -147,7 +157,7 @@ class TestRevoluteJoint(DirectApiTestCase):
         p2 = Box(0.2, 0.2, 2)
         j2 = RigidJoint("j2", p2, Location())
 
-        j1.connect_to(j2, angle=22.5)
+        j1.attach(j2, angle=22.5)
 
         self.assertVectorAlmostEquals(p2.location.orientation, (0, 0, 67.5), 6)
 
@@ -157,7 +167,7 @@ class TestRevoluteJoint(DirectApiTestCase):
         j1 = RigidJoint("j1", b1, Location((-4, -4, 0.5)))
         j2 = RevoluteJoint("j2", b2, Axis((2.5, 2.5, 0), (0, -1, 0)))
 
-        j1.connect_to(j2, angle=0)
+        j1.attach(j2, angle=0)
 
         self.assertVectorAlmostEquals(j1.location.position, j2.location.position, 5)
         self.assertVectorAlmostEquals(
@@ -180,7 +190,7 @@ class TestRevoluteJoint(DirectApiTestCase):
         )
         j2 = RevoluteJoint("pin", arm, axis=Axis.Z, angular_range=(0, 360))
 
-        j1.connect_to(j2, position=6, angle=60)
+        j1.attach(j2, position=6, angle=60)
 
         target_location = Rotation(0, 0, 60)
         target_location.position = linear_axis.position + linear_axis.direction * 6
@@ -195,7 +205,7 @@ class TestRevoluteJoint(DirectApiTestCase):
         j1 = RevoluteJoint("j1", base_part, Axis((3, 0, 1), (0, -1, 0)))
         j2 = RigidJoint("j2", rotating_part, Location((-2, 0, -1), (90, 0, -90)))
 
-        base_part.joints["j1"].connect_to(rotating_part.joints["j2"], angle=30)
+        base_part.joints["j1"].attach(rotating_part.joints["j2"], angle=30)
 
         self.assertVectorAlmostEquals(base_part.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(base_part.location.orientation, (0, 0, 0), 5)
@@ -238,7 +248,7 @@ class TestRevoluteJoint(DirectApiTestCase):
         fixed_top = Solid.make_box(1, 0.5, 1)
         j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.25, 0)))
         with self.assertRaises(ValueError):
-            j1.connect_to(j2, angle=270)
+            j1.attach(j2, angle=270)
 
     def test_revolute_joint_error_bad_joint_type(self):
         """Test that the joint angle is within bounds"""
@@ -247,7 +257,7 @@ class TestRevoluteJoint(DirectApiTestCase):
         fixed_top = Solid.make_box(1, 0.5, 1)
         j2 = RevoluteJoint("bottom", fixed_top, Axis.Z, (0, 180))
         with self.assertRaises(TypeError):
-            j1.connect_to(j2, angle=0)
+            j1.attach(j2, angle=0)
 
     def test_builder(self):
         with BuildPart() as test:
@@ -269,7 +279,7 @@ class TestLinearJoint(DirectApiTestCase):
         )
         fixed_top = Solid.make_box(1, 1, 1)
         j2 = RigidJoint("bottom", fixed_top, Location((0.5, 0.5, 0)))
-        j1.connect_to(j2, position=0.25)
+        j1.attach(j2, position=0.25)
         bbox = fixed_top.bounding_box()
         self.assertVectorAlmostEquals(bbox.min, (-0.25, 0, 1), 5)
         self.assertVectorAlmostEquals(bbox.max, (0.75, 1, 2), 5)
@@ -293,7 +303,7 @@ class TestLinearJoint(DirectApiTestCase):
             angle_reference=(1, 0, 0),
             angular_range=(0, 180),
         )
-        j1.connect_to(j2, position=0.25, angle=90)
+        j1.attach(j2, position=0.25, angle=90)
 
         bbox = revolute_top.bounding_box()
         self.assertVectorAlmostEquals(bbox.min, (0, 0, 1), 5)
@@ -305,15 +315,15 @@ class TestLinearJoint(DirectApiTestCase):
 
         # Test invalid position
         with self.assertRaises(ValueError):
-            j1.connect_to(j2, position=5, angle=90)
+            j1.attach(j2, position=5, angle=90)
 
         # Test invalid angle
         with self.assertRaises(ValueError):
-            j1.connect_to(j2, position=0.5, angle=270)
+            j1.attach(j2, position=0.5, angle=270)
 
         # Test invalid joint
         with self.assertRaises(TypeError):
-            j1.connect_to(Solid.make_box(1, 1, 1), position=0.5, angle=90)
+            j1.attach(Solid.make_box(1, 1, 1), position=0.5, angle=90)
 
     def test_builder(self):
         with BuildPart() as test:
@@ -329,7 +339,7 @@ class TestLinearJoint(DirectApiTestCase):
     def test_error_handling(self):
         j1 = LinearJoint("one", Box(1, 1, 1))
         with self.assertRaises(TypeError):
-            j1.connect_to(Solid.make_box(1, 1, 1))
+            j1.attach(Solid.make_box(1, 1, 1))
 
         with self.assertRaises(TypeError):
             j1.relative_to(Solid.make_box(1, 1, 1))
@@ -354,7 +364,7 @@ class TestCylindricalJoint(DirectApiTestCase):
             Solid.make_box(1, 1, 1).locate(Location((-0.5, 0, 0)))
         )
         j2 = RigidJoint("bottom", dowel, Location((0, 0, 0), (0, 0, 0)))
-        j1.connect_to(j2, position=0.25, angle=90)
+        j1.attach(j2, position=0.25, angle=90)
         dowel_bbox = dowel.bounding_box()
         self.assertVectorAlmostEquals(dowel_bbox.min, (0, -0.3, -0.25), 5)
         self.assertVectorAlmostEquals(dowel_bbox.max, (0.3, 0.3, 0.75), 5)
@@ -367,15 +377,15 @@ class TestCylindricalJoint(DirectApiTestCase):
 
         # Test invalid position
         with self.assertRaises(ValueError):
-            j1.connect_to(j2, position=5, angle=90)
+            j1.attach(j2, position=5, angle=90)
 
         # Test invalid angle
         with self.assertRaises(ValueError):
-            j1.connect_to(j2, position=0.5, angle=270)
+            j1.attach(j2, position=0.5, angle=270)
 
         # Test invalid joint
         with self.assertRaises(TypeError):
-            j1.connect_to(Solid.make_box(1, 1, 1), position=0.5, angle=90)
+            j1.attach(Solid.make_box(1, 1, 1), position=0.5, angle=90)
 
     def test_cylindrical_joint_error_bad_angle_reference(self):
         """Test that the angle_reference must be normal to the axis"""
@@ -401,10 +411,10 @@ class TestCylindricalJoint(DirectApiTestCase):
         )
         j2 = RigidJoint("bottom", Solid.make_cylinder(1, 1), Location((0.5, 0.25, 0)))
         with self.assertRaises(ValueError):
-            j1.connect_to(j2, position=0.5, angle=270)
+            j1.attach(j2, position=0.5, angle=270)
 
         with self.assertRaises(ValueError):
-            j1.connect_to(j2, position=4, angle=30)
+            j1.attach(j2, position=4, angle=30)
 
     def test_builder(self):
         with BuildPart() as test:
@@ -420,7 +430,7 @@ class TestCylindricalJoint(DirectApiTestCase):
     def test_error_handling(self):
         j1 = CylindricalJoint("one", Box(1, 1, 1))
         with self.assertRaises(TypeError):
-            j1.connect_to(Solid.make_box(1, 1, 1))
+            j1.attach(Solid.make_box(1, 1, 1))
 
         with self.assertRaises(TypeError):
             j1.relative_to(Solid.make_box(1, 1, 1))
@@ -441,7 +451,7 @@ class TestBallJoint(DirectApiTestCase):
             Solid.make_sphere(0.3).locate(Location((0, 0, 2)))
         )
         j2 = RigidJoint("ball", ball_rod, Location((0, 0, 2), (180, 0, 0)))
-        j1.connect_to(j2, angles=(45, 45, 0))
+        j1.attach(j2, angles=(45, 45, 0))
         self.assertVectorAlmostEquals(
             ball_rod.faces().filter_by(GeomType.PLANE)[0].center(CenterOf.GEOMETRY),
             (1.914213562373095, -0.5, 2),
@@ -452,11 +462,11 @@ class TestBallJoint(DirectApiTestCase):
         self.assertVectorAlmostEquals(j1.symbol.location.orientation, (0, 0, 0), 6)
 
         with self.assertRaises(ValueError):
-            j1.connect_to(j2, angles=(90, 45, 0))
+            j1.attach(j2, angles=(90, 45, 0))
 
         # Test invalid joint
         with self.assertRaises(TypeError):
-            j1.connect_to(Solid.make_box(1, 1, 1), angles=(0, 0, 0))
+            j1.attach(Solid.make_box(1, 1, 1), angles=(0, 0, 0))
 
     def test_builder(self):
         with BuildPart() as test:
@@ -472,7 +482,7 @@ class TestBallJoint(DirectApiTestCase):
     def test_error_handling(self):
         j1 = BallJoint("one", Box(1, 1, 1))
         with self.assertRaises(TypeError):
-            j1.connect_to(Solid.make_box(1, 1, 1))
+            j1.attach(Solid.make_box(1, 1, 1))
 
         with self.assertRaises(TypeError):
             j1.relative_to(Solid.make_box(1, 1, 1))
@@ -482,65 +492,65 @@ class TestJointOrder(DirectApiTestCase):
     def test_rigid_rigid(self):
         j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
         j2 = RigidJoint("two", Sphere(0.5))
-        j1.connect_to(j2)
+        j1.attach(j2)
         self.assertVectorAlmostEquals(j1.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j2.parent.location.position, (1, 2, 3), 5)
 
         j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
         j2 = RigidJoint("two", Sphere(0.5))
-        j2.connect_to(j1)
+        j2.attach(j1)
         self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
 
     def test_rigid_ball(self):
         j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
         j2 = BallJoint("two", Sphere(0.5))
-        j1.connect_to(j2, angles=(0, 0, 0))
+        j1.attach(j2, angles=(0, 0, 0))
         self.assertVectorAlmostEquals(j1.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j2.parent.location.position, (1, 2, 3), 5)
 
         j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
         j2 = BallJoint("two", Sphere(0.5))
-        j2.connect_to(j1, angles=(0, 0, 0))
+        j2.attach(j1, angles=(0, 0, 0))
         self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
 
     def test_rigid_cylindrical(self):
         j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
         j2 = CylindricalJoint("two", Sphere(0.5))
-        j1.connect_to(j2, position=0, angle=0)
+        j1.attach(j2, position=0, angle=0)
         self.assertVectorAlmostEquals(j1.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j2.parent.location.position, (1, 2, 3), 5)
 
         j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
         j2 = CylindricalJoint("two", Sphere(0.5))
-        j2.connect_to(j1, position=0, angle=0)
+        j2.attach(j1, position=0, angle=0)
         self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
 
     def test_rigid_linear(self):
         j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
         j2 = LinearJoint("two", Sphere(0.5))
-        j1.connect_to(j2, position=0)
+        j1.attach(j2, position=0)
         self.assertVectorAlmostEquals(j1.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j2.parent.location.position, (1, 2, 3), 5)
 
         j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
         j2 = LinearJoint("two", Sphere(0.5))
-        j2.connect_to(j1, position=0)
+        j2.attach(j1, position=0)
         self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
 
     def test_rigid_revolute(self):
         j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
         j2 = RevoluteJoint("two", Sphere(0.5))
-        j1.connect_to(j2, angle=0)
+        j1.attach(j2, angle=0)
         self.assertVectorAlmostEquals(j1.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j2.parent.location.position, (1, 2, 3), 5)
 
         j1 = RigidJoint("one", Box(1, 1, 1), joint_location=Location((1, 2, 3)))
         j2 = RevoluteJoint("two", Sphere(0.5))
-        j2.connect_to(j1, angle=0)
+        j2.attach(j1, angle=0)
         self.assertVectorAlmostEquals(j2.parent.location.position, (0, 0, 0), 5)
         self.assertVectorAlmostEquals(j1.parent.location.position, (-1, -2, -3), 5)
 
@@ -560,7 +570,7 @@ class TestJointCopy(DirectApiTestCase):
         arm = Box(2, 2, 10)
         RigidJoint("top", base, Location((0, 0, 1)))
         RigidJoint("bottom", arm, Location((0, 0, -5)))
-        base.joints["top"].connect_to(arm.joints["bottom"])
+        base.joints["top"].attach(arm.joints["bottom"])
 
         for name, base_copy in (
             ("deepcopy", copy.deepcopy(base)),
@@ -669,7 +679,7 @@ class TestJointPlacement(DirectApiTestCase):
 
         peg = Box(1, 1, 2)
         RigidJoint("base", peg, Location((0, 0, -1)))
-        builder.joints["top"].connect_to(peg.joints["base"])
+        builder.joints["top"].attach(peg.joints["base"])
         self.assertVectorAlmostEquals(peg.center(), (0, -14, 0), 5)
 
     def test_rigid_joint_follows_the_workplane(self):
@@ -692,7 +702,7 @@ class TestJointPlacement(DirectApiTestCase):
         # and a part connected to it lands on that face
         peg = Box(1, 1, 2)
         RigidJoint("base", peg, Location((0, 0, -1)))
-        joint.connect_to(peg.joints["base"])
+        joint.attach(peg.joints["base"])
         self.assertTrue(
             any((f.center() - face.center()).length < 1e-5 for f in peg.faces())
         )
@@ -731,7 +741,7 @@ class TestFreeJoints(DirectApiTestCase):
         self.assertVectorAlmostEquals(free.location.position, (5, 0, 1), 5)
         self.assertGreater(free.symbol.bounding_box().diagonal, 0)
         with self.assertRaisesRegex(ValueError, "free joint cannot be connected"):
-            free.connect_to(RigidJoint(joint_location=Location()))
+            free.attach(RigidJoint(joint_location=Location()))
 
     def test_assignment_binds_a_joint_where_it_is(self):
         part = Box(2, 2, 2).moved(Location((5, 0, 0)))
@@ -1179,7 +1189,7 @@ class TestJointTransforms(DirectApiTestCase):
         def connected_frame(base, angle):
             peg = Box(1, 1, 6)
             RigidJoint("p", peg, Location((0, 0, -3)))
-            base.joints["h"].connect_to(peg.joints["p"], angle=angle)
+            base.joints["h"].attach(peg.joints["p"], angle=angle)
             return Plane(peg.joints["p"].location)
 
         mirror_x = lambda v: Vector(-v.X, v.Y, v.Z)
@@ -1218,7 +1228,7 @@ class TestJointTransforms(DirectApiTestCase):
         for part, expected_x in ((base, 4), (mirrored, -4)):
             peg = Box(1, 1, 1)
             RigidJoint("p", peg, Location())
-            part.joints["slide"].connect_to(peg.joints["p"], position=4)
+            part.joints["slide"].attach(peg.joints["p"], position=4)
             self.assertVectorAlmostEquals(peg.center(), (expected_x, 0, 1), 5)
 
     def test_frames_after_locate_rotate_and_copy(self):

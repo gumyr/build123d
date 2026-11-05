@@ -48,6 +48,6 @@ with BuildPart() as ball:
     ball.part.color = Color("aliceblue")
     RigidJoint("ball", joint_location=Location())
 
-rod_end.part.joints["socket"].connect_to(ball.part.joints["ball"], angles=(5, 10, 0))
+rod_end.part.joints["socket"].attach(ball.part.joints["ball"], angles=(5, 10, 0))
 
 show(rod_end.part, ball.part, s2)
