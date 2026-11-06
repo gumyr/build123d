@@ -846,7 +846,7 @@ def test_gltf_shared_occurrence_metadata(tmp_path, solid):
     assert export_gltf(assembly, path)
     for shape, wrapped in zip([assembly, *assembly.leaves], original_shapes):
         assert shape.wrapped.IsEqual(wrapped)
-    gltf = json.loads(path.read_text())
+    gltf = json.loads(path.read_text(encoding="utf-8"))
     assert Counter(node["name"] for node in gltf["nodes"]) == Counter(
         ["assembly", "branch-0", "branch-1", "branch-2", "red", "蓝", "red"]
     )
