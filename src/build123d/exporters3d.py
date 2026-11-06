@@ -218,8 +218,8 @@ def _create_xde(
 
         if parent is None:
             node_label = shape_tool.AddShape(node.wrapped, False)
-            definition_label = resolve_component_parent_label(node_label)
-            set_name_and_color(node, definition_label, node_name, True)
+            root_label = resolve_component_parent_label(node_label)
+            set_name_and_color(node, root_label, node_name, True)
         else:
             parent_label = label_map.get(id(parent), TDF_Label())
             parent_label = resolve_component_parent_label(parent_label)
