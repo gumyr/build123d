@@ -166,7 +166,7 @@ with BuildPart() as lid_builder:
 box = Compound(
     [box_builder.part, lid_builder.part.moved(Location((0, 0, (wall + deck) / 2)))]
 )
-visible, hidden = box.project_to_viewport((70, -50, 120))
+visible, hidden = box.drawing_view((70, -50, 120))
 max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
 exporter = ExportSVG(scale=100 / max_dimension)
 exporter.add_layer("Visible")

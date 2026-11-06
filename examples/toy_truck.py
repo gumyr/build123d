@@ -164,7 +164,7 @@ with BuildPart() as cab:
     cab.part.color = truck_color
 
 # Attach the cab to the truck body using joints
-body.joints["body_top"].connect_to(cab.joints["cab_base"])
+body.joints["body_top"].attach(cab.joints["cab_base"])
 
 # Show the result
 show(body.part, cab.part)

@@ -69,7 +69,7 @@ class BaseSketchObject(Sketch, BaseObject):
     Base class for all BuildSketch objects
 
     Args:
-        face (Face): face to create
+        obj (Face): face to create
         rotation (float, optional): angle to rotate object. Defaults to 0
         align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX of object.
             Defaults to None

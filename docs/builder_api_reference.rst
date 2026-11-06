@@ -45,6 +45,7 @@ Enums
 .. autoclass:: FontStyle
 .. autoclass:: GeomType
 .. autoclass:: HemType
+.. autoclass:: Hit
 .. autoclass:: SheetSurface
 .. autoclass:: Keep
 .. autoclass:: Kind

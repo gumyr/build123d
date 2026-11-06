@@ -114,6 +114,20 @@ html_baseurl = os.environ.get(
     "READTHEDOCS_CANONICAL_URL",
     "https://build123d.readthedocs.io/en/latest/",
 )
+# Read the Docs uses a numeric Git identifier for pull-request previews, which
+# isn't a branch in the upstream repository. Link those previews to dev.
+github_version = (
+    "dev"
+    if os.environ.get("READTHEDOCS_VERSION_TYPE") == "external"
+    else os.environ.get("READTHEDOCS_GIT_IDENTIFIER", "dev")
+)
+html_context = {
+    "display_github": True,
+    "github_user": "gumyr",
+    "github_repo": "build123d",
+    "github_version": github_version,
+    "conf_py_path": "/docs/",
+}
 pygments_style = "colorful"
 
 # Add any paths that contain custom static files (such as style sheets) here,

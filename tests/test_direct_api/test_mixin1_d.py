@@ -378,6 +378,24 @@ class TestMixin1D(unittest.TestCase):
         with self.assertRaises(ValueError):
             Edge.make_line((0, 0, 0), (1, 0, 0)).locations()
 
+    def test_location_at_corrected_frenet_position(self):
+        """The CORRECTED frame is placed where position_at puts it, in both modes"""
+        path = Polyline((0, 0), (10, 0), (10, 10), (0, 10))
+        for position in (0.0, 0.25, 0.6, 1.0):
+            for mode in (PositionMode.PARAMETER, PositionMode.LENGTH):
+                value = (
+                    position
+                    if mode == PositionMode.PARAMETER
+                    else (position * path.length)
+                )
+                with self.subTest(position=position, mode=mode):
+                    location = path.location_at(
+                        value, mode, frame_method=FrameMethod.CORRECTED
+                    )
+                    self.assertAlmostEqual(
+                        location.position, path.position_at(value, mode), 5
+                    )
+
     def test_location_at_corrected_frenet(self):
         # A polyline with sharp corners — problematic for classic Frenet
         path = Polyline((0, 0), (10, 0), (10, 10), (0, 10))
@@ -409,24 +427,35 @@ class TestMixin1D(unittest.TestCase):
             angles.append(angle)
         self.assertTrue(all(abs(angle) < 90 for angle in angles))
 
-    def test_project(self):
+    def test_project_to_shape_onto_a_face(self):
         target = Face.make_rect(10, 10, Plane.XY.rotated((0, 45, 0)))
         circle = Edge.make_circle(1).locate(Location((0, 0, 10)))
-        ellipse: Wire = circle.project(target, (0, 0, -1))
+        ellipse: Wire = circle.project_to_shape(target, (0, 0, -1))[0]
         bbox = ellipse.bounding_box()
         self.assertAlmostEqual(bbox.min, (-1, -1, -1), 5)
         self.assertAlmostEqual(bbox.max, (1, 1, 1), 5)
         circle.wrapped = None
         with self.assertRaises(ValueError):
-            circle.project(target, (0, 0, -1))
+            circle.project_to_shape(target, (0, 0, -1))
 
-    def test_project2(self):
+    def test_project_to_shape_front_and_back(self):
         target = Cylinder(1, 10).faces().filter_by(GeomType.PLANE, reverse=True)[0]
         square = Wire.make_rect(1, 1, Plane.YZ).locate(Location((10, 0, 0)))
-        projections: list[Wire] = square.project(
-            target, direction=(-1, 0, 0), closest=False
-        )
+        projections = square.project_to_shape(target, direction=(-1, 0, 0))
         self.assertEqual(len(projections), 2)
+        self.assertGreater(projections[0].center().X, projections[1].center().X)
+
+    def test_project_is_deprecated(self):
+        target = Face.make_rect(10, 10, Plane.XY.rotated((0, 45, 0)))
+        circle = Edge.make_circle(1).locate(Location((0, 0, 10)))
+        with self.assertWarns(DeprecationWarning):
+            ellipse = circle.project(target, (0, 0, -1))
+        self.assertAlmostEqual(ellipse.bounding_box().max, (1, 1, 1), 5)
+        square = Wire.make_rect(1, 1, Plane.YZ).locate(Location((10, 0, 0)))
+        side = Cylinder(1, 10).faces().filter_by(GeomType.PLANE, reverse=True)[0]
+        with self.assertWarns(DeprecationWarning):
+            both = square.project(side, direction=(-1, 0, 0), closest=False)
+        self.assertEqual(len(both), 2)
 
     def test_is_forward(self):
         plate = Box(10, 10, 1) - Cylinder(1, 1)
@@ -689,11 +718,11 @@ class TestMixin1D(unittest.TestCase):
             Edge.make_line((0, 0), (1, 0)).derivative_at((0, 0), 2), (0, 0, 0), 5
         )
 
-    def test_project_to_viewport(self):
+    def test_view(self):
         line = Edge.make_line((0, 0), (1, 0))
         line.wrapped = None
         with self.assertRaises(ValueError):
-            line.project_to_viewport((0, 0, 0))
+            line.drawing_view((0, 0, 0))
 
     def test_split(self):
         # nothing to split leaves nothing on either side

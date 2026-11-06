@@ -304,16 +304,10 @@ def process_hatch(entity: DXFGraphic) -> ShapeList[Edge | Wire]:
 
 def process_solid_trace_3dface(entity: DXFGraphic):
     """Convert filled objects - i.e. Faces"""
-    # Gather vertices as a list of (x, y, z) tuples
-    vertices = []
-    for i in range(4):
-        # Some entities like SOLID or TRACE may define only 3 vertices, repeating the last one
-        # if the fourth vertex is not defined.
-        try:
-            vertex = entity.dxf.get(f"v{i}")
-            vertices.append((vertex.x, vertex.y, vertex.z))
-        except AttributeError:
-            break
+    # Gather vertices as a list of (x, y, z) tuples. ezdxf returns the WCS vertices in
+    # outline order, i.e. it swaps the last two corners of SOLID and TRACE and drops the
+    # repeated last corner of a triangle.
+    vertices = [(vertex.x, vertex.y, vertex.z) for vertex in entity.wcs_vertices()]
 
     # Create the Polygon object
     polygon_obj = Polygon(*vertices)
