@@ -113,24 +113,21 @@ class TestFace(unittest.TestCase):
         rect = Face.make_rect(1, 1)
         self.assertAlmostEqual(rect.volume, 0, 5)
 
-    def test_project_to_face_with_compound_boolean_result(self):
+    def test_project_through_two_faces_gives_a_face_per_surface(self):
         source = Face.make_rect(1, 1, Plane.XY.offset(1))
-        target = Face.make_rect(3, 3)
-        boolean_result = Compound(
+        target = Compound(
             children=[
-                Face.make_rect(1, 1),
-                Face.make_rect(1, 1, Plane.XY.offset(-1)),
+                Face.make_rect(3, 3),
+                Face.make_rect(3, 3, Plane.XY.offset(-1)),
             ]
         )
 
-        with patch(
-            "build123d.topology.two_d._topods_bool_op",
-            return_value=boolean_result.wrapped,
-        ):
-            projected = source.project_to_shape(target, (0, 0, -1))
+        projected = source.project_to_shape(target, (0, 0, -1))
 
         self.assertEqual(len(projected), 2)
         self.assertTrue(all(isinstance(face, Face) for face in projected))
+        self.assertAlmostEqual(projected[0].center().Z, 0, 5)
+        self.assertAlmostEqual(projected[1].center().Z, -1, 5)
 
     def test_split_by_perimeter(self):
         def area_of(shape_or_shapes):
@@ -612,6 +609,32 @@ class TestFace(unittest.TestCase):
         square = Face.make_rect(10, 10)
         self.assertTrue(square.is_inside((1, 1)))
         self.assertFalse(square.is_inside((20, 1)))
+        # by normalized surface parameters, the boundary included
+        ring = Face.make_rect(10, 10) - Face.make_rect(4, 4)
+        self.assertTrue(ring.is_inside(0.1, 0.5))
+        self.assertFalse(ring.is_inside(0.5, 0.5))
+        self.assertTrue(ring.is_inside(0.3, 0.5))  # on the hole's edge
+        self.assertTrue(ring.is_inside(u=0.1, v=0.5, tolerance=1e-3))
+        with self.assertRaises(ValueError):
+            ring.is_inside(u=0.1)
+
+    def test_interior_point(self):
+        square = Face.make_rect(10, 10)
+        self.assertAlmostEqual(square.interior_point(), (0, 0, 0), 5)
+        # the centre of a ring is in its hole
+        ring = Face.make_rect(10, 10) - Face.make_rect(4, 4)
+        self.assertFalse(ring.is_inside(ring.center()))
+        self.assertTrue(ring.is_inside(ring.interior_point()))
+        # and of a crescent off to its concave side
+        crescent = Circle(10).face() - Pos(5, 0) * Circle(8).face()
+        self.assertTrue(crescent.is_inside(crescent.interior_point()))
+        # a curved face whose parameter range is cut away at its centre
+        top = (Box(10, 10, 10) - Cylinder(2, 20)).faces().sort_by(Axis.Z)[-1]
+        self.assertTrue(top.is_inside(top.interior_point()))
+        side = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        self.assertTrue(side.is_inside(side.interior_point()))
+        sliver = Face.make_rect(10, 0.001)
+        self.assertTrue(sliver.is_inside(sliver.interior_point()))
 
     def test_import_stl(self):
         torus = Solid.make_torus(10, 1)
@@ -1515,6 +1538,31 @@ class TestFace(unittest.TestCase):
 
         # Invalid
         self.assertIsNone(Face.make_rect(1, 1).axis_of_rotation)
+
+    def test_extrusion_direction_property(self):
+        profile = Spline((0, 0, 0), (1, 1, 0), (2, 0, 0))
+        swept = Face.extrude(profile, (0, 1, 3))
+        self.assertEqual(swept.geom_type, GeomType.EXTRUSION)
+        direction = swept.extrusion_direction
+        self.assertAlmostEqual(direction.length, 1, 5)
+        self.assertAlmostEqual(abs(direction.dot(Vector(0, 1, 3).normalized())), 1, 5)
+
+        # Geom_RectangularTrimmedSurface and Geom_OffsetSurface are unwrapped
+        trim_surf = Geom_RectangularTrimmedSurface(
+            swept.geom_adaptor(), 0.2, 0.8, 0.5, 2.5
+        )
+        trim_face = Face(BRepBuilderAPI_MakeFace(trim_surf, 1e-6).Face())
+        self.assertAlmostEqual(abs(trim_face.extrusion_direction.dot(direction)), 1, 5)
+        off_surf = Geom_OffsetSurface(swept.geom_adaptor(), 0.1)
+        off_face = Face(BRepBuilderAPI_MakeFace(off_surf, 1e-6).Face())
+        self.assertAlmostEqual(abs(off_face.extrusion_direction.dot(direction)), 1, 5)
+
+        # Other surfaces and nothing have no extrusion direction
+        self.assertIsNone(Face.make_rect(1, 1).extrusion_direction)
+        self.assertIsNone(
+            Cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0].extrusion_direction
+        )
+        self.assertIsNone(Face().extrusion_direction)
 
     def test_is_convex_concave(self):
 

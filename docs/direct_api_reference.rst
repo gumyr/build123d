@@ -73,6 +73,7 @@ Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~top
 .. autoclass:: Wire
 .. autoclass:: Vertex
    :special-members: __add__, __sub__
+.. autoclass:: DrawingViewOutput
 .. autoclass:: Curve
    :special-members: __matmul__, __mod__
 .. autoclass:: Part
@@ -103,10 +104,11 @@ Methods and functions specific to exporting and importing build123d objects are 
 Joint Object
 ************
 Base Joint class which is used to position Solid and Compound objects relative to each
-other are defined below. The :ref:`joints` section contains the class description of the
-derived Joint classes.
+other, and the dictionary of joints a part holds, are defined below. The :ref:`joints`
+section contains the class description of the derived Joint classes.
 
 .. py:module:: topology
    :noindex:
 
 .. autoclass:: Joint
+.. autoclass:: JointDict

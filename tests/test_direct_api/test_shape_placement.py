@@ -296,7 +296,7 @@ class TestShapePlacement(unittest.TestCase):
         cap.label = "cap"
         RigidJoint("top", block, Location((0, 0, 2)))
         RigidJoint("seat", cap)
-        block.joints["top"].connect_to(cap.joints["seat"])
+        block.joints["top"].attach(cap.joints["seat"])
         original = Compound(children=[block, cap], label="pair")
         for name, relocated in (
             ("located", original.located(ELSEWHERE)),

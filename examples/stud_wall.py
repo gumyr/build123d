@@ -124,13 +124,13 @@ class StudWall(Compound):
         for i, loc in enumerate(stud_locations):
             stud_joint = RigidJoint(f"stud{i}", plate, loc)
             stud_copy = copy.copy(stud)
-            stud_joint.connect_to(stud_copy.joints["end0"])
+            stud_joint.attach(stud_copy.joints["end0"])
             studs.append(stud_copy)
         top_plate = copy.copy(plate)
         sole_plate = copy.copy(plate)
 
         # Position the top plate relative to the top of the first stud
-        studs[0].joints["end1"].connect_to(top_plate.joints["stud0"])
+        studs[0].joints["end1"].attach(top_plate.joints["stud0"])
 
         # Build the assembly of parts
         super().__init__(children=[top_plate, sole_plate] + studs)
@@ -142,7 +142,7 @@ class StudWall(Compound):
 
 x_wall = StudWall(13 * FT)
 y_wall = StudWall(9 * FT)
-x_wall.joints["inside0"].connect_to(y_wall.joints["end0"])
+x_wall.joints["inside0"].attach(y_wall.joints["end0"])
 
 show(x_wall, y_wall, render_joints=False)
 # [End]

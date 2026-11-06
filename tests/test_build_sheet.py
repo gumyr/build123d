@@ -1,5 +1,7 @@
 """Tests for the surface-native BuildSheet builder and operations."""
 
+import copy
+import pickle
 import unittest
 from math import asin, cos, degrees, pi, radians, sin, sqrt, tan
 from unittest.mock import PropertyMock, patch
@@ -1940,6 +1942,28 @@ class TestUnfoldFaceMap(unittest.TestCase):
         _, (flat, face_map) = self.two_flanges()
         moved = Pos(5, 7, 0) * flat
         self.assertTrue(all(face in face_map for face in moved.faces()))
+
+    def test_the_map_copies_and_pickles(self):
+        """copy, deepcopy and pickle rebuild a dict subclass through
+        __setitem__, which on a FaceMap expects a Face; the map rebuilds from
+        its stored keys instead and still answers for the pattern's faces"""
+        _, (flat, face_map) = self.two_flanges()
+        for name, duplicate in (
+            ("copy", copy.copy(face_map)),
+            ("deepcopy", copy.deepcopy(face_map)),
+            ("pickle", pickle.loads(pickle.dumps(face_map))),
+        ):
+            with self.subTest(name):
+                self.assertIsInstance(duplicate, FaceMap)
+                self.assertIsNot(duplicate, face_map)
+                self.assertEqual(len(duplicate), len(face_map))
+                for face in flat.faces():
+                    self.assertIn(face, duplicate)
+                    self.assertEqual(duplicate[face].is_bend, face_map[face].is_bend)
+        # a shallow copy shares the records, a deep copy does not
+        face = flat.faces()[0]
+        self.assertIs(copy.copy(face_map)[face], face_map[face])
+        self.assertIsNot(copy.deepcopy(face_map)[face], face_map[face])
 
     def test_bend_lines_follow_the_alignment(self):
         sheet, parameters = TestUnfoldOperation.flanged()

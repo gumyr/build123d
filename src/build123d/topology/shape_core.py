@@ -52,7 +52,7 @@ import itertools
 import warnings
 from abc import ABC, abstractmethod
 from collections import deque
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from functools import reduce
 from math import inf
 from typing import (
@@ -176,6 +176,7 @@ from .kernel import list_shapes
 
 if TYPE_CHECKING:  # pragma: no cover
     from build123d.build_part import BuildPart  # pylint: disable=R0801
+    from build123d.build_sheet import BuildSheet
 
     from .composite import Compound  # pylint: disable=R0801
     from .one_d import Edge, Wire  # pylint: disable=R0801
@@ -1265,6 +1266,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         if SkipClean.clean:
             new_shape = new_shape.clean()
+        self.copy_attributes_to(new_shape, ["wrapped", "_NodeMixin__children"])
 
         return new_shape
 
@@ -1294,10 +1296,18 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         As with ``copy.copy``, the copy stands outside any assembly, and the
         copy of an assembly is an assembly whose compound is rebuilt from its
-        copied children, so the two share geometry. The record of how the
-        shape was made names the original's kernel sub-shapes and is left
-        behind.
+        copied children, so the two share geometry. The copy shares nothing
+        with the original, and keeps what the original's children shared
+        with each other: the halves of a split hold one cut face between
+        them, and so do their copies, so the copy counts the same vertices,
+        edges and faces as the original. The record of how the shape was
+        made names the original's kernel sub-shapes and is left behind.
         """
+        # One kernel copy of every leaf at once, so that a sub-shape two
+        # leaves share is copied once and stays shared between their copies
+        copier = BRepBuilderAPI_Copy(
+            _make_topods_compound_from_shapes(leaf.wrapped for leaf in self.leaves)
+        )
 
         def kernel_copy(node: Shape) -> TopoDS_Shape:
             if node.children:  # rebuilt from the copied children
@@ -1308,7 +1318,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 unplaced = node.wrapped.Located(TopLoc_Location())
                 copied = BRepBuilderAPI_Copy(unplaced).Shape()
                 return copied.Located(node.wrapped.Location())
-            return BRepBuilderAPI_Copy(node.wrapped).Shape()
+            return copier.ModifiedShape(node.wrapped)
 
         return self._copied(kernel_copy, memo, deep=True, keep_history=False)
 
@@ -1398,8 +1408,15 @@ class Shape(NodeMixin, Generic[TOPODS]):
         for original, placed in self._placed_pairs(result):
             if "joints" in original.__dict__:  # only the classes that can have joints
                 placed.joints = copy.deepcopy(original.joints, copies)
-                for joint in placed.joints.values():
-                    joint.parent = placed
+                JointDict._adopt(placed)
+        # A joint copies its connection by reference. One connected to a joint
+        # of another copied node is connected to that joint's copy instead.
+        for _, placed in self._placed_pairs(result):
+            for joint in getattr(placed, "joints", {}).values():
+                if joint.connected_to is not None:
+                    joint.connected_to = copies.get(
+                        id(joint.connected_to), joint.connected_to
+                    )
         return result
 
     def _copied_node(
@@ -1684,11 +1701,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
             # Copy the attribute only if the target's attribute not set
             if attr == "joints":
                 if not getattr(target, attr):
-                    # the memo maps the joints' parent, self, to the target,
-                    # so the copy does not reach into self's geometry
-                    target.joints = copy.deepcopy(self.joints, {id(self): target})
-                for joint in target.joints.values():
-                    joint.parent = target
+                    # bound where they are in the world: target, a boolean result
+                    # or a rewrapped shape, may sit in a different frame
+                    target.joints = JointDict(target, copy.deepcopy(self.joints))
+                else:
+                    JointDict._adopt(target)
             elif not getattr(target, attr):
                 setattr(target, attr, getattr(self, attr))
 
@@ -2201,24 +2218,41 @@ class Shape(NodeMixin, Generic[TOPODS]):
         path: Wire | Edge,
         start: float = 0,
     ) -> ShapeList[Face]:
-        """Projected Faces following the given path on Shape
+        """Project a row of planar faces onto this shape along a path
 
-        Project by positioning each face of to the shape along the path and
-        projecting onto the surface.
+        The faces, drawn on ``Plane.XY``, are laid out along ``path``, a curve
+        on this shape, by their x positions: the leftmost point of the set
+        lands ``start`` of the way along the path and each face's centre as far
+        beyond that as it is to the right of the leftmost point. Each face is
+        stood on the surface at its own point, x along the path's tangent and z
+        along the surface normal there, and projected onto the shape along that
+        normal with :meth:`~topology.Face.project_to_shape`. A line of text
+        follows the path this way.
 
-        Note that projection may result in distortion depending on
-        the shape at a position along the path.
+        This is the tool for a target with several faces: a face that straddles
+        the boundary between two faces of the target, a glyph running round a
+        filleted corner, comes back as a Shell with a piece on each. For a
+        single surface :meth:`~topology.Face.wrap_faces` is the better choice:
+        it writes the faces into the surface's parameter space, which keeps
+        their lengths on a developable surface and handles seams, where a
+        projection foreshortens on a slope.
 
-        .. image:: projectText.png
+        Limits: the surface normal at each point is found by a ray from the
+        path toward the shape's centre, so the shape's centre must lie behind
+        the surface along the whole path, and a face placed at a sharp corner
+        of the target projects poorly.
+
+        .. image:: /projectText.png
 
         Args:
-            faces (Union[list[Face], Compound]): faces to project
-            path: Path on the Shape to follow
-            start: Relative location on path to start the faces. Defaults to 0.
+            faces (Union[list[Face], Compound]): planar faces on ``Plane.XY``
+            path (Wire | Edge): a curve on this shape to lay the faces along
+            start (float, optional): how far along the path, from 0 to 1, the
+                leftmost point of the faces lands. Defaults to 0.
 
         Returns:
-            The projected faces
-
+            ShapeList[Face]: the faces on the surface, a Shell where a face
+            spans more than one face of the target
         """
         path_length = path.length
         # The derived classes of Shape implement center
@@ -2458,7 +2492,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """split and keep inside or outside"""
 
     @overload
-    def split(self, tool: TrimmingTool, keep: Literal[Keep.ALL]) -> list[Self]:
+    def split(
+        self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Literal[Keep.ALL]
+    ) -> list[Self]:
         """split and return the unordered pieces"""
 
     @overload
@@ -2475,20 +2511,39 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """invalid split"""
 
     @overload
+    def split(
+        self,
+        tool: Iterable[TrimmingTool],
+        keep: Literal[Keep.TOP, Keep.BOTTOM, Keep.BOTH, Keep.INSIDE, Keep.OUTSIDE],
+    ) -> NoReturn:
+        """several tools leave no side to keep"""
+
+    @overload
     def split(self, tool: TrimmingTool) -> Self | list[Self]:
         """split and keep inside (default)"""
 
-    def split(self, tool: TrimmingTool, keep: Keep = Keep.TOP):
+    def split(self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Keep = Keep.TOP):
         """split
 
-        Split this shape by the provided plane or face.
+        Split this shape by the provided plane, face or shell, or by several of
+        them at once.
+
+        A single tool has two sides, so the pieces can be kept by side. Several
+        tools are all applied in one operation and each is intersected with the
+        others, so faces that cross one another seal a region between them even
+        though no one of them divides the shape on its own (sewing the same faces
+        into one shell does not do this, as a shell is never intersected with
+        itself). The pieces then have no top or bottom, so several tools require
+        ``keep=Keep.ALL``.
 
         Args:
-            tool (Plane | Face): surface to segment shape
+            tool (Plane | Face | Shell | Iterable of): surface(s) to segment shape
             keep (Keep, optional): which object(s) to save. Defaults to Keep.TOP.
 
-        Returns:
-            Shape: result of split
+        Raises:
+            ValueError: no tool, an empty tool, an invalid keep, or several tools
+                with a keep other than Keep.ALL
+
         Returns:
             Self | list[Self],
             tuple[Self | list[Self]]: The result of the split operation.
@@ -2499,8 +2554,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
               the empty shape if no bottom is found.
             - **Keep.BOTH**: Returns a tuple `(inside, outside)` where each element is
               either a `Self` or `list[Self]`, or the empty shape if no corresponding part is found.
+            - **Keep.ALL**: Returns every piece as a `list[Self]`, in no particular order.
         """
-        if isinstance(tool, Shape) and tool.is_empty:
+        tools = [tool] if isinstance(tool, (Plane, Shape)) else list(tool)
+        if not tools:
+            raise ValueError("Can't split without a tool")
+        if any(isinstance(t, Shape) and t.is_empty for t in tools):
             raise ValueError("Can't split with an empty tool")
         if self.is_empty:  # nothing to split; nothing on either side
             nothing = self._zero_class()()
@@ -2510,18 +2569,38 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         if keep in [Keep.INSIDE, Keep.OUTSIDE]:
             raise ValueError(f"{keep} is invalid")
+        if len(tools) > 1 and keep != Keep.ALL:
+            raise ValueError(
+                "Several tools leave the pieces with no top or bottom; use keep=Keep.ALL"
+            )
 
         shape_list = List_TopoDS_Shape()
         shape_list.Append(self.wrapped)
 
-        # Define the splitting tool
-        trim_tool = (
-            BRepBuilderAPI_MakeFace(tool.wrapped).Face()  # gp_Pln to Face
-            if isinstance(tool, Plane)
-            else tool.wrapped
-        )
+        # Define the splitting tool(s). A lone plane becomes an unbounded face,
+        # but the kernel can't intersect two unbounded faces with each other, so
+        # with several tools each plane becomes a face that spans this shape.
+        def planar_face(plane: Plane) -> TopoDS_Face:
+            if len(tools) == 1:
+                return BRepBuilderAPI_MakeFace(plane.wrapped).Face()
+            bbox = self.bounding_box()
+            half_span = bbox.diagonal + 1.0
+            center = plane.to_local_coords(bbox.center())
+            return BRepBuilderAPI_MakeFace(
+                plane.wrapped,
+                center.X - half_span,
+                center.X + half_span,
+                center.Y - half_span,
+                center.Y + half_span,
+            ).Face()
+
+        tool = tools[0]
+        trim_tool = planar_face(tool) if isinstance(tool, Plane) else tool.wrapped
         tool_list = List_TopoDS_Shape()
-        tool_list.Append(trim_tool)
+        for a_tool in tools:
+            tool_list.Append(
+                planar_face(a_tool) if isinstance(a_tool, Plane) else a_tool.wrapped
+            )
 
         # Create the splitter algorithm
         splitter = BRepAlgoAPI_Splitter()
@@ -2541,10 +2620,13 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # For speed the user may just want all the objects which they
         # can sort more efficiently then the generic algorithm below
         if keep == Keep.ALL:
-            return ShapeList(
+            pieces = ShapeList(
                 self.__class__.cast(part)
                 for part in get_top_level_topods_shapes(split_result)
             )
+            for piece in pieces:
+                self.copy_attributes_to(piece, ["wrapped", "_NodeMixin__children"])
+            return pieces
 
         if not isinstance(tool, Plane):
             # Get a TopoDS_Face to work with from the tool
@@ -2600,6 +2682,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 BRepGProp.LinearProperties_s(is_up_obj, properties)
                 # Mass represents the total length for linear properties
                 is_up = properties.Mass() >= TOLERANCE
+            self.copy_attributes_to(sub_shape, ["wrapped", "_NodeMixin__children"])
             (tops if is_up else bottoms).append(sub_shape)
 
         # a side with nothing on it is the empty shape of self's class
@@ -3064,6 +3147,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return builder.Shape()
 
         shape_copy = self._transformed(transform)
+        # The geometry moved under each node's unchanged frame; so must its joints
+        for _, placed in self._placed_pairs(shape_copy):
+            for joint in getattr(placed, "joints", {}).values():
+                joint._transform(transformation)
         if self._history is not None and not self.children:
             # the record follows the one transform of a shape without children;
             # an assembly's compound is rebuilt from its children instead
@@ -4333,12 +4420,22 @@ class Joint(ABC):
 
     Abstract Base Joint class - used to join two components together
 
+    A joint made without a part is free: it has a location of its own and no
+    parent until it is bound to a part, by assigning it into the part's
+    ``joints`` under its label or by adding it to the part with ``+``. A free
+    joint can be placed with ``*`` like a shape: ``Pos(0, 0, 5) * joint`` is a
+    moved copy and ``GridLocations(...) * joint`` is one copy per location,
+    labelled ``label0``, ``label1``, ...
+
     Args:
-        parent (Union[Solid, Compound]): object that joint to bound to
+        label (str, optional): user assigned label. A free joint takes the key
+            it is assigned to. Defaults to None.
+        parent (BuildPart | BuildSheet | Solid | Compound, optional): object the joint is
+            bound to. Defaults to None, a free joint.
 
     Attributes:
         label (str): user assigned label
-        parent (Shape): object joint is bound to
+        parent (Shape | None): object joint is bound to, None for a free joint
         connected_to (Joint): joint that is connect to this joint
 
     """
@@ -4348,28 +4445,125 @@ class Joint(ABC):
 
     # ---- Constructor ----
 
-    def __init__(self, label: str, parent: BuildPart | Solid | Compound):
-        self.label = label
+    def __init__(
+        self,
+        label: str | None = None,
+        parent: BuildPart | BuildSheet | Solid | Compound | None = None,
+    ):
+        self.label = "" if label is None else label
         self.parent = parent
         self.connected_to: Joint | None = None
 
-    def _reparent(self, parent: Solid | Compound) -> None:
-        """Bind this joint to a new parent without changing its location."""
-        relative_to_new_parent = parent.location.inverse() * self.parent.location
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
+        """Copy the joint's own state only. ``parent`` and ``connected_to`` refer
+        to shapes outside the joint and are carried by reference; whoever copies
+        a shape rebinds ``parent`` to the copy."""
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for key, value in self.__dict__.items():
+            if key in ("parent", "connected_to"):
+                setattr(result, key, value)
+            else:
+                setattr(result, key, copy.deepcopy(value, memo))
+        return result
+
+    @staticmethod
+    def _frame_of(owner: BuildPart | BuildSheet | Solid | Compound | None) -> Location:
+        """The frame a joint on ``owner`` is stored relative to: a shape's location,
+        or the identity for a builder, which constructs in its own frame and places
+        its joints with the part on exit, for a free joint, and for an empty shape,
+        which has no location of its own"""
+        if isinstance(owner, Shape) and not owner.is_empty:
+            return owner.location
+        return Location()
+
+    def _move(self, location: Location) -> None:
+        """Move the joint by ``location`` within its frame. Joints with a reference
+        direction or plane rotate it along with the axis."""
         if hasattr(self, "relative_location"):
-            self.relative_location = relative_to_new_parent * self.relative_location
+            self.relative_location = location * self.relative_location
         elif hasattr(self, "relative_axis"):
-            self.relative_axis = self.relative_axis.located(relative_to_new_parent)
+            self.relative_axis = self.relative_axis.located(location)
         else:  # pragma: no cover - all current concrete joints use one representation
             raise TypeError(f"Unsupported joint type {type(self).__name__}")
+
+    @staticmethod
+    def _rotated_direction(direction: Vector, location: Location) -> Vector:
+        """``direction`` turned by the rotation of ``location``"""
+        return (location * Location(direction)).position - location.position
+
+    def _reparent(
+        self, parent: BuildPart | BuildSheet | Solid | Compound | None
+    ) -> None:
+        """Bind this joint to a new parent, or free it with None, without changing
+        its location."""
+        self._move(Joint._frame_of(parent).inverse() * Joint._frame_of(self.parent))
         self.parent = parent
+
+    @staticmethod
+    def _transformed_location(location: Location, transformation: gp_Trsf) -> Location:
+        """``location`` under a kernel transformation. The origin is transformed as
+        a point and the X and Z directions as directions, with Y recomputed to keep
+        the frame right-handed, as ``Location.mirror`` does for a reflection."""
+        plane = Plane(location)
+        return Location(
+            Plane(
+                origin=Vector(plane.origin.to_pnt().Transformed(transformation)),
+                x_dir=Vector(plane.x_dir.to_dir().Transformed(transformation)),
+                z_dir=Vector(plane.z_dir.to_dir().Transformed(transformation)),
+            )
+        )
+
+    @staticmethod
+    def _transformed_direction(
+        direction: Vector, transformation: gp_Trsf, frame: Location
+    ) -> Vector:
+        """A direction given in ``frame`` under a kernel transformation applied in
+        world coordinates, returned in ``frame`` again"""
+        world = (frame * Location(direction)).position - frame.position
+        transformed = Vector(world.to_dir().Transformed(transformation))
+        inverse = frame.inverse()
+        return (inverse * Location(transformed)).position - inverse.position
+
+    def _transform(self, transformation: gp_Trsf) -> None:
+        """Apply the kernel transformation its part's geometry was given to the
+        joint, in world coordinates; the part's frame is unchanged by it"""
+        frame = Joint._frame_of(self.parent)
+        if hasattr(self, "relative_location"):
+            world = frame * self.relative_location
+            self.relative_location = frame.inverse() * Joint._transformed_location(
+                world, transformation
+            )
+        elif hasattr(self, "relative_axis"):
+            world_axis = self.relative_axis.located(frame)
+            self.relative_axis = Axis(
+                Vector(world_axis.position.to_pnt().Transformed(transformation)),
+                Vector(world_axis.direction.to_dir().Transformed(transformation)),
+            ).located(frame.inverse())
+        else:  # pragma: no cover - all current concrete joints use one representation
+            raise TypeError(f"Unsupported joint type {type(self).__name__}")
+
+    def _reference_size(self) -> float:
+        """A size to draw the symbol at: the diagonal of the parent's bounding box,
+        or of the part under construction for a builder, or a nominal 10 for a
+        free joint"""
+        shape = self.parent if isinstance(self.parent, Shape) else None
+        if shape is None:
+            shape = getattr(self.parent, "_obj", None)
+        if isinstance(shape, Shape) and not shape.is_empty:
+            return shape.bounding_box(optimal=False).diagonal
+        return 10.0
 
     # ---- Properties ----
 
     @property
-    @abstractmethod
     def location(self) -> Location:
         """Location of joint"""
+        frame = Joint._frame_of(self.parent)
+        if hasattr(self, "relative_location"):
+            return frame * self.relative_location
+        return frame * self.relative_axis.location
 
     @property
     @abstractmethod
@@ -4379,23 +4573,196 @@ class Joint(ABC):
     # ---- Instance Methods ----
 
     @abstractmethod
+    def attach(self, *args, **kwargs):
+        """All derived classes must provide an attach method"""
+
+    @deprecated("Joint.connect_to is deprecated; use attach instead.")
     def connect_to(self, *args, **kwargs):
-        """All derived classes must provide a connect_to method"""
+        """Attach another joint's part to this one
+
+        .. deprecated::
+            Use :meth:`attach`, which reads the way it behaves: this joint's
+            part stays where it is and the other joint's part is moved.
+        """
+        return self.attach(*args, **kwargs)
 
     @abstractmethod
     def relative_to(self, *args, **kwargs) -> Location:
         """Return relative location to another joint"""
 
-    def _connect_to(self, other: Joint, **kwargs):  # pragma: no cover
-        """Connect Joint self by repositioning other"""
+    def moved(self, loc: Location | Plane) -> Self:
+        """A copy of this free joint moved by ``loc``
+
+        Raises:
+            ValueError: the joint is bound to a part
+        """
+        if self.parent is not None:
+            raise ValueError(
+                f"Joint '{self.label}' is bound to a part and cannot be moved; "
+                "make a free joint at its location instead"
+            )
+        result = copy.deepcopy(self)
+        result._move(loc if isinstance(loc, Location) else Location(loc))
+        return result
+
+    @overload
+    def __rmul__(self, other: Location | Plane) -> Self: ...
+    @overload
+    def __rmul__(self, other: Iterable[Location | Plane]) -> list[Self]: ...
+    def __rmul__(self, other):
+        """Place a free joint with ``*``: a moved copy for a Location or Plane, or
+        one per item of an iterable of them, labelled label0, label1, ..."""
+        placed = apply_location_like(self, other)
+        if isinstance(placed, list) and len(placed) > 1 and self.label:
+            for index, joint in enumerate(placed):
+                joint.label = f"{self.label}{index}"
+        return placed
+
+    def _attach(self, other: Joint, **kwargs):  # pragma: no cover
+        """Attach other to this joint by repositioning other's part"""
 
         if not isinstance(other, Joint):
             raise TypeError(f"other must of type Joint not {type(other)}")
-        if self.parent.location is None:
-            raise ValueError("Parent location is not set")
+        if self.parent is None or other.parent is None:
+            raise ValueError(
+                "A free joint cannot be connected; bind it to a part first"
+            )
         relative_location = self.relative_to(other, **kwargs)
-        other.parent.locate(tcast(Location, self.parent.location * relative_location))
+        other.parent.locate(
+            tcast(Location, Joint._frame_of(self.parent) * relative_location)
+        )
         self.connected_to = other
+
+
+class JointDict(dict[str, Joint]):
+    """The joints bound to a part or builder, by label
+
+    Assigning a joint attaches it: the joint takes the key as its label and is
+    bound to the owner where it is, so ``part.joints["x"] = joint`` binds a free
+    joint to the part, or moves a joint across from another part, without
+    changing its location in the world. Deleting a joint frees it where it is,
+    as does assigning another joint under its label. ``update`` and ``|=`` take
+    a mapping of label to joint, or an iterable of joints each under its own
+    label, as ``locations * joint`` produces: ``part.joints |= locations * joint``.
+
+    Args:
+        owner (BuildPart | BuildSheet | Solid | Compound): the part or builder the joints are on
+        joints (Mapping[str, Joint] | Iterable[Joint], optional): joints to
+            attach. Defaults to None.
+    """
+
+    def __init__(
+        self,
+        owner: BuildPart | BuildSheet | Solid | Compound,
+        joints: Mapping[str, Joint] | Iterable[Joint] | None = None,
+    ):
+        super().__init__()
+        self.owner = owner
+        if joints:
+            self.update(joints)
+
+    @classmethod
+    def _adopt(cls, owner: Solid | Compound) -> None:
+        """Rebind the joints ``owner`` holds to it: a copy has taken the place of
+        their previous parent, so they are rebound without being moved"""
+        joints = owner.joints
+        if not isinstance(joints, JointDict):
+            joints = cls._restore(owner, joints)
+            setattr(owner, "joints", joints)
+        joints.owner = owner
+        for joint in joints.values():
+            joint.parent = owner
+
+    @staticmethod
+    def _restore(owner: Any, joints: Mapping[str, Joint]) -> JointDict:
+        """A JointDict holding ``joints`` as they are, without attaching them"""
+        result = JointDict(owner)
+        for label, joint in joints.items():
+            dict.__setitem__(result, label, joint)
+        return result
+
+    def __reduce__(self):
+        return (JointDict._restore, (self.owner, dict(self)))
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> JointDict:
+        result = JointDict(self.owner)
+        memo[id(self)] = result
+        for label, joint in self.items():
+            dict.__setitem__(result, label, copy.deepcopy(joint, memo))
+        return result
+
+    def __setitem__(self, label: str, joint: Joint) -> None:
+        if not isinstance(joint, Joint):
+            raise TypeError(f"joints hold Joint objects, not {type(joint).__name__}")
+        joint.label = label
+        if joint.parent is not self.owner:
+            # a joint moving across from another part leaves that part's joints
+            previous = getattr(joint.parent, "joints", None)
+            if isinstance(previous, JointDict):
+                for old_label, old_joint in list(previous.items()):
+                    if old_joint is joint:
+                        dict.__delitem__(previous, old_label)
+            joint._reparent(self.owner)
+        displaced = dict.get(self, label)
+        if displaced is not None and displaced is not joint:
+            displaced._reparent(None)
+        super().__setitem__(label, joint)
+
+    def __delitem__(self, label: str) -> None:
+        joint = self[label]
+        super().__delitem__(label)
+        joint._reparent(None)
+
+    def __ior__(self, other):  # type: ignore[override, misc]
+        self.update(other)
+        return self
+
+    def update(self, other=(), /, **kwargs) -> None:  # type: ignore[override]
+        """Attach joints from a mapping of label to joint, an iterable of
+        (label, joint) pairs, or an iterable of labelled joints
+
+        Raises:
+            ValueError: a joint in an iterable has no label, or two share one
+        """
+        items = list(other.items()) if isinstance(other, Mapping) else list(other)
+        if items and all(isinstance(item, Joint) for item in items):
+            joints = [tcast(Joint, item) for item in items]
+            labels = [joint.label for joint in joints]
+            if not all(labels):
+                raise ValueError("A joint added to a part needs a label")
+            if len(set(labels)) != len(labels):
+                raise ValueError(f"Joint labels must be unique, got {labels}")
+            items = list(zip(labels, joints))
+        for label, joint in dict(items, **kwargs).items():
+            self[label] = joint
+
+    def setdefault(  # type: ignore[override]
+        self, label: str, default: Joint | None = None
+    ) -> Joint:
+        if label not in self:
+            if default is None:
+                raise TypeError("a Joint is required")
+            self[label] = default
+        return self[label]
+
+    def pop(self, label: str, *default: Joint) -> Joint:  # type: ignore[override]
+        if label in self:
+            joint = self[label]
+            del self[label]
+            return joint
+        if default:
+            return default[0]
+        raise KeyError(label)
+
+    def popitem(self) -> tuple[str, Joint]:
+        label, joint = super().popitem()
+        joint._reparent(None)
+        return label, joint
+
+    def clear(self) -> None:
+        for joint in self.values():
+            joint._reparent(None)
+        super().clear()
 
 
 class SkipClean:

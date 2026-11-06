@@ -48,9 +48,9 @@ base_top_edges = base.edges().filter_by(loc.x_axis).group_by(loc.z_axis)[-1]
 fixed_arm = JointBox(1, 1, 5, 0.2)
 j1 = RigidJoint("side", base, Plane(base.faces().sort_by(loc.x_axis).last).location)
 j2 = RigidJoint("top", fixed_arm, (-Plane(fixed_arm.faces().sort_by().last)).location)
-base.joints["side"].connect_to(fixed_arm.joints["top"])
+base.joints["side"].attach(fixed_arm.joints["top"])
 # or
-# j1.connect_to(j2)
+# j1.attach(j2)
 
 #
 # Hinge
@@ -67,7 +67,7 @@ base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]
 base_hinge_axis = Axis(base_corner_edge)
 j3 = RevoluteJoint("hinge", base, axis=base_hinge_axis, angular_range=(0, 180))
 j4 = RigidJoint("corner", hinge_arm, swing_arm_hinge_axis.location)
-base.joints["hinge"].connect_to(hinge_arm.joints["corner"], angle=90)
+base.joints["hinge"].attach(hinge_arm.joints["corner"], angle=90)
 
 
 #
@@ -81,8 +81,8 @@ s1 = LinearJoint(
     linear_range=(0, base_top_edges[0].length),
 )
 s2 = RigidJoint("slide", slider_arm, Location(Vector(0, 0, 0)))
-base.joints["slide"].connect_to(slider_arm.joints["slide"], position=8)
-# s1.connect_to(s2,8)
+base.joints["slide"].attach(slider_arm.joints["slide"], position=8)
+# s1.attach(s2,8)
 
 #
 # Cylindrical
@@ -94,7 +94,7 @@ hole_axis = Axis(
 screw_arm = JointBox(1, 1, 10, 0.49)
 j5 = CylindricalJoint("hole", base, hole_axis, linear_range=(-10, 10))
 j6 = RigidJoint("screw", screw_arm, screw_arm.faces().sort_by(Axis.Z)[-1].location)
-j5.connect_to(j6, position=-1, angle=90)
+j5.attach(j6, position=-1, angle=90)
 
 #
 # PinSlotJoint
@@ -107,7 +107,7 @@ j7 = LinearJoint(
 )
 pin_arm = JointBox(2, 1, 2)
 j8 = RevoluteJoint("pin", pin_arm, axis=Axis.Z, angular_range=(0, 360))
-j7.connect_to(j8, position=6, angle=60)
+j7.attach(j8, position=6, angle=60)
 
 #
 # BallJoint
@@ -115,6 +115,6 @@ j7.connect_to(j8, position=6, angle=60)
 j9 = BallJoint("socket", base, Plane(base.faces().sort_by(Axis.X)[0]).location)
 ball = JointBox(2, 2, 2, 0.99)
 j10 = RigidJoint("ball", ball, Location(Vector(0, 0, 1)))
-j9.connect_to(j10, angles=(10, 20, 30))
+j9.attach(j10, angles=(10, 20, 30))
 
 show_all(render_joints=True, transparent=True)

@@ -20,7 +20,7 @@ with BuildPart() as pipe_builder:
     RigidJoint(label="outlet", joint_location=path.location_at(1))
 
 # Place the flanges at the ends of the pipe
-pipe_builder.part.joints["inlet"].connect_to(flange_inlet.joints["pipe"])
-pipe_builder.part.joints["outlet"].connect_to(flange_outlet.joints["pipe"])
+pipe_builder.part.joints["inlet"].attach(flange_inlet.joints["pipe"])
+pipe_builder.part.joints["outlet"].attach(flange_outlet.joints["pipe"])
 
 show(pipe_builder, flange_inlet, flange_outlet, render_joints=True)
