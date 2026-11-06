@@ -646,6 +646,47 @@ class BuildLineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             JernArc((1, 0), (0, 1), 1, (5, 0))
 
+    def test_jern_arc_negative_full_turn_direction(self):
+        arc = JernArc((0, 0), (1, 0), 1, -360)
+        self.assertAlmostEqual(arc.tangent_at(0), (1, 0, 0), 5)
+        self.assertAlmostEqual(arc.position_at(0.25), (1, -1, 0), 5)
+        self.assertAlmostEqual(arc.position_at(0), (0, 0, 0), 5)
+        self.assertAlmostEqual(arc.position_at(1), (0, 0, 0), 5)
+        self.assertAlmostEqual(arc.center_point, (0, -1, 0), 5)
+        self.assertAlmostEqual(arc.radius, 1, 5)
+        self.assertAlmostEqual(arc.length, 2 * pi, 5)
+        self.assertTrue(arc.is_closed)
+        self.assertEqual(arc.geom_type, GeomType.CIRCLE)
+
+    def test_jern_arc_full_turn_controls(self):
+        with BuildLine() as positive_builder:
+            JernArc((0, 0), (1, 0), 1, 360)
+        self.assertAlmostEqual(
+            positive_builder.line.edges()[0].position_at(0.25), (1, 1, 0), 5
+        )
+
+        with BuildLine() as partial_builder:
+            JernArc((0, 0), (1, 0), 1, -90)
+        self.assertAlmostEqual(partial_builder.line @ 1, (1, -1, 0), 5)
+
+    def test_jern_arc_translated_nonunit_negative_full_turn(self):
+        with BuildLine() as builder:
+            arc = JernArc((3, -2), (5, 0), 2, -360)
+
+        edge = builder.line.edges()[0]
+        self.assertAlmostEqual(edge.tangent_at(0), (1, 0, 0), 5)
+        self.assertAlmostEqual(edge.position_at(0.25), (5, -4, 0), 5)
+        self.assertAlmostEqual(arc.center_point, (3, -4, 0), 5)
+        self.assertAlmostEqual(arc.radius, 2, 5)
+        self.assertAlmostEqual(arc.length, 4 * pi, 5)
+        self.assertTrue(arc.is_closed)
+
+    def test_jern_arc_negative_full_turn_in_xz_builder(self):
+        with BuildLine(Plane.XZ) as builder:
+            JernArc((0, 0), (1, 0), 1, -360)
+
+        self.assertAlmostEqual(builder.line.edges()[0].position_at(0.25), (1, 0, -1), 5)
+
     def test_polar_line(self):
         """Test 2D and 3D polar lines"""
         with BuildLine():
