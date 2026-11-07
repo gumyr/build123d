@@ -545,15 +545,15 @@ class TestShape(unittest.TestCase):
         # Contour edges
         cyl = Solid.make_cylinder(2, 10)
         visible, hidden = cyl.drawing_view((-20, 20, 20))
-        # Note that some edges are broken into two
-        self.assertEqual(len(visible), 6)
-        self.assertEqual(len(hidden), 2)
+        # The kernel splits the circles at the silhouette, the pieces are merged
+        self.assertEqual(len(visible), 4)
+        self.assertEqual(len(hidden), 1)
 
         # Hidden contour edges
         hole = box - cyl
         visible, hidden = hole.drawing_view((-20, 20, 20))
-        self.assertEqual(len(visible), 13)
-        self.assertEqual(len(hidden), 6)
+        self.assertEqual(len(visible), 12)
+        self.assertEqual(len(hidden), 5)
 
         # Outline edges
         sphere = Solid.make_sphere(5)
