@@ -35,7 +35,7 @@ import unittest
 
 from IPython.lib import pretty
 from build123d.build_common import GridLocations, PolarLocations
-from build123d.build_enums import Convexity, GeomType
+from build123d.build_enums import Convexity, GeomType, SortBy
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Pos, Vector
 from build123d.objects_part import Box, Cylinder
@@ -723,6 +723,67 @@ class TestShapeListAddition(unittest.TestCase):
         expected_sub = [e for e in edges if e not in set(removed)]
         self.assertEqual(len(difference), len(expected_sub))
         self.assertTrue(all(a is b for a, b in zip(difference, expected_sub)))
+
+
+class TestSortByDeprecation(unittest.TestCase):
+    """SortBy still works but warns, naming the replacement for the shapes sorted"""
+
+    def test_sort_by_still_sorts_and_names_the_property(self):
+        edges = Solid.make_box(1, 2, 3).edges()
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"use Edge\.length instead"
+        ) as cm:
+            by_length = edges.sort_by(SortBy.LENGTH)
+        self.assertEqual(by_length, edges.sort_by(Edge.length))
+        self.assertEqual(cm.filename, __file__)
+
+    def test_group_by_names_the_property(self):
+        faces = Solid.make_box(1, 1, 2).faces()
+        with self.assertWarnsRegex(DeprecationWarning, r"use Face\.area instead"):
+            self.assertEqual(len(faces.group_by(SortBy.AREA)[0]), 2)
+
+    def test_the_class_comes_from_the_shapes(self):
+        circles = Solid.make_cone(2, 1, 2).edges().filter_by(GeomType.CIRCLE)
+        with self.assertWarnsRegex(DeprecationWarning, r"use Edge\.radius instead"):
+            circles.sort_by(SortBy.RADIUS)
+        with self.assertWarnsRegex(DeprecationWarning, r"use Wire\.length instead"):
+            Solid.make_box(1, 2, 3).wires().sort_by(SortBy.LENGTH)
+        with self.assertWarnsRegex(DeprecationWarning, r"use Solid\.volume instead"):
+            Solid.make_box(1, 2, 3).solids().sort_by(SortBy.VOLUME)
+
+    def test_an_empty_list_falls_back_to_the_usual_class(self):
+        with self.assertWarnsRegex(DeprecationWarning, r"use Solid\.volume instead"):
+            self.assertEqual(ShapeList().sort_by(SortBy.VOLUME), [])
+        with self.assertWarnsRegex(DeprecationWarning, r"use Face\.area instead"):
+            self.assertEqual(len(ShapeList().group_by(SortBy.AREA)), 0)
+
+    def test_distance_points_at_the_method_or_the_key(self):
+        vertices = Solid.make_box(1, 1, 1).vertices()
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"sort_by_distance\(\(0, 0, 0\)\)"
+        ):
+            self.assertEqual(
+                vertices.sort_by(SortBy.DISTANCE), vertices.sort_by_distance((0, 0, 0))
+            )
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"Vertex\(0, 0, 0\)\.distance_to"
+        ) as cm:
+            groups = vertices.group_by(SortBy.DISTANCE)
+        self.assertAlmostEqual(Vector(groups[-1][0]), (1, 1, 1), 5)
+        self.assertIn("lambda s: s.center().length", str(cm.warning))
+
+    def test_operators_warn_at_the_callers_line(self):
+        box = Solid.make_box(1, 2, 3)
+        for expression in (
+            lambda: box.edges() > SortBy.LENGTH,
+            lambda: box.faces() < SortBy.AREA,
+            lambda: box.solids() >> SortBy.VOLUME,
+            lambda: box.vertices() << SortBy.DISTANCE,
+        ):
+            with self.subTest(expression=expression):
+                with self.assertWarns(DeprecationWarning) as cm:
+                    expression()
+                self.assertEqual(cm.filename, __file__)
 
 
 if __name__ == "__main__":

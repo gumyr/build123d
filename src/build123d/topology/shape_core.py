@@ -3732,6 +3732,41 @@ def topo_distance_to(
     return key_f
 
 
+# The class whose property stands in for a SortBy member when the list being
+# sorted is empty and so has no element to take the class from
+_SORT_BY_FALLBACK_CLASS = {
+    SortBy.LENGTH: "Edge",
+    SortBy.RADIUS: "Edge",
+    SortBy.AREA: "Face",
+    SortBy.VOLUME: "Solid",
+}
+
+
+def _warn_sort_by_deprecated(key: SortBy, shapes: list, method: str) -> None:
+    """Warn that a SortBy member is deprecated, naming the replacement for the
+    class of shape in ``shapes``: the property of the same name, or for DISTANCE
+    the method or key that measures from the origin. The warning is attributed
+    to the caller of the caller: the user's line, when called from ``_sort_by``
+    or ``_group_by``"""
+    if key is SortBy.DISTANCE:
+        exact = (
+            "or the key lambda s: s.center().length to keep the order by each "
+            "centre's distance from the origin"
+        )
+        if method == "sort_by":
+            advice = f"use sort_by_distance((0, 0, 0)) instead, {exact}"
+        else:
+            advice = f"use the key Vertex(0, 0, 0).distance_to instead, {exact}"
+    else:
+        cls = type(shapes[0]).__name__ if shapes else _SORT_BY_FALLBACK_CLASS[key]
+        advice = f"use {cls}.{key.name.lower()} instead"
+    warnings.warn(
+        f"SortBy.{key.name} is deprecated; {advice}.",
+        DeprecationWarning,
+        stacklevel=4,
+    )
+
+
 class ShapeList(list[T]):
     """Subclass of list with custom filter and sort methods appropriate to CAD"""
 
@@ -3800,15 +3835,15 @@ class ShapeList(list[T]):
 
     def __gt__(self, sort_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:  # type: ignore
         """Sort operator >"""
-        return self.sort_by(sort_by)
+        return self._sort_by(sort_by, reverse=False)
 
     def __lshift__(self, group_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:
         """Group and select smallest group operator <<"""
-        return self.group_by(group_by)[0]
+        return self._group_by(group_by)[0]
 
     def __lt__(self, sort_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:  # type: ignore
         """Reverse sort operator <"""
-        return self.sort_by(sort_by, reverse=True)
+        return self._sort_by(sort_by, reverse=True)
 
     # Normally implementing __eq__ is enough, but ShapeList subclasses list,
     # which already implements __ne__, so we need to override it, too
@@ -3824,7 +3859,7 @@ class ShapeList(list[T]):
 
     def __rshift__(self, group_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:
         """Group and select largest group operator >>"""
-        return self.group_by(group_by)[-1]
+        return self._group_by(group_by)[-1]
 
     def __sub__(self, other: ShapeList) -> ShapeList[T]:
         """Differences between two ShapeLists operator -"""
@@ -4159,6 +4194,7 @@ class ShapeList(list[T]):
         Args:
             group_by (Callable | Axis | Edge | Wire | SortBy | property, optional):
                 group and sort criteria, or the ``Convexity`` enum itself.
+                ``SortBy`` is deprecated; pass the property instead.
                 Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
             tol_digits (int, optional): Tolerance for building the group keys by
@@ -4167,6 +4203,16 @@ class ShapeList(list[T]):
         Returns:
             GroupBy[T, K]: sorted groups of ShapeLists
         """
+        return self._group_by(group_by, reverse, tol_digits)
+
+    def _group_by(
+        self,
+        group_by: Callable[[T], K] | Axis | Edge | Wire | SortBy | property = Axis.Z,
+        reverse: bool = False,
+        tol_digits: int = 6,
+    ) -> GroupBy[T, K]:
+        """group_by, called directly by the public method and the operators so
+        a deprecation warning raised here points at the user's line either way"""
 
         if isinstance(group_by, type):
             # the enum itself, checked first because a class is also callable
@@ -4200,6 +4246,7 @@ class ShapeList(list[T]):
                 return round(group_by.param_at_point(pnt1), tol_digits)
 
         elif isinstance(group_by, SortBy):
+            _warn_sort_by_deprecated(group_by, self, "group_by")
             if group_by == SortBy.LENGTH:
 
                 def key_f(obj):
@@ -4285,7 +4332,8 @@ class ShapeList(list[T]):
 
         Args:
             sort_by (Callable | Axis | Edge | Wire | SortBy | property, optional):
-                sort criteria. Defaults to Axis.Z.
+                sort criteria. ``SortBy`` is deprecated; pass the property
+                instead. Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
 
         Raises:
@@ -4296,6 +4344,15 @@ class ShapeList(list[T]):
         Returns:
             ShapeList: sorted list of objects
         """
+        return self._sort_by(sort_by, reverse)
+
+    def _sort_by(
+        self,
+        sort_by: Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
+        reverse: bool,
+    ) -> ShapeList[T]:
+        """sort_by, called directly by the public method and the operators so
+        a deprecation warning raised here points at the user's line either way"""
 
         if callable(sort_by):
             # If a callable is provided, use it directly as the key
@@ -4334,6 +4391,7 @@ class ShapeList(list[T]):
             )
 
         elif isinstance(sort_by, SortBy):
+            _warn_sort_by_deprecated(sort_by, self, "sort_by")
             if sort_by == SortBy.LENGTH:
                 objects = sorted(
                     self,
