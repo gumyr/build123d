@@ -88,3 +88,11 @@ with BuildPart() as example_10:
     ConvexPolyhedron(example_10.vertices())
     # [Ex. 10]
     write_svg("convex_polyhedron_example")
+
+# [Ex. 11]
+with BuildPart() as example_11:
+    Box(3, 2, 1)
+    with Locations(example_11.faces().sort_by(Axis.Z)[-1]):
+        CounterDrillHole(0.2, 0.4, 0.3, 0.9, point_angle=118)
+    # [Ex. 11]
+    write_svg("counter_drill_hole_example")

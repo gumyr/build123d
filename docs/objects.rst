@@ -479,6 +479,13 @@ Reference
         +++
         Counter bore hole defined by radii and depths
 
+    .. grid-item-card:: :class:`~objects_part.CounterDrillHole`
+
+        .. image:: assets/counter_drill_hole_example.svg
+
+        +++
+        Counter drill hole defined by radii, depths and drill point angles
+
     .. grid-item-card:: :class:`~objects_part.CounterSinkHole`
 
         .. image:: assets/counter_sink_hole_example.svg
@@ -522,6 +529,30 @@ Reference
         Wedge defined by lengths along multiple Axes
 
 
+Drill points
+^^^^^^^^^^^^
+
+A blind hole made by a twist drill ends in a cone whose included angle is the
+drill's point angle, 118° for a standard drill. Giving ``point_angle`` to
+:class:`~objects_part.Hole`, :class:`~objects_part.CounterBoreHole`,
+:class:`~objects_part.CounterSinkHole` or :class:`~objects_part.CounterDrillHole`
+adds that cone below the hole; without it, the bottom stays flat. As on a
+drawing, ``depth`` is measured to the end of the full diameter, so the cone adds
+``radius / tan(point_angle / 2)`` below it. A drill point needs a ``depth``,
+because a through hole has no bottom.
+
+.. image:: assets/hole_drill_point.svg
+    :align: center
+
+.. code-block:: python
+
+    with BuildPart() as block:
+        Box(40, 40, 30, align=(Align.CENTER, Align.CENTER, Align.MAX))
+        Hole(radius=5, depth=12, point_angle=118)
+
+The drawing above is a section of this block, made by ``docs/hole_drill_point.py``.
+
+
 Reference
 ^^^^^^^^^
 .. py:module:: objects_part
@@ -531,6 +562,7 @@ Reference
 .. autoclass:: Cone
 .. autoclass:: ConvexPolyhedron
 .. autoclass:: CounterBoreHole
+.. autoclass:: CounterDrillHole
 .. autoclass:: CounterSinkHole
 .. autoclass:: Cylinder
 .. autoclass:: Hole
