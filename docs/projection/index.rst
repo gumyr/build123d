@@ -27,13 +27,13 @@ what they project onto and what comes back.
       - the surface of a shape
       - the same kind of thing, lying on that surface, ready to extrude or
         follow
-    * - :meth:`~topology.Shape.drawing_view`
+    * - :meth:`~topology.Mixin1D.drawing_view`
       - a drawing, from a viewpoint
       - always edges, split into visible and hidden
 
 The first two keep the dimension of their input and are operations in both
-Builder and Algebra mode. The third is a method on any shape and is the
-basis of technical drawings.
+Builder and Algebra mode. The third is a method of edges, wires, faces,
+solids and compounds and is the basis of technical drawings.
 
 .. code-block:: build123d
 
