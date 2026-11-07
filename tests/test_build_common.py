@@ -161,10 +161,10 @@ class TestBuilder(unittest.TestCase):
         for builder in (flat, placed):
             self.assertEqual(builder.material, builder.part.material)
             self.assertEqual(builder.part.material.name, "Stainless_G304_ANNEALED")
-        self.assertEqual(tuple(flat.part.color), (1, 0, 0, 1))
-        self.assertEqual(tuple(placed.part.color), (0, 0, 1, 1))
-        self.assertEqual(tuple(nested.part.color), tuple(Color("green")))
-        self.assertEqual(tuple(sketch_builder.sketch.color), (1, 0, 0, 1))
+        self.assertEqual(flat.part.color, Color("red"))
+        self.assertEqual(placed.part.color, Color(0, 0, 1))
+        self.assertEqual(nested.part.color, Color("green"))
+        self.assertEqual(sketch_builder.sketch.color, Color("red"))
         self.assertIsNone(outer.color)
         self.assertIsNone(outer.material)
 
@@ -174,7 +174,7 @@ class TestBuilder(unittest.TestCase):
             builder.material = "stainless"
             builder.color = "red"
             Box(1, 1, 1)
-        self.assertEqual(tuple(builder.part.color), (1, 0, 0, 1))
+        self.assertEqual(builder.part.color, Color("red"))
 
     def test_builder_color_and_material_validation(self):
         builder = BuildPart()

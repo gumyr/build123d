@@ -1628,6 +1628,20 @@ class Color:
         """Return deepcopy of self"""
         return Color(*tuple(self))
 
+    def __eq__(self, other: object) -> bool:
+        """Colors equal operator ==: the same red, green, blue and alpha"""
+        if not isinstance(other, Color):
+            return NotImplemented
+        return self._key() == other._key()
+
+    def __hash__(self) -> int:
+        """Hash of Color"""
+        return hash(self._key())
+
+    def _key(self) -> tuple[float, ...]:
+        """Canonical key used for equality and hashing."""
+        return tuple(self)
+
     def __str__(self) -> str:
         """Generate string"""
         rgb = self.wrapped.GetRGB().Values(Quantity_TypeOfColor.Quantity_TOC_sRGB)
