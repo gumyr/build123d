@@ -2363,10 +2363,13 @@ class TestSheetSelectors(unittest.TestCase):
             self.assertEqual(len(bs.edges(Select.NEW)), 1)
             self.assertEqual(bs.edges(Select.LAST)[0].geom_type, GeomType.CIRCLE)
             split(bs.flats().sort_by(Axis.Z)[0], bisect_by=Plane.XZ, keep=Keep.BOTH)
-            # the halves are new faces; the wall the split reached is rebuilt
-            # by the sewing, and traced back to itself
-            self.assertEqual(len(bs.faces(Select.LAST)), 2)
-            self.assertEqual(len(bs.flats(Select.LAST)), 2)
+            # the halves are the flat trimmed, not new faces, so what the split
+            # made is the pair of cut edges, one on each half
+            self.assertEqual(len(bs.faces(Select.LAST)), 0)
+            self.assertEqual(len(bs.flats(Select.LAST)), 0)
+            self.assertEqual(len(bs.edges(Select.LAST)), 2)
+            self.assertEqual(len(bs.edges(Select.NEW)), 2)
+            self.assertTrue(all(e.geom_type == GeomType.LINE for e in bs.edges(Select.LAST)))
 
     def test_a_bend_moves_the_far_side_and_leaves_the_near_side(self):
         with BuildSheet(thickness=1, bend_radius=2) as bs:

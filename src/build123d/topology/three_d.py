@@ -1442,7 +1442,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         target: Compound | Solid,
         direction: VectorLike,
         until: Until = Until.NEXT,
-    ) -> Solid:
+    ) -> Solid | Compound:
         """extrude_until
 
         Extrude `profile` in the provided `direction` until it encounters a
@@ -1488,7 +1488,10 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 cuts the extrusion.
 
         Returns:
-            Solid: The extruded and limited solid.
+            Solid | Compound: The extruded and limited solid. A profile that
+            straddles a step in the target, part on a face and part inside the
+            material, stops each part at its own surface, and the parts come
+            back as a Compound when they do not join.
         """
         direction = Vector(direction)
         if until in [Until.PREVIOUS, Until.FIRST]:
@@ -1524,7 +1527,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         target: Compound | Solid,
         direction: Vector,
         reach: float,
-    ) -> Solid:
+    ) -> Solid | Compound:
         """The part of ``extrusion``, from its ``profile`` face along
         ``direction``, that lies before the first surface of ``target``"""
         # 1: The faces of the target, split where they turn away from the
@@ -1579,20 +1582,34 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 if piece
             )
 
-        # 3: Split the extrusion by the faces and walls together. The walls
-        #    run the whole way, so beyond the surface they cut the remainder
-        #    into pieces, which doesn't matter: only the piece holding the
-        #    profile is wanted
-        pieces = extrusion.split([*faces, *walls], keep=Keep.ALL)
+        # 3: Split the extrusion by the faces, then the pieces by the walls.
+        #    The walls run the whole way, so beyond the surface they cut the
+        #    remainder into pieces, which doesn't matter: only the pieces
+        #    holding the profile are wanted. Two passes, since a wall swept
+        #    from an edge often lies in the plane of another target face, and
+        #    the splitter fails when one pass is given coincident tools.
+        #    The profile is the extrusion's own base face. A target edge lying
+        #    in the profile's plane cuts it into sub-faces, so the profile is
+        #    followed through the splits' records to know what it became
+        pieces = extrusion.split(list(faces), keep=Keep.ALL)
+        base_faces = cls._became(pieces, [profile.wrapped])
+        if walls:
+            pieces = ShapeList(
+                piece for whole in pieces for piece in whole.split(walls, keep=Keep.ALL)
+            )
+            base_faces = cls._became(pieces, base_faces)
 
-        # 4: The profile is the extrusion's own base face and survives the
-        #    split, so the piece to return is the one that holds it. A target
-        #    the extrusion never reaches leaves it in one piece; so does one
-        #    that only touches it
+        # 4: The pieces to return are those holding the profile, or what it
+        #    became. A target the extrusion never reaches leaves it in one
+        #    piece; so does one that only touches it
         holders = [
             piece
             for piece in pieces
-            if any(face.wrapped.IsSame(profile.wrapped) for face in piece.faces())
+            if any(
+                face.wrapped.IsSame(base)
+                for face in piece.faces()
+                for base in base_faces
+            )
         ]
         if len(pieces) == 1 and extrusion.distance(target) > TOLERANCE:
             raise ValueError("No intersection: extrusion does not contact target")
@@ -1601,7 +1618,27 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 "the surface reached does not cut the extrusion - the profile "
                 "lies in it, or only touches it"
             )
-        return holders[0]
+        if len(holders) == 1:
+            return holders[0]
+        # The profile straddles a step in the target, part on a face and part
+        # inside the material beyond the face's end: each part stopped at its
+        # own surface
+        return holders[0].fuse(*holders[1:])
+
+    @staticmethod
+    def _became(
+        pieces: Iterable[Shape], faces: list[TopoDS_Shape]
+    ) -> list[TopoDS_Shape]:
+        """What ``faces`` became in the split(s) that made ``pieces``: the
+        sub-faces a split cut a face into, or the face itself when left whole"""
+        records = {id(p._history): p._history for p in pieces if p._history is not None}
+        became: list[TopoDS_Shape] = []
+        for face in faces:
+            modified = [
+                sub for record in records.values() for sub in record.modified(face)
+            ]
+            became.extend(modified if modified else [face])
+        return became
 
     @classmethod
     def from_bounding_box(cls, bbox: BoundBox | OrientedBoundBox) -> Solid:

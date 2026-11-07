@@ -564,6 +564,38 @@ class TestExtrude(unittest.TestCase):
             nearest = extrude(cross.sketch, until=Until.NEXT, mode=Mode.PRIVATE)
             self.assertAlmostEqual(nearest.volume, rib.volume, 5)
 
+    def test_extrude_until_from_a_face_and_into_a_step(self):
+        """A profile partly on a face of the target and partly inside the
+        material beyond the face's end reaches the surface ahead of it across
+        its whole width; the material it starts inside only divides the result
+        where the extrusion leaves it"""
+        bar = Box(3.5, 74, 15, align=(Align.MIN, Align.MAX, Align.CENTER))
+        step = Pos(0, -74, 0) * Box(
+            10, 6, 15, align=(Align.MIN, Align.MAX, Align.CENTER)
+        )
+        wall = Pos(12, -40, 0) * Box(
+            3, 40, 15, align=(Align.MIN, Align.MAX, Align.CENTER)
+        )
+        target = bar + step + wall
+        # 16 of the 18 on the bar's face, 2 inside the step beyond its end
+        profile = Plane((3.5, -67, 0), x_dir=(0, 0, 1), z_dir=(1, 0, 0)) * Rectangle(
+            14.99, 18
+        )
+        nearest = extrude(profile, until=Until.NEXT, dir=(1, 0, 0), target=target)
+        # the whole profile to the wall at x=12, 8.5 ahead of it
+        self.assertAlmostEqual(nearest.volume, 18 * 14.99 * 8.5, 3)
+        self.assertTrue(nearest.is_valid)
+        boss = target + nearest
+        self.assertTrue(boss.is_valid)
+        # what the step already held, 2 wide and 6.5 deep, adds nothing
+        self.assertAlmostEqual(
+            boss.volume, target.volume + 18 * 14.99 * 8.5 - 2 * 14.99 * 6.5, 3
+        )
+
+        last = extrude(profile, until=Until.LAST, dir=(1, 0, 0), target=target)
+        self.assertAlmostEqual(last.volume, 18 * 14.99 * 11.5, 3)
+        self.assertTrue(last.is_valid)
+
     def test_extrude_until_from_inside_the_material(self):
         """A profile inside the target stops where the extrusion leaves the
         material, at a face looking away from it"""
@@ -1297,6 +1329,22 @@ class TestSplit(unittest.TestCase):
     def test_no_objects(self):
         with self.assertRaisesRegex(ValueError, "objects must be provided"):
             split()
+
+    def test_last_is_the_cut_face(self):
+        """A split's record says the trimmed faces were modified, so only the
+        cut face and its edges are last. With both halves kept they share the
+        one cut face"""
+        for keep, solids in ((Keep.TOP, 1), (Keep.BOTH, 2)):
+            with self.subTest(keep=keep):
+                with BuildPart() as test:
+                    Box(4, 4, 4)
+                    split(bisect_by=Plane.XY, keep=keep)
+                self.assertEqual(len(test.solids()), solids)
+                last_faces = test.faces(Select.LAST)
+                self.assertEqual(len(last_faces), 1)
+                self.assertAlmostEqual(last_faces[0].center().Z, 0, 6)
+                self.assertEqual(len(test.edges(Select.LAST)), 4)
+                self.assertEqual(len(test.faces(Select.NEW)), 1)
 
 
 class TestThicken(unittest.TestCase):

@@ -2611,6 +2611,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         # Perform the splitting operation
         splitter.Build()
+        history = ShapeHistory.from_boolean(
+            splitter, before=[self.wrapped], brought=list(tool_list)
+        )
 
         split_result = downcast(splitter.Shape())
         # Remove unnecessary TopoDS_Compound around single shape
@@ -2621,7 +2624,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # can sort more efficiently then the generic algorithm below
         if keep == Keep.ALL:
             pieces = ShapeList(
-                self.__class__.cast(part)
+                self.__class__.cast(part)._made_by(history)
                 for part in get_top_level_topods_shapes(split_result)
             )
             for piece in pieces:
@@ -2660,7 +2663,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         bottoms: list[Shape] = []
         properties = GProp_GProps()
         for part in get_top_level_topods_shapes(split_result):
-            sub_shape = self.__class__.cast(part)
+            sub_shape = self.__class__.cast(part)._made_by(history)
             if isinstance(tool, Plane):
                 # A piece lies wholly on one side of the plane and so does its
                 # centre of mass. The geometric centre need not: that of a curved
