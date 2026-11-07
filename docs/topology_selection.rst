@@ -75,7 +75,7 @@ operation did, and are described under :ref:`when a feature came to be <when>`.
     Rectangle(1, 1).edges()
 
 A |ShapeList| has the same selectors, so a selection can be narrowed in steps: the
-edges of the smallest faces are ``part.faces().group_by(SortBy.AREA)[0].edges()``.
+edges of the smallest faces are ``part.faces().group_by(Face.area)[0].edges()``.
 
 .. _operators:
 
@@ -90,12 +90,11 @@ list of |ShapeList| objects accessible by index or key.
 +----------------------+---------------------------------------------------------------------------+-------------------------------------------------------+
 | Method               | Criteria                                                                  | Description                                           |
 +======================+===========================================================================+=======================================================+
-| |sort_by|            | ``Axis``, ``Edge``, ``Wire``, ``SortBy``, callable, property              | Sort ``ShapeList`` by criteria                        |
+| |sort_by|            | ``Axis``, ``Edge``, ``Wire``, callable, property                          | Sort ``ShapeList`` by criteria                        |
 +----------------------+---------------------------------------------------------------------------+-------------------------------------------------------+
 | |sort_by_distance|   | ``Shape``, ``VectorLike``                                                 | Sort ``ShapeList`` by distance from criteria          |
 +----------------------+---------------------------------------------------------------------------+-------------------------------------------------------+
-| |group_by|           | ``Axis``, ``Edge``, ``Wire``, ``SortBy``, ``Convexity``, callable,        | Group ``ShapeList`` by criteria                       |
-|                      | property                                                                  |                                                       |
+| |group_by|           | ``Axis``, ``Edge``, ``Wire``, ``Convexity``, callable, property           | Group ``ShapeList`` by criteria                       |
 +----------------------+---------------------------------------------------------------------------+-------------------------------------------------------+
 | |filter_by|          | ``Axis``, ``Plane``, ``GeomType``, ``Convexity``, callable, property      | Filter ``ShapeList`` by criteria                      |
 +----------------------+---------------------------------------------------------------------------+-------------------------------------------------------+
@@ -109,13 +108,13 @@ The most common operators also have a shorthand, so a selection can read as a ch
 +----------+---------------------------+--------------------------------------------------------+------------------------------------+
 | Operator | Operand                   | Meaning                                                | Example                            |
 +==========+===========================+========================================================+====================================+
-| ``>``    | ``SortBy``, ``Axis``      | |sort_by|                                              | ``part.vertices() > Axis.Z``       |
+| ``>``    | ``Axis``, property        | |sort_by|                                              | ``part.vertices() > Axis.Z``       |
 +----------+---------------------------+--------------------------------------------------------+------------------------------------+
-| ``<``    | ``SortBy``, ``Axis``      | |sort_by| reversed                                     | ``part.faces() < Axis.Z``          |
+| ``<``    | ``Axis``, property        | |sort_by| reversed                                     | ``part.faces() < Axis.Z``          |
 +----------+---------------------------+--------------------------------------------------------+------------------------------------+
-| ``>>``   | ``SortBy``, ``Axis``      | |group_by|, last group                                 | ``part.solids() >> Axis.X``        |
+| ``>>``   | ``Axis``, property        | |group_by|, last group                                 | ``part.solids() >> Axis.X``        |
 +----------+---------------------------+--------------------------------------------------------+------------------------------------+
-| ``<<``   | ``SortBy``, ``Axis``      | |group_by|, first group                                | ``part.faces() << Axis.Y``         |
+| ``<<``   | ``Axis``, property        | |group_by|, first group                                | ``part.faces() << Axis.Y``         |
 +----------+---------------------------+--------------------------------------------------------+------------------------------------+
 | ``|``    | ``Axis``, ``Plane``,      | |filter_by|                                            | ``part.faces() | Axis.Z``          |
 |          | ``GeomType``,             |                                                        |                                    |
@@ -158,9 +157,9 @@ Examples
 .. grid:: 3
     :gutter: 3
 
-    .. grid-item-card:: SortBy
-        :img-top: assets/topology_selection/thumb_sort_sortby.png
-        :link: sort_sortby
+    .. grid-item-card:: Property
+        :img-top: assets/topology_selection/thumb_sort_property.png
+        :link: sort_property
         :link-type: ref
 
     .. grid-item-card:: Along Wire
@@ -190,19 +189,19 @@ by key with the ``group`` method. If the group keys are unknown they can be disc
 with ``key_to_group_index``. The ``first`` and ``last`` properties return the first
 and last |ShapeList| groups, respectively, so selectors can be chained directly::
 
-    part.faces().group_by(SortBy.AREA).first.edges()
+    part.faces().group_by(Face.area).first.edges()
 
 These properties follow the group order, including when ``reverse=True`` is passed
 to |group_by|, and raise ``IndexError`` if there are no groups.
 
 If we want only the edges from the smallest faces by area we can get the faces, then
-group by ``SortBy.AREA``. The |ShapeList| of smallest faces is available from the first
+group by ``Face.area``. The |ShapeList| of smallest faces is available from the first
 list index. Finally, a |ShapeList| has access to selectors, so calling |edges| will
 return a new list of all edges in the previous list.
 
 .. code-block:: build123d
 
-    part.faces().group_by(SortBy.AREA)[0].edges()
+    part.faces().group_by(Face.area)[0].edges()
 
 .. figure:: assets/topology_selection/operators_group_area.png
     :align: center
@@ -339,9 +338,9 @@ evaluate them, and they are the criteria most selectors start with.
 - **Type**: :class:`~build_enums.GeomType` names the curve or surface - ``LINE``,
   ``CIRCLE``, ``PLANE``, ``CYLINDER`` and so on. ``part.edges().filter_by(GeomType.CIRCLE)``
   keeps the circular edges; ``geom_type`` is the property behind it.
-- **Size**: :class:`~build_enums.SortBy` orders by ``LENGTH``, ``RADIUS``, ``AREA``,
-  ``VOLUME`` or ``DISTANCE``; the properties ``length``, ``radius``, ``area`` and
-  ``volume`` can be passed to |sort_by| and |group_by| directly. |filter_by| tests
+- **Size**: the properties ``length``, ``radius``, ``area`` and ``volume``, passed as
+  ``Edge.length``, ``Face.area`` and so on, order a |ShapeList| through |sort_by| and
+  |group_by|; |sort_by_distance| orders by distance from a point. |filter_by| tests
   a property's truth, so a size goes through |filter_by_value|, which keeps the
   features of a given size within a tolerance:
   ``part.faces().filter_by_value(Face.radius, 2)`` keeps the R2 fillets.

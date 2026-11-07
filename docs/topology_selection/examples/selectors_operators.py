@@ -85,7 +85,7 @@ save_screenshot(os.path.join(filedir, "selectors_select_new_fillet.png"))
 show(part, part.vertices().sort_by(Axis.X)[-4:])
 save_screenshot(os.path.join(filedir, "operators_sort_x.png"))
 
-show(part, part.faces().group_by(SortBy.AREA)[0].edges())
+show(part, part.faces().group_by(Face.area)[0].edges())
 save_screenshot(os.path.join(filedir, "operators_group_area.png"))
 
 faces = part.faces().filter_by(lambda f: f.normal_at() == Vector(0, 0, 1))

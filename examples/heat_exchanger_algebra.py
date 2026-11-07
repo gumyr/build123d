@@ -43,7 +43,7 @@ heat_exchanger += extrude(plate_plane * plate, plate_thickness)
 edges = (
     heat_exchanger.edges()
     .filter_by(GeomType.CIRCLE)
-    .group_by(SortBy.RADIUS)[1]
+    .group_by(Edge.radius)[1]
     .group_by()[2]
 )
 half_volume_before_fillet = heat_exchanger.volume

@@ -68,10 +68,7 @@ base.joints["side"].attach(fixed_arm.joints["top"])
 #
 hinge_arm = JointBox(2, 1, 10, taper=1)
 swing_arm_hinge_edge: Edge = (
-    hinge_arm.edges()
-    .group_by(SortBy.LENGTH)[-1]
-    .sort_by(Axis.X)[-2:]
-    .sort_by(Axis.Y)[0]
+    hinge_arm.edges().group_by(Edge.length)[-1].sort_by(Axis.X)[-2:].sort_by(Axis.Y)[0]
 )
 swing_arm_hinge_axis = Axis(swing_arm_hinge_edge)
 base_corner_edge = base.edges().sort_by(Axis((0, 0, 0), (1, 1, 0)))[-1]

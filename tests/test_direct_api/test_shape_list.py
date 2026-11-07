@@ -35,7 +35,7 @@ import unittest
 
 from IPython.lib import pretty
 from build123d.build_common import GridLocations, PolarLocations
-from build123d.build_enums import Convexity, GeomType, SortBy
+from build123d.build_enums import Convexity, GeomType
 from build123d.build_part import BuildPart
 from build123d.geometry import Axis, Plane, Pos, Vector
 from build123d.objects_part import Box, Cylinder
@@ -80,7 +80,7 @@ class TestShapeList(unittest.TestCase):
             self.assertEqual(actual_split, expected_split)
 
     def test_sort_by(self):
-        faces = Solid.make_box(1, 2, 3).faces() < SortBy.AREA
+        faces = Solid.make_box(1, 2, 3).faces() < Face.area
         self.assertAlmostEqual(faces[-1].area, 2, 5)
 
     def test_sort_by_lambda(self):
@@ -219,10 +219,6 @@ class TestShapeList(unittest.TestCase):
     def test_filter_by_value_empty_list(self):
         self.assertEqual(ShapeList().filter_by_value(Edge.length, 30), [])
 
-    def test_filter_by_value_rejects_sort_by(self):
-        with self.assertRaises(ValueError):
-            Box(1, 1, 1).edges().filter_by_value(SortBy.LENGTH, 1)
-
     def test_first_last(self):
         vertices = (
             Solid.make_box(1, 1, 1).vertices().sort_by(Axis((0, 0, 0), (1, 1, 1)))
@@ -234,26 +230,28 @@ class TestShapeList(unittest.TestCase):
         vertices = Solid.make_box(1, 1, 1).vertices().group_by(Axis.Z)
         self.assertEqual(len(vertices[0]), 4)
 
-        edges = Solid.make_box(1, 1, 1).edges().group_by(SortBy.LENGTH)
+        edges = Solid.make_box(1, 1, 1).edges().group_by(Edge.length)
         self.assertEqual(len(edges[0]), 12)
 
         edges = (
             Solid.make_cone(2, 1, 2)
             .edges()
             .filter_by(GeomType.CIRCLE)
-            .group_by(SortBy.RADIUS)
+            .group_by(Edge.radius)
         )
         self.assertEqual(len(edges[0]), 1)
 
-        edges = (Solid.make_cone(2, 1, 2).edges() | GeomType.CIRCLE) << SortBy.RADIUS
+        edges = (Solid.make_cone(2, 1, 2).edges() | GeomType.CIRCLE) << Edge.radius
         self.assertAlmostEqual(edges[0].length, 2 * math.pi, 5)
 
-        vertices = Solid.make_box(1, 1, 1).vertices().group_by(SortBy.DISTANCE)
+        vertices = (
+            Solid.make_box(1, 1, 1).vertices().group_by(Vertex(0, 0, 0).distance_to)
+        )
         self.assertAlmostEqual(Vector(vertices[-1][0]), (1, 1, 1), 5)
 
         box = Solid.make_box(1, 1, 2)
-        self.assertEqual(len(box.faces().group_by(SortBy.AREA)[0]), 2)
-        self.assertEqual(len(box.faces().group_by(SortBy.AREA)[1]), 4)
+        self.assertEqual(len(box.faces().group_by(Face.area)[0]), 2)
+        self.assertEqual(len(box.faces().group_by(Face.area)[1]), 4)
 
         line = Edge.make_line((0, 0, 0), (1, 1, 2))
         vertices_by_line = box.vertices().group_by(line)
@@ -271,8 +269,8 @@ class TestShapeList(unittest.TestCase):
                 Box(1, 1, 1)
             with PolarLocations(100, 10):
                 Box(1, 1, 2)
-        self.assertEqual(len(boxes.solids().group_by(SortBy.VOLUME)[-1]), 10)
-        self.assertEqual(len((boxes.solids()) << SortBy.VOLUME), 9)
+        self.assertEqual(len(boxes.solids().group_by(Solid.volume)[-1]), 10)
+        self.assertEqual(len((boxes.solids()) << Solid.volume), 9)
 
         with self.assertRaises(ValueError):
             boxes.solids().group_by("AREA")

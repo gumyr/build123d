@@ -909,40 +909,40 @@ class TestShapeList(unittest.TestCase):
 
     def test_sort_by_type(self):
         """test sorting by different attributes"""
-        with self.subTest(sort_by=SortBy.AREA):
+        with self.subTest(sort_by="area"):
             with BuildPart() as test:
                 Wedge(1, 1, 1, 0, 0, 0.5, 0.5)
-                faces = test.faces().sort_by(SortBy.AREA)
+                faces = test.faces().sort_by(Face.area)
             self.assertEqual(faces[0].area, 0.25)
             self.assertEqual(faces[-1].area, 1)
 
-        with self.subTest(sort_by=SortBy.LENGTH):
+        with self.subTest(sort_by="length"):
             with BuildPart() as test:
                 Wedge(1, 1, 1, 0, 0, 0.5, 0.5)
-                edges = test.edges().sort_by(SortBy.LENGTH)
+                edges = test.edges().sort_by(Edge.length)
             self.assertEqual(edges[0].length, 0.5)
             self.assertAlmostEqual(edges[-1].length, 1.2247448713915892, 7)
 
-        with self.subTest(sort_by=SortBy.DISTANCE):
+        with self.subTest(sort_by="distance"):
             with BuildPart() as test:
                 Box(1, 1, 1, align=(Align.MIN, Align.CENTER, Align.CENTER))
-                faces = test.faces().sort_by(SortBy.DISTANCE)
+                faces = test.faces().sort_by(lambda f: f.center().length)
             self.assertAlmostEqual(faces[0].center().length, 0, 7)
             self.assertAlmostEqual(faces[-1].center().length, 1, 7)
 
-        with self.subTest(sort_by=SortBy.VOLUME):
+        with self.subTest(sort_by="volume"):
             with BuildPart() as test:
                 Box(1, 1, 1)
                 with Locations((0, 0, 10)):
                     Box(2, 2, 2)
-                solids = test.solids().sort_by(SortBy.VOLUME)
+                solids = test.solids().sort_by(Solid.volume)
             self.assertAlmostEqual(solids[0].volume, 1, 7)
             self.assertAlmostEqual(solids[-1].volume, 8, 7)
 
-        with self.subTest(sort_by=SortBy.RADIUS):
+        with self.subTest(sort_by="radius"):
             with BuildPart() as test:
                 Cone(1, 0.5, 2)
-                edges = test.edges().filter_by(GeomType.CIRCLE).sort_by(SortBy.RADIUS)
+                edges = test.edges().filter_by(GeomType.CIRCLE).sort_by(Edge.radius)
             self.assertEqual(edges[0].radius, 0.5)
             self.assertEqual(edges[-1].radius, 1)
 

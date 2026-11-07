@@ -38,7 +38,6 @@ from build123d.build_enums import (
     Keep,
     PositionMode,
     Side,
-    SortBy,
 )
 from build123d.geometry import Axis, Location, Plane, Rot, Vector, TOLERANCE
 from build123d.objects_curve import CenterArc, Line, Polyline
@@ -479,7 +478,7 @@ class TestMixin1D(unittest.TestCase):
         self.assertAlmostEqual(
             offset_wire_right.edges()
             .filter_by(GeomType.CIRCLE)
-            .sort_by(SortBy.RADIUS)[-1]
+            .sort_by(Edge.radius)[-1]
             .radius,
             0.5,
             4,

@@ -37,13 +37,13 @@ that existed in no input of it.
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
 | Operator | Operand               | Method             | Description                                           | Example                                                                   |
 +==========+=======================+====================+=======================================================+===========================================================================+
-| >        | SortBy, Axis          | sort_by            | Sort ShapeList by operand                             | `part.vertices() > Axis.Z`                                                |
+| >        | Axis, property        | sort_by            | Sort ShapeList by operand                             | `part.vertices() > Axis.Z`                                                |
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
-| <        | SortBy, Axis          | sort_by            | Reverse sort ShapeList by operand                     | `part.faces() < Axis.Z`                                                   |
+| <        | Axis, property        | sort_by            | Reverse sort ShapeList by operand                     | `part.faces() < Axis.Z`                                                   |
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
-| >>       | SortBy, Axis          | group_by           | Group ShapeList by operand and return last value      | `part.solids() >> Axis.X`                                                 |
+| >>       | Axis, property        | group_by           | Group ShapeList by operand and return last value      | `part.solids() >> Axis.X`                                                 |
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
-| <<       | SortBy, Axis          | group_by           | Group ShapeList by operand and return first value     | `part.faces() << Axis.Y`                                                  |
+| <<       | Axis, property        | group_by           | Group ShapeList by operand and return first value     | `part.faces() << Axis.Y`                                                  |
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
 | \|       | Axis, Plane, GeomType,| filter_by          | Filter ShapeList by Axis, Plane, GeomType or          | `part.faces() \| Axis.Z`                                                  |
 |          | Convexity             |                    | Convexity                                             |                                                                           |
@@ -53,21 +53,20 @@ that existed in no input of it.
 |          | Axis                  | filter_by_position | Filter ShapeList by Axis & mix / max values           | `part.faces()..filter_by_position(Axis.Z, 1, 2, inclusive=(False, True))` |
 +----------+-----------------------+--------------------+-------------------------------------------------------+---------------------------------------------------------------------------+
 
-The operand types are: Axis, Plane, SortBy, GeomType, and Convexity. An Axis is a base object with an origin and a
+The operand types are: Axis, Plane, GeomType, Convexity and a shape property. An Axis is a base object with an origin and a
 direction with several predefined values such as ``Axis.X``, ``Axis.Y``, and ``Axis.Z``; however,
 any Axis could be used as an operand (e.g. ``Axis((1,2,3),(0.5,0,-0.5))`` is valid) - see
 :class:`~geometry.Axis` for a complete description.
 A Plane is a coordinate system defined by an origin, x_dir (X direction), y_dir (Y direction), and
 z_dir (Z direction). See :class:`~geometry.Plane` for a complete description.
 Filtering by a Plane will return faces/edges parallel to it.
-SortBy, GeomType and Convexity are python
-Enum class described here:
+A property such as ``Edge.length``, ``Face.area`` or ``Solid.volume`` sorts or groups by
+that measurement; ``sort_by_distance`` orders by distance from a point or shape.
+GeomType and Convexity are python Enum classes described here:
 
 :class:`~build_enums.GeomType`
     BEZIER, BSPLINE, CIRCLE, CONE, CYLINDER, ELLIPSE, EXTRUSION, HYPERBOLA, LINE, OFFSET, OTHER,
     PARABOLA, PLANE, REVOLUTION, SPHERE, TORUS
-:class:`~build_enums.SortBy`
-    LENGTH, RADIUS, AREA, VOLUME, DISTANCE
 :class:`~build_enums.Convexity`
     CONVEX, CONCAVE, SMOOTH, SADDLE - how the shape an element was selected from sits
     around it, see :doc:`topology_selection` for the definitions

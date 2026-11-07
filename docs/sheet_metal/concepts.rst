@@ -192,7 +192,7 @@ selecting it through one of them is how you say which side stays put.
 
 .. code-block:: build123d
 
-    long_bends = tray.bends().sort_by(SortBy.LENGTH)[-2:]
+    long_bends = tray.bends().sort_by(Face.length)[-2:]
     top_rims = tray.rims().group_by(Axis.Z)[-1]
     line = tray.flats().sort_by(Axis.X)[0].fold_lines()[0]
 

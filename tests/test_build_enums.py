@@ -53,7 +53,6 @@ class TestEnumRepr(unittest.TestCase):
             PageSize,
             Select,
             Side,
-            SortBy,
             Transition,
             TextAlign,
             Unit,

@@ -200,7 +200,7 @@ with BuildSketch() as isosceles_triangle:
     # [Ex. 15]
     ExtensionLine(t.edges().sort_by(Axis.Y)[0], 6, d, label="a")
     ExtensionLine(t.edges().sort_by(Axis.X)[-1], 6, d, label="b")
-    ExtensionLine(t.edges().sort_by(SortBy.LENGTH)[-1], 6, d, label="c")
+    ExtensionLine(t.edges().sort_by(Edge.length)[-1], 6, d, label="c")
 a1 = CenterArc(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[0], 5, 0, t.B)
 a2 = CenterArc(t.vertices().group_by(Axis.Y)[0].sort_by(Axis.X)[-1], 5, 180 - t.C, t.C)
 a3 = CenterArc(t.vertices().sort_by(Axis.Y)[-1], 5, 270 - t.A / 2, t.A)

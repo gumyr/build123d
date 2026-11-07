@@ -1492,7 +1492,7 @@ class TestLengthMode(unittest.TestCase):
 
     def wall_of(self, bs: BuildSheet) -> float:
         # the wall is the smaller flat, whichever way it folds
-        return bs.sheet.flats().sort_by(SortBy.AREA)[0].area / 60
+        return bs.sheet.flats().sort_by(Face.area)[0].area / 60
 
     def test_the_height_and_run_are_the_sides_of_the_walls_triangle(self):
         # a 60 degree wall of 10 stands 10 sin 60 high and reaches 10 cos 60
@@ -1910,7 +1910,7 @@ class TestUnfoldFaceMap(unittest.TestCase):
             self.assertTrue(any(sheet_face.is_same(f) for f in bs.sheet_local.faces()))
         self.assertEqual(sum(face_map[face].is_bend for face in flat.faces()), 2)
 
-        base = face_map[flat.faces().sort_by(SortBy.AREA)[-1]]
+        base = face_map[flat.faces().sort_by(Face.area)[-1]]
         self.assertFalse(base.is_bend)
         self.assertEqual(base.angle, 0)
         self.assertIsNone(base.bend_line)
@@ -2390,7 +2390,7 @@ class TestSheetSelectors(unittest.TestCase):
             flange(bs.edges(), length=20, gaps=3.1)
             base = bs.faces().sort_by(Axis.Z)[0]
             corner_relief(
-                base.vertices().group_by(SortBy.DISTANCE)[-1],
+                base.vertices().group_by(Vertex(0, 0, 0).distance_to)[-1],
                 ReliefType.ROUND,
                 radius=3,
             )
@@ -3185,7 +3185,7 @@ class TestCornerRelief(unittest.TestCase):
         blank, so it carries on into the flange beyond the bend rather than
         stopping at the bend's far tangent line."""
         sheet = self.two_flange_sheet().sheet_local
-        walls = sheet.faces().filter_by(GeomType.PLANE).sort_by(SortBy.AREA)[:2]
+        walls = sheet.faces().filter_by(GeomType.PLANE).sort_by(Face.area)[:2]
         result = corner_relief(
             self.shared_corner(sheet),
             ReliefType.ROUND,
@@ -3194,7 +3194,7 @@ class TestCornerRelief(unittest.TestCase):
         )
         self.assertTrue(result.is_valid)
         self.assertAlmostEqual(self.blank_removed(sheet, result), 0.75 * pi * 6**2, 4)
-        after = result.faces().filter_by(GeomType.PLANE).sort_by(SortBy.AREA)[:2]
+        after = result.faces().filter_by(GeomType.PLANE).sort_by(Face.area)[:2]
         for wall, cut in zip(walls, after):
             self.assertLess(cut.area, wall.area - 1.0)
 

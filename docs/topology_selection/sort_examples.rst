@@ -2,44 +2,45 @@
 Sort Examples
 ################
 
-.. _sort_sortby:
+.. _sort_property:
 
-SortBy
+Property
 =============
 
-:class:`~build_enums.SortBy` enums are shape property shorthands which work across
-``Shape`` multiple object types. ``SortBy`` is a criteria for both ``sort_by`` and
-``group_by``.
+A shape property is a key for both ``sort_by`` and ``group_by``: pass the property
+itself, from the class of the features in the list, and each feature is measured by
+it.
 
-* ``SortBy.LENGTH`` works with ``Edge``, ``Wire``
-* ``SortBy.AREA`` works with ``Face``, ``Solid``
-* ``SortBy.VOLUME`` works with ``Solid``
-* ``SortBy.RADIUS`` works with ``Edge``, ``Face`` with :class:`~build_enums.GeomType` ``CIRCLE``, ``CYLINDER``, ``SPHERE``
-* ``SortBy.DISTANCE`` works ``Vertex``, ``Edge``, ``Wire``, ``Face``, ``Solid``
+* ``Edge.length`` and ``Wire.length``
+* ``Face.area`` and ``Solid.area``
+* ``Solid.volume``
+* ``Edge.radius``, and ``Face.radius`` for :class:`~build_enums.GeomType` ``CIRCLE``,
+  ``CYLINDER`` and ``SPHERE`` geometry
 
-``SortBy`` is often interchangeable with specific shape properties and can alternatively
-be used with``group_by``.
+Distance is not a property of a feature alone, so it has its own method:
+``sort_by_distance`` orders by distance from a point or shape, and the ``distance_to``
+method of a reference shape serves as the key for ``group_by``.
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/sort_sortby.py
+    .. literalinclude:: examples/sort_property.py
         :language: build123d
         :lines: 3, 8-13
 
-.. literalinclude:: examples/sort_sortby.py
+.. literalinclude:: examples/sort_property.py
     :language: build123d
-    :lines: 19-22
+    :lines: 19-20
 
-.. figure:: ../assets/topology_selection/sort_sortby_length.png
+.. figure:: ../assets/topology_selection/sort_edge_length.png
     :align: center
 
 |
 
-.. literalinclude:: examples/sort_sortby.py
+.. literalinclude:: examples/sort_property.py
     :language: build123d
-    :lines: 24-27
+    :lines: 22-23
 
-.. figure:: ../assets/topology_selection/sort_sortby_distance.png
+.. figure:: ../assets/topology_selection/sort_by_distance.png
     :align: center
 
 |

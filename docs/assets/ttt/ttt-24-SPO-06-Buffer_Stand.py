@@ -11,7 +11,7 @@ with BuildPart() as p:
 
     with BuildSketch(Plane.YZ) as yz:
         Trapezoid(2.5, 4, 90 - 6, align=(Align.CENTER, Align.MIN))
-        full_round(yz.edges().sort_by(SortBy.LENGTH)[0])
+        full_round(yz.edges().sort_by(Edge.length)[0])
         circle_edge = yz.edges().filter_by(GeomType.CIRCLE)[0]
         arc_center = circle_edge.arc_center
         arc_radius = circle_edge.radius
@@ -42,7 +42,7 @@ with BuildPart() as p:
     with BuildSketch(Plane.YZ) as rib:
         with Locations((0, 0.25)):
             Trapezoid(0.5, 1, 90 - 8, align=(Align.CENTER, Align.MIN))
-        full_round(rib.edges().sort_by(SortBy.LENGTH)[0])
+        full_round(rib.edges().sort_by(Edge.length)[0])
     extrude(amount=4.25 / 2)
 
     mirror(about=Plane.YZ)

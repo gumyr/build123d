@@ -46,7 +46,7 @@ with BuildPart() as example:
     fillet(
         example.edges()
         .filter_by(GeomType.CIRCLE)
-        .sort_by(SortBy.RADIUS)[-2:]
+        .sort_by(Edge.radius)[-2:]
         .sort_by(Axis.Z)[-1],
         radius=1,
     )

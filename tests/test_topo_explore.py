@@ -6,7 +6,7 @@ from OCP.GProp import GProp_GProps
 from OCP.BRepGProp import BRepGProp
 from OCP.gp import gp_Pnt, gp_Pln
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape
-from build123d.build_enums import ContinuityLevel, GeomType, SortBy
+from build123d.build_enums import ContinuityLevel, GeomType
 
 from build123d.objects_part import Box
 from build123d.geometry import (
@@ -68,10 +68,8 @@ class TestTopoExplore(DirectApiTestCase):
             )
         )
 
-        hypotenuse = triangle.edges().sort_by(SortBy.LENGTH)[-1]
-        connected_edges = topo_explore_connected_edges(hypotenuse).sort_by(
-            SortBy.LENGTH
-        )
+        hypotenuse = triangle.edges().sort_by(Edge.length)[-1]
+        connected_edges = topo_explore_connected_edges(hypotenuse).sort_by(Edge.length)
         self.assertAlmostEqual(connected_edges[0].length, 1.5, 5)
         self.assertAlmostEqual(connected_edges[1].length, 1.75, 5)
 
@@ -203,7 +201,7 @@ class TestTopoExplore(DirectApiTestCase):
                 ]
             )
         )
-        hypotenuse = triangle.edges().sort_by(SortBy.LENGTH)[-1]
+        hypotenuse = triangle.edges().sort_by(Edge.length)[-1]
         base = triangle.edges().sort_by(Axis.Y)[0]
         common_vertex = topo_explore_common_vertex(hypotenuse, base)
         self.assertIsNotNone(common_vertex)

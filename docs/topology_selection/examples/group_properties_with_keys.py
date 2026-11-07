@@ -45,7 +45,7 @@ with BuildPart() as part:
     after_holes = copy(part)
 
     radius_groups = part.edges().filter_by(GeomType.CIRCLE).group_by(Edge.radius)
-    bearing_edges = radius_groups.group(8).group_by(SortBy.DISTANCE)[-1]
+    bearing_edges = radius_groups.group(8).group_by(Vertex(0, 0, 0).distance_to)[-1]
     pin_edges = radius_groups.group(1.5).filter_by_position(Axis.Z, -5, -5)
     chamfer([pin_edges, bearing_edges], .5)
 

@@ -157,13 +157,13 @@ Cheat Sheet
     +----------+---------------------------------------------------------------------------------------------------------+------------------------------------------------+
     | Operator | Operand                                                                                                 | Method                                         |
     +==========+=========================================================================================================+================================================+
-    | >        | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy` | :meth:`~topology.ShapeList.sort_by`            |
+    | >        | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, property                     | :meth:`~topology.ShapeList.sort_by`            |
     +----------+---------------------------------------------------------------------------------------------------------+------------------------------------------------+
-    | <        | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy` | :meth:`~topology.ShapeList.sort_by`            |
+    | <        | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, property                     | :meth:`~topology.ShapeList.sort_by`            |
     +----------+---------------------------------------------------------------------------------------------------------+------------------------------------------------+
-    | >>       | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy` | :meth:`~topology.ShapeList.group_by`\[-1\]     |
+    | >>       | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, property                     | :meth:`~topology.ShapeList.group_by`\[-1\]     |
     +----------+---------------------------------------------------------------------------------------------------------+------------------------------------------------+
-    | <<       | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, :class:`~build_enums.SortBy` | :meth:`~topology.ShapeList.group_by`\[0\]      |
+    | <<       | :class:`~geometry.Axis`, :class:`~topology.Edge`, :class:`~topology.Wire`, property                     | :meth:`~topology.ShapeList.group_by`\[0\]      |
     +----------+---------------------------------------------------------------------------------------------------------+------------------------------------------------+
     | \|       | :class:`~geometry.Axis`, :class:`~geometry.Plane`, :class:`~build_enums.GeomType`,                      | :meth:`~topology.ShapeList.filter_by`          |
     |          | :class:`~build_enums.Convexity`                                                                         |                                                |
@@ -305,8 +305,6 @@ Cheat Sheet
     | :class:`~build_enums.Select`           | ALL, LAST, NEW                                                                                                                          |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.Side`             | BOTH, LEFT, RIGHT                                                                                                                       |
-    +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
-    | :class:`~build_enums.SortBy`           | LENGTH, RADIUS, AREA, VOLUME, DISTANCE                                                                                                  |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+
     | :class:`~build_enums.TextAlign`        | BOTTOM, CENTER, LEFT, RIGHT, TOP, TOPFIRSTLINE                                                                                          |
     +----------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+

@@ -30,7 +30,7 @@ with BuildPart() as p:
         p.part.edges()
         .filter_by(GeomType.CIRCLE)
         .sort_by(Axis.Z)[2:-2]
-        .sort_by(SortBy.RADIUS)[1:],
+        .sort_by(Edge.radius)[1:],
         3,
     )
     pln = Plane(pln2)

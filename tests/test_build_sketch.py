@@ -752,8 +752,8 @@ class TestBuildSketchObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             full_round(face.edges()[0])
 
-        positive = full_round(trap.edges().sort_by(SortBy.LENGTH)[0])
-        negative = full_round(trap.edges().sort_by(SortBy.LENGTH)[0], invert=True)
+        positive = full_round(trap.edges().sort_by(Edge.length)[0])
+        negative = full_round(trap.edges().sort_by(Edge.length)[0], invert=True)
         self.assertLess(negative.face().area, positive.face().area)
 
         rect = Rectangle(34, 10)

@@ -54,7 +54,6 @@ Enums
 .. autoclass:: Mode
 .. autoclass:: ReliefType
 .. autoclass:: Select
-.. autoclass:: SortBy
 .. autoclass:: Transition
 .. autoclass:: Until
 

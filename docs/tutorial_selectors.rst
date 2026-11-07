@@ -163,14 +163,14 @@ Step 6c: Sort the circles by radius
 
 The perimeter are the largest circles - the central cylinder must be
 excluded - so we'll sort all of the circles by their radius with:
-``example.edges().filter_by(GeomType.CIRCLE).sort_by(SortBy.RADIUS)``.
+``example.edges().filter_by(GeomType.CIRCLE).sort_by(Edge.radius)``.
 
 Step 6d: Slice the list to get the two largest
 ----------------------------------------------
 
 We know that the ``example`` part has two perimeter circles so we'll
 select just the top two edges from the sorted circle list with:
-``example.edges().filter_by(GeomType.CIRCLE).sort_by(SortBy.RADIUS)[-2:]``.  The
+``example.edges().filter_by(GeomType.CIRCLE).sort_by(Edge.radius)[-2:]``.  The
 syntax of this slicing operation is standard python list slicing.
 
 Step 6e: Select the top Edge
@@ -180,7 +180,7 @@ The last sub-step is to select the top perimeter edge, the one with
 the greatest Z value which we'll do with the ``sort_by(Axis.Z)[-1]`` method just like
 Step 3b - note that these methods work on all Shape objects (Edges, Wires,
 Faces, Solids, and Compounds) - with:
-``example.edges().filter_by(GeomType.CIRCLE).sort_by(SortBy.RADIUS)[-2:].sort_by(Axis.Z)[-1]``.
+``example.edges().filter_by(GeomType.CIRCLE).sort_by(Edge.radius)[-2:].sort_by(Axis.Z)[-1]``.
 
 **********
 Conclusion
