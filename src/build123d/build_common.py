@@ -60,6 +60,8 @@ from typing import Any, Generic, Type, TypeVar, cast
 from OCP.Standard import Standard_ConstructionError
 from typing_extensions import Self, deprecated
 
+from bd_materials import FinishedMaterial, resolve as resolve_material
+
 from build123d.build_enums import Align, Mode, Select
 
 # Compatibility import, so that existing code can import constants from build_common
@@ -80,6 +82,8 @@ from build123d.build_constants import (  # pylint: disable=unused-import
 )
 from build123d.geometry import (
     Axis,
+    Color,
+    ColorLike,
     Location,
     Plane,
     Vector,
@@ -234,6 +238,8 @@ class Builder(ABC, Generic[ShapeT]):
     ):
         self.mode = mode
         self._label = ""
+        self._color: Color | None = None
+        self._material: FinishedMaterial | None = None
         self.output_placements = _normalize_placements(placements)
         self.placements = self.output_placements
         self._scope_context: AbstractContextManager[BuildScope] | None = None
@@ -273,6 +279,35 @@ class Builder(ABC, Generic[ShapeT]):
     def label(self, value: str) -> None:
         """Assign a label to the builder's output object."""
         self._label = value
+
+    @property
+    def color(self) -> Color | None:
+        """Color assigned to the builder's output object."""
+        return self._color
+
+    @color.setter
+    def color(self, value: ColorLike | None) -> None:
+        """Assign a color to the builder's output object."""
+        self._color = Color(value) if value is not None else None
+
+    @property
+    def material(self) -> FinishedMaterial | None:
+        """Material assigned to the builder's output object."""
+        return self._material
+
+    @material.setter
+    def material(self, value: FinishedMaterial | str | None) -> None:
+        """Assign a material to the builder's output object, by name or
+        as a FinishedMaterial."""
+        if value is None or isinstance(value, FinishedMaterial):
+            self._material = value
+        elif isinstance(value, str):
+            self._material = resolve_material(value)
+        else:
+            raise TypeError(
+                f"Non supported type {type(value).__name__}, "
+                "need FinishedMaterial, str or None"
+            )
 
     @property
     @deprecated("Builder.new_edges is deprecated; use edges(Select.NEW) instead.")
@@ -367,8 +402,17 @@ class Builder(ABC, Generic[ShapeT]):
             local_product = self._publication_product()
         except AttributeError:
             local_product = None
-        if local_product is not None and self._label:
-            local_product.label = self._label
+        if local_product is not None:
+            # The builder's own attributes go onto the product before it is
+            # published or placed, so every copy made from it carries them.
+            # Material first: a material's own color must not override one
+            # the user assigned.
+            if self._label:
+                local_product.label = self._label
+            if self._material is not None:
+                local_product.material = self._material
+            if self._color is not None:
+                local_product.color = self._color
         if self.builder_parent is not None and self.mode != Mode.PRIVATE:
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__

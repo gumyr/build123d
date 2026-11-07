@@ -125,7 +125,7 @@ with BuildPart() as body:
 
     # Define a joint on top of the body to connect the cab later
     RigidJoint("body_top", joint_location=Location((0, -7.5, 10)))
-    body.part.color = truck_color
+    body.color = truck_color
 
 # Create the cab as an independent part to mount on the body
 with BuildPart() as cab:
@@ -161,7 +161,7 @@ with BuildPart() as cab:
 
     # Define joint on cab base
     RigidJoint("cab_base", joint_location=Location((0, 0, 0)))
-    cab.part.color = truck_color
+    cab.color = truck_color
 
 # Attach the cab to the truck body using joints
 body.joints["body_top"].attach(cab.joints["cab_base"])

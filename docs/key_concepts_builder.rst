@@ -88,15 +88,22 @@ A builder is a construction tool, not the object it creates. Builder settings th
 affect the completed output must be assigned before the builder context exits. When
 the context exits, the builder finalizes and publishes its output.
 
-For example, a builder label should be assigned while building:
+For example, a builder's ``label``, ``color`` and ``material`` are assigned while
+building and are applied to its output when the context exits:
 
 .. code-block:: build123d
 
     with BuildPart() as bracket_builder:
         bracket_builder.label = "bracket"
+        bracket_builder.color = "steelblue"
+        bracket_builder.material = "stainless"
         Box(20, 10, 5)
 
     assert bracket_builder.part.label == "bracket"
+
+Assign these on the builder rather than on ``bracket_builder.part`` while the
+context is open: with a workplane, ``part`` is a placed copy made afresh on
+each access, so an attribute set on it is lost.
 
 Changing the builder afterward does not modify the completed part:
 

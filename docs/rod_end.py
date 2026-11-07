@@ -45,7 +45,7 @@ with BuildPart() as ball:
     Sphere(inner_radius - inner_gap)
     Box(50, 50, 13, mode=Mode.INTERSECT)
     Hole(4)
-    ball.part.color = Color("aliceblue")
+    ball.color = Color("aliceblue")
     RigidJoint("ball", joint_location=Location())
 
 rod_end.part.joints["socket"].attach(ball.part.joints["ball"], angles=(5, 10, 0))

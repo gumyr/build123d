@@ -139,6 +139,52 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual(part_builder.part.label, "part label")
         self.assertEqual(sketch_builder.sketch.label, "sketch label")
 
+    def test_color_and_material_propagate_to_builder_output(self):
+        """Builder color and material reach the placed output, with or without a
+        workplane, as the label does"""
+        with BuildPart() as flat:
+            flat.color = "red"
+            flat.material = "stainless"
+            Box(1, 1, 1)
+        with BuildPart(Plane.XZ) as placed:
+            placed.color = (0, 0, 1)
+            placed.material = "stainless"
+            Box(1, 1, 1)
+        with BuildPart() as outer:
+            with BuildPart(Plane.XZ, Plane.YZ) as nested:
+                nested.color = Color("green")
+                Box(1, 1, 1)
+        with BuildSketch(Plane.XZ) as sketch_builder:
+            sketch_builder.color = "red"
+            Rectangle(1, 1)
+
+        for builder in (flat, placed):
+            self.assertEqual(builder.material, builder.part.material)
+            self.assertEqual(builder.part.material.name, "Stainless_G304_ANNEALED")
+        self.assertEqual(tuple(flat.part.color), (1, 0, 0, 1))
+        self.assertEqual(tuple(placed.part.color), (0, 0, 1, 1))
+        self.assertEqual(tuple(nested.part.color), tuple(Color("green")))
+        self.assertEqual(tuple(sketch_builder.sketch.color), (1, 0, 0, 1))
+        self.assertIsNone(outer.color)
+        self.assertIsNone(outer.material)
+
+    def test_builder_color_beats_material_color(self):
+        """An assigned color wins over the one the material would bring"""
+        with BuildPart(Plane.XZ) as builder:
+            builder.material = "stainless"
+            builder.color = "red"
+            Box(1, 1, 1)
+        self.assertEqual(tuple(builder.part.color), (1, 0, 0, 1))
+
+    def test_builder_color_and_material_validation(self):
+        builder = BuildPart()
+        builder.color = None
+        builder.material = None
+        self.assertIsNone(builder.color)
+        self.assertIsNone(builder.material)
+        with self.assertRaises(TypeError):
+            builder.material = 42
+
     def test_exit(self):
         """test transferring objects to parent"""
         with BuildPart() as outer:
