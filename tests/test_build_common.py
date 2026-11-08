@@ -176,6 +176,56 @@ class TestBuilder(unittest.TestCase):
             Box(1, 1, 1)
         self.assertEqual(builder.part.color, Color("red"))
 
+    def test_attributes_set_on_output_as_last_step_are_kept(self):
+        """A label, color or material assigned to the placed output as the last
+        step before exit reaches the result, with a workplane, within Locations
+        and in a nested sketch, where the output read while open is a copy"""
+        with BuildPart() as flat:
+            Box(1, 1, 1)
+            flat.part.label = "flat"
+            flat.part.material = "stainless"
+        with BuildPart(Plane.XZ) as placed:
+            Box(1, 1, 1)
+            self.assertIs(placed.part, placed.part)
+            placed.part.label = "placed"
+            placed.part.material = "stainless"
+            placed.part.color = "red"
+        with BuildPart() as outer:
+            with Locations((0, 0, 0), (5, 0, 0)):
+                with BuildPart() as located:
+                    Box(1, 1, 1)
+                    located.part.label = "located"
+            with BuildSketch(Plane.XZ) as nested_sketch:
+                Rectangle(1, 1)
+                nested_sketch.sketch.color = "blue"
+            extrude(amount=1)
+
+        for builder, label in ((flat, "flat"), (placed, "placed")):
+            self.assertEqual(builder.part.label, label)
+            self.assertEqual(builder.part.material.name, "Stainless_G304_ANNEALED")
+        self.assertEqual(placed.part.color, Color("red"))
+        self.assertEqual(located.part.label, "located")
+        self.assertEqual(nested_sketch.sketch.color, Color("blue"))
+        self.assertEqual(outer.part.label, "")
+        self.assertIsNone(outer.material)
+
+    def test_builder_attributes_win_over_those_set_on_output(self):
+        """The builder's own attribute overrides one assigned to its output"""
+        with BuildPart(Plane.XZ) as builder:
+            builder.material = "stainless"
+            Box(1, 1, 1)
+            builder.part.material = "aluminum"
+        self.assertEqual(builder.part.material.name, "Stainless_G304_ANNEALED")
+
+    def test_attributes_set_on_output_before_a_later_step_are_not_kept(self):
+        """Only the last step before exit counts: a later operation makes a new
+        product without the attributes"""
+        with BuildPart(Plane.XZ) as builder:
+            Box(1, 1, 1)
+            builder.part.label = "early"
+            Box(2, 2, 2)
+        self.assertEqual(builder.part.label, "")
+
     def test_builder_color_and_material_validation(self):
         builder = BuildPart()
         builder.color = None

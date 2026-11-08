@@ -101,9 +101,9 @@ building and are applied to its output when the context exits:
 
     assert bracket_builder.part.label == "bracket"
 
-Assign these on the builder rather than on ``bracket_builder.part`` while the
-context is open: with a workplane, ``part`` is a placed copy made afresh on
-each access, so an attribute set on it is lost.
+They may also be assigned to ``bracket_builder.part`` as the last step before
+the context exits. Any later operation makes a new part without them, so when
+the assignment is not the final step use the builder attributes.
 
 Changing the builder afterward does not modify the completed part:
 

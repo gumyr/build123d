@@ -245,6 +245,10 @@ class Builder(ABC, Generic[ShapeT]):
         self._scope_context: AbstractContextManager[BuildScope] | None = None
         self._placed_obj: Shape | None = None
         self._published_obj: Shape | None = None
+        # The placed output handed out while the context is open, and the
+        # local product it was placed from
+        self._open_output: Shape | None = None
+        self._open_output_source: Shape | None = None
         current_frame = inspect.currentframe()
         assert current_frame is not None
         assert current_frame.f_back is not None
@@ -403,10 +407,14 @@ class Builder(ABC, Generic[ShapeT]):
         except AttributeError:
             local_product = None
         if local_product is not None:
-            # The builder's own attributes go onto the product before it is
-            # published or placed, so every copy made from it carries them.
+            # A label, color or material assigned to the placed output as the
+            # last step before exit is kept: the copy it was set on is about to
+            # be discarded, so it moves onto the product that is placed here.
+            # The builder's own attributes then go onto the product before it
+            # is published or placed, so every copy made from it carries them.
             # Material first: a material's own color must not override one
             # the user assigned.
+            self._keep_open_output_attributes(local_product, construction_product)
             if self._label:
                 local_product.label = self._label
             if self._material is not None:
@@ -439,7 +447,40 @@ class Builder(ABC, Generic[ShapeT]):
             )
         )
 
+        self._open_output = None
+        self._open_output_source = None
+
         logger.info("Exiting %s", type(self).__name__)
+
+    def _keep_open_output_attributes(
+        self, local_product: Shape, construction_product: Shape | None
+    ) -> None:
+        """Carry label, color and material assigned to the placed output while
+        the context was open onto the product(s) it was placed from, where they
+        are not already set. The copy is current only if the product it was
+        placed from is still the builder's product; an attribute set before a
+        later operation is not kept."""
+        carried = self._open_output
+        if (
+            carried is None
+            or carried is local_product
+            or self._open_output_source is not construction_product
+        ):
+            return
+        targets = [local_product]
+        if (
+            construction_product is not None
+            and construction_product is not local_product
+        ):
+            targets.append(construction_product)
+        for target in targets:
+            if carried.label and not target.label:
+                target.label = carried.label
+            # pylint: disable=protected-access
+            if carried._material is not None and target._material is None:
+                target._material = carried._material
+            if carried._color is not None and target._color is None:
+                target._color = carried._color
 
     def _place_output(self) -> Shape:
         """Apply publication locations and output placements to the local product."""
@@ -457,7 +498,12 @@ class Builder(ABC, Generic[ShapeT]):
             return self._placed_obj
         scope = _get_build_scope()
         if scope is not None and scope.owner is self:
-            return self._place_output()
+            # The same placed copy is handed out until the product changes, so
+            # an attribute assigned to it is still there at exit to be kept
+            if self._open_output is None or self._open_output_source is not self._obj:
+                self._open_output_source = self._obj
+                self._open_output = self._place_output()
+            return self._open_output
         return self._obj
 
     @abstractmethod
