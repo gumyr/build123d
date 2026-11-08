@@ -563,14 +563,16 @@ def _record_matching_vertices(
                 break
 
 
-def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
+def _fillet_wire_corner(
+    wire: Wire, vertex: Vertex, radius: float, *, original_vertex: Vertex | None = None
+) -> Wire:
     """Fillet a single planar wire corner with the available 2D fillet solvers."""
 
     corner = _analyze_wire_fillet_corner(wire, vertex)
     if _wire_fillet_corner_is_tangent_continuous(corner):
         return wire
 
-    vertex_label = str(vertex)
+    vertex_label = str(original_vertex if original_vertex is not None else vertex)
     solution = _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(corner, radius)
 
     if solution is not None:
@@ -4366,7 +4368,9 @@ class Wire(Mixin1D[TopoDS_Wire]):
             if (Vector(current_vertex) - Vector(vertex_local)).length > TOLERANCE:
                 raise ValueError(f"Could not find fillet vertex on wire: {vertex}")
             before_corner = filleted_wire
-            filleted_wire = _fillet_wire_corner(filleted_wire, current_vertex, radius)
+            filleted_wire = _fillet_wire_corner(
+                filleted_wire, current_vertex, radius, original_vertex=vertex
+            )
             if filleted_wire is not before_corner:
                 record.merge(filleted_wire._history)
 
