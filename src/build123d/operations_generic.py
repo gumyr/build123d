@@ -1299,8 +1299,12 @@ def split(
     surfaces may be given at once, in which case they are applied together
     and all of the pieces are kept (``keep=Keep.ALL``).
 
+    The pieces are returned as a Part, Sketch or Curve by dimension, except
+    that a Shell - a sheet - stays a Shell, or a Compound of Shells when the
+    split cut it apart, so sheet operations can continue on the result.
+
     Args:
-        objects (Edge |  Wire |  Face |  Solid or Iterable of), objects to split
+        objects (Edge |  Wire |  Face |  Shell |  Solid or Iterable of), objects to split
         bisect_by (Plane |  Face | Shell or Iterable of, optional): surface(s) to
             segment part. Defaults to Plane.XZ.
         keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
@@ -1384,16 +1388,27 @@ def split(
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)
 
-    split_compound = Compound(new_objects)
-    if all([obj._dim == 3 for obj in object_list]):
-        result = Part(split_compound.wrapped)
-        object_list[0].copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
-        return result
-    if all([obj._dim == 2 for obj in object_list]):
-        return Sketch(split_compound.wrapped)
-    if all([obj._dim == 1 for obj in object_list]):
-        return Curve(split_compound.wrapped)
-    return split_compound
+    kept: Shape
+    if all(isinstance(obj, Shell) for obj in object_list):
+        # A sheet stays a sheet: the one shell kept, or a compound of shells
+        # when the split cut it apart, as a sheet builder also gives
+        if not new_objects:
+            kept = Shell()
+        elif len(new_objects) == 1 and isinstance(new_objects[0], Shell):
+            kept = new_objects[0]
+        else:
+            kept = Compound(new_objects)
+        object_list[0].copy_attributes_to(kept, ["wrapped", "_NodeMixin__children"])
+    elif all([obj._dim == 3 for obj in object_list]):
+        kept = Part(Compound(new_objects).wrapped)
+        object_list[0].copy_attributes_to(kept, ["wrapped", "_NodeMixin__children"])
+    elif all([obj._dim == 2 for obj in object_list]):
+        kept = Sketch(Compound(new_objects).wrapped)
+    elif all([obj._dim == 1 for obj in object_list]):
+        kept = Curve(Compound(new_objects).wrapped)
+    else:
+        kept = Compound(new_objects)
+    return kept
 
 
 SweepType: TypeAlias = Compound | Edge | Wire | Face | Solid

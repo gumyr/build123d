@@ -1039,6 +1039,31 @@ class SplitReturnTypeTests(unittest.TestCase):
         self.assertEqual(len(result.faces()), 2)
         self.assertAlmostEqual(result.area, 100, 5)
 
+    def test_returns_a_shell_for_a_shell(self):
+        """A sheet split in algebra mode is still a sheet"""
+        sheet = Box(10, 10, 10).shell()
+        sheet.label = "box"
+        result = split(sheet, Plane.XY.offset(2), keep=Keep.BOTTOM)
+        self.assertIsInstance(result, Shell)
+        self.assertEqual(len(result.faces()), 5)
+        self.assertAlmostEqual(result.bounding_box().max.Z, 2, 5)
+        self.assertEqual(result.label, "box")
+        # the result feeds the next sheet operation
+        self.assertIsInstance(split(result, Plane.XY.offset(-2), keep=Keep.TOP), Shell)
+
+        # both sides, or a side in several pieces, are a compound of shells
+        both = split(sheet, Plane.XY, keep=Keep.BOTH)
+        self.assertIsInstance(both, Compound)
+        self.assertEqual([type(s) for s in both.shells()], [Shell, Shell])
+        box_faces = Box(10, 10, 10).faces()
+        u_sheet = Shell(box_faces.filter_by(Axis.X) + [box_faces.sort_by(Axis.Z)[0]])
+        legs = split(u_sheet, Plane.XY, keep=Keep.TOP)
+        self.assertIsInstance(legs, Compound)
+        self.assertEqual(len(legs.shells()), 2)
+
+        # nothing on a side is the empty shell
+        self.assertTrue(split(sheet, Plane.XY.offset(20), keep=Keep.TOP).is_empty)
+
 
 class TestSweep(unittest.TestCase):
     def test_return_is_cleaned_inside_a_builder(self):
