@@ -122,6 +122,10 @@ the right one inside the left would place them:
         pairs = GridLocations(4, 4, 2, 1) * GridLocations(1, 1, 2, 2)  # 8 locations
         holes = pairs * Circle(0.25)
 
+A location list is a Python ``list`` of ``Location``: it can be indexed, sliced,
+edited and concatenated with ``+``, and the result is still a location list, as
+is ``plane * GridLocations(...)`` or ``location * GridLocations(...)``.
+
 
 Details can be found in :ref:`location_arithmetics`.
 
