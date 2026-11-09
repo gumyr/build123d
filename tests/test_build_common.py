@@ -571,6 +571,44 @@ class TestCommonOperations(unittest.TestCase):
 
 
 class TestLocations(unittest.TestCase):
+    def test_location_list_product(self):
+        """g1 * g2 composes two location lists as nesting g2 inside g1 does"""
+        g1 = GridLocations(1, 1, 2, 2)
+        g2 = GridLocations(4, 4, 2, 1)
+        product = g1 * g2
+        with g1:
+            nested = GridLocations(4, 4, 2, 1).locations
+        self.assertIsInstance(product, LocationList)
+        self.assertEqual(len(product.locations), 8)
+        for composed, expected in zip(product, nested):
+            self.assertEqual(composed, expected)
+
+        # the product is a context and a placement, like any location list
+        with BuildPart() as builder:
+            with product:
+                Box(0.1, 0.1, 0.1)
+        self.assertEqual(len(builder.part.solids()), 8)
+        placed = product * Box(0.1, 0.1, 0.1)
+        self.assertEqual(len(placed), 8)
+        self.assertIsInstance(Location((1, 0, 0)) * product, list)
+
+        with self.assertRaises(TypeError):
+            g1 * 3  # pylint: disable=pointless-statement
+
+    def test_location_list_product_in_a_context(self):
+        """Lists made inside a Locations context carry that context once"""
+        with Locations((10, 0, 0)):
+            g1 = GridLocations(1, 1, 2, 2)
+            g2 = GridLocations(4, 4, 2, 1)
+            product = g1 * g2
+            with g1:
+                nested = GridLocations(4, 4, 2, 1).locations
+        for composed, expected in zip(product, nested):
+            self.assertEqual(composed, expected)
+        self.assertAlmostEqual(
+            sum(loc.position.X for loc in product) / len(product.locations), 10, 5
+        )
+
     def test_polar_locations(self):
         locs = PolarLocations(1, 5, 45, 90, False).local_locations
         for i, angle in enumerate(range(45, 135, 18)):

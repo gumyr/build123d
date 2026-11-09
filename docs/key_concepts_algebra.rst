@@ -105,6 +105,23 @@ The generic forms of object placement are:
 
         plane * location * alg_compound
 
+3. Placement at several locations at once, with a location list such as
+``GridLocations`` or ``PolarLocations``. The result is a list, one copy per
+location:
+
+    .. code-block:: build123d
+
+        GridLocations(4, 4, 2, 1) * alg_compound
+
+Two location lists compose with ``*`` into one ``LocationList`` of every
+location of the left list applied to every location of the right, as nesting
+the right one inside the left would place them:
+
+    .. code-block:: build123d
+
+        pairs = GridLocations(4, 4, 2, 1) * GridLocations(1, 1, 2, 2)  # 8 locations
+        holes = pairs * Circle(0.25)
+
 
 Details can be found in :ref:`location_arithmetics`.
 

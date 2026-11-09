@@ -1134,6 +1134,28 @@ class LocationList:
     def __iter__(self):
         return iter(self.locations)
 
+    def __mul__(self, other: LocationList) -> LocationList:
+        """Compose two location lists: every location of this list applied to
+        every location of ``other``, in the order nesting ``other`` inside this
+        list would place them. This list stands as it is, composed with any
+        enclosing context; ``other`` contributes its own locations, so that
+        context is not applied twice."""
+        if not isinstance(other, LocationList):
+            return NotImplemented
+        # pylint: disable=protected-access
+        return LocationList(
+            [
+                outer * inner
+                for outer in self.locations
+                for inner in other._own_locations
+            ],
+            own_locations=[
+                outer * inner
+                for outer in self._own_locations
+                for inner in other._own_locations
+            ],
+        )
+
     @classmethod
     def _get_context(cls):
         """Return the LocationList held by the authoritative BuildScope.
