@@ -253,6 +253,61 @@ class TestShape(unittest.TestCase):
         self.assertTrue(isinstance(split_shape, ShapeList))
         self.assertEqual(len(split_shape), 2)
 
+    def test_split_shell(self):
+        """A split shell is one connected shell in the kernel, so its faces are
+        classified and each side reassembled into a shell, or shells"""
+        shell = Box(10, 10, 10).shell()
+        top = shell.split(Plane.XY, keep=Keep.TOP)
+        self.assertIsInstance(top, Shell)
+        self.assertEqual(len(top.faces()), 5)
+        self.assertAlmostEqual(top.bounding_box().min.Z, 0, 5)
+        top, bottom = shell.split(Plane.XY, keep=Keep.BOTH)
+        self.assertEqual(len(bottom.faces()), 5)
+        self.assertAlmostEqual(bottom.bounding_box().max.Z, 0, 5)
+        self.assertAlmostEqual(top.area + bottom.area, shell.area, 5)
+        self.assertEqual(len(shell.split(Plane.XY, keep=Keep.ALL)[0].faces()), 10)
+
+        # by a face: the half-space classification
+        top = shell.split(Face.make_rect(20, 20), keep=Keep.TOP)
+        self.assertIsInstance(top, Shell)
+        self.assertEqual(len(top.faces()), 5)
+        self.assertAlmostEqual(top.bounding_box().min.Z, 0, 5)
+
+        # a side in two separate pieces is a list of shells
+        box_faces = Box(10, 10, 10).faces()
+        u_shell = Shell(box_faces.filter_by(Axis.X) + [box_faces.sort_by(Axis.Z)[0]])
+        top = u_shell.split(Plane.XY, keep=Keep.TOP)
+        self.assertIsInstance(top, list)
+        self.assertEqual([type(piece) for piece in top], [Shell, Shell])
+        self.assertTrue(all(len(piece.faces()) == 1 for piece in top))
+        bottom = u_shell.split(Plane.XY, keep=Keep.BOTTOM)
+        self.assertIsInstance(bottom, Shell)
+        self.assertEqual(len(bottom.faces()), 3)
+
+        # the shell's attributes reach the pieces
+        shell.label = "box"
+        self.assertEqual(shell.split(Plane.XY, keep=Keep.TOP).label, "box")
+
+    def test_split_wire(self):
+        """A split wire is one connected wire in the kernel, so its edges are
+        classified and each side reassembled into a wire, or wires"""
+        # Plane.XZ's normal points to -Y, so its top is the -Y side
+        wire = Wire.make_rect(10, 10)
+        top = wire.split(Plane.XZ, keep=Keep.TOP)
+        self.assertIsInstance(top, Wire)
+        self.assertEqual(len(top.edges()), 3)
+        self.assertAlmostEqual(top.bounding_box().max.Y, 0, 5)
+        top, bottom = wire.split(Plane.XZ, keep=Keep.BOTH)
+        self.assertAlmostEqual(top.length + bottom.length, wire.length, 5)
+
+        # the open side of a U gives two separate pieces, a list of wires
+        u_wire = Wire.make_polygon([(-5, 5), (-5, -5), (5, -5), (5, 5)], close=False)
+        top = u_wire.split(Plane.XZ, keep=Keep.TOP)
+        self.assertIsInstance(top, Wire)
+        self.assertEqual(len(top.edges()), 3)
+        bottom = u_wire.split(Plane.XZ, keep=Keep.BOTTOM)
+        self.assertEqual([type(piece) for piece in bottom], [Wire, Wire])
+
     def test_split_edge_by_shell(self):
         edge = Edge.make_line((-5, 0, 0), (5, 0, 0))
         tool = Wire.make_rect(4, 4)

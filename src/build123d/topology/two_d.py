@@ -3096,6 +3096,22 @@ class Shell(Mixin2D[TopoDS_Shell]):
 
     # ---- Instance Methods ----
 
+    def _split_parts(self, split_result: TopoDS_Shape) -> list[TopoDS_Shape]:
+        """A split shell is one connected shell, its halves sharing the section
+        edges, so the pieces to classify by side are its faces"""
+        return _topods_entities(split_result, "Face")
+
+    def _split_side(self, parts: list[TopoDS_Shape]) -> list[TopoDS_Shape]:
+        """The faces on one side of a split sewn into a shell per connected
+        group, a lone face held in a shell of its own"""
+        if not parts:
+            return parts
+        sewn = _sew_topods_faces([TopoDS.Face(part) for part in parts])
+        return [
+            _make_topods_shell([group]) if isinstance(group, TopoDS_Face) else group
+            for group in get_top_level_topods_shapes(sewn)
+        ]
+
     def bends(self) -> ShapeList[Face]:
         """The cylindrical faces of this Shell.
 
