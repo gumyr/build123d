@@ -4302,7 +4302,7 @@ class Wire(Mixin1D[TopoDS_Wire]):
         shape_fix.Perform()
         chamfered_face = downcast(shape_fix.Shape())
         if not isinstance(chamfered_face, TopoDS_Face):
-            raise RuntimeError("An internal error occured creating the chamfer")
+            raise RuntimeError("An internal error occurred creating the chamfer")
         # Return the outer wire
         result = Wire(BRepTools.OuterWire_s(chamfered_face))
         return result._made_by(
