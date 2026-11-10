@@ -10,10 +10,10 @@ flat it consumes. It is what goes to the laser or the punch, and getting it
 right is the reason the model tracks the neutral axis at all. ``unfold``
 produces it from the reference shell.
 
-.. image:: ../assets/sheet_metal/unfold_basic.svg
+.. image:: /assets/sheet_metal/unfold_basic.svg
     :align: center
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [unfold_basic]
     :end-before: [unfold_basic]

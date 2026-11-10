@@ -64,7 +64,7 @@ You can modify the script to:
 Code
 ----
 
-.. literalinclude:: technical_drawing.py
+.. literalinclude:: /technical_drawing.py
     :language: build123d
     :start-after: [code]
     :end-before: [end]

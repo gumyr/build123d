@@ -140,7 +140,7 @@ subclass of ``list``, so any list slice can be used.
 
     part.vertices().sort_by(Axis.X)[-4:]
 
-.. figure:: assets/topology_selection/operators_sort_x.png
+.. figure:: /assets/topology_selection/operators_sort_x.png
     :align: center
 
 |
@@ -203,7 +203,7 @@ return a new list of all edges in the previous list.
 
     part.faces().group_by(Face.area)[0].edges()
 
-.. figure:: assets/topology_selection/operators_group_area.png
+.. figure:: /assets/topology_selection/operators_group_area.png
     :align: center
 
 |
@@ -251,7 +251,7 @@ against a vector direction and filtered accordingly.
 
     part.faces().filter_by(lambda f: f.normal_at() == Vector(0, 0, 1))
 
-.. figure:: assets/topology_selection/operators_filter_z_normal.png
+.. figure:: /assets/topology_selection/operators_filter_z_normal.png
     :align: center
 
 |
@@ -265,7 +265,7 @@ selected regardless of their orientation:
     obj = Box(1, 1, 1) - Cylinder(0.2, 1)
     faces_with_holes = obj.faces().filter_by(lambda f: f.inner_wires())
 
-.. image:: assets/custom_selector.png
+.. image:: /assets/custom_selector.png
 
 Standard Python tools work too. ``sorted``, ``filter`` and comprehensions all accept a
 |ShapeList|, which is useful when a selection needs several properties at once:
@@ -488,7 +488,7 @@ mesh faces are grouped into topological rings expanding away from that starting 
 
     show(*face_rings, colors=ColorMap.listed(len(face_rings)))
 
-.. figure:: assets/topology_selection/topo_distance_to.png
+.. figure:: /assets/topology_selection/topo_distance_to.png
     :align: center
 
 The same approach can be used with edges or vertices. For example, a single edge on the
@@ -535,17 +535,17 @@ selectors are the builder's own:
         part.faces(Select.LAST)     # the cylinder's faces
         part.edges(Select.NEW)      # the two circles where the cylinder meets the box
 
-.. figure:: assets/topology_selection/selectors_select_all.png
+.. figure:: /assets/topology_selection/selectors_select_all.png
     :align: center
 
     The default ``Select.ALL`` features
 
-.. figure:: assets/topology_selection/selectors_select_last.png
+.. figure:: /assets/topology_selection/selectors_select_last.png
     :align: center
 
     ``Select.LAST`` features
 
-.. figure:: assets/topology_selection/selectors_select_new.png
+.. figure:: /assets/topology_selection/selectors_select_new.png
     :align: center
 
     ``Select.NEW`` edges where box and cylinder intersect
@@ -563,7 +563,7 @@ circle where they meet is the cylinder's own bottom edge, brought in rather than
         part.edges(Select.NEW)      # none
         part.edges(Select.LAST)     # the cylinder's three edges, that circle among them
 
-.. figure:: assets/topology_selection/selectors_select_new_none.png
+.. figure:: /assets/topology_selection/selectors_select_new_none.png
     :align: center
 
     ``Select.NEW`` edges when box and cylinder don't intersect

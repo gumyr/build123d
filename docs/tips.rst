@@ -86,7 +86,7 @@ When selecting features in a design it's sometimes easier to select an object fr
 higher up in the topology first, then select the object from there.  For example let's
 consider a plate with four chamfered holes like this:
 
-.. image:: assets/plate.svg
+.. image:: /assets/plate.svg
     :align: center
 
 When selecting edges to be chamfered one might first select the face that these edges
@@ -164,11 +164,11 @@ that they don't overlap, with an optional padding/spacing.  Here's the
 result of packing a bunch of overlapping boxes (left) using some
 padding (right):
 
-.. image:: assets/packed_boxes_input.svg
+.. image:: /assets/packed_boxes_input.svg
   :width: 200
   :align: left
 
-.. image:: assets/packed_boxes_output.svg
+.. image:: /assets/packed_boxes_output.svg
   :align: right
 
 
@@ -216,7 +216,7 @@ they are drawing directly on the placement provided.  For example:
         with Locations(vertices().group_by(Axis.X)[-1].sort_by(Axis.Z)[-1]):
             Circle(0.2)
 
-.. image:: assets/vertical_sketch.png
+.. image:: /assets/vertical_sketch.png
 
 In this case the circle is not positioned in the top right as one would expect; in-fact, the position
 of the circle randomly switches between the bottom and top corner.
@@ -236,7 +236,7 @@ of a 3D part but is simulated here by rotating a ``Plane``):
         with Locations(vertices().group_by(Axis.X)[-1].sort_by(Axis.Y)[-1]):
             Circle(0.2)
 
-.. image:: assets/sketch_on_custom_plane.png
+.. image:: /assets/sketch_on_custom_plane.png
 
 Here one can see both ``sketch_local`` (with the light fill on ``Plane.XY``) and the ``sketch``
 (with the darker fill) published to the user provided placement. As the selectors work off global

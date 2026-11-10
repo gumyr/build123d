@@ -23,24 +23,24 @@ method of a reference shape serves as the key for ``group_by``.
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/sort_property.py
+    .. literalinclude:: /topology_selection/examples/sort_property.py
         :language: build123d
         :lines: 3, 8-13
 
-.. literalinclude:: examples/sort_property.py
+.. literalinclude:: /topology_selection/examples/sort_property.py
     :language: build123d
     :lines: 19-20
 
-.. figure:: ../assets/topology_selection/sort_edge_length.png
+.. figure:: /assets/topology_selection/sort_edge_length.png
     :align: center
 
 |
 
-.. literalinclude:: examples/sort_property.py
+.. literalinclude:: /topology_selection/examples/sort_property.py
     :language: build123d
     :lines: 22-23
 
-.. figure:: ../assets/topology_selection/sort_by_distance.png
+.. figure:: /assets/topology_selection/sort_by_distance.png
     :align: center
 
 |
@@ -57,15 +57,15 @@ the order is random.
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/sort_along_wire.py
+    .. literalinclude:: /topology_selection/examples/sort_along_wire.py
         :language: build123d
         :lines: 3, 8-12
 
-.. literalinclude:: examples/sort_along_wire.py
+.. literalinclude:: /topology_selection/examples/sort_along_wire.py
     :language: build123d
     :lines: 14-15
 
-.. figure:: ../assets/topology_selection/sort_not_along_wire.png
+.. figure:: /assets/topology_selection/sort_not_along_wire.png
     :align: center
 
 |
@@ -73,11 +73,11 @@ the order is random.
 Vertices may be sorted along the wire they fall on to create order. Notice the fillet
 radii now increase in order.
 
-.. literalinclude:: examples/sort_along_wire.py
+.. literalinclude:: /topology_selection/examples/sort_along_wire.py
     :language: build123d
     :lines: 26-28
 
-.. figure:: ../assets/topology_selection/sort_along_wire.png
+.. figure:: /assets/topology_selection/sort_along_wire.png
     :align: center
 
 |
@@ -94,15 +94,15 @@ edge can be found sorting along y-axis.
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/sort_axis.py
+    .. literalinclude:: /topology_selection/examples/sort_axis.py
         :language: build123d
         :lines: 4, 9-18
 
-.. literalinclude:: examples/sort_axis.py
+.. literalinclude:: /topology_selection/examples/sort_axis.py
     :language: build123d
     :lines: 22-24
 
-.. figure:: ../assets/topology_selection/sort_axis.png
+.. figure:: /assets/topology_selection/sort_axis.png
     :align: center
 
 |
@@ -118,15 +118,15 @@ Here we are sorting the boxes by distance from the origin, using an empty ``Vert
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/sort_distance_from.py
+    .. literalinclude:: /topology_selection/examples/sort_distance_from.py
         :language: build123d
         :lines: 2-5, 9-13
 
-.. literalinclude:: examples/sort_distance_from.py
+.. literalinclude:: /topology_selection/examples/sort_distance_from.py
     :language: build123d
     :lines: 15-16
 
-.. figure:: ../assets/topology_selection/sort_distance_from_origin.png
+.. figure:: /assets/topology_selection/sort_distance_from_origin.png
     :align: center
 
 |
@@ -135,11 +135,11 @@ The example can be extended by first sorting the boxes by volume using the ``Sol
 property ``volume``, and getting the last (largest) box. Then, the boxes sorted by
 their distance from the largest box.
 
-.. literalinclude:: examples/sort_distance_from.py
+.. literalinclude:: /topology_selection/examples/sort_distance_from.py
     :language: build123d
     :lines: 19-20
 
-.. figure:: ../assets/topology_selection/sort_distance_from_largest.png
+.. figure:: /assets/topology_selection/sort_distance_from_largest.png
     :align: center
 
 |

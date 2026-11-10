@@ -17,24 +17,24 @@ operations, and are sometimes necessary e.g. before sorting or filtering by radi
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/filter_geomtype.py
+    .. literalinclude:: /topology_selection/examples/filter_geomtype.py
         :language: build123d
         :lines: 3, 8-13
 
-.. literalinclude:: examples/filter_geomtype.py
+.. literalinclude:: /topology_selection/examples/filter_geomtype.py
     :language: build123d
     :lines: 15
 
-.. figure:: ../assets/topology_selection/filter_geomtype_line.png
+.. figure:: /assets/topology_selection/filter_geomtype_line.png
     :align: center
 
 |
 
-.. literalinclude:: examples/filter_geomtype.py
+.. literalinclude:: /topology_selection/examples/filter_geomtype.py
     :language: build123d
     :lines: 17
 
-.. figure:: ../assets/topology_selection/filter_geomtype_cylinder.png
+.. figure:: /assets/topology_selection/filter_geomtype_cylinder.png
     :align: center
 
 |
@@ -51,15 +51,15 @@ circular edges selects the counterbore faces that meet the joint criteria.
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/filter_all_edges_circle.py
+    .. literalinclude:: /topology_selection/examples/filter_all_edges_circle.py
         :language: build123d
         :lines: 3, 8-41
 
-.. literalinclude:: examples/filter_all_edges_circle.py
+.. literalinclude:: /topology_selection/examples/filter_all_edges_circle.py
     :language: build123d
     :lines: 43-47
 
-.. figure:: ../assets/topology_selection/filter_all_edges_circle.png
+.. figure:: /assets/topology_selection/filter_all_edges_circle.png
     :align: center
 
 |
@@ -88,7 +88,7 @@ Plane will select faces parallel to the plane.
     part.faces().filter_by(Axis.Z)
     part.faces().filter_by(Plane.XY)
 
-.. figure:: ../assets/topology_selection/filter_axisplane.png
+.. figure:: /assets/topology_selection/filter_axisplane.png
     :align: center
 
 |
@@ -103,7 +103,7 @@ to 0. The result is faces parallel to the axis or perpendicular to the plane.
     part.faces().filter_by(lambda f: abs(f.normal_at().dot(Axis.Z.direction) < 1e-6)
     part.faces().filter_by(lambda f: abs(f.normal_at().dot(Plane.XY.z_dir)) < 1e-6)
 
-.. figure:: ../assets/topology_selection/filter_dot_axisplane.png
+.. figure:: /assets/topology_selection/filter_dot_axisplane.png
     :align: center
 
 |
@@ -119,19 +119,19 @@ axis of rotation, but the motor bore and slots need specific placement. The moto
 can be found by filtering for faces with 5 inner wires, sorting for the desired face,
 and then filtering for the specific inner wire by radius.
 
-- bracket STEP model: :download:`nema-17-bracket.step <examples/nema-17-bracket.step>`
+- bracket STEP model: :download:`nema-17-bracket.step </topology_selection/examples/nema-17-bracket.step>`
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/filter_inner_wire_count.py
+    .. literalinclude:: /topology_selection/examples/filter_inner_wire_count.py
         :language: build123d
         :lines: 4, 9-16
 
-.. literalinclude:: examples/filter_inner_wire_count.py
+.. literalinclude:: /topology_selection/examples/filter_inner_wire_count.py
     :language: build123d
     :lines: 18-21
 
-.. figure:: ../assets/topology_selection/filter_inner_wire_count.png
+.. figure:: /assets/topology_selection/filter_inner_wire_count.png
     :align: center
 
 |
@@ -141,11 +141,11 @@ than a single location. The slot arc centers can be used for creating a linear j
 axis and range. To do that we can filter for faces with 6 inner wires, sort for and
 select the top face, and then filter for the circular edges of the inner wires.
 
-.. literalinclude:: examples/filter_inner_wire_count.py
+.. literalinclude:: /topology_selection/examples/filter_inner_wire_count.py
     :language: build123d
     :lines: 25-32
 
-.. figure:: ../assets/topology_selection/filter_inner_wire_count_linear.png
+.. figure:: /assets/topology_selection/filter_inner_wire_count_linear.png
     :align: center
 
 |
@@ -164,15 +164,15 @@ any line edges.
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/filter_nested.py
+    .. literalinclude:: /topology_selection/examples/filter_nested.py
         :language: build123d
         :lines: 4, 9-22
 
-.. literalinclude:: examples/filter_nested.py
+.. literalinclude:: /topology_selection/examples/filter_nested.py
     :language: build123d
     :lines: 26-32
 
-.. figure:: ../assets/topology_selection/filter_nested.png
+.. figure:: /assets/topology_selection/filter_nested.png
     :align: center
 
 |
@@ -187,11 +187,11 @@ interior and exterior edges using the ``Edge`` ``is interior`` property to apply
 different fillets accordingly. Then the ``Face`` ``is_circular_*`` properties are used
 to highlight the resulting fillets.
 
-.. literalinclude:: examples/filter_shape_properties.py
+.. literalinclude:: /topology_selection/examples/filter_shape_properties.py
     :language: build123d
     :lines: 3-4, 8-22
 
-.. figure:: ../assets/topology_selection/filter_shape_properties.png
+.. figure:: /assets/topology_selection/filter_shape_properties.png
     :align: center
 
 |

@@ -12,7 +12,7 @@ With build123d :doc:`installed <installation>`, this is a complete first model:
 
     box = Box(80, 60, 10)
 
-.. image:: assets/general_ex1.svg
+.. image:: /assets/general_ex1.svg
     :align: center
 
 A build123d model is an ordinary Python script, and

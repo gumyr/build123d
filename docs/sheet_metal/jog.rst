@@ -10,10 +10,10 @@ it. Fabricators use one to let a panel sit flush over a neighbour, to clear a
 weld or a fastener head, or to stiffen a long flat with a step. It is two
 bends made as one feature so that the step comes out at the right height.
 
-.. image:: ../assets/sheet_metal/jog_basic.svg
+.. image:: /assets/sheet_metal/jog_basic.svg
     :align: center
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [jog_basic]
     :end-before: [jog_basic]
@@ -31,7 +31,7 @@ sloping one. The two bends between them climb ``(r1 + r2)(1 - cos angle)``
 and the straight run makes up the rest, so a jog needs at least that much
 offset; a shallower angle needs less.
 
-.. image:: ../assets/sheet_metal/jog_profile.svg
+.. image:: /assets/sheet_metal/jog_profile.svg
     :align: center
 
 Both bends take their allowance of the blank, and ``position`` places the
@@ -52,10 +52,10 @@ flange: new material steps off the edge and runs on for ``length`` in the
 plane of the face it came from. ``gaps`` trim the bend ends the way they do
 for a flange.
 
-.. image:: ../assets/sheet_metal/jog_rim.svg
+.. image:: /assets/sheet_metal/jog_rim.svg
     :align: center
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [jog_rim]
     :end-before: [jog_rim]

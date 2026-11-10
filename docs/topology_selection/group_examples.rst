@@ -13,11 +13,11 @@ result knowing how many edges to expect.
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/group_axis.py
+    .. literalinclude:: /topology_selection/examples/group_axis.py
         :language: build123d
         :lines: 4, 9-17
 
-.. figure:: ../assets/topology_selection/group_axis_without.png
+.. figure:: /assets/topology_selection/group_axis_without.png
     :align: center
 
 |
@@ -25,11 +25,11 @@ result knowing how many edges to expect.
 However, ``group_by`` can be used to first group all the edges by z-axis position and then
 group again by length. In both cases, you can select the desired edges from the last group.
 
-.. literalinclude:: examples/group_axis.py
+.. literalinclude:: /topology_selection/examples/group_axis.py
     :language: build123d
     :lines: 21-22
 
-.. figure:: ../assets/topology_selection/group_axis_with.png
+.. figure:: /assets/topology_selection/group_axis_with.png
     :align: center
 
 |
@@ -45,15 +45,15 @@ with the largest hole.
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/group_hole_area.py
+    .. literalinclude:: /topology_selection/examples/group_hole_area.py
         :language: build123d
         :lines: 4, 9-17
 
-.. literalinclude:: examples/group_hole_area.py
+.. literalinclude:: /topology_selection/examples/group_hole_area.py
     :language: build123d
     :lines: 21-24
 
-.. figure:: ../assets/topology_selection/group_hole_area.png
+.. figure:: /assets/topology_selection/group_hole_area.png
     :align: center
 
 |
@@ -71,15 +71,15 @@ then the desired groups are selected with the ``group`` method using the lengths
 
 .. dropdown:: Setup
 
-    .. literalinclude:: examples/group_properties_with_keys.py
+    .. literalinclude:: /topology_selection/examples/group_properties_with_keys.py
         :language: build123d
         :lines: 4, 9-26
 
-.. literalinclude:: examples/group_properties_with_keys.py
+.. literalinclude:: /topology_selection/examples/group_properties_with_keys.py
     :language: build123d
     :lines: 30, 31
 
-.. figure:: ../assets/topology_selection/group_length_key.png
+.. figure:: /assets/topology_selection/group_length_key.png
     :align: center
 
 |
@@ -93,15 +93,15 @@ and then further specify only the edges the bearings and pins are installed from
 
 .. dropdown:: Adding holes
 
-    .. literalinclude:: examples/group_properties_with_keys.py
+    .. literalinclude:: /topology_selection/examples/group_properties_with_keys.py
         :language: build123d
         :lines: 35-43
 
-.. literalinclude:: examples/group_properties_with_keys.py
+.. literalinclude:: /topology_selection/examples/group_properties_with_keys.py
     :language: build123d
     :lines: 47-50
 
-.. figure:: ../assets/topology_selection/group_radius_key.png
+.. figure:: /assets/topology_selection/group_radius_key.png
     :align: center
 
 |

@@ -8,7 +8,7 @@ A label on a curved part is a row of flat letters laid along a curve on the
 surface, each standing on the surface at its own place. Two methods do that,
 and they differ in how they put a letter onto the surface.
 
-.. image:: ../assets/projection/faces.svg
+.. image:: /assets/projection/faces.svg
     :align: center
 
 ******************************
@@ -21,7 +21,7 @@ surface, a cylinder or a cone, that is exact: the letters keep their lengths
 as if the sheet had been rolled onto the part. Seams are handled. The path
 must lie on the one face.
 
-.. literalinclude:: ../projection_examples.py
+.. literalinclude:: /projection_examples.py
     :language: build123d
     :start-after: [faces_wrap]
     :end-before: [faces_wrap]
@@ -38,7 +38,7 @@ corner, comes back as a shell with a piece on each. That is the case a wrap
 of one face cannot do. Projection foreshortens on a slope, so on a single
 surface it is the approximate choice.
 
-.. literalinclude:: ../projection_examples.py
+.. literalinclude:: /projection_examples.py
     :language: build123d
     :start-after: [faces_project]
     :end-before: [faces_project]

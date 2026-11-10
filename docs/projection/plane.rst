@@ -9,10 +9,10 @@ object from its own side, and hands back the result flat, in the plane's own
 coordinates. It exists for one workflow above all: bring a 3D object into a
 sketch or a line, enhance it there, and use the result to modify the object.
 
-.. image:: ../assets/projection/plane_faces.svg
+.. image:: /assets/projection/plane_faces.svg
     :align: center
 
-.. literalinclude:: ../projection_examples.py
+.. literalinclude:: /projection_examples.py
     :language: build123d
     :start-after: [plane_faces]
     :end-before: [plane_faces]
@@ -49,7 +49,7 @@ A builder takes what it can hold and reduces or refuses the rest.
 * Edges and wires cannot go into a sketch. Those raise unless
   ``mode=Mode.PRIVATE``, which returns the result without adding it.
 
-.. image:: ../assets/projection/plane_silhouette.svg
+.. image:: /assets/projection/plane_silhouette.svg
     :align: center
 
 .. tab-set::
@@ -57,7 +57,7 @@ A builder takes what it can hold and reduces or refuses the rest.
     .. tab-item:: Builder
         :sync: builder
 
-        .. literalinclude:: ../projection_examples.py
+        .. literalinclude:: /projection_examples.py
             :language: build123d
             :start-after: [plane_silhouette]
             :end-before: [plane_silhouette]
@@ -65,7 +65,7 @@ A builder takes what it can hold and reduces or refuses the rest.
     .. tab-item:: Algebra
         :sync: algebra
 
-        .. literalinclude:: ../projection_examples.py
+        .. literalinclude:: /projection_examples.py
             :language: build123d
             :start-after: [plane_silhouette_algebra]
             :end-before: [plane_silhouette_algebra]
@@ -75,7 +75,7 @@ A builder takes what it can hold and reduces or refuses the rest.
     .. tab-item:: Builder
         :sync: builder
 
-        .. literalinclude:: ../projection_examples.py
+        .. literalinclude:: /projection_examples.py
             :language: build123d
             :start-after: [plane_edges]
             :end-before: [plane_edges]
@@ -83,7 +83,7 @@ A builder takes what it can hold and reduces or refuses the rest.
     .. tab-item:: Algebra
         :sync: algebra
 
-        .. literalinclude:: ../projection_examples.py
+        .. literalinclude:: /projection_examples.py
             :language: build123d
             :start-after: [plane_edges_algebra]
             :end-before: [plane_edges_algebra]
@@ -95,7 +95,7 @@ Algebra mode
 The same rules hold with an explicit workplane, and points come back as
 ``Vector`` positions in the plane's coordinates.
 
-.. literalinclude:: ../projection_examples.py
+.. literalinclude:: /projection_examples.py
     :language: build123d
     :start-after: [plane_algebra]
     :end-before: [plane_algebra]

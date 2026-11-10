@@ -11,10 +11,10 @@ to be ground off. **Corner relief** cuts that material away before forming,
 opening the corner so each flange can fold on its own. Every box, tray and
 enclosure with folded-up sides has it.
 
-.. image:: ../assets/sheet_metal/corner_relief_basic.svg
+.. image:: /assets/sheet_metal/corner_relief_basic.svg
     :align: center
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [corner_relief_basic]
     :end-before: [corner_relief_basic]
@@ -37,7 +37,7 @@ circle on the blank, not on the formed part, where the parts crossing a bend
 read smaller. One wide enough to pass right through a bend carries on into
 the flange beyond it, as the hole would on the blank.
 
-.. image:: ../assets/sheet_metal/corner_relief_types.svg
+.. image:: /assets/sheet_metal/corner_relief_types.svg
     :align: center
 
 ==================  ===========================================================
@@ -61,7 +61,7 @@ Shape               What it is and when to use it
                     stops at.
 ==================  ===========================================================
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [corner_relief_types]
     :end-before: [corner_relief_types]

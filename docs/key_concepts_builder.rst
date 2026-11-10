@@ -311,7 +311,7 @@ six face placements.
 
 This is the result:
 
-.. image:: boxes_on_faces.svg
+.. image:: /boxes_on_faces.svg
   :align: center
 
 .. note::

@@ -80,7 +80,7 @@ as shown in the following code where the final line selects the edges that were 
 by the last operation and fillets them. Such a selection would be quite difficult
 otherwise.
 
-.. literalinclude:: ../examples/intersecting_pipes.py
+.. literalinclude:: /../examples/intersecting_pipes.py
     :language: build123d
     :lines: 30, 39-49
 

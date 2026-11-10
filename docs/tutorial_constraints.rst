@@ -160,7 +160,7 @@ reference entities.
 For example, a circle of fixed radius tangent to two secant circles can produce up to
 eight valid solutions as shown below. This is expected behavior, not an error.
 
-.. figure:: ./assets/tangent_circles.svg
+.. figure:: /assets/tangent_circles.svg
    :align: center
 
 To reduce ambiguity, tangency constraints support **qualification** of relative position:
@@ -288,7 +288,7 @@ to a spline (on the right).
    connector = BlendCurve(m1, m2, tangent_scalars=(2, 1), continuity=ContinuityLevel.C2)
    comb = Curve(Wire([m1, connector, m2]).curvature_comb(200))
 
-.. figure:: ./assets/blend_curve_ex.svg
+.. figure:: /assets/blend_curve_ex.svg
    :align: center
 
 The key call is ``BlendCurve(..., continuity=ContinuityLevel.C2)``. ``C2`` continuity
@@ -312,7 +312,7 @@ Coincident
       l1 = Line((0, 0), (1, 2))
       l2 = Line(l1 @ 1, l1 @ 1 + (1, 0))
       
-.. figure:: ./assets/coincident_ex.svg
+.. figure:: /assets/coincident_ex.svg
    :align: center
 
 The second line starts at ``l1 @ 1`` (the end of ``l1``), creating an exact coincident
@@ -327,7 +327,7 @@ Tangent
       l1 = Line((0, 0), (1, 1))
       l2 = JernArc(start=l1 @ 1, tangent=l1 % 1, radius=1, arc_size=70)
 
-.. figure:: ./assets/tangent_ex.svg
+.. figure:: /assets/tangent_ex.svg
    :align: center
 
 The arc starts at the line endpoint and uses ``l1 % 1`` as its initial tangent direction.
@@ -344,7 +344,7 @@ Perpendicular
          start=l1 @ 1, length=1, direction=l1.tangent_at(1).rotate(Axis.Z, -90)
       )
 
-.. figure:: ./assets/perpendicular_ex.svg
+.. figure:: /assets/perpendicular_ex.svg
    :align: center
 
 The direction vector is built from ``l1.tangent_at(1)`` rotated by 90 degrees, giving an
@@ -361,7 +361,7 @@ Extent / Termination Constraints
       l2 = PolarLine(start=(-0.2, 0.1), length=c1, angle=70)
       l3 = insert(c1.trim(l1 @ 1, l2 @ 1))
 
-.. figure:: ./assets/intersect_ex.svg
+.. figure:: /assets/intersect_ex.svg
    :align: center
 
 :class:`~objects_curve.PolarLine` creates each line from a start point and direction,
@@ -398,7 +398,7 @@ Offset / Equidistance Constraints
    perimeter = offset(inside, amount=0.2, side=Side.RIGHT)
 
 
-.. figure:: ./assets/offset_ex.svg
+.. figure:: /assets/offset_ex.svg
    :align: center
 
 :class:`~operations_generic.offset` preserves the source profile shape while enforcing constant wall thickness.
@@ -471,7 +471,7 @@ followed by filtering via ``selector``.
       l3 = insert(c1.trim(l1 @ 1, l2 @ 1))
       l4 = insert(c2.trim(l1 @ 0, l2 @ 0))
 
-.. figure:: ./assets/enclosing_ex.svg
+.. figure:: /assets/enclosing_ex.svg
    :align: center
 
 In the "egg-plant" example, ``Tangency.OUTSIDE`` and ``Tangency.ENCLOSING`` reduce the
@@ -529,7 +529,7 @@ Signature A: Two constraints + ``radius``
        selector=lambda arcs: arcs,
    )
 
-.. figure:: ./assets/tan2_rad_ex.svg
+.. figure:: /assets/tan2_rad_ex.svg
    :align: center
 
 Use when radius is known and the arc must be tangent to each curve input or pass through
@@ -548,7 +548,7 @@ Signature B: Two constraints + ``center_on``
        selector=lambda arcs: arcs,
    )
 
-.. figure:: ./assets/tan2_on_ex.svg
+.. figure:: /assets/tan2_on_ex.svg
    :align: center
 
 Use when center must lie on a specific line/curve rather than radius being fixed.
@@ -566,7 +566,7 @@ Signature C: Three constraints
        selector=lambda arcs: arcs,
    )
 
-.. figure:: ./assets/tan3_ex.svg
+.. figure:: /assets/tan3_ex.svg
    :align: center
 
 Use for an arc tangent to three curve targets. This can produce several branches;
@@ -583,7 +583,7 @@ Signature D: One constraint + fixed ``center``
        selector=lambda arcs: arcs[0],
    )
 
-.. figure:: ./assets/pnt_center_ex.svg
+.. figure:: /assets/pnt_center_ex.svg
    :align: center
 
 Useful for "center-known" constructions.
@@ -600,7 +600,7 @@ Signature E: One constraint + radius + ``center_on``
        selector=lambda arcs: arcs,
    )
 
-.. figure:: ./assets/tan_rad_on_ex.svg
+.. figure:: /assets/tan_rad_on_ex.svg
    :align: center
 
 Useful for guided-center constructions with fixed radius.
@@ -637,7 +637,7 @@ Signature A: Two constraints
        selector=lambda lines: lines,
    )
 
-.. figure:: ./assets/lines_tan2_ex.svg
+.. figure:: /assets/lines_tan2_ex.svg
    :align: center
 
 
@@ -652,7 +652,7 @@ Signature B: One constraint + through point
        selector=lambda lines: lines,
    )
 
-.. figure:: ./assets/lines_tan_pnt_ex.svg
+.. figure:: /assets/lines_tan_pnt_ex.svg
    :align: center
 
 Signature C: One constraint + fixed orientation
@@ -667,7 +667,7 @@ Signature C: One constraint + fixed orientation
        selector=lambda lines: lines,
    )
 
-.. figure:: ./assets/lines_angle_ex.svg
+.. figure:: /assets/lines_angle_ex.svg
    :align: center
 
 Exactly one of ``angle`` or ``direction`` should be provided.
@@ -729,7 +729,7 @@ Complex Drawing Example
 This example pulls many of the techniques described above into a single example
 where the following full constrained, complex sketch is converted into build123d code.
 
-.. figure:: ./assets/complex_sketch.png
+.. figure:: /assets/complex_sketch.png
    :align: center
 
 When working with a drawing such as this one, the ``ImageFace`` functionality of the
@@ -781,7 +781,7 @@ clockwise creating the perimeter of the object.
       make_face()
       a14 = Circle(14 / 2, mode=Mode.SUBTRACT)
 
-.. figure:: ./assets/complex_ex.svg
+.. figure:: /assets/complex_ex.svg
    :align: center
 
 Implementation notes:

@@ -9,10 +9,10 @@ most common feature there is: the sides of a tray, the lips of a bracket, the
 return on a panel that gives it stiffness. Making one adds two faces to the
 model, the cylindrical **bend** and the flat **wall** beyond it.
 
-.. image:: ../assets/sheet_metal/flange_basic.svg
+.. image:: /assets/sheet_metal/flange_basic.svg
     :align: center
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [flange_basic]
     :end-before: [flange_basic]
@@ -31,10 +31,10 @@ edge belongs to, which for a blank drawn on ``Plane.XY`` is up; negative
 angles fold the other way. Anything short of a full fold is allowed, so an
 angle of 45 gives a sloping wall and 90 a square one.
 
-.. image:: ../assets/sheet_metal/flange_angle.svg
+.. image:: /assets/sheet_metal/flange_angle.svg
     :align: center
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [flange_angle]
     :end-before: [flange_angle]
@@ -63,10 +63,10 @@ can go depends on the angle, the reference surface and what lies beside the
 wall, so it is not checked; a collision shows in the thickened part, as any
 other does.
 
-.. image:: ../assets/sheet_metal/flange_gaps.svg
+.. image:: /assets/sheet_metal/flange_gaps.svg
     :align: center
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [flange_gaps]
     :end-before: [flange_gaps]
@@ -92,7 +92,7 @@ other positions set the bend back onto the face so that a chosen feature of
 the formed bend lands on the edge, with the face giving up a strip of material
 to the bend as it rolls up:
 
-.. image:: ../assets/sheet_metal/flange_position.svg
+.. image:: /assets/sheet_metal/flange_position.svg
     :align: center
 
 =====================  ========================================================
@@ -106,7 +106,7 @@ Position               What lands on the edge
 ``CENTER``             The middle of the bend, which straddles the edge.
 =====================  ========================================================
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [flange_position]
     :end-before: [flange_position]
@@ -129,7 +129,7 @@ How long the wall is
 A drawing usually gives the overall size instead, to a virtual sharp, and
 ``length_from`` takes it that way so the trigonometry is left to the flange:
 
-.. image:: ../assets/sheet_metal/flange_length.svg
+.. image:: /assets/sheet_metal/flange_length.svg
     :align: center
 
 =================  ============================================================
@@ -142,7 +142,7 @@ Length from        ``length`` is measured from
                    outside size a drawing gives.
 =================  ============================================================
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [flange_length]
     :end-before: [flange_length]
@@ -156,7 +156,7 @@ A wall at an angle is as often dimensioned by its height above the face it
 comes from, or by how far it reaches along that face, and ``length_mode``
 names which side of that triangle ``length`` is, as it does for ``PolarLine``:
 
-.. image:: ../assets/sheet_metal/flange_length_mode.svg
+.. image:: /assets/sheet_metal/flange_length_mode.svg
     :align: center
 
 =================  ============================================================
@@ -167,7 +167,7 @@ Length mode        ``length`` is
 ``HORIZONTAL``     The wall's run along that face.
 =================  ============================================================
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [flange_length_mode]
     :end-before: [flange_length_mode]

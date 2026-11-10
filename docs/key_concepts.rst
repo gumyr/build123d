@@ -210,4 +210,4 @@ the ``-`` operator.
 Selectors
 =========
 
-.. include:: selectors.rst
+.. include:: /selectors.rst

@@ -9,10 +9,10 @@ along a direction, the way a label is cast onto a curved part. What comes
 back lies on that surface: faces ready to be extruded into the part, or
 edges to follow.
 
-.. image:: ../assets/projection/shape_emboss.svg
+.. image:: /assets/projection/shape_emboss.svg
     :align: center
 
-.. literalinclude:: ../projection_examples.py
+.. literalinclude:: /projection_examples.py
     :language: build123d
     :start-after: [shape_emboss]
     :end-before: [shape_emboss]
@@ -36,10 +36,10 @@ plate lands on the plate's top and on its underside; cast onto a stepped
 part it lands on each step and on each face behind it. ``hit`` says which to
 keep.
 
-.. image:: ../assets/projection/shape_hits.svg
+.. image:: /assets/projection/shape_hits.svg
     :align: center
 
-.. literalinclude:: ../projection_examples.py
+.. literalinclude:: /projection_examples.py
     :language: build123d
     :start-after: [shape_hits]
     :end-before: [shape_hits]
@@ -75,10 +75,10 @@ An edge or wire projects the same way and comes back as edges or wires on
 the surface, nearest first. ``Hit.NEAREST`` picks the near side of a drum,
 where ``Hit.ALL`` would give the far side too.
 
-.. image:: ../assets/projection/shape_curve.svg
+.. image:: /assets/projection/shape_curve.svg
     :align: center
 
-.. literalinclude:: ../projection_examples.py
+.. literalinclude:: /projection_examples.py
     :language: build123d
     :start-after: [shape_curve]
     :end-before: [shape_curve]

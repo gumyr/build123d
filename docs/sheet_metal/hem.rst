@@ -13,7 +13,7 @@ A hem is really a flange folded through 180 degrees, and ``hem`` takes the same
 rims a :ref:`flange <sheet_metal_flange>` does. What distinguishes hems from
 each other is the profile of the fold, named by ``HemType``.
 
-.. image:: ../assets/sheet_metal/hem_types.svg
+.. image:: /assets/sheet_metal/hem_types.svg
     :align: center
 
 =============  =================================================================
@@ -34,7 +34,7 @@ Type           Profile and when to use it
                and where a rounded edge is wanted.
 =============  =================================================================
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [hem_types]
     :end-before: [hem_types]

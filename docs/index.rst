@@ -25,7 +25,7 @@
 
 .. highlight:: python
 
-.. image:: ./assets/build123d_logo/logo-banner.svg
+.. image:: /assets/build123d_logo/logo-banner.svg
   :align: center
   :alt: build123d logo
 
@@ -56,7 +56,7 @@ Python code—as demonstrated by the tea cup example below.
 
 .. dropdown:: Teacup Example
 
-    .. literalinclude:: ../examples/tea_cup.py
+    .. literalinclude:: /../examples/tea_cup.py
         :language: build123d
         :start-after: [Code]
         :end-before: [End]

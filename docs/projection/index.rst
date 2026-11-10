@@ -9,7 +9,7 @@ part's outline onto a drawing sheet, a label onto a curved surface, a path
 onto the ground beneath it. build123d has three projections, told apart by
 what they project onto and what comes back.
 
-.. image:: ../assets/projection/shape_hits.svg
+.. image:: /assets/projection/shape_hits.svg
     :align: center
 
 .. list-table::

@@ -78,7 +78,7 @@ drawn face has a normal, and positive bend angles fold toward it. In section,
 with the drawn face as the horizontal line and a bend folded toward its
 normal, the four choices put the material here:
 
-.. image:: ../assets/sheet_surfaces.svg
+.. image:: /assets/sheet_surfaces.svg
     :align: center
 
 =============  ==================  ====================================

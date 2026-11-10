@@ -229,7 +229,7 @@ bd_materials uses the material and the finish to determine the appropriate physi
 
     show(box, lid, hinge_outer, hinge_inner, m6_screw)
 
-.. image:: assets/pbr_hinges_brass.png
+.. image:: /assets/pbr_hinges_brass.png
     :alt: pbr_hinges_brass
 
 ***********************************
@@ -245,7 +245,7 @@ Step 5: External viewers (optional)
 
 The file ``"box.glb"`` can then be visualized in any glTF viewer, e.g. here the `Khronos glTF viewer <https://github.khronos.org/glTF-Sample-Viewer-Release>`_:
 
-.. image:: assets/pbr_external_viewer.png
+.. image:: /assets/pbr_external_viewer.png
     :alt: pbr_external_viewer
 
 
@@ -278,7 +278,7 @@ Appendix 1: Custom materials
 
     show(box, lid, hinge_outer, hinge_inner, m6_screw)
 
-.. image:: assets/pbr_hinges_carbon.png
+.. image:: /assets/pbr_hinges_carbon.png
     :alt: pbr_hinges_carbon
 
 .. code-block:: python

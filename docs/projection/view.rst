@@ -9,10 +9,10 @@ seen from a viewpoint, split by hidden-line removal into those in sight and
 those behind the shape's own surface. Whatever it is given, a solid, a
 compound of parts or a single face, it returns edges.
 
-.. image:: ../assets/projection/view_basic.svg
+.. image:: /assets/projection/view_basic.svg
     :align: center
 
-.. literalinclude:: ../projection_examples.py
+.. literalinclude:: /projection_examples.py
     :language: build123d
     :start-after: [view_basic]
     :end-before: [view_basic]
@@ -31,7 +31,7 @@ Making a drawing
 The edges lie in the plane of the view and go straight into the SVG or DXF
 exporters, hidden lines on their own layer so they can be dotted.
 
-.. literalinclude:: ../projection_examples.py
+.. literalinclude:: /projection_examples.py
     :language: build123d
     :start-after: [view_export]
     :end-before: [view_export]

@@ -28,7 +28,7 @@ the perimeter of the surface and a central point on that surface.
 To create the perimeter, we'll define the perimeter edges. Since the heart is
 symmetric, we'll only create half of its surface here:
 
-.. literalinclude:: heart_token.py
+.. literalinclude:: /heart_token.py
     :language: build123d
     :start-after: [Code]
     :end-before: [SurfaceEdges]
@@ -36,25 +36,25 @@ symmetric, we'll only create half of its surface here:
 Note that ``l4`` is not in the same plane as the other lines; it defines the center line
 of the heart and archs up off ``Plane.XY``.
 
-.. image:: ./assets/surface_modeling/token_heart_perimeter.png
+.. image:: /assets/surface_modeling/token_heart_perimeter.png
   :align: center
   :alt: token perimeter
 
 In preparation for creating the surface, we'll define a point on the surface:
 
-.. literalinclude:: heart_token.py
+.. literalinclude:: /heart_token.py
     :language: build123d
     :start-after: [SurfaceEdges]
     :end-before: [SurfacePoint]
 
 We will then use this point to create a non-planar ``Face``:
 
-.. literalinclude:: heart_token.py
+.. literalinclude:: /heart_token.py
     :language: build123d
     :start-after: [SurfacePoint]
     :end-before: [Surface]
 
-.. image:: ./assets/surface_modeling/token_half_surface.png
+.. image:: /assets/surface_modeling/token_half_surface.png
   :align: center
   :alt: token perimeter
 
@@ -65,7 +65,7 @@ side is up, which isn't necessary but helps with viewing.
 Now that one half of the top of the heart has been created, the remainder of the top
 and bottom can be created by mirroring:
 
-.. literalinclude:: heart_token.py
+.. literalinclude:: /heart_token.py
     :language: build123d
     :start-after: [Surface]
     :end-before: [Surfaces]
@@ -73,12 +73,12 @@ and bottom can be created by mirroring:
 The sides of the heart are going to be created by extruding the outside of the perimeter
 as follows:
 
-.. literalinclude:: heart_token.py
+.. literalinclude:: /heart_token.py
     :language: build123d
     :start-after: [Surfaces]
     :end-before: [Sides]
 
-.. image:: ./assets/surface_modeling/token_sides.png
+.. image:: /assets/surface_modeling/token_sides.png
   :align: center
   :alt: token sides
 
@@ -86,12 +86,12 @@ With the top, bottom, and sides, the complete boundary of the object is defined.
 now put them together, first into a :class:`~topology.Shell` and then into a
 :class:`~topology.Solid`:
 
-.. literalinclude:: heart_token.py
+.. literalinclude:: /heart_token.py
     :language: build123d
     :start-after: [Sides]
     :end-before: [Solid]
 
-.. image:: ./assets/surface_modeling/token_heart_solid.png
+.. image:: /assets/surface_modeling/token_heart_solid.png
   :align: center
   :alt: token heart solid
 
@@ -104,7 +104,7 @@ now put them together, first into a :class:`~topology.Shell` and then into a
 Finally, we'll create the frame around the heart as a simple extrusion of a planar
 shape defined by the perimeter of the heart and merge all of the components together:
 
-.. literalinclude:: heart_token.py
+.. literalinclude:: /heart_token.py
     :language: build123d
     :start-after: [Solid]
     :end-before: [End]

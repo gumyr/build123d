@@ -11,10 +11,10 @@ material is: entirely to one side of the shell for ``INSIDE`` and ``OUTSIDE``,
 straddling it for ``MID`` and ``NEUTRAL``. The result is the part you export,
 measure, assemble with others, or subtract from.
 
-.. image:: ../assets/sheet_metal/thicken_basic.svg
+.. image:: /assets/sheet_metal/thicken_basic.svg
     :align: center
 
-.. literalinclude:: ../sheet_metal_examples.py
+.. literalinclude:: /sheet_metal_examples.py
     :language: build123d
     :start-after: [thicken_basic]
     :end-before: [thicken_basic]
