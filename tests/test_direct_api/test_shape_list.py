@@ -121,6 +121,36 @@ class TestShapeList(unittest.TestCase):
         self.assertEqual(len(box.edges().filter_by(Axis.X)), 4)
         self.assertEqual(len(box.vertices().filter_by(Axis.X)), 0)
 
+    def test_filter_by_axis_cylinder(self):
+        faces = Solid.make_cylinder(1, 2, Plane.YZ).faces()  # axis along X
+        along = faces.filter_by(Axis.X)
+        self.assertEqual(len(along), 3)  # the two caps and the cylinder
+        self.assertEqual(len(along.filter_by(GeomType.CYLINDER)), 1)
+        self.assertEqual(len(faces.filter_by(Axis.Z)), 0)
+        self.assertEqual(len(faces.filter_by(Axis.X, reverse=True)), 0)
+        # anti-parallel and offset axes match too
+        self.assertEqual(len(faces.filter_by(Axis((5, 5, 5), (-1, 0, 0)))), 3)
+
+    def test_filter_by_axis_of_rotation(self):
+        spline = Edge.make_spline([(1, 0, 0), (2, 0, 1), (1, 0, 2)])
+        for name, shape in {
+            "cone": Solid.make_cone(2, 1, 2, Plane.YZ),
+            "sphere": Solid.make_sphere(1, Plane.YZ),
+            "torus": Solid.make_torus(3, 1, Plane.YZ),
+            "revolution": Plane.YZ * Face.revolve(spline, 360, Axis.Z),
+        }.items():
+            with self.subTest(surface=name):
+                curved = shape.faces().filter_by(GeomType.PLANE, reverse=True)
+                self.assertEqual(len(curved), 1)
+                self.assertEqual(len(curved.filter_by(Axis.X)), 1)
+                self.assertEqual(len(curved.filter_by(Axis.Z)), 0)
+        # a face with no axis of rotation is never matched
+        freeform = Face.make_surface_from_array_of_points(
+            [[(0, 0, 0), (0, 1, 1)], [(1, 0, 1), (1, 1, 0)]]
+        )
+        for axis in (Axis.X, Axis.Y, Axis.Z):
+            self.assertEqual(len(ShapeList([freeform]).filter_by(axis)), 0)
+
     def test_filter_by_plane(self):
         c1 = Cylinder(1, 3)
         c2 = Cylinder(1, 3, rotation=(90, 0, 0))

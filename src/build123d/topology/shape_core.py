@@ -3958,8 +3958,10 @@ class ShapeList(list[T]):
         """filter by
 
         Either:
-        - filter objects of type planar Face or linear Edge by their normal or tangent
-        (respectively) and sort the results by the given axis, or
+        - filter objects of type planar Face, Face with an axis of rotation (cylinder,
+        cone, sphere, torus or surface of revolution) or linear Edge by their normal,
+        axis of rotation or tangent (respectively) and sort the results by the given
+        axis, or
         - filter the objects by the provided type. Note that not all types apply to all
         objects.
 
@@ -3998,6 +4000,8 @@ class ShapeList(list[T]):
                         surface_normal.X(), surface_normal.Y(), surface_normal.Z()
                     ).normalized()
                     shape_axis = Axis(shape.center(), normalized_surface_normal)
+                elif getattr(shape, "axis_of_rotation", None) is not None:
+                    shape_axis = getattr(shape, "axis_of_rotation")
                 elif (
                     isinstance(shape.wrapped, TopoDS_Edge)
                     and shape.geom_type == GeomType.LINE
