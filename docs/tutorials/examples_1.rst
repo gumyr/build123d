@@ -20,112 +20,112 @@ Most of the examples show the builder and algebra modes.
 .. grid:: 3
 
     .. grid-item-card:: Benchy |Builder|
-        :img-top:  assets/examples/thumbnail_benchy_01.png
+        :img-top:  /assets/examples/thumbnail_benchy_01.png
         :link: examples-benchy
         :link-type: ref
 
     .. grid-item-card:: Bicycle Tire |Builder|
-        :img-top:  assets/examples/bicycle_tire.png
+        :img-top:  /assets/examples/bicycle_tire.png
         :link: examples-bicycle_tire
         :link-type: ref
 
     .. grid-item-card:: Bracelet |Algebra|
-        :img-top:  assets/examples/bracelet.png
+        :img-top:  /assets/examples/bracelet.png
         :link: examples-bracelet
         :link-type: ref
 
     .. grid-item-card:: Canadian Flag Blowing in The Wind |Builder| |Algebra|
-            :img-top: assets/examples/example_canadian_flag_01.png
+            :img-top: /assets/examples/example_canadian_flag_01.png
             :link: examples-canadian_flag
             :link-type: ref
 
     .. grid-item-card:: Cast Bearing Unit |Builder|
-            :img-top: assets/examples/cast_bearing_unit.png
+            :img-top: /assets/examples/cast_bearing_unit.png
             :link: examples-cast_bearing_unit
             :link-type: ref
 
     .. grid-item-card:: Circuit Board With Holes |Builder| |Algebra|
-            :img-top: assets/examples/thumbnail_circuit_board_01.png
+            :img-top: /assets/examples/thumbnail_circuit_board_01.png
             :link: examples-circuit_board
             :link-type: ref
 
     .. grid-item-card:: Clock Face |Builder| |Algebra|
-            :img-top: assets/examples/clock_face.png
+            :img-top: /assets/examples/clock_face.png
             :link: clock_face
             :link-type: ref
 
     .. grid-item-card:: Fast Grid Holes |Algebra|
-            :img-top: assets/examples/fast_grid_holes.png
+            :img-top: /assets/examples/fast_grid_holes.png
             :link: fast_grid_holes
             :link-type: ref
 
     .. grid-item-card:: Handle |Builder| |Algebra|
-            :img-top: assets/examples/handle.png
+            :img-top: /assets/examples/handle.png
             :link: handle
             :link-type: ref
 
     .. grid-item-card:: Heat Exchanger |Builder| |Algebra|
-            :img-top: assets/examples/heat_exchanger.png
+            :img-top: /assets/examples/heat_exchanger.png
             :link: heat_exchanger
             :link-type: ref
 
     .. grid-item-card:: Key Cap |Builder| |Algebra|
-            :img-top: assets/examples/key_cap.png
+            :img-top: /assets/examples/key_cap.png
             :link: key_cap
             :link-type: ref
 
     .. grid-item-card:: (former) build123d Logo |Builder| |Algebra|
-            :img-top: assets/examples/thumbnail_build123d_logo_01.png
+            :img-top: /assets/examples/thumbnail_build123d_logo_01.png
             :link: examples-build123d_logo
             :link-type: ref
 
     .. grid-item-card:: Maker Coin |Builder|
-            :img-top: assets/examples/maker_coin.png
+            :img-top: /assets/examples/maker_coin.png
             :link: maker_coin
             :link-type: ref
 
     .. grid-item-card:: Multi-Sketch Loft |Builder| |Algebra|
-            :img-top: assets/examples/loft.png
+            :img-top: /assets/examples/loft.png
             :link: multi_sketch_loft
             :link-type: ref
 
     .. grid-item-card:: Peg Board J Hook |Builder|  |Algebra|
-            :img-top: assets/examples/peg_board_hook.png
+            :img-top: /assets/examples/peg_board_hook.png
             :link: peg_board_hook
             :link-type: ref
 
     .. grid-item-card:: Platonic Solids |Algebra|
-            :img-top: assets/examples/platonic_solids.png
+            :img-top: /assets/examples/platonic_solids.png
             :link: platonic_solids
             :link-type: ref
 
     .. grid-item-card:: Playing Cards |Builder|
-            :img-top: assets/examples/playing_cards.png
+            :img-top: /assets/examples/playing_cards.png
             :link: playing_cards
             :link-type: ref
 
     .. grid-item-card:: Spring |Algebra|
-            :img-top: assets/examples/spring.svg
+            :img-top: /assets/examples/spring.svg
             :link: spring
             :link-type: ref
 
     .. grid-item-card:: Stud Wall |Algebra|
-            :img-top: assets/examples/stud_wall.png
+            :img-top: /assets/examples/stud_wall.png
             :link: stud_wall
             :link-type: ref
 
     .. grid-item-card:: Tea Cup |Builder| |Algebra|
-            :img-top: assets/examples/tea_cup.png
+            :img-top: /assets/examples/tea_cup.png
             :link: tea_cup
             :link-type: ref
 
     .. grid-item-card:: Toy Truck |Builder|
-            :img-top: assets/examples/toy_truck.png
+            :img-top: /assets/examples/toy_truck.png
             :link: toy_truck
             :link-type: ref
 
     .. grid-item-card:: Vase |Builder| |Algebra|
-            :img-top: assets/examples/vase.png
+            :img-top: /assets/examples/vase.png
             :link: vase
             :link-type: ref
 
@@ -133,7 +133,7 @@ Most of the examples show the builder and algebra modes.
 
 .. TODO: Copy this block to add the example thumbnails here
     .. grid-item-card:: name-of-your-example-with-spaces |Builder| |Algebra|
-            :img-top: assets/examples/thumbnail_{name-of-your-example}_01.{extension}
+            :img-top: /assets/examples/thumbnail_{name-of-your-example}_01.{extension}
             :link: examples-{name-of-your-example}
             :link-type: ref
 

@@ -6,7 +6,7 @@ operations. A selector names a kind of feature, operators refine the list, and t
 criteria they refine by come in three kinds: what a feature is (its type, size and
 direction), how it sits in its shape (its convexity, its neighbours, the route it was
 selected by), and when it came to be (``Select.LAST`` and ``Select.NEW``, read from
-the record every operation leaves on its result). See :doc:`topology_selection` for
+the record every operation leaves on its result). See :doc:`/how_to/topology_selection` for
 the full account.
 
 Quick Reference
@@ -69,7 +69,7 @@ GeomType and Convexity are python Enum classes described here:
     PARABOLA, PLANE, REVOLUTION, SPHERE, TORUS
 :class:`~build_enums.Convexity`
     CONVEX, CONCAVE, SMOOTH, SADDLE - how the shape an element was selected from sits
-    around it, see :doc:`topology_selection` for the definitions
+    around it, see :doc:`/how_to/topology_selection` for the definitions
 
 
 ShapeList Class

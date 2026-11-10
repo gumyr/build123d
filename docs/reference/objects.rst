@@ -542,7 +542,7 @@ Reference
 Text
 ----
 
-.. include:: /objects/text.rst
+.. include:: /reference/objects/text.rst
 
 
 Custom Objects

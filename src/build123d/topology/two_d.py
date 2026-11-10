@@ -2537,7 +2537,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
             For example, make a series of slots on the curved walls of a cylinder.
 
-        .. image:: slotted_cylinder.png
+        .. image:: /slotted_cylinder.png
 
         Args:
           interior_wires: a list of hole outline wires

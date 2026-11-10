@@ -12,10 +12,15 @@ and other elements that define the boundary of an object. When creating objects 
 non-planar faces, it is often more convenient to explicitly create the boundary faces of
 the object. To illustrate this process, we will create the following game token:
 
+.. The viewer's poster is read from _images, so the picture has to be used
+   by an image directive to be copied there. This definition is never shown.
+
+.. |heart_token_poster| image:: /assets/surface_modeling/heart_token.png
+
 .. raw:: html
 
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-    <model-viewer poster="_images/heart_token.png" src="_static/heart_token.glb" alt="Game Token" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
+    <model-viewer poster="../_images/heart_token.png" src="../_static/heart_token.glb" alt="Game Token" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
 
 Useful :class:`~topology.Face` creation methods include
 :meth:`~topology.Face.make_surface`, :meth:`~topology.Face.make_bezier_surface`,

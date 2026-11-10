@@ -21,8 +21,8 @@ and the :ref:`explanation <explanation>` do that.
     cheat_sheet.rst
     objects.rst
     operations.rst
-    Sheet Metal Reference <sheet_metal/reference.rst>
-    Projection Reference <projection/reference.rst>
+    Sheet Metal Reference <sheet_metal.rst>
+    Projection Reference <projection.rst>
     builder_api_reference.rst
     direct_api_reference.rst
     external.rst

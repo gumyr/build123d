@@ -86,11 +86,11 @@ Table Of Contents
 .. toctree::
     :maxdepth: 2
 
-    getting_started.rst
-    tutorials.rst
-    how_to.rst
-    reference.rst
-    explanation.rst
+    getting_started/index.rst
+    tutorials/index.rst
+    how_to/index.rst
+    reference/index.rst
+    explanation/index.rst
 
 ==================
 Indices and tables

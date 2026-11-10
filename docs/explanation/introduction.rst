@@ -275,4 +275,4 @@ integrated with code management tools.
 Advantages Over CadQuery
 ************************
 
-.. include:: /advantages.rst
+.. include:: /explanation/advantages.rst

@@ -39,6 +39,6 @@ To use the model outside of Python, export it:
     export_stl(box, "box.stl")
 
 STEP keeps the exact geometry for other CAD tools and STL is the usual input
-for a 3D printing slicer; :doc:`import_export` covers the other formats.
+for a 3D printing slicer; :doc:`/how_to/import_export` covers the other formats.
 
 :ref:`where_next` suggests what to read from here.
