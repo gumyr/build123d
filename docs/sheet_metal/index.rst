@@ -129,9 +129,9 @@ and what it refuses.
         Take a solid sheet-metal part apart into its two surfaces and its
         thickness.
 
-*********************
-Recipes and reference
-*********************
+*******
+Recipes
+*******
 
 .. grid:: 1 2 2 2
     :gutter: 3
@@ -142,13 +142,6 @@ Recipes and reference
 
         Short worked answers to the things a part usually needs: a tab out of
         a slot, a flared leg, a cut across a bend.
-
-    .. grid-item-card:: Reference
-        :link: sheet_metal_reference
-        :link-type: ref
-
-        ``BuildSheet``, ``SheetMetalParameters``, the enums and every
-        operation's full signature.
 
 .. toctree::
     :hidden:
@@ -167,4 +160,4 @@ Recipes and reference
     thicken
     sheet_shells
     recipes
-    reference
+    ../build_sheet

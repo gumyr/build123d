@@ -1,3 +1,5 @@
+.. _tutorials:
+
 #########
 Tutorials
 #########
@@ -9,6 +11,7 @@ as later tutorials build on the concepts introduced in earlier ones.
 .. toctree::
     :maxdepth: 2
 
+    introductory_examples.rst
     tutorial_design.rst
     tutorial_selectors.rst
     tutorial_constraints.rst

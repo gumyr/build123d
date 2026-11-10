@@ -86,30 +86,11 @@ Table Of Contents
 .. toctree::
     :maxdepth: 2
 
-    introduction.rst
-    installation.rst
-    key_concepts.rst
-    key_concepts_builder.rst
-    key_concepts_algebra.rst
-    moving_objects.rst
-    OpenSCAD.rst
-    introductory_examples.rst
+    getting_started.rst
     tutorials.rst
-    objects.rst
-    operations.rst
-    topology_selection.rst
-    builders.rst
-    sheet_metal/index.rst
-    projection/index.rst
-    joints.rst
-    assemblies.rst
-    tips.rst
-    import_export.rst
-    advanced.rst
-    cheat_sheet.rst
-    external.rst
-    builder_api_reference.rst
-    direct_api_reference.rst
+    how_to.rst
+    reference.rst
+    explanation.rst
 
 ==================
 Indices and tables

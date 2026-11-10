@@ -79,15 +79,6 @@ Operations
         ``wrap_faces`` and ``project_faces``: a row of letters laid along a
         curve on a surface.
 
-.. grid:: 1 2 2 2
-    :gutter: 3
-
-    .. grid-item-card:: Reference
-        :link: projection_reference
-        :link-type: ref
-
-        Every signature, the ``Hit`` enum and ``DrawingViewOutput``.
-
 .. toctree::
     :hidden:
 
@@ -95,4 +86,3 @@ Operations
     shape
     view
     faces
-    reference
