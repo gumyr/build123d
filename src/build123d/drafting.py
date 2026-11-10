@@ -264,11 +264,17 @@ class Draft:
             return_value = f"{measurement}{unit_str}{tolerance_str}"
         else:
             whole_part = floor(number / IN)
+            numerator = round((number / IN - whole_part) * self.fractional_precision)
+            if numerator == self.fractional_precision:
+                # The fraction rounded up to a whole inch, carry it over
+                whole_part += 1
+                numerator = 0
             numerator, denominator = simplify_fraction(
-                round((number / IN - whole_part) * self.fractional_precision),
-                self.fractional_precision,
+                numerator, self.fractional_precision
             )
-            if whole_part == 0:
+            if numerator == 0:
+                return_value = f"{whole_part}{unit_str}{tolerance_str}"
+            elif whole_part == 0:
                 return_value = f"{numerator}/{denominator}{unit_str}{tolerance_str}"
             else:
                 return_value = (
