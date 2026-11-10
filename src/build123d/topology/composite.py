@@ -981,11 +981,13 @@ class Compound(Mixin3D[TopoDS_Compound]):
         compound = _make_topods_compound_from_shapes([c.wrapped for c in self.children])
         compound.Location(self._wrapped.Location())
         self._wrapped = compound
+        self._stale = False
 
     def _post_attach(self, parent: Compound):
         """Method call after attaching to `parent`."""
         logger.debug("Updated parent of %s to %s", self.label, parent.label)
         parent._rebuild_from_children()
+        parent._mark_ancestors_stale()
 
     def _post_attach_children(self, children: Iterable[Shape]):
         """Method call after attaching `children`."""
@@ -993,6 +995,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             kids = ",".join([child.label for child in children])
             logger.debug("Adding children %s to %s", kids, self.label)
             self._rebuild_from_children()
+            self._mark_ancestors_stale()
         # else:
         #     logger.debug("Adding no children to %s", self.label)
 
@@ -1001,6 +1004,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         if parent.children:
             parent._rebuild_from_children()
+        parent._mark_ancestors_stale()
         # else:
         #     parent.wrapped = None
 
@@ -1010,6 +1014,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             kids = ",".join([child.label for child in children])
             logger.debug("Removing children %s from %s", kids, self.label)
             self._rebuild_from_children()
+            self._mark_ancestors_stale()
         # else:
         #     logger.debug("Removing no children from %s", self.label)
 
