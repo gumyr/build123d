@@ -6,7 +6,7 @@ Cheat Sheet
 
 .. card:: Stateful Contexts
 
-    | :class:`~build_line.BuildLine` :class:`~build_part.BuildPart` :class:`~build_sketch.BuildSketch`
+    | :class:`~build_line.BuildLine` :class:`~build_part.BuildPart` :class:`~build_sheet.BuildSheet` :class:`~build_sketch.BuildSketch`
     | :class:`~build_common.GridLocations` :class:`~build_common.HexLocations` :class:`~build_common.Locations` :class:`~build_common.PolarLocations`
 
 .. card:: Objects
@@ -127,6 +127,19 @@ Cheat Sheet
             | :func:`~operations_generic.sweep`
             | :func:`~operations_part.thicken`
 
+        .. grid-item-card:: Sheet - BuildSheet
+
+            | :func:`~operations_sheet.bend`
+            | :func:`~operations_sheet.bend_relief`
+            | :func:`~operations_sheet.corner_relief`
+            | :func:`~operations_sheet.flange`
+            | :func:`~operations_sheet.hem`
+            | :func:`~operations_sheet.jog`
+            | :func:`~operations_sheet.miter`
+            | :func:`~operations_sheet.sheet_shells`
+            | :func:`~operations_part.thicken`
+            | :func:`~operations_sheet.unfold`
+
 .. card:: Selectors
 
     .. grid:: 3
@@ -230,7 +243,7 @@ Cheat Sheet
     +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
     | \&       | :class:`~geometry.Axis`  \| :class:`~geometry.Location` \| :class:`~geometry.Plane` \| ``VectorLike`` \| :class:`~topology.Shape`       | Intersect                   |
     +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
-    | \*       | :class:`~geometry.Shape` \| :class:`~geometry.Location` \| Iterable[:class:`~geometry.Location`]                                        | Relocate                    |
+    | \*       | :class:`~topology.Shape` \| :class:`~geometry.Location` \| Iterable[:class:`~geometry.Location`]                                        | Relocate                    |
     +----------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------+
 
 .. card:: Vector Operators
@@ -252,9 +265,9 @@ Cheat Sheet
     +----------+-----------------------------+-------------------------------------+
     | Operator | Operand                     | Method                              |
     +==========+=============================+=====================================+
-    | \+       | :class:`~topology.Vertex`   | :meth:`~topology.Vertex.add`        |
+    | \+       | :class:`~topology.Vertex`   | :meth:`~topology.Vertex.__add__`    |
     +----------+-----------------------------+-------------------------------------+
-    | \-       | :class:`~topology.Vertex`   | :meth:`~topology.Vertex.sub`        |
+    | \-       | :class:`~topology.Vertex`   | :meth:`~topology.Vertex.__sub__`    |
     +----------+-----------------------------+-------------------------------------+
 
 .. card:: Enums

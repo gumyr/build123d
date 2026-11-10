@@ -74,10 +74,14 @@ Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~top
 .. autoclass:: Vertex
    :special-members: __add__, __sub__
 .. autoclass:: DrawingViewOutput
+.. autoclass:: UVFrame
 .. autoclass:: Curve
    :special-members: __matmul__, __mod__
 .. autoclass:: Part
 .. autoclass:: Sketch
+
+.. autofunction:: new_edges
+.. autofunction:: topo_distance_to
 
 
 *************

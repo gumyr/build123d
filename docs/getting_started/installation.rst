@@ -2,6 +2,8 @@
 Installation
 ############
 
+build123d requires Python 3.11 to 3.14.
+
 The recommended method for most users to install **build123d** is:
 
 .. doctest::
@@ -85,7 +87,7 @@ the OCP stubs as follows:
 
 .. doctest::
 
-	>>> python3 -m pip install git+https://github.com/CadQuery/OCP-stubs@7.7.0
+	>>> python3 -m pip install "build123d[stubs]"
 
 Test your build123d installation:
 ----------------------------------------------

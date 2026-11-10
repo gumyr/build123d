@@ -611,7 +611,7 @@ Allowed constraint objects
 For arc constraints, accepted objects include:
 
 - :class:`~topology.Edge` and :class:`~geometry.Axis` as curve-tangency targets
-- :class:`~geometry.Vertex` / :class:`~geometry.VectorLike` as point-incidence targets
+- :class:`~topology.Vertex` / ``VectorLike`` as point-incidence targets
 - optional qualifier wrapper: ``(object, Tangency.XXX)``
 
 ConstrainedLines

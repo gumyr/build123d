@@ -8,7 +8,7 @@ The build123d Examples
 Overview
 --------------------------------
 
-In the GitHub repository you will find an `examples folder <https://github.com/42sol-eu/build123d/tree/examples>`_.
+In the GitHub repository you will find an `examples folder <https://github.com/gumyr/build123d/tree/dev/examples>`_.
 
 Most of the examples show the builder and algebra modes.
 
@@ -155,7 +155,7 @@ modify it by replacing chimney with a BREP version.
 - Benchy STL model: :download:`low_poly_benchy.stl </../examples/low_poly_benchy.stl>`
 
 
-.. note
+.. note::
 
      *Attribution:*
      The low-poly-benchy used in this example is by `reddaugherty`, see

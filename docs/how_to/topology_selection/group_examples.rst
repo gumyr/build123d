@@ -66,7 +66,7 @@ Properties with Keys
 Groups are usually selected by list slice, often smallest ``[0]`` or largest ``[-1]``,
 but they can also be selected by key with the ``group`` method if the keys are known.
 Starting with an incomplete bearing block we are looking to add fillets to the ribs
-and corners. We know the edge lengths so the edges can be grouped by ``Edge.Length`` and
+and corners. We know the edge lengths so the edges can be grouped by ``Edge.length`` and
 then the desired groups are selected with the ``group`` method using the lengths as keys.
 
 .. dropdown:: Setup

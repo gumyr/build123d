@@ -243,7 +243,7 @@ like a screw combining the functionality of a :class:`~joints.LinearJoint` and a
 ``angle`` parameters as shown below extracted from the joint tutorial.
 
 
-.. code-block::python
+.. code-block:: python
 
     hinge_outer.joints["hole2"].attach(m6_joint, position=5 * MM, angle=30)
 

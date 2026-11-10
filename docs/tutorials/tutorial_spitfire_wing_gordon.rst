@@ -53,7 +53,7 @@ The resulting chord lengths define uniform scales for each airfoil curve.
 Step 3 — Build airfoil profiles (root and tip)
 ==============================================
 
-We place two different NACA airfoils on :data:`Plane.YZ`—with the airfoil origins
+We place two different NACA airfoils on ``Plane.YZ``—with the airfoil origins
 shifted so the leading edge fraction is aligned—then scale to the chord lengths
 from Step 2.
 

@@ -179,14 +179,14 @@ that have setters and getters as shown below:
     >>> b = Box(1, 1, 1)
     >>> box_location = b.location
     >>> box_location
-    (p=(0.00, 0.00, 0.00), o=(-0.00, 0.00, -0.00))
+    Location((0, 0, 0), (0, 0, 0))
     >>> # Set position and orientation independently
     >>> box_location.position = (1, 2, 3)
     >>> box_location.orientation = (30, 40, 50)
     >>> box_location.position
-    Vector: (1.0, 2.0, 3.0)
+    Vector(1, 2, 3)
     >>> box_location.orientation
-    Vector: (29.999999999999993, 40.00000000000002, 50.000000000000036)
+    Vector(30, 40, 50)
 
 Combining the getter and setter enables relative changes as follows:
 
@@ -195,7 +195,7 @@ Combining the getter and setter enables relative changes as follows:
     >>> # Relative change
     >>> box_location.position += (3, 2, 1)
     >>> box_location.position
-    Vector: (4.0, 4.0, 4.0)
+    Vector(4, 4, 4)
 
 There are also four methods that are used to change the location of objects:
 

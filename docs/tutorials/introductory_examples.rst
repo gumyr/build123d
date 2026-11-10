@@ -1163,7 +1163,7 @@ angles so their effects are easy to compare.
     The first box applies a :class:`~geometry.Rot` through a
     :class:`~build_common.Locations` context. The second uses the object's
     ``rotation`` parameter. The third is created privately, rotated with
-    :meth:`~topology.Shape.rotate` around :attr:`~geometry.Axis.Z`, and then
+    :meth:`~topology.Shape.rotate` around ``Axis.Z``, and then
     added at its location. The final box passes a rotated
     :class:`~geometry.Location` directly to :class:`~build_part.BuildPart`.
 

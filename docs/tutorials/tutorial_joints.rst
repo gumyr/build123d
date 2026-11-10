@@ -53,14 +53,14 @@ Step 3: Add Joints to the Hinge Leaf
 
 The hinge includes five joints:
 
-* A :class:`~topology.RigidJoint` to attach the leaf
-* A :class:`~topology.RigidJoint` or :class:`~topology.RevoluteJoint` as the hinge Axis
-* Three :class:`~topology.CylindricalJoint`'s for the countersunk screws
+* A :class:`~joints.RigidJoint` to attach the leaf
+* A :class:`~joints.RigidJoint` or :class:`~joints.RevoluteJoint` as the hinge Axis
+* Three :class:`~joints.CylindricalJoint`'s for the countersunk screws
 
 Step 3a: Leaf Joint
 -------------------
 
-The first joint to add is a :class:`~topology.RigidJoint` that is used to fix the hinge leaf to the box
+The first joint to add is a :class:`~joints.RigidJoint` that is used to fix the hinge leaf to the box
 or lid.
 
 .. literalinclude:: /tutorials/tutorial_joints.py
@@ -77,7 +77,7 @@ why there are two tuples (the orientation listed is rotate about the X axis 90 d
 Step 3b: Hinge Joint
 --------------------
 
-The second joint to add is either a :class:`~topology.RigidJoint` (on the inner leaf) or a :class:`~topology.RevoluteJoint`
+The second joint to add is either a :class:`~joints.RigidJoint` (on the inner leaf) or a :class:`~joints.RevoluteJoint`
 (on the outer leaf) that describes the hinge axis.
 
 .. literalinclude:: /tutorials/tutorial_joints.py
@@ -86,9 +86,9 @@ The second joint to add is either a :class:`~topology.RigidJoint` (on the inner 
     :end-before: [Fastener holes]
     :emphasize-lines: 10-24
 
-The inner leaf just pivots around the outer leaf and therefore the simple :class:`~topology.RigidJoint` is
+The inner leaf just pivots around the outer leaf and therefore the simple :class:`~joints.RigidJoint` is
 used to define the Location of this pivot.  The outer leaf contains the more complex
-:class:`~topology.RevoluteJoint` which defines an axis of rotation and angular limits to that rotation (90
+:class:`~joints.RevoluteJoint` which defines an axis of rotation and angular limits to that rotation (90
 and 270 in this example as the two leaves will interfere with each other outside of this range).
 Note that the maximum angle must be greater than the minimum angle and therefore may be greater
 than 360°. Other types of joints have linear ranges as well as angular ranges.
@@ -96,7 +96,7 @@ than 360°. Other types of joints have linear ranges as well as angular ranges.
 Step 3c: Fastener Joints
 ------------------------
 
-The third set of joints to add are :class:`~topology.CylindricalJoint`'s that describe how the countersunk
+The third set of joints to add are :class:`~joints.CylindricalJoint`'s that describe how the countersunk
 screws used to attach the leaves move.
 
 .. literalinclude:: /tutorials/tutorial_joints.py
@@ -104,7 +104,7 @@ screws used to attach the leaves move.
     :start-after: [Fastener holes]
     :end-before: [End Fastener holes]
 
-Much like the :class:`~topology.RevoluteJoint`, a :class:`~topology.CylindricalJoint` has an Axis of motion but this type
+Much like the :class:`~joints.RevoluteJoint`, a :class:`~joints.CylindricalJoint` has an Axis of motion but this type
 of joint allows both movement around and along this axis - exactly as a screw would move.
 Here is the Axis is setup such that a position of 0 aligns with the screw being fully set
 in the hole and positive numbers indicate the distance the head of the screw is above the
@@ -151,7 +151,7 @@ the joint used to attach the outer hinge leaf.
     :end-before: [Demonstrate that objects with Joints can be moved and the joints follow]
     :emphasize-lines: 13-16
 
-Since the hinge will be fixed to the box another :class:`~topology.RigidJoint` is used mark where the hinge
+Since the hinge will be fixed to the box another :class:`~joints.RigidJoint` is used mark where the hinge
 will go. Note that the orientation of this :class:`~topology.Joint` will control how the hinge leaf is
 attached and is independent of the orientation of the hinge as it was constructed.
 
@@ -173,7 +173,7 @@ property.
 Step 5: Create the Lid
 **********************
 
-Much like the box, the lid is created in a :class:`~build_part.BuildPart` context and is assigned a :class:`~topology.RigidJoint`.
+Much like the box, the lid is created in a :class:`~build_part.BuildPart` context and is assigned a :class:`~joints.RigidJoint`.
 
 .. image:: /tutorials/assets/joints/tutorial_joint_lid.svg
     :align: center
@@ -205,8 +205,8 @@ screw.
     :start-after: [A screw to attach the hinge to the box]
     :end-before: [End of screw creation]
 
-Here a simple :class:`~topology.RigidJoint` is bound to the top of the screw head such that it can be
-connected to the hinge's :class:`~topology.CylindricalJoint`.
+Here a simple :class:`~joints.RigidJoint` is bound to the top of the screw head such that it can be
+connected to the hinge's :class:`~joints.CylindricalJoint`.
 
 ***********************************
 Step 7: Connect the Joints together
@@ -243,7 +243,7 @@ box.
     :start-after: [Connect Hinge Leaves]
     :end-before: [Connect Hinge Leaves]
 
-As ``hinge_outer.joints["hinge_axis"]`` is a :class:`~topology.RevoluteJoint` there is an ``angle``
+As ``hinge_outer.joints["hinge_axis"]`` is a :class:`~joints.RevoluteJoint` there is an ``angle``
 parameter that can be set (angles default to the minimum range value) - here to 120°.
 This is what that looks like:
 

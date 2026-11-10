@@ -199,7 +199,7 @@ By adopting this approach, build123d ensures a natural, intuitive workflow for c
 Builders
 ========
 
-The three builders, ``BuildLine``, ``BuildSketch``, and ``BuildPart`` are tools to create
+The four builders, ``BuildLine``, ``BuildSketch``, ``BuildPart`` and ``BuildSheet`` are tools to create
 new objects - not the objects themselves. Objects and operations used with a builder
 update the builder's running result, while the completed geometry remains available
 through the builder's output properties.
@@ -277,7 +277,7 @@ output is requested or when the builder exits and publishes to its parent.
 Inside the builder, selectors and operations work against the local construction
 result.
 
-This rule applies to all three builders:
+This rule applies to all four builders:
 
 - ``BuildPart`` constructs ``part_local`` in local ``Plane.XY`` coordinates and
   publishes ``part`` to its placements.
@@ -285,6 +285,8 @@ This rule applies to all three builders:
   ``sketch`` to its placements.
 - ``BuildLine`` constructs ``line_local`` in local ``Plane.XY`` coordinates and
   publishes ``line`` to its single placement.
+- ``BuildSheet`` constructs ``sheet_local`` in local ``Plane.XY`` coordinates and
+  publishes ``sheet`` to its placements.
 
 .. code-block:: build123d
 
@@ -414,14 +416,14 @@ nested. A user can retrieve the active local locations:
 
 .. code-block::
 
-    Location(p=(-0.50,-0.50,0.00), o=(0.00,-0.00,0.00))
-    Location(p=(-0.50,0.50,0.00), o=(0.00,-0.00,0.00))
-    Location(p=(0.50,-0.50,0.00), o=(0.00,-0.00,0.00))
-    Location(p=(0.50,0.50,0.00), o=(0.00,-0.00,0.00))
-    Location(p=(-0.50,-0.00,-0.50), o=(90.00,-0.00,0.00))
-    Location(p=(-0.50,0.00,0.50), o=(90.00,-0.00,0.00))
-    Location(p=(0.50,0.00,-0.50), o=(90.00,-0.00,0.00))
-    Location(p=(0.50,0.00,0.50), o=(90.00,-0.00,0.00))
+    Location: (position=(-0.5, -0.5, 0), orientation=(0, 0, 0))
+    Location: (position=(-0.5, 0.5, 0), orientation=(0, 0, 0))
+    Location: (position=(0.5, -0.5, 0), orientation=(0, 0, 0))
+    Location: (position=(0.5, 0.5, 0), orientation=(0, 0, 0))
+    Location: (position=(-0.5, 0, -0.5), orientation=(90, 0, 0))
+    Location: (position=(-0.5, 0, 0.5), orientation=(90, 0, 0))
+    Location: (position=(0.5, 0, -0.5), orientation=(90, 0, 0))
+    Location: (position=(0.5, 0, 0.5), orientation=(90, 0, 0))
 
 
 Operation Inputs

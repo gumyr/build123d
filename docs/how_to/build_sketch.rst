@@ -121,7 +121,7 @@ When using the :func:`~operations_generic.insert` operation to insert an externa
 to a sketch the face will automatically be reoriented to ``Plane.XY`` before being
 combined with the sketch.  As Faces don't provide an x-direction it's possible
 that the new Face may not be oriented as expected. To reorient the Face manually
-to ``Plane.XY`` one can use the :meth:`~geometry.to_local_coords` method as
+to ``Plane.XY`` one can use the :meth:`~geometry.Plane.to_local_coords` method as
 follows:
 
 .. code-block:: build123d

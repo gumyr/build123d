@@ -100,7 +100,7 @@ to 0. The result is faces parallel to the axis or perpendicular to the plane.
 
 .. code-block:: build123d
 
-    part.faces().filter_by(lambda f: abs(f.normal_at().dot(Axis.Z.direction) < 1e-6)
+    part.faces().filter_by(lambda f: abs(f.normal_at().dot(Axis.Z.direction)) < 1e-6)
     part.faces().filter_by(lambda f: abs(f.normal_at().dot(Plane.XY.z_dir)) < 1e-6)
 
 .. figure:: /how_to/assets/topology_selection/filter_dot_axisplane.png

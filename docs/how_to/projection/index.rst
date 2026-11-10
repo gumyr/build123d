@@ -27,7 +27,7 @@ what they project onto and what comes back.
       - the surface of a shape
       - the same kind of thing, lying on that surface, ready to extrude or
         follow
-    * - :meth:`~topology.Shape.drawing_view`
+    * - :meth:`~topology.Mixin3D.drawing_view`
       - a drawing, from a viewpoint
       - always edges, split into visible and hidden
 

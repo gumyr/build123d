@@ -151,7 +151,7 @@ There are a couple ways to generate a 2D drawing of a 3D part:
 
 * Generate a section: The  :func:`~operations_part.section` operation can be used to
   create a 2D cross section of a 3D part at a given plane.
-* Generate a view: The :meth:`~topology.Shape.drawing_view` method can be
+* Generate a view: The :meth:`~topology.Mixin3D.drawing_view` method can be
   used to create a 2D line drawing of a 3D scene. Similar to a camera, the ``viewpoint``
   defines the location of camera, the ``up`` defines the orientation of the camera,
   and the ``look_at`` parameter defined where the camera is pointed.  By default, 
@@ -177,7 +177,7 @@ in this example:
     exporter.add_shape(hidden, layer="Hidden")
     exporter.write("part_projection.svg")
 
-``ExportSVG`` accepts the standard :class:`~geometry.ColorLike` interface for
+``ExportSVG`` accepts the standard ``ColorLike`` interface for
 layer fill and line colors. When a layer color is omitted, a Face color is used
 for its SVG fill and an Edge or Wire color is used for its SVG stroke. An
 explicit layer color, including ``None``, overrides the shape color.
@@ -216,11 +216,13 @@ Enum and are shown in the following diagram:
 .. image:: /how_to/assets/import_export/line_types.svg
     :align: center
 
+.. autoclass:: exporters.LineType
+
 
 ExportDXF
 ---------
 
-``ExportDXF`` accepts the standard :class:`~geometry.ColorLike` interface for
+``ExportDXF`` accepts the standard ``ColorLike`` interface for
 document and layer colors. ColorLike alpha is written as DXF layer transparency.
 True-color black is always ``0x000000``; unlike ACI 7, DXF viewers do not switch
 it to white on dark backgrounds. DXF versions before R2004 have no true color,
@@ -244,19 +246,14 @@ ExportSVG
 .. py:module:: exporters3d
 
 .. autofunction:: export_brep
-   :noindex:
 
 .. autofunction:: export_gltf
-   :noindex:
 
 .. autofunction:: export_obj
-   :noindex:
 
 .. autofunction:: export_step
-   :noindex:
 
 .. autofunction:: export_stl
-   :noindex:
 
 3D Mesh Export
 --------------
@@ -344,9 +341,9 @@ For example:
     )
     print(f"Imported model unit: {importer.model_unit}")
     print(f"{cone.label=}")
-    print(f"{cone.color.to_tuple()=}")
+    print(f"{cone.color=}")
     print(f"{cyl.label=}")
-    print(f"{cyl.color.to_tuple()=}")
+    print(f"{cyl.color=}")
 
 .. code-block:: none
 
