@@ -31,7 +31,7 @@ Align
 2D/Sketch and 3D/Part objects can be aligned relative to themselves, either centered, or justified
 right or left of each Axis. The following diagram shows how this alignment works in 2D:
 
-.. image:: /assets/align.svg
+.. image:: /reference/assets/objects/align.svg
     :align: center
 
 For example:
@@ -78,35 +78,35 @@ active ``Locations`` place 1D objects when they are added to the active builder.
 
     .. grid-item-card:: :class:`~objects_curve.Airfoil`
 
-        .. image:: /assets/example_airfoil.svg
+        .. image:: /reference/assets/objects/example_airfoil.svg
 
         +++
         Airfoil described by 4 digit NACA profile
 
     .. grid-item-card:: :class:`~objects_curve.Bezier`
 
-        .. image:: /assets/bezier_curve_example.svg
+        .. image:: /reference/assets/objects/bezier_curve_example.svg
 
         +++
         Curve defined by control points and weights
 
     .. grid-item-card:: :class:`~objects_curve.BlendCurve`
 
-        .. image:: /assets/example_blend_curve.svg
+        .. image:: /reference/assets/objects/example_blend_curve.svg
 
         +++
         Curve blending curvature of two curves
 
     .. grid-item-card:: :class:`~objects_curve.BSpline`
 
-        .. image:: /assets/example_bspline.svg
+        .. image:: /reference/assets/objects/example_bspline.svg
 
         +++
         B-spline from control points and knot data
 
     .. grid-item-card:: :class:`~objects_curve.CenterArc`
 
-        .. image:: /assets/center_arc_example.svg
+        .. image:: /reference/assets/objects/center_arc_example.svg
 
         +++
         Arc defined by center, radius, & angles
@@ -114,7 +114,7 @@ active ``Locations`` place 1D objects when they are added to the active builder.
 
     .. grid-item-card:: :class:`~objects_curve.ConstrainedArcs`
 
-        .. image:: /assets/constrained_arcs_example.svg
+        .. image:: /reference/assets/objects/constrained_arcs_example.svg
 
         +++
         Arc(s) constrained by other geometric objects
@@ -122,126 +122,126 @@ active ``Locations`` place 1D objects when they are added to the active builder.
 
     .. grid-item-card:: :class:`~objects_curve.ConstrainedLines`
 
-        .. image:: /assets/constrained_lines_example.svg
+        .. image:: /reference/assets/objects/constrained_lines_example.svg
 
         +++
         Line(s) constrained by other geometric objects
 
     .. grid-item-card:: :class:`~objects_curve.DoubleTangentArc`
 
-        .. image:: /assets/double_tangent_line_example.svg
+        .. image:: /reference/assets/objects/double_tangent_line_example.svg
 
         +++
         Arc defined by point/tangent pair & other curve
 
     .. grid-item-card:: :class:`~objects_curve.EllipticalCenterArc`
 
-        .. image:: /assets/elliptical_center_arc_example.svg
+        .. image:: /reference/assets/objects/elliptical_center_arc_example.svg
 
         +++
         Elliptical arc defined by center,  radii & angles
 
     .. grid-item-card:: :class:`~objects_curve.EllipticalStartArc`
 
-        .. image:: /assets/elliptical_start_arc_example.svg
+        .. image:: /reference/assets/objects/elliptical_start_arc_example.svg
 
         +++
         Elliptical arc defined by start, tangent, radii & angles
 
     .. grid-item-card:: :class:`~objects_curve.ParabolicCenterArc`
 
-        .. image:: /assets/parabolic_center_arc_example.svg
+        .. image:: /reference/assets/objects/parabolic_center_arc_example.svg
 
         +++
         Parabolic arc defined by vertex, focal length & angles
 
     .. grid-item-card:: :class:`~objects_curve.HyperbolicCenterArc`
 
-        .. image:: /assets/hyperbolic_center_arc_example.svg
+        .. image:: /reference/assets/objects/hyperbolic_center_arc_example.svg
 
         +++
         Hyperbolic arc defined by center, radii & angles
 
     .. grid-item-card:: :class:`~objects_curve.FilletPolyline`
 
-        .. image:: /assets/filletpolyline_example.svg
+        .. image:: /reference/assets/objects/filletpolyline_example.svg
 
         +++
         Polyline with filleted corners defined by pts and radius
 
     .. grid-item-card:: :class:`~objects_curve.Helix`
 
-        .. image:: /assets/helix_example.svg
+        .. image:: /reference/assets/objects/helix_example.svg
 
         +++
         Helix defined pitch, radius and height
 
     .. grid-item-card:: :class:`~objects_curve.IntersectingLine`
 
-        .. image:: /assets/intersecting_line_example.svg
+        .. image:: /reference/assets/objects/intersecting_line_example.svg
 
         +++
         Intersecting line defined by start, direction & other line
 
     .. grid-item-card:: :class:`~objects_curve.JernArc`
 
-        .. image:: /assets/jern_arc_example.svg
+        .. image:: /reference/assets/objects/jern_arc_example.svg
 
         +++
         Arc define by start point, tangent, radius and angle
 
     .. grid-item-card:: :class:`~objects_curve.Line`
 
-        .. image:: /assets/line_example.svg
+        .. image:: /reference/assets/objects/line_example.svg
 
         +++
         Line defined by end points
 
     .. grid-item-card:: :class:`~objects_curve.PolarLine`
 
-        .. image:: /assets/polar_line_example.svg
+        .. image:: /reference/assets/objects/polar_line_example.svg
 
         +++
         Line defined by start, angle and length
 
     .. grid-item-card:: :class:`~objects_curve.Polyline`
 
-        .. image:: /assets/polyline_example.svg
+        .. image:: /reference/assets/objects/polyline_example.svg
 
         +++
         Multiple line segments defined by points
 
     .. grid-item-card:: :class:`~objects_curve.RadiusArc`
 
-        .. image:: /assets/radius_arc_example.svg
+        .. image:: /reference/assets/objects/radius_arc_example.svg
 
         +++
         Arc defined by two points and a radius
 
     .. grid-item-card:: :class:`~objects_curve.SagittaArc`
 
-        .. image:: /assets/sagitta_arc_example.svg
+        .. image:: /reference/assets/objects/sagitta_arc_example.svg
 
         +++
         Arc defined by two points and a sagitta
 
     .. grid-item-card:: :class:`~objects_curve.Spline`
 
-        .. image:: /assets/spline_example.svg
+        .. image:: /reference/assets/objects/spline_example.svg
 
         +++
         Curve define by points
 
     .. grid-item-card:: :class:`~objects_curve.TangentArc`
 
-        .. image:: /assets/tangent_arc_example.svg
+        .. image:: /reference/assets/objects/tangent_arc_example.svg
 
         +++
         Arc defined by two points and a tangent
 
     .. grid-item-card:: :class:`~objects_curve.ThreePointArc`
 
-        .. image:: /assets/three_point_arc_example.svg
+        .. image:: /reference/assets/objects/three_point_arc_example.svg
 
         +++
         Arc defined by three points
@@ -285,14 +285,14 @@ Reference
 
     .. grid-item-card:: :class:`~drafting.Arrow`
 
-        .. image:: /assets/arrow.svg
+        .. image:: /reference/assets/objects/arrow.svg
 
         +++
         Arrow with head and path for shaft
 
     .. grid-item-card:: :class:`~drafting.ArrowHead`
 
-        .. image:: /assets/arrow_head.svg
+        .. image:: /reference/assets/objects/arrow_head.svg
 
         +++
         Arrow head with multiple types
@@ -300,14 +300,14 @@ Reference
 
     .. grid-item-card:: :class:`~objects_sketch.Circle`
 
-        .. image:: /assets/circle_example.svg
+        .. image:: /reference/assets/objects/circle_example.svg
 
         +++
         Circle defined by radius
 
     .. grid-item-card:: :class:`~drafting.DimensionLine`
 
-        .. image:: /assets/d_line.svg
+        .. image:: /reference/assets/objects/d_line.svg
 
         +++
         Dimension line
@@ -315,105 +315,105 @@ Reference
 
     .. grid-item-card:: :class:`~objects_sketch.Ellipse`
 
-        .. image:: /assets/ellipse_example.svg
+        .. image:: /reference/assets/objects/ellipse_example.svg
 
         +++
         Ellipse defined by major and minor radius
 
     .. grid-item-card:: :class:`~drafting.ExtensionLine`
 
-        .. image:: /assets/e_line.svg
+        .. image:: /reference/assets/objects/e_line.svg
 
         +++
         Extension lines for distance or angles
 
     .. grid-item-card:: :class:`~objects_sketch.Polygon`
 
-        .. image:: /assets/polygon_example.svg
+        .. image:: /reference/assets/objects/polygon_example.svg
 
         +++
         Polygon defined by points
 
     .. grid-item-card:: :class:`~objects_sketch.Rectangle`
 
-        .. image:: /assets/rectangle_example.svg
+        .. image:: /reference/assets/objects/rectangle_example.svg
 
         +++
         Rectangle defined by width and height
 
     .. grid-item-card:: :class:`~objects_sketch.RectangleRounded`
 
-        .. image:: /assets/rectangle_rounded_example.svg
+        .. image:: /reference/assets/objects/rectangle_rounded_example.svg
 
         +++
         Rectangle with rounded corners defined by width, height, and radius
 
     .. grid-item-card:: :class:`~objects_sketch.RegularPolygon`
 
-        .. image:: /assets/regular_polygon_example.svg
+        .. image:: /reference/assets/objects/regular_polygon_example.svg
 
         +++
         RegularPolygon defined by radius and number of sides
 
     .. grid-item-card:: :class:`~objects_sketch.SlotCurve`
 
-        .. image:: /assets/slot_curve_example.svg
+        .. image:: /reference/assets/objects/slot_curve_example.svg
 
         +++
         SlotCurve defined by a center line and height
 
     .. grid-item-card:: :class:`~objects_sketch.SlotCenterPoint`
 
-        .. image:: /assets/slot_center_point_example.svg
+        .. image:: /reference/assets/objects/slot_center_point_example.svg
 
         +++
         SlotCenterPoint defined by two points and a height
 
     .. grid-item-card:: :class:`~objects_sketch.SlotCenterToCenter`
 
-        .. image:: /assets/slot_center_to_center_example.svg
+        .. image:: /reference/assets/objects/slot_center_to_center_example.svg
 
         +++
         SlotCenterToCenter defined by center separation and height
 
     .. grid-item-card:: :class:`~objects_sketch.SlotOverall`
 
-        .. image:: /assets/slot_overall_example.svg
+        .. image:: /reference/assets/objects/slot_overall_example.svg
 
         +++
         SlotOverall defined by end-to-end length and height
 
     .. grid-item-card:: :class:`~objects_sketch.Superellipse`
 
-        .. image:: /assets/superellipse_example.svg
+        .. image:: /reference/assets/objects/superellipse_example.svg
 
         +++
         Superellipse ("squircle") defined by width, height, and order
 
     .. grid-item-card:: :class:`~drafting.TechnicalDrawing`
 
-        .. image:: /assets/tech_drawing.svg
+        .. image:: /reference/assets/objects/tech_drawing.svg
 
         +++
         A technical drawing with descriptions
 
     .. grid-item-card:: :class:`~objects_sketch.Text`
 
-        .. image:: /assets/text_example.svg
+        .. image:: /reference/assets/objects/text_example.svg
 
         +++
         Text defined by string and font parameters
 
     .. grid-item-card:: :class:`~objects_sketch.Trapezoid`
 
-        .. image:: /assets/trapezoid_example.svg
+        .. image:: /reference/assets/objects/trapezoid_example.svg
 
         +++
         Trapezoid defined by width, height and interior angles
 
     .. grid-item-card:: :class:`~objects_sketch.Triangle`
 
-        .. image:: /assets/triangle_example.svg
+        .. image:: /reference/assets/objects/triangle_example.svg
 
         +++
         Triangle defined by one side & two other sides or interior angles
@@ -453,70 +453,70 @@ Reference
 
     .. grid-item-card:: :class:`~objects_part.Box`
 
-        .. image:: /assets/box_example.svg
+        .. image:: /reference/assets/objects/box_example.svg
 
         +++
         Box defined by length, width, height
 
     .. grid-item-card:: :class:`~objects_part.Cone`
 
-        .. image:: /assets/cone_example.svg
+        .. image:: /reference/assets/objects/cone_example.svg
 
         +++
         Cone defined by radii and height
 
     .. grid-item-card:: :class:`~objects_part.ConvexPolyhedron`
 
-        .. image:: /assets/convex_polyhedron_example.svg
+        .. image:: /reference/assets/objects/convex_polyhedron_example.svg
 
         +++
         Convex Polyhedron defined by points
 
     .. grid-item-card:: :class:`~objects_part.CounterBoreHole`
 
-        .. image:: /assets/counter_bore_hole_example.svg
+        .. image:: /reference/assets/objects/counter_bore_hole_example.svg
 
         +++
         Counter bore hole defined by radii and depths
 
     .. grid-item-card:: :class:`~objects_part.CounterSinkHole`
 
-        .. image:: /assets/counter_sink_hole_example.svg
+        .. image:: /reference/assets/objects/counter_sink_hole_example.svg
 
         +++
         Counter sink hole defined by radii and depth and angle
 
     .. grid-item-card:: :class:`~objects_part.Cylinder`
 
-        .. image:: /assets/cylinder_example.svg
+        .. image:: /reference/assets/objects/cylinder_example.svg
 
         +++
         Cylinder defined by radius and height
 
     .. grid-item-card:: :class:`~objects_part.Hole`
 
-        .. image:: /assets/hole_example.svg
+        .. image:: /reference/assets/objects/hole_example.svg
 
         +++
         Hole defined by radius and depth
 
     .. grid-item-card:: :class:`~objects_part.Sphere`
 
-        .. image:: /assets/sphere_example.svg
+        .. image:: /reference/assets/objects/sphere_example.svg
 
         +++
         Sphere defined by radius and arc angles
 
     .. grid-item-card:: :class:`~objects_part.Torus`
 
-        .. image:: /assets/torus_example.svg
+        .. image:: /reference/assets/objects/torus_example.svg
 
         +++
         Torus defined major and minor radii
 
     .. grid-item-card:: :class:`~objects_part.Wedge`
 
-        .. image:: /assets/wedge_example.svg
+        .. image:: /reference/assets/objects/wedge_example.svg
 
         +++
         Wedge defined by lengths along multiple Axes
@@ -600,7 +600,7 @@ is constructed. This validation is provided by the inherited ``_applies_to``
 attribute; most custom objects don't need to set it themselves unless they are
 creating a new base class or intentionally changing the Builder compatibility.
 
-.. image:: /assets/card_box.svg
+.. image:: /reference/assets/objects/card_box.svg
   :align: center
 
 Here is an example of a custom sketch object specially created as part of the design of
@@ -627,5 +627,5 @@ That's it. The ``Club`` object can now be used anywhere a
 :class:`~objects_sketch.Circle` would be used, with either the Algebra or
 Builder API.
 
-.. image:: /assets/buildline_example_6.svg
+.. image:: /how_to/assets/build_line/buildline_example_6.svg
   :align: center

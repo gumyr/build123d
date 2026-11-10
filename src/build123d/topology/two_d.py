@@ -2537,7 +2537,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
             For example, make a series of slots on the curved walls of a cylinder.
 
-        .. image:: /slotted_cylinder.png
+        .. image:: /reference/assets/api/slotted_cylinder.png
 
         Args:
           interior_wires: a list of hole outline wires
@@ -2745,7 +2745,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
         A projection with no taper is illustrated below:
 
-        .. image:: /flatProjection.png
+        .. image:: /reference/assets/api/flatProjection.png
             :alt: flatProjection
 
         The projection meets every surface in its path, so a face cast onto a

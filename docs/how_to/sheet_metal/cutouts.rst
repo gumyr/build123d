@@ -19,10 +19,10 @@ on**. Drawn in ``Mode.SUBTRACT`` it trims that face, so a circle on the
 default plane cuts the base and one placed on a wall's plane cuts the wall.
 Where the shape lies is where it cuts:
 
-.. image:: /assets/sheet_metal/cutout_face.svg
+.. image:: /how_to/assets/sheet_metal/cutout_face.svg
     :align: center
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [cutout_face]
     :end-before: [cutout_face]
@@ -64,10 +64,10 @@ are cutters too, so holes can be placed with the usual location contexts, and
 a cutter built before the context comes in with
 :func:`~operations_generic.insert`:
 
-.. image:: /assets/sheet_metal/cutout_solid.svg
+.. image:: /how_to/assets/sheet_metal/cutout_solid.svg
     :align: center
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [cutout_solid]
     :end-before: [cutout_solid]

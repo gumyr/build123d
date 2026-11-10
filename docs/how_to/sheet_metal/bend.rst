@@ -10,13 +10,13 @@ that has been cut to its outline, with the fold marked as a line across it, and
 folds it there. This is how a fabricator works from a flat pattern: cut the
 blank, then bend along the lines.
 
-.. image:: /assets/sheet_metal/bend_before.svg
+.. image:: /how_to/assets/sheet_metal/bend_before.svg
     :align: center
 
-.. image:: /assets/sheet_metal/bend_basic.svg
+.. image:: /how_to/assets/sheet_metal/bend_basic.svg
     :align: center
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [bend_basic]
     :end-before: [bend_basic]
@@ -49,10 +49,10 @@ shared with another flat.
 The same blank, split down the middle and bent the same way, gives mirror
 images depending on which flat the line was taken through:
 
-.. image:: /assets/sheet_metal/bend_side.svg
+.. image:: /how_to/assets/sheet_metal/bend_side.svg
     :align: center
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [bend_side]
     :end-before: [bend_side]

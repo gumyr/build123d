@@ -46,7 +46,7 @@ The steps involved are:
 Result
 ------
 
-.. image:: /assets/stepper_drawing.svg
+.. image:: /tutorials/assets/tech_drawing/stepper_drawing.svg
    :alt: Stepper motor technical drawing
    :class: align-center
    :width: 80%
@@ -64,7 +64,7 @@ You can modify the script to:
 Code
 ----
 
-.. literalinclude:: /technical_drawing.py
+.. literalinclude:: /tutorials/technical_drawing.py
     :language: build123d
     :start-after: [code]
     :end-before: [end]

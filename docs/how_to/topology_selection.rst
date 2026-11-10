@@ -140,7 +140,7 @@ subclass of ``list``, so any list slice can be used.
 
     part.vertices().sort_by(Axis.X)[-4:]
 
-.. figure:: /assets/topology_selection/operators_sort_x.png
+.. figure:: /how_to/assets/topology_selection/operators_sort_x.png
     :align: center
 
 |
@@ -158,22 +158,22 @@ Examples
     :gutter: 3
 
     .. grid-item-card:: Property
-        :img-top: /assets/topology_selection/thumb_sort_property.png
+        :img-top: /how_to/assets/topology_selection/thumb_sort_property.png
         :link: sort_property
         :link-type: ref
 
     .. grid-item-card:: Along Wire
-        :img-top: /assets/topology_selection/thumb_sort_along_wire.png
+        :img-top: /how_to/assets/topology_selection/thumb_sort_along_wire.png
         :link: sort_along_wire
         :link-type: ref
 
     .. grid-item-card:: Axis
-        :img-top: /assets/topology_selection/thumb_sort_axis.png
+        :img-top: /how_to/assets/topology_selection/thumb_sort_axis.png
         :link: sort_axis
         :link-type: ref
 
     .. grid-item-card:: Distance From
-        :img-top: /assets/topology_selection/thumb_sort_distance.png
+        :img-top: /how_to/assets/topology_selection/thumb_sort_distance.png
         :link: sort_distance_from
         :link-type: ref
 
@@ -203,7 +203,7 @@ return a new list of all edges in the previous list.
 
     part.faces().group_by(Face.area)[0].edges()
 
-.. figure:: /assets/topology_selection/operators_group_area.png
+.. figure:: /how_to/assets/topology_selection/operators_group_area.png
     :align: center
 
 |
@@ -221,17 +221,17 @@ Examples
     :gutter: 3
 
     .. grid-item-card:: Axis and Length
-        :img-top: /assets/topology_selection/thumb_group_axis.png
+        :img-top: /how_to/assets/topology_selection/thumb_group_axis.png
         :link: group_axis
         :link-type: ref
 
     .. grid-item-card:: Hole Area
-        :img-top: /assets/topology_selection/thumb_group_hole_area.png
+        :img-top: /how_to/assets/topology_selection/thumb_group_hole_area.png
         :link: group_hole_area
         :link-type: ref
 
     .. grid-item-card:: Properties with Keys
-        :img-top: /assets/topology_selection/thumb_group_properties_with_keys.png
+        :img-top: /how_to/assets/topology_selection/thumb_group_properties_with_keys.png
         :link: group_properties_with_keys
         :link-type: ref
 
@@ -251,7 +251,7 @@ against a vector direction and filtered accordingly.
 
     part.faces().filter_by(lambda f: f.normal_at() == Vector(0, 0, 1))
 
-.. figure:: /assets/topology_selection/operators_filter_z_normal.png
+.. figure:: /how_to/assets/topology_selection/operators_filter_z_normal.png
     :align: center
 
 |
@@ -265,7 +265,7 @@ selected regardless of their orientation:
     obj = Box(1, 1, 1) - Cylinder(0.2, 1)
     faces_with_holes = obj.faces().filter_by(lambda f: f.inner_wires())
 
-.. image:: /assets/custom_selector.png
+.. image:: /how_to/assets/topology_selection/custom_selector.png
 
 Standard Python tools work too. ``sorted``, ``filter`` and comprehensions all accept a
 |ShapeList|, which is useful when a selection needs several properties at once:
@@ -291,32 +291,32 @@ Examples
     :gutter: 3
 
     .. grid-item-card:: GeomType
-        :img-top: /assets/topology_selection/thumb_filter_geomtype.png
+        :img-top: /how_to/assets/topology_selection/thumb_filter_geomtype.png
         :link: filter_geomtype
         :link-type: ref
 
     .. grid-item-card:: All Edges Circle
-        :img-top: /assets/topology_selection/thumb_filter_all_edges_circle.png
+        :img-top: /how_to/assets/topology_selection/thumb_filter_all_edges_circle.png
         :link: filter_all_edges_circle
         :link-type: ref
 
     .. grid-item-card:: Axis and Plane
-        :img-top: /assets/topology_selection/thumb_filter_axisplane.png
+        :img-top: /how_to/assets/topology_selection/thumb_filter_axisplane.png
         :link: filter_axis_plane
         :link-type: ref
 
     .. grid-item-card:: Inner Wire Count
-        :img-top: /assets/topology_selection/thumb_filter_inner_wire_count.png
+        :img-top: /how_to/assets/topology_selection/thumb_filter_inner_wire_count.png
         :link: filter_inner_wire_count
         :link-type: ref
 
     .. grid-item-card:: Nested Filters
-        :img-top: /assets/topology_selection/thumb_filter_nested.png
+        :img-top: /how_to/assets/topology_selection/thumb_filter_nested.png
         :link: filter_nested
         :link-type: ref
 
     .. grid-item-card:: Shape Properties
-        :img-top: /assets/topology_selection/thumb_filter_shape_properties.png
+        :img-top: /how_to/assets/topology_selection/thumb_filter_shape_properties.png
         :link: filter_shape_properties
         :link-type: ref
 
@@ -488,7 +488,7 @@ mesh faces are grouped into topological rings expanding away from that starting 
 
     show(*face_rings, colors=ColorMap.listed(len(face_rings)))
 
-.. figure:: /assets/topology_selection/topo_distance_to.png
+.. figure:: /how_to/assets/topology_selection/topo_distance_to.png
     :align: center
 
 The same approach can be used with edges or vertices. For example, a single edge on the
@@ -535,17 +535,17 @@ selectors are the builder's own:
         part.faces(Select.LAST)     # the cylinder's faces
         part.edges(Select.NEW)      # the two circles where the cylinder meets the box
 
-.. figure:: /assets/topology_selection/selectors_select_all.png
+.. figure:: /how_to/assets/topology_selection/selectors_select_all.png
     :align: center
 
     The default ``Select.ALL`` features
 
-.. figure:: /assets/topology_selection/selectors_select_last.png
+.. figure:: /how_to/assets/topology_selection/selectors_select_last.png
     :align: center
 
     ``Select.LAST`` features
 
-.. figure:: /assets/topology_selection/selectors_select_new.png
+.. figure:: /how_to/assets/topology_selection/selectors_select_new.png
     :align: center
 
     ``Select.NEW`` edges where box and cylinder intersect
@@ -563,7 +563,7 @@ circle where they meet is the cylinder's own bottom edge, brought in rather than
         part.edges(Select.NEW)      # none
         part.edges(Select.LAST)     # the cylinder's three edges, that circle among them
 
-.. figure:: /assets/topology_selection/selectors_select_new_none.png
+.. figure:: /how_to/assets/topology_selection/selectors_select_new_none.png
     :align: center
 
     ``Select.NEW`` edges when box and cylinder don't intersect

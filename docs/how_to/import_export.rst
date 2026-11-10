@@ -213,7 +213,7 @@ information presented in the drawings.
 The line types used by the 2D Exporters are defined by the :class:`~exporters.LineType` 
 Enum and are shown in the following diagram:
 
-.. image:: /assets/line_types.svg
+.. image:: /how_to/assets/import_export/line_types.svg
     :align: center
 
 

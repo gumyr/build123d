@@ -138,9 +138,9 @@ as will combining parts with boolean operations or within a :class:`~build_part.
 As a example of creating parts with joints and connecting them together, consider the following code where
 flanges are attached to the ends of a curved pipe:
 
-.. image:: /assets/rigid_joints_pipe.png
+.. image:: /how_to/assets/joints/rigid_joints_pipe.png
 
-.. literalinclude:: /rigid_joints_pipe.py
+.. literalinclude:: /how_to/rigid_joints_pipe.py
     :language: build123d
     :emphasize-lines: 19-20, 23-24
 
@@ -199,17 +199,17 @@ Linear Joint
 
 Component moves along a single axis as with a sliding latch shown here:
 
-.. image:: /assets/joint-latch-slide.png
+.. image:: /how_to/assets/joints/joint-latch-slide.png
 
 The code to generate these components follows:
 
-.. literalinclude:: /slide_latch.py
+.. literalinclude:: /how_to/slide_latch.py
     :language: build123d
     :emphasize-lines: 30, 52, 55
 
-.. image:: /assets/joint-latch.png
+.. image:: /how_to/assets/joints/joint-latch.png
     :width: 65 %
-.. image:: /assets/joint-slide.png
+.. image:: /how_to/assets/joints/joint-slide.png
     :width: 27.5 %
 
 Note how the slide is constructed in a different orientation than the direction of motion. The
@@ -263,9 +263,9 @@ Ball Joint
 A component rotates around all 3 axes using a gimbal system (3 nested rotations). A :class:`~joints.BallJoint`
 is found within a rod end as shown here:
 
-.. image:: /assets/rod_end.png
+.. image:: /how_to/assets/joints/rod_end.png
 
-.. literalinclude:: /rod_end.py
+.. literalinclude:: /how_to/rod_end.py
     :language: build123d
     :emphasize-lines: 40-44,51,53
 

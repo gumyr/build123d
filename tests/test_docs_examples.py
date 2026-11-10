@@ -59,17 +59,24 @@ def generate_docs_example_test(path: Path):
             prefix=f"build123d_test_docs_{name}"
         ) as tmpdir:
 
-            # copy assets subfolder to the temp directory
-            # this ensures 1. files are present to be imported
-            # 2. directory structure allows for temporary exports
-            if (_docs_dir / "assets").exists():
-                shutil.copytree(
-                    _docs_dir / "assets", Path(tmpdir) / "assets", dirs_exist_ok=True
-                )
+            # Mirror the docs layout in the temp directory so that an example,
+            # run from the copy of its own folder, finds the files it reads
+            # and the folders it writes to at the same relative paths:
+            # every "assets" folder, plus the data files beside the example.
+            for assets_dir in _docs_dir.rglob("assets"):
+                rel_assets = assets_dir.relative_to(_docs_dir)
+                if assets_dir.is_dir() and not any(
+                    part in IGNORE_DIRS and part != "ttt" for part in rel_assets.parts
+                ):
+                    shutil.copytree(
+                        assets_dir, Path(tmpdir) / rel_assets, dirs_exist_ok=True
+                    )
 
-            for file_obj in _docs_dir.glob("*.*"):
+            run_dir = Path(tmpdir) / path.parent.relative_to(_docs_dir)
+            run_dir.mkdir(parents=True, exist_ok=True)
+            for file_obj in path.parent.glob("*.*"):
                 if file_obj.is_file() and file_obj.suffix not in [".py", ".rst", ".md"]:
-                    shutil.copy(file_obj, Path(tmpdir) / file_obj.name)
+                    shutil.copy(file_obj, run_dir / file_obj.name)
             # ------------------------------------------------------------------------
 
             mock_ocp_vscode = Path(tmpdir) / "_mock_ocp_vscode.py"
@@ -88,7 +95,7 @@ def generate_docs_example_test(path: Path):
             got = subprocess.run(
                 [sys.executable, "-c", cmd],
                 capture_output=True,
-                cwd=tmpdir,
+                cwd=run_dir,
                 check=False,
                 text=True,
                 encoding="utf-8",

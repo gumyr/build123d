@@ -6,10 +6,10 @@ Finding the center of a CAD object is a surprisingly complex operation.  To illu
 let's consider two examples: a simple isosceles triangle and a curved line (their bounding
 boxes are shown with dashed lines):
 
-.. image:: /assets/center.svg
+.. image:: /explanation/assets/center/center.svg
     :width: 49%
 
-.. image:: /assets/one_d_center.svg
+.. image:: /explanation/assets/center/one_d_center.svg
     :width: 49%
 
 

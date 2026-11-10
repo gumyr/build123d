@@ -3,7 +3,7 @@ Create Text Object
 
 Create text object or add to ``BuildSketch`` using :class:`~objects_sketch.Text`:
 
-.. image:: /assets/objects/text.png
+.. image:: /reference/assets/objects/text.png
     :width: 80%
     :align: center
 
@@ -100,7 +100,7 @@ Placement
 Multiline text has two methods of alignment.
 ``text_align`` aligns the text relative to its ``Location``:
 
-.. image:: /assets/objects/text_align.png
+.. image:: /reference/assets/objects/text_align.png
     :width: 80%
     :align: center
 
@@ -114,7 +114,7 @@ Multiline text has two methods of alignment.
 ``align`` aligns the object bounding box relative to its ``Location`` *after*
 text alignment:
 
-.. image:: /assets/objects/align.png
+.. image:: /reference/assets/objects/align.png
     :width: 80%
     :align: center
 
@@ -128,7 +128,7 @@ text alignment:
 
 Place text along an ``Edge`` or ``Wire`` with ``path`` and ``position_on_path``:
 
-.. image:: /assets/objects/path.png
+.. image:: /reference/assets/objects/path.png
     :width: 80%
     :align: center
 
@@ -158,7 +158,7 @@ than filled faces.
 ``Text`` creates an outlined face by default. The outline width is controlled
 by ``single_line_width``. This operation is slow with many glyphs.
 
-.. image:: /assets/objects/outline.png
+.. image:: /reference/assets/objects/outline.png
     :width: 80%
     :align: center
 
@@ -173,7 +173,7 @@ by ``single_line_width``. This operation is slow with many glyphs.
 Use ``Compound.make_text()`` to create *unoutlined* single-line text.
 Useful for routing, engraving, or drawing label paths.
 
-.. image:: /assets/objects/singleline.png
+.. image:: /reference/assets/objects/singleline.png
     :width: 80%
     :align: center
 
@@ -194,7 +194,7 @@ Modern variable-width fonts often contain glyphs with overlapping stroke
 outlines, which produce invalid geometry. ``ocp_vscode`` ignores invalid
 faces.
 
-.. image:: /assets/objects/missing_glyph.png
+.. image:: /reference/assets/objects/missing_glyph.png
     :align: center
 
 |

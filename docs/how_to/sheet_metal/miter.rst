@@ -11,10 +11,10 @@ does. In the flat pattern a mitered corner is one straight cut from the rim to
 the edge of the blank. Miters also trim a flange end back for clearance, and
 with a negative angle they *extend* it into a flare.
 
-.. image:: /assets/sheet_metal/miter_basic.svg
+.. image:: /how_to/assets/sheet_metal/miter_basic.svg
     :align: center
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [miter_basic]
     :end-before: [miter_basic]
@@ -40,10 +40,10 @@ mitered corner is in the flat pattern: one straight cut across the whole
 flange to the edge of the blank. A trimming miter narrows the bend to match
 the wall and an extending one widens it.
 
-.. image:: /assets/sheet_metal/miter_through_bend.svg
+.. image:: /how_to/assets/sheet_metal/miter_through_bend.svg
     :align: center
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [miter_through_bend]
     :end-before: [miter_through_bend]
@@ -62,10 +62,10 @@ A negative angle extends the side of the flange instead of trimming it. With
 ``through_bend`` the bend widens to match, so the flare runs from the fold
 line rather than starting at the tangent line:
 
-.. image:: /assets/sheet_metal/miter_flare.svg
+.. image:: /how_to/assets/sheet_metal/miter_flare.svg
     :align: center
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [miter_flare]
     :end-before: [miter_flare]

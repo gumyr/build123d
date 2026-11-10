@@ -32,7 +32,7 @@ bare ``thicken()``:
             with BuildSketch():
                 Rectangle(120, 80)
 
-.. image:: /assets/sheet_metal/tutorial_1.svg
+.. image:: /how_to/assets/sheet_metal/tutorial_1.svg
     :align: center
 
 The rectangle becomes the base of the enclosure, drawn on ``Plane.XY`` with
@@ -54,13 +54,13 @@ blank's four edges are its ``rims()``, and a positive angle, the default 90,
 folds toward the face normal. The ``gaps`` trim each wall back from the ends
 of its edge so the neighbouring walls clear each other at the corners:
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [tutorial_2]
     :end-before: [tutorial_2]
     :dedent:
 
-.. image:: /assets/sheet_metal/tutorial_2.svg
+.. image:: /how_to/assets/sheet_metal/tutorial_2.svg
     :align: center
 
 The wall ``length`` is the flat past the bend. A drawing would more likely
@@ -79,13 +79,13 @@ each corner so the two bends can fold independently. The corners are the
 convex vertices of the base, the lowest flat; the vertices where each bend
 starts lie on a straight run of the outline and are not corners:
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [tutorial_3]
     :end-before: [tutorial_3]
     :dedent:
 
-.. image:: /assets/sheet_metal/tutorial_3.svg
+.. image:: /how_to/assets/sheet_metal/tutorial_3.svg
     :align: center
 
 The relief is laid out on the flat pattern, so it is a true circle on the
@@ -100,13 +100,13 @@ Mounting holes are cut in the base with sketch objects in ``Mode.SUBTRACT``: a
 in the long wall is different, because it has to run through the bend into
 the base. That takes a solid cutter, which cuts every face it passes through:
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [tutorial_4]
     :end-before: [tutorial_4]
     :dedent:
 
-.. image:: /assets/sheet_metal/tutorial_4.svg
+.. image:: /how_to/assets/sheet_metal/tutorial_4.svg
     :align: center
 
 Both kinds of cut are covered under :ref:`holes and cutouts
@@ -121,13 +121,13 @@ The top edges of the walls are raw sheared edges. A :ref:`hem
 long walls are the free edges that run along ``Axis.X`` at the top of the
 part. The steps from here on are still inside the ``BuildSheet`` context:
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [tutorial_5]
     :end-before: [tutorial_5]
     :dedent:
 
-.. image:: /assets/sheet_metal/tutorial_5.svg
+.. image:: /how_to/assets/sheet_metal/tutorial_5.svg
     :align: center
 
 An open hem leaves a gap between the folded leg and the wall, which is easier
@@ -142,13 +142,13 @@ Everything so far has been a surface, the reference shell. Leaving the
 enclosing ``BuildPart``, and :ref:`thicken <sheet_metal_thicken>` gives it
 its material:
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [tutorial_6]
     :end-before: [tutorial_6]
     :dedent:
 
-.. image:: /assets/sheet_metal/tutorial_6.svg
+.. image:: /how_to/assets/sheet_metal/tutorial_6.svg
     :align: center
 
 ``enclosure_part.part`` is now a solid to export or assemble like any other.
@@ -162,13 +162,13 @@ the part is cut from. Outside the context the operation takes the shell and
 its parameters explicitly, and ``Align.MIN`` corners the pattern on the
 origin for the cutter:
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [tutorial_7]
     :end-before: [tutorial_7]
     :dedent:
 
-.. image:: /assets/sheet_metal/tutorial_7.svg
+.. image:: /how_to/assets/sheet_metal/tutorial_7.svg
     :align: center
 
 Each bend has become the length of flat it consumes, worked out on the

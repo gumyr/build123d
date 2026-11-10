@@ -11,10 +11,10 @@ the end of the bend, and the tear runs into the flat. **Bend relief** notches
 the sheet beside the end of the bend so the fold line ends on a free edge
 instead. Any partial-width flange or tab needs it.
 
-.. image:: /assets/sheet_metal/bend_relief_basic.svg
+.. image:: /how_to/assets/sheet_metal/bend_relief_basic.svg
     :align: center
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [bend_relief_basic]
     :end-before: [bend_relief_basic]
@@ -32,7 +32,7 @@ The shape is named by ``ReliefType``, the same enum :ref:`corner relief
 <sheet_metal_corner_relief>` uses, and like those it is cut in the flat
 pattern so it keeps its shape on the blank:
 
-.. image:: /assets/sheet_metal/bend_relief_types.svg
+.. image:: /how_to/assets/sheet_metal/bend_relief_types.svg
     :align: center
 
 =============  ================================================================
@@ -47,7 +47,7 @@ Shape          What it is and when to use it
                is the choice for punched blanks.
 =============  ================================================================
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [bend_relief_types]
     :end-before: [bend_relief_types]

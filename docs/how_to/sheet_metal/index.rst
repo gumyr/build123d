@@ -11,7 +11,7 @@ folds can be made, hem the raw edges, and finally either give the surface its
 thickness for a solid or unfold it back into the flat pattern the blank is cut
 from.
 
-.. image:: /assets/sheet_metal/hero.svg
+.. image:: /how_to/assets/sheet_metal/hero.svg
     :align: center
 
 Everything here works in both of build123d's styles. In Builder mode the

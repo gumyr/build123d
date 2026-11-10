@@ -14,7 +14,7 @@ Basic Functionality
 
 The following is a simple BuildPart example:
 
-.. literalinclude:: /general_examples.py
+.. literalinclude:: /tutorials/general_examples.py
     :language: build123d
     :start-after: [Ex. 2]
     :end-before: [Ex. 2]
@@ -31,7 +31,7 @@ a polyhedron with rectangular faces centered on the default ``Plane.XY``.
 The second object is a ``Cylinder`` that is subtracted from the box as directed
 by the ``mode=Mode.SUBTRACT`` parameter thus creating a hole.
 
-.. image:: /assets/general_ex2.svg
+.. image:: /tutorials/assets/introductory_examples/general_ex2.svg
     :align: center
 
 *******************
@@ -61,7 +61,7 @@ operation on the last line:
 :func:`~operations_generic.sweep` requires a 2D cross section - ``handle_cross_section`` -
 and a path - ``handle_path`` - which are both passed implicitly.
 
-.. image:: /tea_cup.png
+.. image:: /how_to/assets/build_part/tea_cup.png
   :align: center
 
 *****

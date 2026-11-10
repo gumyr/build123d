@@ -10,10 +10,10 @@ another program, and then there is no reference shell to unfold or to add a
 flange to. :func:`~operations_sheet.sheet_shells` is the way back: it takes a
 constant-thickness solid apart into its two sheet surfaces and its thickness.
 
-.. image:: /assets/sheet_metal/sheet_shells_basic.svg
+.. image:: /how_to/assets/sheet_metal/sheet_shells_basic.svg
     :align: center
 
-.. literalinclude:: /sheet_metal_examples.py
+.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
     :language: build123d
     :start-after: [sheet_shells_basic]
     :end-before: [sheet_shells_basic]

@@ -15,7 +15,7 @@ This page describes the builder itself: what it takes in, what it does with
 objects drawn inside it, and what it produces. The operations, the concepts
 behind them and a tutorial are under :ref:`Sheet Metal <sheet_metal>`.
 
-.. image:: /assets/sheet_metal_box.png
+.. image:: /how_to/assets/build_sheet/sheet_metal_box.png
     :align: center
 
 .. code-block:: build123d
