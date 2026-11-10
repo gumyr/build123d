@@ -64,7 +64,6 @@ from typing import (
     NoReturn,
     Protocol,
     SupportsIndex,
-    TypeVar,
     Union,
 )
 from typing import cast as tcast
@@ -138,7 +137,7 @@ from OCP.collections import (
 )
 from OCP.collections import List_TopoDS_Shape
 from OCP.TopTools import TopTools_ShapeMapHasher
-from typing_extensions import Self, deprecated
+from typing_extensions import Self, TypeVar, deprecated
 
 from bd_materials import FinishedMaterial, resolve as resolve_material
 
@@ -186,7 +185,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
 TrimmingTool = Union[Plane, "Shell", "Face"]
-TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape)
+TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape, default=Any)
 CalcFn = Callable[[TopoDS_Shape, GProp_GProps], None]
 CompositeFactory = Callable[[Iterable["Shape"]], "Shape"]
 ShapeConstructor = Callable[[Any], "Shape"]
