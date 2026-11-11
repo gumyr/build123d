@@ -3,6 +3,7 @@ import ctypes
 import os
 from os import fsencode, fsdecode
 import unittest
+import urllib.error
 import urllib.request
 import tempfile
 import zipfile
@@ -40,12 +41,22 @@ from build123d.build_enums import Align, GeomType, Unit
 
 
 def download(url: str) -> bytes:
-    """Return the content at url."""
+    """Return the content at url, or skip the calling test if it can't be fetched.
+
+    The suite should still run without network access (offline builds,
+    rate-limited hosts), so only the tests that need a remote file are skipped.
+    A file that is gone (404, 410) still fails, so a dead link gets noticed.
+    """
     request = urllib.request.Request(
         url, headers={"User-Agent": "build123d test suite"}
     )
-    with urllib.request.urlopen(request) as response:
-        return response.read()
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return response.read()
+    except OSError as error:  # URLError, HTTPError and timeouts
+        if getattr(error, "code", None) in (404, 410):
+            raise
+        raise unittest.SkipTest(f"could not download {url}: {error}") from error
 
 
 def fetch_once(destination: Path, fetch: Callable[[], bytes]) -> Path:
@@ -65,6 +76,31 @@ def fetch_once(destination: Path, fetch: Callable[[], bytes]) -> Path:
             file.write(data)
         os.replace(temp_name, destination)
     return destination
+
+
+class Download(unittest.TestCase):
+    def test_failed_download_skips(self):
+        url = "https://example.com/model.step"
+        for error in (
+            urllib.error.HTTPError(url, 429, "Too Many Requests", None, None),
+            urllib.error.URLError("no network"),
+            TimeoutError("timed out"),
+        ):
+            with self.subTest(error=type(error).__name__):
+                with patch("urllib.request.urlopen", side_effect=error):
+                    with self.assertRaises(unittest.SkipTest):
+                        download(url)
+
+    def test_missing_file_fails(self):
+        url = "https://example.com/model.step"
+        error = urllib.error.HTTPError(url, 404, "Not Found", None, None)
+        with patch("urllib.request.urlopen", side_effect=error):
+            with self.assertRaises(urllib.error.HTTPError):
+                # SkipTest would escape assertRaises and report a skip, not a failure
+                try:
+                    download(url)
+                except unittest.SkipTest:
+                    self.fail("a missing file was skipped")
 
 
 class ImportSVG(unittest.TestCase):
@@ -246,19 +282,6 @@ class ImportBREP(unittest.TestCase):
 
 
 class ImportSTEP(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        """setUpClass is a class method that is executed once for the entire test
-        class before any of the test methods in the class are executed. It's intended
-        for setting up expensive resources or doing tasks that are required by all
-        tests in the class, such as downloading a large file, establishing a database
-        connection, or starting a server.
-        """
-        url = "https://raw.githubusercontent.com/tpaviot/pythonocc-demos/master/assets/models/as1-oc-214.stp"
-        cls.large_step_file_path = fetch_once(
-            Path(tempfile.gettempdir()) / "as1-oc-214.stp", lambda: download(url)
-        )
-
     def test_single_object(self):
         export_step(Solid.make_box(1, 1, 1), self.tmp_path / "test.step")
         box = import_step(self.tmp_path / "test.step")
@@ -303,7 +326,11 @@ class ImportSTEP(unittest.TestCase):
         self.assertEqual(tuple(imported_assembly.children[1].color), (0, 0, 1, 1))
 
     def test_assembly_with_oriented_parts(self):
-        assembly = import_step(self.large_step_file_path)
+        url = "https://raw.githubusercontent.com/tpaviot/pythonocc-demos/master/assets/models/as1-oc-214.stp"
+        file_path = fetch_once(
+            Path(tempfile.gettempdir()) / "as1-oc-214.stp", lambda: download(url)
+        )
+        assembly = import_step(file_path)
         fused = Solid.fuse(*assembly.solids())
         # If the parts where placed correctly they all touch and can be fused
         self.assertEqual(len(fused.solids()), 1)
