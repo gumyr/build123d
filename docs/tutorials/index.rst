@@ -14,6 +14,7 @@ as later tutorials build on the concepts introduced in earlier ones.
     sketch_then_extrude.rst
     drawing_outlines.rst
     placing_features.rst
+    selecting_and_finishing.rst
     introductory_examples.rst
     tutorial_design.rst
     tutorial_selectors.rst
