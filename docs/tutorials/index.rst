@@ -11,6 +11,7 @@ as later tutorials build on the concepts introduced in earlier ones.
 .. toctree::
     :maxdepth: 2
 
+    sketch_then_extrude.rst
     introductory_examples.rst
     tutorial_design.rst
     tutorial_selectors.rst
