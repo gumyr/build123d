@@ -33,6 +33,8 @@ ends of the line.
 .. image:: /how_to/assets/build_line/buildline_example_1.svg
     :align: center
 
+.. _drawing_with_constraints:
+
 ***********
 Constraints
 ***********
@@ -41,6 +43,10 @@ Building with constraints enables the designer to capture design intent and
 add a high degree of robustness to their designs.  The following sections
 describe creating positional and tangential constraints as well as using
 object attributes to enable this type of design.
+
+Why build123d works this way, and has no sketch solver, is discussed in
+:ref:`constraints_explained`. :ref:`tutorial_dimensioned_drawing` uses
+several of these techniques together on one drawing.
 
 @ ``position_at`` Operator
 ===========================
@@ -119,6 +125,275 @@ of ``l2`` and the radius of arc ``l3``.
 
 Building with constraints as shown here will ensure that your designs both fully represent
 design intent and are robust to design changes.
+
+Perpendicular to a Curve
+========================
+
+To leave a curve at a right angle, take its tangent with ``tangent_at`` (the
+method behind ``%``) and rotate it by 90 degrees:
+
+.. code-block:: build123d
+
+    with BuildLine() as perpendicular_ex:
+        l1 = CenterArc((0, 0), 1.5, 0, 45)
+        l2 = PolarLine(
+            start=l1 @ 1, length=1, direction=l1.tangent_at(1).rotate(Axis.Z, -90)
+        )
+
+.. figure:: /tutorials/assets/constraints/perpendicular_ex.svg
+    :align: center
+
+The direction of ``l2`` is built from ``l1.tangent_at(1)``, so it stays
+perpendicular to the end of the arc whatever the arc is changed to.
+
+Run Until It Meets Another Object
+=================================
+
+When the intent is "go in this direction until you meet that", give the
+other object in place of a length. Here two lines leave one point at
+different angles and each stops on an ellipse:
+
+.. code-block:: build123d
+
+    with BuildLine() as intersect_ex:
+        c1 = EllipticalCenterArc((0, 0), 1.2, 1.8, 0, arc_size=120, mode=Mode.PRIVATE)
+        l1 = PolarLine(start=(-0.2, 0.1), length=c1, angle=10)
+        l2 = PolarLine(start=(-0.2, 0.1), length=c1, angle=70)
+        l3 = insert(c1.trim(l1 @ 1, l2 @ 1))
+
+.. figure:: /tutorials/assets/constraints/intersect_ex.svg
+    :align: center
+
+:class:`~objects_curve.PolarLine` creates each line from a start point and
+a direction and limits it by its intersection with the ellipse. The ellipse
+is construction geometry (``mode=Mode.PRIVATE``); the piece of it between
+the two lines is cut out with ``trim`` and added with ``insert``. This is
+cleaner than drawing long helper lines and trimming them afterwards.
+
+The limit can be a :class:`~topology.Shape`, :class:`~geometry.Axis`,
+:class:`~geometry.Location`, :class:`~geometry.Plane` or a point, and if the
+line never meets it a ``ValueError`` is raised. The same works for the
+``arc_size`` of several arcs:
+
+- :class:`~objects_curve.CenterArc`
+- :class:`~objects_curve.EllipticalCenterArc`
+- :class:`~objects_curve.EllipticalStartArc`
+- :class:`~objects_curve.JernArc`
+- :class:`~objects_curve.ParabolicCenterArc`
+- :class:`~objects_curve.HyperbolicCenterArc`
+
+For example, a parabola or a hyperbola can be grown from a start condition
+and ended by a line or an axis:
+
+.. code-block:: build123d
+
+    p1 = ParabolicCenterArc((0, 0), 0.5, 0, arc_size=Line((0, 1), (5, 1)))
+    h1 = HyperbolicCenterArc((0, 0), 2, 1, 0, arc_size=Axis((0, 1), (1, 0)))
+
+This is particularly useful when a sketch is not symmetric and several
+local constructions must each end against different surrounding geometry.
+
+Keep a Constant Distance
+========================
+
+.. code-block:: build123d
+
+    inside = FilletPolyline((1.5, 0), (1.5, 1), (-1.5, 1), (-1.5, 0), radius=0.2)
+    perimeter = offset(inside, amount=0.2, side=Side.RIGHT)
+
+.. figure:: /tutorials/assets/constraints/offset_ex.svg
+    :align: center
+
+:func:`~operations_generic.offset` keeps the shape of the source profile
+while enforcing a constant distance from it. This is the common pattern for
+wall thicknesses, clearances and manufacturing margins. How the corners are
+joined is controlled by its ``kind`` parameter.
+
+Join Two Curves Smoothly
+========================
+
+To connect two curves with a third that meets both smoothly, use
+:class:`~objects_curve.BlendCurve`. Here a semi-circle, on the left, is
+joined to a spline, on the right:
+
+.. code-block:: build123d
+
+    m1 = CenterArc((-2, 0.6), 1, -10, 200).reversed()
+    m2 = Spline((0.4, -0.6), (1, -1.6), (2, 0))
+    connector = BlendCurve(m1, m2, tangent_scalars=(2, 1), continuity=ContinuityLevel.C2)
+    comb = Curve(Wire([m1, connector, m2]).curvature_comb(200))
+
+.. figure:: /tutorials/assets/constraints/blend_curve_ex.svg
+    :align: center
+
+``continuity=ContinuityLevel.C2`` matches curvature at each end as well as
+position and tangent, which avoids a visible break in fairness at the
+joins; :ref:`constraints_explained` describes the levels.
+``tangent_scalars`` controls how strongly the connector departs from each
+source curve.
+
+``curvature_comb`` is used here as a diagnostic. The length of each tooth
+of the comb shows the curvature at that point; a smooth transition gives a
+comb that varies gradually, with no abrupt steps.
+
+Tangent to Other Lines and Arcs
+===============================
+
+:class:`~objects_curve.ConstrainedArcs` and
+:class:`~objects_curve.ConstrainedLines` make arcs and lines that are
+tangent to curves, pass through points, or both. Tangent constructions
+usually have several answers, so there are two things to do: narrow the
+answers down, and choose among those left.
+
+.. code-block:: build123d
+
+    with BuildLine() as egg_plant:
+        # Construction Geometry
+        c1 = CenterArc((-2, 0), 0.75, 80, 240, mode=Mode.PRIVATE)
+        c2 = CenterArc((2, 0), 1, 220, 250, mode=Mode.PRIVATE)
+
+        # egg_plant perimeter
+        l1 = ConstrainedArcs((c2, Tangency.OUTSIDE), (c1, Tangency.OUTSIDE), radius=6)
+        l2 = ConstrainedArcs(
+            (c2, Tangency.ENCLOSING),
+            (c1, Tangency.ENCLOSING),
+            radius=8,
+            selector=lambda a: a.sort_by(Axis.Y)[-1],
+        )
+        l3 = insert(c1.trim(l1 @ 1, l2 @ 1))
+        l4 = insert(c2.trim(l1 @ 0, l2 @ 0))
+
+.. figure:: /tutorials/assets/constraints/enclosing_ex.svg
+    :align: center
+
+In this "egg-plant", each reference curve is paired with a ``Tangency``
+qualifier. ``Tangency.OUTSIDE`` asks for the arc that lies outside both
+circles, and ``Tangency.ENCLOSING`` for the one that wraps round both. That
+reduces the answers to the intended outer profile, and the ``selector`` on
+``l2`` settles what is left by taking the highest in Y.
+
+**Choosing among the answers.** Both objects return a
+:class:`~topology.Curve` holding one or more edges. In algebra mode, make
+them all and select afterwards:
+
+.. code-block:: build123d
+
+    arcs = ConstrainedArcs(..., sagitta=Sagitta.BOTH)
+    chosen = arcs.edges().sort_by(Edge.length)[0]
+
+In builder mode, select inside the call with ``selector``, so that only the
+wanted answers are added to the ``BuildLine``. Without one, every answer is
+added, which is rarely what a sketch needs:
+
+.. code-block:: build123d
+
+    with BuildLine() as bl:
+        ConstrainedArcs(
+            ...,
+            sagitta=Sagitta.BOTH,
+            selector=lambda arcs: arcs.sort_by(Edge.length)[0],
+        )
+
+Some useful selectors:
+
+.. code-block:: build123d
+
+    # Nearest to point
+    selector=lambda edges: edges.sort_by_distance((0, 0))[0]
+
+    # Longest
+    selector=lambda edges: edges.sort_by(Edge.length)[-1]
+
+    # Right most
+    selector=lambda edges: edges.sort_by(Axis.X)[-1]
+
+    # Keep two branches
+    selector=lambda edges: edges[:2]
+
+    # Keep all solutions
+    selector=lambda edges: edges
+
+Prefer geometric criteria (distance, position along an axis, length) over
+an index into the list when the geometry upstream may change.
+
+**If it does not work:**
+
+- Too many results: add qualifiers and a stricter ``selector``.
+- No results: relax the qualifier, starting with ``Tangency.UNQUALIFIED``,
+  and check that the geometry is coplanar.
+- The choice changes when the model changes: avoid selecting by index
+  alone; sort geometrically.
+- Builder mode adds many edges unexpectedly: give a ``selector`` in the
+  call.
+- A qualifier seems to do the opposite: check the direction of the input
+  edge, since inside and outside are defined by it.
+
+Every form the two objects accept, and the exact meaning of the qualifiers,
+is in :ref:`constrained_arcs_and_lines`.
+
+Solve for a Dimension
+=====================
+
+Where a dimension follows from others by trigonometry, the
+:class:`~objects_sketch.Triangle` object has a solver built in: give it any
+three of its sides and angles and it works out the rest.
+
+.. code-block:: build123d
+
+    >>> isosceles = Triangle(a=30, b=30, C=60)
+    >>> isosceles.c
+    29.999999999999996
+    >>> isosceles.A
+    60.00000000000001
+    >>> isosceles.B
+    60.00000000000001
+    >>> isosceles.vertex_A
+    Vertex(-1.7763568394002505e-15, 17.32050807568877, 0.0)
+
+Here the sides ``a`` and ``b`` and the angle between them, ``C``, are
+given, and the remaining side, angles and vertices are computed. Side ``a``
+is opposite angle ``A``, ``b`` opposite ``B`` and ``c`` opposite ``C``.
+
+When the governing relationships are algebraic and awkward to construct
+with objects, solve them first with an external solver and feed the solved
+values into ordinary build123d objects. This uses the symbolic solver
+``sympy``:
+
+.. code-block:: build123d
+
+    from math import sin, cos, tan, radians
+    from build123d import *
+    from ocp_vscode import *
+    import sympy
+
+    # This problem uses the sympy symbolic math solver
+
+    # Define the symbols for the unknowns
+    # - the center of the radius 30 arc (x30, y30)
+    # - the center of the radius 66 arc (x66, y66)
+    # - end of the 8° line (l8x, l8y)
+    # - the point with the radius 30 and 66 arc meet i30_66
+    # - the start of the horizontal line lh
+    y30, x66, xl8, yl8 = sympy.symbols("y30 x66 xl8 yl8")
+    x30 = 77 - 55 / 2
+    y66 = 66 + 32
+
+    # There are 4 unknowns so we need 4 equations
+    equations = [
+        (x66 - x30) ** 2 + (y66 - y30) ** 2 - (66 + 30) ** 2,  # distance between centers
+        xl8 - (x30 + 30 * sin(radians(8))),  # 8 degree slope
+        yl8 - (y30 + 30 * cos(radians(8))),  # 8 degree slope
+        (yl8 - 50) / (55 / 2 - xl8) - tan(radians(8)),  # 8 degree slope
+    ]
+    # There are two solutions but we want the 2nd one
+    solution = {k: float(v) for k,v in sympy.solve(equations, dict=True)[1].items()}
+
+    # Create the critical points
+    c30 = Vector(x30, solution[y30])
+    c66 = Vector(solution[x66], y66)
+    l8 = Vector(solution[xl8], solution[yl8])
+
+    ...
 
 ************************
 BuildLine to BuildSketch

@@ -25,3 +25,4 @@ want to deepen your understanding rather than get something done.
     algebra_performance.rst
     location_arithmetic.rst
     center.rst
+    constraints.rst

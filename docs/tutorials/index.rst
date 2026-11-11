@@ -19,7 +19,7 @@ as later tutorials build on the concepts introduced in earlier ones.
     combining_solids.rst
     parametric_part.rst
     tutorial_design.rst
-    tutorial_constraints.rst
+    dimensioned_drawing.rst
     tutorial_lego.rst
     tutorial_joints.rst
     tutorial_materials.rst

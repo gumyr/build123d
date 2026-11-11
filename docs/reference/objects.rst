@@ -545,6 +545,241 @@ Text
 .. include:: /reference/objects/text.rst
 
 
+.. _constrained_arcs_and_lines:
+
+Constrained Arcs and Lines
+--------------------------
+
+:class:`~objects_curve.ConstrainedArcs` and
+:class:`~objects_curve.ConstrainedLines` create planar arcs and lines from
+constraints relative to existing geometry. Both return a
+:class:`~topology.Curve` containing one or more :class:`~topology.Edge`
+objects, because a set of constraints often has more than one solution.
+:ref:`constraints_explained` gives the background and
+:ref:`drawing_with_constraints` shows them in use.
+
+Constraint objects
+^^^^^^^^^^^^^^^^^^
+
+Each positional argument is one constraint:
+
+- an :class:`~topology.Edge` or :class:`~geometry.Axis` is a curve the
+  result must be **tangent to**;
+- a :class:`~topology.Vertex` or ``VectorLike`` is a point the result must
+  **pass through**;
+- a curve may be wrapped with a qualifier as ``(object, Tangency.XXX)``.
+
+Tangency qualifiers
+^^^^^^^^^^^^^^^^^^^
+
+The ``Tangency`` qualifiers come from OCCT and state where a solution must
+lie relative to the curve it is tangent to:
+
+- ``Tangency.UNQUALIFIED``: no preference; every valid solution is returned
+  (OCCT ``Unqualified``).
+- ``Tangency.OUTSIDE``: the solution and the target are external to each
+  other (OCCT ``Outside``).
+- ``Tangency.ENCLOSING``: the solution encloses the target (OCCT
+  ``Enclosing``).
+- ``Tangency.ENCLOSED``: the solution is enclosed by the target (OCCT
+  ``Enclosed``).
+
+OCCT defines interior and exterior by orientation:
+
+- Circle: the exterior is on the right-hand side when travelling along it
+  in its direction; the interior, the material side, is on the left.
+- Line or open curve: the interior is the left-hand side with respect to
+  the direction of travel and the exterior is the other side.
+
+Because of this, reversing an input edge can change which solutions satisfy
+``OUTSIDE``, ``ENCLOSING`` and ``ENCLOSED``. If a qualifier appears to be
+inverted, inspect the orientation of the input edge first. In many
+practical cases ``UNQUALIFIED`` followed by a ``selector`` is a good
+default.
+
+Sagitta and selector
+^^^^^^^^^^^^^^^^^^^^
+
+``sagitta`` (``ConstrainedArcs`` only) chooses which arc of each solution
+circle is returned: ``Sagitta.SHORT``, ``Sagitta.LONG`` or
+``Sagitta.BOTH``.
+
+``selector`` is a function that receives the solutions as a
+:class:`~topology.ShapeList` of edges and returns the ones to keep:
+
+.. code-block:: build123d
+
+    # Keep all solutions
+    ConstrainedArcs(..., selector=lambda arcs: arcs)
+
+    # Keep first
+    ConstrainedArcs(..., selector=lambda arcs: arcs[0])
+
+    # Keep shortest
+    ConstrainedArcs(..., selector=lambda arcs: arcs.sort_by(Edge.length)[0])
+
+In Builder mode, every solution the selector returns is added to the
+context. Use qualifiers and ``sagitta`` to reduce the number of solutions,
+then finish with ``selector`` for a deterministic result.
+
+ConstrainedArcs
+^^^^^^^^^^^^^^^
+
+:class:`~objects_curve.ConstrainedArcs` supports five families of
+signature:
+
+1. Two tangency or point constraints + fixed radius
+2. Two tangency or point constraints + centre constrained to a locus
+3. Three tangency constraints
+4. One tangency or point constraint + fixed centre
+5. One tangency or point constraint + fixed radius + centre constrained to
+   a locus
+
+Point inputs are supported by signatures 1, 2, 4 and 5. The
+three-constraint signature requires curves.
+
+**Signature A: Two constraints +** ``radius``
+
+.. code-block:: build123d
+
+    ConstrainedArcs(
+        tangency_one,
+        tangency_two,
+        radius=...,
+        sagitta=Sagitta.SHORT,
+        selector=lambda arcs: arcs,
+    )
+
+.. figure:: /tutorials/assets/constraints/tan2_rad_ex.svg
+    :align: center
+
+Use when the radius is known and the arc must be tangent to each curve
+input or pass through each point input.
+
+**Signature B: Two constraints +** ``center_on``
+
+.. code-block:: build123d
+
+    ConstrainedArcs(
+        tangency_one,
+        tangency_two,
+        center_on=Axis(...),  # or Edge
+        sagitta=Sagitta.SHORT,
+        selector=lambda arcs: arcs,
+    )
+
+.. figure:: /tutorials/assets/constraints/tan2_on_ex.svg
+    :align: center
+
+Use when the centre must lie on a specific line or curve and the radius is
+not fixed.
+
+**Signature C: Three constraints**
+
+.. code-block:: build123d
+
+    ConstrainedArcs(
+        tangency_one,
+        tangency_two,
+        tangency_three,
+        sagitta=Sagitta.BOTH,
+        selector=lambda arcs: arcs,
+    )
+
+.. figure:: /tutorials/assets/constraints/tan3_ex.svg
+    :align: center
+
+Use for an arc tangent to three curves. This can produce several solutions;
+always consider using ``selector``.
+
+**Signature D: One constraint + fixed** ``center``
+
+.. code-block:: build123d
+
+    ConstrainedArcs(
+        tangency_one,
+        center=(x, y),
+        selector=lambda arcs: arcs[0],
+    )
+
+.. figure:: /tutorials/assets/constraints/pnt_center_ex.svg
+    :align: center
+
+Use when the centre is known.
+
+**Signature E: One constraint +** ``radius`` **+** ``center_on``
+
+.. code-block:: build123d
+
+    ConstrainedArcs(
+        tangency_one,
+        radius=...,
+        center_on=some_edge,
+        selector=lambda arcs: arcs,
+    )
+
+.. figure:: /tutorials/assets/constraints/tan_rad_on_ex.svg
+    :align: center
+
+Use for a fixed radius with the centre guided along a curve.
+
+ConstrainedLines
+^^^^^^^^^^^^^^^^
+
+:class:`~objects_curve.ConstrainedLines` supports three families of
+signature:
+
+1. Tangent to two curves
+2. Tangent to one curve and passing through a fixed point
+3. Tangent to one curve with a fixed orientation (``angle`` or
+   ``direction``)
+
+For all of them, qualifiers can be attached to the curve inputs when the
+side must be controlled.
+
+**Signature A: Two constraints**
+
+.. code-block:: build123d
+
+    ConstrainedLines(
+        tangency_one,
+        tangency_two,
+        selector=lambda lines: lines,
+    )
+
+.. figure:: /tutorials/assets/constraints/lines_tan2_ex.svg
+    :align: center
+
+**Signature B: One constraint + through point**
+
+.. code-block:: build123d
+
+    ConstrainedLines(
+        tangency_one,
+        (x, y),  # through point
+        selector=lambda lines: lines,
+    )
+
+.. figure:: /tutorials/assets/constraints/lines_tan_pnt_ex.svg
+    :align: center
+
+**Signature C: One constraint + fixed orientation**
+
+.. code-block:: build123d
+
+    ConstrainedLines(
+        tangency_one,
+        Axis.Y,
+        angle=30,              # OR direction=(dx, dy)
+        selector=lambda lines: lines,
+    )
+
+.. figure:: /tutorials/assets/constraints/lines_angle_ex.svg
+    :align: center
+
+Exactly one of ``angle`` or ``direction`` should be provided.
+
+
 .. _custom_objects:
 
 Custom Objects
