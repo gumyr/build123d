@@ -115,7 +115,7 @@ Most of the examples show the builder and algebra modes.
             :link-type: ref
 
     .. grid-item-card:: Tea Cup |Builder| |Algebra|
-            :img-top: /tutorials/assets/examples/tea_cup.png
+            :img-top: /tutorials/assets/examples/tea_cup_example.png
             :link: tea_cup
             :link-type: ref
 
@@ -657,7 +657,7 @@ are used to position all of objects.
 
 Tea Cup
 -------
-.. image:: /tutorials/assets/examples/tea_cup.png
+.. image:: /tutorials/assets/examples/tea_cup_example.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)

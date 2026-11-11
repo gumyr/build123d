@@ -54,7 +54,7 @@ def render_sketch(sketch: Shape, name: str) -> None:
     exporter = ExportSVG(scale=100 / max(size.X, size.Y))
     exporter.add_layer("Sketch", fill_color=0xC4D6E8, line_weight=0.4)
     exporter.add_shape(sketch.faces(), layer="Sketch")
-    exporter.write(OUTPUT / f"{name}.svg")
+    exporter.write(OUTPUT / f"plate_{name}.svg")
 
 
 def render_part(part: Shape, name: str) -> None:
@@ -66,7 +66,7 @@ def render_part(part: Shape, name: str) -> None:
     exporter.add_layer("Hidden", line_color=0x969696, line_type=LineType.ISO_DOT)
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
-    exporter.write(OUTPUT / f"{name}.svg")
+    exporter.write(OUTPUT / f"plate_{name}.svg")
 
 
 def same(first: Shape, second: Shape) -> bool:

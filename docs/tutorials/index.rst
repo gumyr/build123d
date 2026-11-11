@@ -12,6 +12,7 @@ as later tutorials build on the concepts introduced in earlier ones.
     :maxdepth: 2
 
     sketch_then_extrude.rst
+    drawing_outlines.rst
     introductory_examples.rst
     tutorial_design.rst
     tutorial_selectors.rst

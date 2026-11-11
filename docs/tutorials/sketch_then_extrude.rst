@@ -9,7 +9,7 @@ depth. In this tutorial you will build this slotted mounting plate that way:
 its outline, its hexagonal hole, its two slots and its raised rim are all
 drawn as flat sketches first, and only then turned into a solid.
 
-.. image:: /tutorials/assets/sketch_then_extrude/rim.svg
+.. image:: /tutorials/assets/sketch_then_extrude/plate_rim.svg
     :align: center
 
 Along the way you will:
@@ -73,7 +73,7 @@ ready-made: :class:`~objects_sketch.RectangleRounded`.
             :start-after: [outline_algebra]
             :end-before: [outline_algebra]
 
-.. image:: /tutorials/assets/sketch_then_extrude/outline.svg
+.. image:: /tutorials/assets/sketch_then_extrude/plate_outline.svg
     :align: center
 
 This is a *sketch*: a flat shape with an area but no thickness. In builder
@@ -106,7 +106,7 @@ here by ``thickness``.
             :start-after: [extrude_algebra]
             :end-before: [extrude_algebra]
 
-.. image:: /tutorials/assets/sketch_then_extrude/extrude.svg
+.. image:: /tutorials/assets/sketch_then_extrude/plate_extrude.svg
     :align: center
 
 It is the same ``extrude`` in both modes, and its first argument is the shape
@@ -146,7 +146,7 @@ so that the shape being extruded already has the hole in it.
             :start-after: [hexagon_algebra]
             :end-before: [hexagon_algebra]
 
-.. image:: /tutorials/assets/sketch_then_extrude/hexagon_sketch.svg
+.. image:: /tutorials/assets/sketch_then_extrude/plate_hexagon_sketch.svg
     :align: center
 
 :class:`~objects_sketch.RegularPolygon` draws the hexagon. In builder mode
@@ -155,7 +155,7 @@ so that the shape being extruded already has the hole in it.
 same job. The ``extrude`` line has not changed, and the hole comes out the
 full depth of the plate:
 
-.. image:: /tutorials/assets/sketch_then_extrude/hexagon.svg
+.. image:: /tutorials/assets/sketch_then_extrude/plate_hexagon.svg
     :align: center
 
 Keeping the design in the sketch pays off as a part grows: the flat drawing
@@ -191,7 +191,7 @@ it, ``slot_spacing`` apart.
             :start-after: [slots_algebra]
             :end-before: [slots_algebra]
 
-.. image:: /tutorials/assets/sketch_then_extrude/slots_sketch.svg
+.. image:: /tutorials/assets/sketch_then_extrude/plate_slots_sketch.svg
     :align: center
 
 In builder mode :class:`~build_common.Locations` names the two places, and
@@ -200,7 +200,7 @@ mode :class:`~geometry.Pos` moves a slot to where it belongs, and an ordinary
 Python loop does that twice. Placing things is the subject of a later
 tutorial; this is all that is needed here.
 
-.. image:: /tutorials/assets/sketch_then_extrude/slots.svg
+.. image:: /tutorials/assets/sketch_then_extrude/plate_slots.svg
     :align: center
 
 *******************************************
@@ -233,7 +233,7 @@ included.
             :start-after: [rim_algebra]
             :end-before: [rim_algebra]
 
-.. image:: /tutorials/assets/sketch_then_extrude/rim_sketch.svg
+.. image:: /tutorials/assets/sketch_then_extrude/plate_rim_sketch.svg
     :align: center
 
 Again it is one operation used two ways. In algebra mode ``offset`` is given
@@ -242,7 +242,7 @@ mode, with no shape named, it works on the sketch so far, and
 ``mode=Mode.SUBTRACT`` removes the result from it. The second
 ``extrude`` adds its solid to the first, and the plate is finished:
 
-.. image:: /tutorials/assets/sketch_then_extrude/rim.svg
+.. image:: /tutorials/assets/sketch_then_extrude/plate_rim.svg
     :align: center
 
 Because the rim is derived from the outline, it follows the outline. Change
