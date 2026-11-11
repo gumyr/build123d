@@ -120,6 +120,11 @@ solid is ``plate.part`` in builder mode and ``plate`` in algebra mode.
 That is the whole method. The rest of the tutorial changes the *sketch*, and
 the solid follows.
 
+If you have used a mainstream CAD program with a graphical interface, this
+will be familiar: there, too, a part starts as a sketch that is then
+extruded. Writing a part as code is very different in execution - you type
+where you would click and drag - but it is not different in concept.
+
 ******************************************
 Step 4: Shape the sketch, not the solid
 ******************************************
