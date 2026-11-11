@@ -44,6 +44,7 @@ boss_radius, boss_height, bore_radius = 16, 22, 10
 blend_radius = 4
 hole_inset, hole_radius = 10, 2.75
 counter_bore_radius, counter_bore_depth = 5, 5
+lead_in = 1
 # [setup]
 
 OUTPUT = Path("assets/selecting_and_finishing")
@@ -297,3 +298,77 @@ assert same(builder_result, pedestal)
 assert len(pedestal.solids()) == 1 and pedestal.is_valid
 render_part(previous, "holes_selected", selected=chosen)
 render_part(pedestal, "holes")
+
+# the next step's selection, drawn on the part as it stands now
+previous = pedestal
+chosen = (
+    pedestal.edges()
+    .group_by(Axis.Z)[-1]
+    .filter_by(GeomType.CIRCLE)
+    .filter_by_value(Edge.radius, bore_radius)
+)
+assert len(pedestal.edges().group_by(Axis.Z)[-1].filter_by(GeomType.CIRCLE)) == 2
+
+# ---------------------------------------------------------------------------
+# Step 8: by what it is
+# ---------------------------------------------------------------------------
+
+# [lead_in_builder]
+with BuildPart() as pedestal:
+    with BuildSketch() as outline:
+        Rectangle(length, width)
+    extrude(amount=base_height)
+
+    fillet(pedestal.edges().filter_by(Axis.Z), radius=corner_radius)
+    chamfer(pedestal.edges().group_by(Axis.Z)[-1], length=edge_chamfer)
+
+    top = pedestal.faces().sort_by(Axis.Z)[-1]
+    with BuildSketch(top) as boss:
+        Circle(boss_radius)
+    extrude(amount=boss_height)
+    fillet(pedestal.edges(Select.LAST).sort_by(Axis.Z)[0], radius=blend_radius)
+
+    with Locations(pedestal.faces().sort_by(Axis.Z)[-1]):
+        Hole(bore_radius)
+    with Locations(top):
+        with GridLocations(length - 2 * hole_inset, width - 2 * hole_inset, 2, 2):
+            CounterBoreHole(hole_radius, counter_bore_radius, counter_bore_depth)
+
+    rims = pedestal.edges().group_by(Axis.Z)[-1].filter_by(GeomType.CIRCLE)
+    mouth = rims.filter_by_value(Edge.radius, bore_radius)
+    chamfer(mouth, length=lead_in)
+# [lead_in_builder]
+builder_result = pedestal.part
+
+# [lead_in_algebra]
+pedestal = extrude(Rectangle(length, width), amount=base_height)
+
+pedestal = fillet(pedestal.edges().filter_by(Axis.Z), radius=corner_radius)
+pedestal = chamfer(pedestal.edges().group_by(Axis.Z)[-1], length=edge_chamfer)
+
+top = pedestal.faces().sort_by(Axis.Z)[-1]
+pedestal += extrude(Plane(top) * Circle(boss_radius), amount=boss_height)
+pedestal = fillet(pedestal.edges(Select.LAST).sort_by(Axis.Z)[0], radius=blend_radius)
+
+rim = pedestal.faces().sort_by(Axis.Z)[-1]
+pedestal -= Plane(rim) * Hole(bore_radius, depth=base_height + boss_height)
+pedestal -= (
+    Plane(top)
+    * GridLocations(length - 2 * hole_inset, width - 2 * hole_inset, 2, 2)
+    * CounterBoreHole(
+        hole_radius, counter_bore_radius, counter_bore_depth, depth=base_height
+    )
+)
+
+rims = pedestal.edges().group_by(Axis.Z)[-1].filter_by(GeomType.CIRCLE)
+mouth = rims.filter_by_value(Edge.radius, bore_radius)
+pedestal = chamfer(mouth, length=lead_in)
+# [lead_in_algebra]
+
+assert same(builder_result, pedestal)
+assert len(pedestal.solids()) == 1 and pedestal.is_valid
+assert len(rims) == 2 and len(mouth) == 1
+assert abs(mouth[0].radius - bore_radius) < 1e-6
+assert pedestal.volume < previous.volume
+render_part(previous, "lead_in_selected", selected=chosen)
+render_part(pedestal, "lead_in")

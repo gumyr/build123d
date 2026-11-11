@@ -11,19 +11,20 @@ CAD program you click on it. In build123d you describe it: "the vertical
 edges", "the highest face", "the edges that were just made". In this
 tutorial you will finish this bearing pedestal that way:
 
-.. image:: /tutorials/assets/selecting_and_finishing/pedestal_holes.svg
+.. image:: /tutorials/assets/selecting_and_finishing/pedestal_lead_in.svg
     :align: center
     :width: 60%
 
 Along the way you will:
 
 * ask a part for its edges and faces,
-* narrow them down by direction, by position and by what was last made,
+* narrow them down by direction, by position, by what was last made, and by
+  what kind of thing they are,
 * round edges with ``fillet`` and bevel them with ``chamfer``,
 * use a selected face as the place for the next sketch, and
 * put holes into a selected face.
 
-It takes about twenty-five minutes and follows on from
+It takes about thirty minutes and follows on from
 :ref:`tutorial_placing_features`. How the builder and algebra tabs on this
 page work is described in :ref:`tutorial_sketch_then_extrude`.
 
@@ -119,6 +120,18 @@ rounded part, which is assigned back to ``pedestal``.
 Notice what was *not* written: no coordinates, and no edge numbers. "The
 edges that run along Z" stays true if the block is made longer, wider or
 taller, so the selection keeps working when the dimensions change.
+
+This matters more than it may seem. Many CAD programs remember "the edge
+you clicked" by an internal name or number, and when an earlier step of
+the design changes, those names can end up pointing at a different edge or
+at nothing. It is known as the *topological naming problem*. A selection
+written as a description has no such name to go stale.
+
+For the same reason, do not pick an edge by its position in the list a part
+gives you. ``pedestal.edges()[3]`` is some edge today, but the order of
+that list is not promised and can change when the part does. Always narrow
+the list down by a description first. An index is safe after a ``sort_by``
+or a ``group_by``, because then the order means something.
 
 .. tip::
 
@@ -290,7 +303,7 @@ lowest of the three, the one at the foot.
 Step 7: Holes on a face
 ***************************
 
-Two kinds of hole finish the part: a bore down through the boss for the
+Two kinds of hole come next: a bore down through the boss for the
 bearing, and four counterbored holes in the base for its fixing screws.
 Each starts from a face.
 
@@ -336,9 +349,79 @@ the part it is cutting and goes all the way through it unless told
 otherwise. In algebra mode the hole is a shape on its own until it is
 subtracted, so it is given a ``depth``.
 
+*************************
+Step 8: By what it is
+*************************
+
+One detail is left. A bearing is easier to press in if the mouth of the
+bore has a small chamfer to guide it. The edge to chamfer is the circle at
+the top of the bore.
+
+Where it is does not single it out this time. Two edges are at that height:
+the mouth of the bore, and the outer rim of the boss around it. What
+separates them is their size, and edges can be selected by what they are
+as well as by where they are.
+
+.. image:: /tutorials/assets/selecting_and_finishing/pedestal_lead_in_selected.svg
+    :align: center
+    :width: 55%
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /tutorials/selecting_and_finishing.py
+            :language: build123d
+            :start-after: [lead_in_builder]
+            :end-before: [lead_in_builder]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /tutorials/selecting_and_finishing.py
+            :language: build123d
+            :start-after: [lead_in_algebra]
+            :end-before: [lead_in_algebra]
+
+.. image:: /tutorials/assets/selecting_and_finishing/pedestal_lead_in.svg
+    :align: center
+    :width: 60%
+
+The selection is built up in three moves, each working on what the one
+before it left:
+
+#. ``group_by(Axis.Z)[-1]`` takes the highest edges, as in step 4.
+#. ``filter_by(GeomType.CIRCLE)`` keeps those that are circles or arcs of
+   circles. ``filter_by`` was given a direction in step 3; here it is given
+   a kind of edge. Two are left, and they have the name ``rims``.
+#. ``filter_by_value(Edge.radius, bore_radius)`` keeps the one whose radius
+   is ``bore_radius``. Where ``sort_by`` and ``group_by`` put things in
+   order and leave you to take the first or the last, ``filter_by_value``
+   asks for a value outright.
+
+The last move says exactly what is wanted: *the circle with the radius of
+the bore*. "The smaller of the two" would have found the same edge today,
+and would find the wrong one if the design changed so that something
+smaller appeared at that height. Where a dimension you have named
+identifies the edge, select by it.
+
+The order of the moves matters. Only a circle has a radius, so asking a
+straight edge for one fails, and ``filter_by_value(Edge.radius, ...)``
+stops with *Shape could not be reduced to a circle* if one is in the list.
+Filtering for circles first makes the list safe to ask. The height comes
+into it as well: the bore has a circle of the same radius at its other
+end, at the bottom of the pedestal.
+
+The selection is written in two lines, with ``rims`` kept in a variable,
+so that each stage can be counted and looked at, as the tip in step 3
+suggests. A selection is a Python list as well, so it can be sliced:
+``[-2:]`` takes the last two of a sorted list.
+
 Try a ``base_height`` of 20 or a ``length`` of 110 at the top of the file.
-Every fillet, the boss and all five holes follow, because none of them was
-placed by a number: each was placed by describing an edge or a face.
+Every fillet and chamfer, the boss and all five holes follow, because none
+of them was placed by a number: each was placed by describing an edge or a
+face.
 
 ********************
 What you learned
@@ -348,9 +431,13 @@ What you learned
   list can be narrowed down: ``filter_by`` keeps those that match,
   ``group_by`` gathers them into groups, and ``sort_by`` puts them in
   order.
-* ``Axis.Z`` was the measure every time here, but each of the three takes
-  many others - the type of an edge, the area of a face, the distance from
-  a point. :ref:`selectors` covers them all.
+* Each of the three takes many measures: a direction such as ``Axis.Z``,
+  the kind of edge with ``GeomType``, and others - the area of a face, the
+  distance from a point. ``filter_by_value`` keeps the ones with a given
+  value of a property, such as ``Edge.radius``. :ref:`selectors` covers
+  them all.
+* Selections can be chained, each step narrowing the one before, and an
+  index or a slice is safe once the list has been sorted or grouped.
 * :func:`~operations_generic.fillet` rounds the edges it is given and
   :func:`~operations_generic.chamfer` bevels them.
 * A **face is a place**. A sketch can be drawn on it, and features such as
@@ -358,4 +445,5 @@ What you learned
 * The edges an operation has just made can be selected with
   ``Select.LAST``.
 * A selection describes what you mean, so it goes on meaning it when the
-  dimensions change.
+  dimensions change. That is how build123d avoids the topological naming
+  problem.
