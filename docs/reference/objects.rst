@@ -545,6 +545,8 @@ Text
 .. include:: /reference/objects/text.rst
 
 
+.. _custom_objects:
+
 Custom Objects
 --------------
 
@@ -626,6 +628,37 @@ by :class:`~objects_sketch.BaseSketchObject`.
 That's it. The ``Club`` object can now be used anywhere a
 :class:`~objects_sketch.Circle` would be used, with either the Algebra or
 Builder API.
+
+:ref:`tutorial_parametric_part` builds a custom part object, ``Beam``, step by
+step.
+
+Why not a function?
+^^^^^^^^^^^^^^^^^^^
+
+A plain Python function that builds a shape and returns it can look like a
+simpler way to reuse a design. It is not recommended, because a function is
+not isolated from the Builder it is called from and takes no part in
+publishing its result:
+
+* A function that uses a Builder internally creates a build of its own. Called
+  inside another Builder it adds nothing to that Builder, and the active
+  :class:`~build_common.Locations` are not applied to it. The returned shape
+  is discarded unless the caller passes it to
+  :func:`~operations_generic.insert`.
+* A function written in Algebra mode is not isolated at all. Called inside a
+  Builder, the intermediate objects it creates are offered to that Builder,
+  which either adds them to the caller's model or raises an error - a
+  ``Rectangle`` created by a function called inside a ``BuildPart`` fails
+  with *BuildPart doesn't have a Rectangle object or operation*.
+* A function has no ``rotation``, ``align`` or ``mode`` unless each is
+  implemented by hand, so it can't be used interchangeably with the built-in
+  objects.
+* The result is a plain shape. It has no type of its own to test for and no
+  attributes recording how it was made.
+
+A function may work in the script it was written for and then fail when it is
+reused inside a larger model. A custom object behaves the same wherever it is
+used.
 
 .. image:: /how_to/assets/build_line/buildline_example_6.svg
   :align: center
