@@ -1411,7 +1411,7 @@ def split(
     return kept
 
 
-SweepType: TypeAlias = Compound | Edge | Wire | Face | Solid
+SweepType: TypeAlias = Compound | Edge | Wire | Face
 """Type of objects which can be swept"""
 
 
@@ -1431,8 +1431,12 @@ def sweep(
     Sweep pending 1D or 2D objects along path. The faces swept out by a 1D
     section are returned in a Sketch that holds them as a Shell.
 
+    A section must be 1D or 2D. A 3D shape is not a cross section: sweeping the
+    volume a moving solid passes through is not supported, so to model the cut
+    of a tool sweep its cross section instead, e.g. the disc of a round tool.
+
     Args:
-        sections (Compound |  Edge |  Wire |  Face |  Solid): cross sections to sweep into object
+        sections (Compound |  Edge |  Wire |  Face): cross sections to sweep into object
         path (Curve |  Edge |  Wire, optional): path to follow.
             Defaults to context pending_edges.
         multisection (bool, optional): sweep multiple on path. Defaults to False.
@@ -1443,6 +1447,10 @@ def sweep(
         binormal (Edge |  Wire, optional): guide rotation along path. Defaults to None.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: a section is 3D (a Solid, Part or Compound of Solids)
+        ValueError: a section has a degenerated edge, as a sphere or cone face does
     """
     context: Builder | None = Builder._get_context("sweep")
 
@@ -1456,6 +1464,15 @@ def sweep(
         section_list = [sections]
 
     validate_inputs(context, "sweep", section_list)
+
+    for sec in section_list:
+        if isinstance(sec, Solid) or (isinstance(sec, Compound) and sec.solids()):
+            raise ValueError(
+                f"sweep sections must be 1D or 2D, not a 3D {type(sec).__name__}. "
+                "Sweeping a solid would sweep each of its faces separately, which "
+                "is not the volume the solid sweeps out. Sweep a cross section "
+                "instead, e.g. the disc of a round tool: Circle(radius)."
+            )
 
     if path is None:
         if (

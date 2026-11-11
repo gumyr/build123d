@@ -240,6 +240,35 @@ def _extrude_topods_shape(obj: TopoDS_Shape, direction: VectorLike) -> TopoDS_Sh
     return extrusion
 
 
+def _check_sweep_profile(profile: TopoDS_Wire) -> None:
+    """Refuse a sweep profile that the kernel cannot sweep
+
+    A degenerated edge is the zero-length edge OCCT puts in the boundary of a
+    face at a pole or apex, as on a sphere or cone face. BRepOffsetAPI_MakePipeShell
+    cannot sweep a wire that contains one: Build() raises an unhelpful
+    Standard_ConstructionError (cone face) or crashes the process with a
+    segmentation fault (sphere face), so such a profile is refused here.
+
+    Args:
+        profile (TopoDS_Wire): the wire about to be added to a pipe shell builder
+
+    Raises:
+        ValueError: the profile contains a degenerated edge
+    """
+    degenerated = 0
+    explorer = TopExp_Explorer(profile, TopAbs_ShapeEnum.TopAbs_EDGE)
+    while explorer.More():
+        if BRep_Tool.Degenerated_s(TopoDS.Edge(explorer.Current())):
+            degenerated += 1
+        explorer.Next()
+    if degenerated:
+        raise ValueError(
+            f"Cannot sweep a profile with {degenerated} degenerated edge(s), the "
+            "collapsed edges at the pole or apex of a sphere or cone face. Sweep a "
+            "planar profile instead, such as a Circle or the Face made from it."
+        )
+
+
 def _make_loft(
     objs: Iterable[Vertex | Wire],
     filled: bool,

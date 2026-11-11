@@ -27,6 +27,9 @@ license:
 """
 
 import math
+import subprocess
+import sys
+import textwrap
 import unittest
 
 # Mocks for testing failure cases
@@ -322,6 +325,45 @@ class TestSolid(unittest.TestCase):
         ]
         with self.assertWarnsRegex(UserWarning, "sweep_multi created an invalid"):
             Solid.sweep_multi(profiles, arc)
+
+    def test_sweep_degenerated_profile(self):
+        """The boundary of a sphere or cone face has degenerated edges at its
+        poles or apex. Sweeping it crashed the process inside OCCT (sphere) or
+        raised an unhelpful kernel error (cone). The calls run in a subprocess so
+        a regression that crashes the interpreter fails this test instead of
+        killing the test run."""
+        script = """
+            from build123d import *
+
+            path = Wire([Edge.make_circle(30, start_angle=0, end_angle=90)])
+            faces = [
+                Solid.make_sphere(3).faces()[0],
+                Solid.make_cone(3, 0, 5).faces().filter_by(GeomType.CONE)[0],
+            ]
+            calls = {
+                "sweep": lambda f: Solid.sweep(f, path),
+                "sweep wire": lambda f: Solid.sweep(f.outer_wire(), path),
+                "sweep_multi": lambda f: Solid.sweep_multi([f, f], path),
+                "extrude_linear_with_rotation": lambda f: (
+                    Solid.extrude_linear_with_rotation(f, (0, 0, 0), (0, 0, 10), 30)
+                ),
+            }
+            for face in faces:
+                for name, call in calls.items():
+                    try:
+                        call(face)
+                    except ValueError as err:
+                        assert "degenerated" in str(err), (name, err)
+                    else:
+                        raise AssertionError(f"{name} accepted a degenerated edge")
+            """
+        result = subprocess.run(
+            [sys.executable, "-c", textwrap.dedent(script)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_constructor(self):
         with self.assertRaises(TypeError):
