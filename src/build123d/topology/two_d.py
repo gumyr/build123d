@@ -1882,12 +1882,17 @@ class Face(Mixin2D[TopoDS_Face]):
         ) = None,
         edge_constraints: Iterable[Edge] | None = None,
         point_constraints: Iterable[VectorLike] | None = None,
+        interior_edges: Iterable[Edge] | None = None,
     ) -> Face:
         """make_surface_patch
 
         Create a potentially non-planar face patch bounded by exterior edges which can
         be optionally refined using support faces to ensure e.g. tangent surface
-        continuity. Also can optionally refine the surface using surface points.
+        continuity. Also can optionally refine the surface using interior edges or
+        surface points.
+
+        Edges in edge_face_constraints and edge_constraints are added as perimeter
+        edges; edges inside the face go in interior_edges.
 
         Args:
             edge_face_constraints (list[tuple[Edge, Face, ContinuityLevel]], optional):
@@ -1897,6 +1902,8 @@ class Face(Mixin2D[TopoDS_Face]):
                 without adjacent support faces. Defaults to None.
             point_constraints (list[VectorLike], optional): Points on the surface that
                 refine the shape. Defaults to None.
+            interior_edges (list[Edge], optional): Edges inside the face that the
+                surface passes through. Defaults to None.
 
         Raises:
             RuntimeError: Error building non-planar face with provided constraints
@@ -1922,6 +1929,11 @@ class Face(Mixin2D[TopoDS_Face]):
         if edge_constraints:
             for edge in edge_constraints:
                 patch.Add(edge.wrapped, continuity_dict[ContinuityLevel.C0])
+
+        if interior_edges:
+            for edge in interior_edges:
+                # IsBound=False: shapes the surface without joining the boundary
+                patch.Add(edge.wrapped, continuity_dict[ContinuityLevel.C0], False)
 
         if point_constraints:
             for point in point_constraints:
