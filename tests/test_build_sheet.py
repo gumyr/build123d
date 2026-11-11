@@ -3,7 +3,7 @@
 import copy
 import pickle
 import unittest
-from math import asin, cos, degrees, pi, radians, sin, sqrt, tan
+from math import asin, copysign, cos, degrees, pi, radians, sin, sqrt, tan
 from unittest.mock import PropertyMock, patch
 
 from OCP.BRepGProp import BRepGProp
@@ -3487,6 +3487,37 @@ class TestCornerRelief(unittest.TestCase):
                     pi * radius**2 * (0.75 + 0.25 * self.SCALE),
                     4,
                 )
+
+    def test_obround_lies_along_the_diagonal_into_the_base(self):
+        """The slot is long on the corner's diagonal, so its round end reaches
+        half its length into the base - further than a circle of its width."""
+        length, width = 12.0, 5.0
+        with BuildSheet(thickness=1, bend_radius=2) as tray:
+            with BuildSketch():
+                Rectangle(60, 40)
+            flange(tray.rims(), length=15, gaps=3.1)
+            base = tray.flats().sort_by(Axis.Z)[0]
+            corners = base.vertices().filter_by(Convexity.CONVEX)
+            self.assertEqual(len(corners), 4)
+            result = corner_relief(
+                corners, ReliefType.OBROUND, length=length, width=width
+            )
+        self.assertTrue(result.is_valid)
+        after = result.flats().sort_by(Axis.Z)[0]
+        margin = 0.3
+        for corner in corners:
+            corner = Vector(corner)
+            toward = base.center() - corner
+            inward = Vector(copysign(1, toward.X), copysign(1, toward.Y), 0)
+            inward = inward.normalized()
+            for reach, material in (
+                (width / 2 + margin, False),
+                (length / 2 - margin, False),
+                (length / 2 + margin, True),
+            ):
+                with self.subTest(corner=tuple(corner), reach=reach):
+                    point = corner + inward * reach
+                    self.assertEqual(after.distance_to(point) < 1e-6, material)
 
     def test_a_wrapped_corner_relief_survives_forming(self):
         builder = self.hole_sheet()
