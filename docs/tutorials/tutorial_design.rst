@@ -1,323 +1,325 @@
 .. _design_tutorial:
 
-#############################
-Designing a Part in build123d
-#############################
+################
+Designing a Part
+################
 
-Designing a part with build123d involves a systematic approach that leverages the power
-of 2D profiles, extrusions, and revolutions. Where possible, always work in the lowest
-possible dimension, 1D lines before 2D sketches before 3D parts. The following guide will
-get you started:
+The tutorials before this one each taught a technique on a part that was
+chosen to suit it. A real part arrives the other way round: you have a
+drawing, or an object in your hand, and have to decide how to build it.
 
-*As an example, we'll go through the design process for this bracket:*
+This page is a way of making those decisions. It is a checklist of eleven
+steps to go through before and while you write the code, and it follows one
+rule throughout: work in the lowest dimension you can - lines before
+sketches, sketches before solids. As an example, it goes through the design
+of this bracket:
 
 .. image:: /tutorials/assets/design/bracket_hand_drawing.jpg
     :align: center
 
+Each step gives the general advice first and then applies it to the
+bracket. Not every step produces code, and for a given part some steps
+produce nothing at all. How the builder and algebra tabs on this page work
+is described in :ref:`tutorial_sketch_then_extrude`.
 
-Step 1. Examine the Part in All Three Orientations
-**************************************************
+**********************************************************
+Step 1: Examine the part in all three orientations
+**********************************************************
 
-Start by visualizing the part from the front, top, and side views. Identify any symmetries
-in these orientations, as symmetries can simplify the design by reducing the number of
-unique features you need to model.
+Start by picturing the part from the front, the top and the side. Look for
+symmetry in each view. A plane of symmetry halves the work: only one side
+has to be designed, and the other is a mirror image of it.
 
-*In the following view of the bracket one can see two planes of symmetry
-so we'll only need to design one quarter of it.*
+The bracket has two planes of symmetry, so only a quarter of it needs to be
+designed.
 
 .. image:: /tutorials/assets/design/bracket_with_symmetry.png
     :align: center
 
-Step 2. Identify Rotational Symmetries
-**************************************
+**********************************************
+Step 2: Identify rotational symmetries
+**********************************************
 
-Look for structures that could be created through the rotation of a 2D shape. For instance,
-cylindrical or spherical features are often the result of revolving a profile around an axis.
-Identify the axis of rotation and make a note of it.
+Look for anything that could be made by turning a flat shape round an axis:
+cylinders, cones, spheres, or any feature that could have come off a lathe.
+Note where the axis is. These features are made with ``revolve``, described
+in :ref:`tutorial_beyond_extrude`.
 
-*There are no rotational structures in the example bracket.*
+The bracket has none.
 
-Step 3. Select a Convenient Origin
-**********************************
+******************************************
+Step 3: Select a convenient origin
+******************************************
 
-Choose an origin point that minimizes the need to move or transform components later in the
-design process. Ideally, the origin should be placed at a natural center of symmetry or a
-critical reference point on the part.
+Choose the origin so that as little as possible has to be moved later. The
+best place is usually where the planes of symmetry meet, or a point that
+other parts will be measured from.
 
-*The planes of symmetry for the bracket was identified in step 1, making it logical to
-place the origin at the intersection of these planes on the bracket's front face. Additionally,
-we'll define the coordinate system we'll be working in: Plane.XY (the default), where
-the origin is set at the global (0,0,0) position. In this system, the x-axis aligns with
-the front of the bracket, and the z-axis corresponds to its width. It’s important to note
-that all coordinate systems/planes in build123d adhere to the*
-`right-hand rule <https://en.wikipedia.org/wiki/Right-hand_rule>`_ *meaning the y-axis is
-automatically determined by this convention.*
+For the bracket, the origin goes where the two planes of symmetry from
+step 1 cross, on its front face. The sketch will be drawn on ``Plane.XY``,
+the default, so the X axis runs across the front of the bracket and the Z
+axis runs along its width. All planes in build123d follow the
+`right-hand rule <https://en.wikipedia.org/wiki/Right-hand_rule>`_, which
+fixes the direction of Y.
 
 .. image:: /tutorials/assets/design/bracket_with_origin.png
     :align: center
 
-Step 4. Create 2D Profiles
-**************************
-Design the 2D profiles of your part in the appropriate orientation(s). These profiles are
-the foundation of the part's geometry and can often represent cross-sections of the part.
-Mirror parts of profiles across any axes of symmetry identified earlier.
+**********************************
+Step 4: Name the dimensions
+**********************************
 
-*The 2D profile of the bracket is as follows:*
+Before drawing anything, give every dimension a name. A part written in
+terms of names can be resized by changing one number, and can be turned
+into a family of parts later. A number typed into the middle of the code
+cannot.
+
+The bracket has eight dimensions, in millimetres. They start its file:
+
+.. literalinclude:: /tutorials/tutorial_design.py
+    :language: build123d
+    :start-after: [setup]
+    :end-before: [setup]
+
+Each step below that has code shows the whole of the rest of the file as it
+stands at that point.
+
+Dimensions need not be the only parameters. :ref:`tutorial_parametric_part`
+describes a part by what it has to do and calculates its size from that.
+
+**********************************
+Step 5: Create 2D profiles
+**********************************
+
+Draw the flat shapes the part is made from, each on the plane it belongs
+to. A profile is very often a cross-section of the part. Draw only the
+piece that is unique, and mirror it across the planes of symmetry found in
+step 1.
+
+This is where most of the design is done. A shape that can be put into the
+sketch should be, for the reasons given in
+:ref:`tutorial_combining_solids`.
+
+The profile of the bracket is this:
 
 .. image:: /tutorials/assets/design/bracket_sketch.png
     :align: center
 
-*The build123d code to generate this profile is as follows:*
+Only half of it is drawn - a base, a rounded corner and one arm - and that
+half is drawn as a single line down its outer side, which is then given
+thickness.
 
-.. code-block:: build123d
+.. tab-set::
 
-    with BuildSketch() as sketch:
-        with BuildLine() as profile:
-            FilletPolyline(
-                (0, 0), (length / 2, 0), (length / 2, height), radius=bend_radius
-            )
-            offset(amount=thickness, side=Side.LEFT)
-        make_face()
-        mirror(about=Plane.YZ)
+    .. tab-item:: Builder
+        :sync: builder
 
-*This code creates a 2D sketch of a mirrored profile in the build123d CAD system. Here's a step-by-step explanation of what it does:*
+        .. literalinclude:: /tutorials/tutorial_design.py
+            :language: build123d
+            :start-after: [profile_builder]
+            :end-before: [profile_builder]
 
-    with BuildSketch() as sketch:
-        *This starts a context for creating a 2D sketch, which defines the overall boundary and geometric features. The sketch will be stored in the variable sketch.*
+    .. tab-item:: Algebra
+        :sync: algebra
 
-    with BuildLine() as profile:
-        *This starts another context, this time for drawing lines (or profiles) within the sketch. The profile consists of connected line segments, arcs, or polylines.*
+        .. literalinclude:: /tutorials/tutorial_design.py
+            :language: build123d
+            :start-after: [profile_algebra]
+            :end-before: [profile_algebra]
 
-    FilletPolyline((0, 0), (length / 2, 0), (length / 2, height), radius=bend_radius)
-        *This object draws a polyline with three points: (0,0), (length/2, 0), and (length/2, height). A fillet (curved corner) with a radius of bend_radius is added where applicable between the segments of the polyline.*
+* ``FilletPolyline`` draws straight lines through the points it is given,
+  like the ``Polyline`` of :ref:`tutorial_beyond_extrude`, and rounds each
+  corner between them to ``bend_radius``.
+* ``offset`` makes a copy of that line ``thickness`` to its left and joins
+  the two at their ends, giving a closed outline. This is the ``offset`` of
+  :ref:`tutorial_sketch_then_extrude`, used on a line instead of a shape.
+* ``make_face`` fills the outline in, as in
+  :ref:`tutorial_drawing_outlines`.
+* ``mirror`` reflects the half in ``Plane.YZ`` to make the whole profile,
+  as in :ref:`tutorial_beyond_extrude`.
 
-    offset(amount=thickness, side=Side.LEFT)
-        *This applies an offset to the polyline created earlier. The offset creates a parallel line at a distance of thickness to the left side of the original polyline. This operation essentially thickens the profile by a given amount.*
+Drawing the centre line of a bent strip and thickening it is much less work
+than drawing both sides of it, and the two sides cannot disagree.
 
-    make_face()
-        *This command creates a 2D face from the closed profile. The offset operation ensures that the profile is closed, allowing the creation of a solid face from the boundary defined.*
+******************************************************
+Step 6: Use extrusion for prismatic features
+******************************************************
 
-    mirror(about=Plane.YZ)
-        *This mirrors the entire face about the YZ plane (which runs along the center of the sketch), creating a symmetrical counterpart of the face. The mirrored geometry will complete the final shape.*
+Where the part has the same cross-section all the way along, extrude the
+profile. A part may need several extrusions, in different directions or of
+different lengths.
 
-Step 5. Use Extrusion for Prismatic Features
-********************************************
-For solid or prismatic shapes, extrude the 2D profiles along the necessary axis. You can 
-also combine multiple extrusions by intersecting or unionizing them to form complex shapes. 
-Use the resulting geometry as sub-parts if needed.
+An extrusion does not have to be given a length. With ``until=Until.NEXT``
+or ``until=Until.LAST`` it carries on until it meets another shape - the
+rest of the part, or a ``target`` you name - and ends on that shape's
+surface, whatever its form. Use this where a feature has to reach
+something, so that it still reaches it when the dimensions change.
+:ref:`Example 36 <ex 36>` shows it.
 
-*The next step in implementing our design in build123d is to convert the above sketch into
-a part by extruding it as shown in this code:*
+The bracket is its profile extruded, and the second plane of symmetry is
+used here: the profile is extruded by half the width and the result is
+mirrored.
 
-.. code-block:: build123d
+.. tab-set::
 
-    with BuildPart() as bracket:
-        with BuildSketch() as sketch:
-            with BuildLine() as profile:
-                FilletPolyline(
-                    (0, 0), (length / 2, 0), (length / 2, height), radius=bend_radius
-                )
-                offset(amount=thickness, side=Side.LEFT)
-            make_face()
-            mirror(about=Plane.YZ)
-        extrude(amount=width / 2)
-        mirror(about=Plane.XY)
+    .. tab-item:: Builder
+        :sync: builder
 
-*In this example, we've wrapped the sketch within a BuildPart context, which is used 
-for creating 3D parts. We utilized the extrude function to extend the 2D sketch into 
-a solid object, turning it into a 3D part. Additionally, we applied the mirror function 
-to replicate the partial part across a plane of symmetry, ensuring a symmetrical design.*
+        .. literalinclude:: /tutorials/tutorial_design.py
+            :language: build123d
+            :start-after: [extrude_builder]
+            :end-before: [extrude_builder]
 
-Step 6. Generate Revolved Features
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /tutorials/tutorial_design.py
+            :language: build123d
+            :start-after: [extrude_algebra]
+            :end-before: [extrude_algebra]
+
+In builder mode the sketch now sits inside a ``BuildPart``, and ``mirror``
+with nothing named reflects the part so far. Mirroring in ``Plane.XY`` puts
+the origin at the middle of the bracket's width, where step 3 said it
+should be.
+
+******************************************
+Step 7: Generate revolved features
+******************************************
+
+Make any feature found in step 2 by revolving its profile about its axis,
+and join it to, or cut it from, the rest of the part.
+
+The bracket has no revolved features.
+
+***********************************************
+Step 8: Combine sub-parts intelligently
+***********************************************
+
+A complicated part is often easier to build as several simpler pieces that
+are then added together, cut from one another or intersected. Do as much of
+that combining as you can in a sketch, and combine solids only for what a
+sketch cannot express. Combining solids is much harder work for the CAD
+kernel than combining flat shapes, and more likely to fail;
+:ref:`tutorial_combining_solids` explains why.
+
+The bracket is a single piece. Further pieces could be made in the same way,
+by adding more sketches and extruding or revolving them.
+
+******************************************
+Step 9: Apply chamfers and fillets
+******************************************
+
+Leave chamfers and fillets on the solid until its main shape is finished.
+Use selectors to pick out the edges, and look at what a selector has found
+before using it. :ref:`tutorial_selecting_and_finishing` covers both.
+
+The back corners of the bracket are to be rounded, which needs the four
+short edges at the ends of its arms.
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /tutorials/tutorial_design.py
+            :language: build123d
+            :start-after: [fillet_builder]
+            :end-before: [fillet_builder]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /tutorials/tutorial_design.py
+            :language: build123d
+            :start-after: [fillet_algebra]
+            :end-before: [fillet_algebra]
+
+Read the selector from left to right. ``bracket.edges()`` is every edge of
+the bracket. ``filter_by(Axis.X)`` keeps the ones that run in the X
+direction. ``group_by(Axis.Y)`` gathers those into groups by how far along
+Y they are, and ``[-1]`` takes the last group, the edges furthest back.
+
+The selection is given a name, ``corners``, before it is used. That is the
+habit recommended in :ref:`tutorial_selecting_and_finishing`: with a name,
+the selection can be counted and shown on its own if the fillet does not
+come out as expected.
+
 **********************************
-If any part of the geometry can be created by revolving a 2D profile around an axis, use 
-the revolve operation. This is particularly useful for parts that include cylindrical, 
-conical, or spherical features. Combine these revolved sub-parts with existing features 
-using additive, subtractive, or intersecting operations.
-
-*Our example has no revolved features.*
-
-Step 7. Combine Sub-parts Intelligently
-***************************************
-When combining multiple sub-parts, keep in mind whether they need to be added, subtracted, 
-or intersected. Subtracting or intersecting can create more refined details, while addition 
-is useful for creating complex assemblies.
-
-*Out example only has one sub-part but further sub-parts could be created in the
-BuildPart context by defining more sketches and extruding or revolving them.*
-
-Step 8. Apply Chamfers and Fillets
+Step 10: Design for assembly
 **********************************
-Identify critical edges or vertices that need chamfering or filleting. Use build123d’s 
-selectors to apply these operations accurately. Always visually inspect the results to 
-ensure the correct edges have been modified.
 
-*The back corners of the bracket need to be rounded off or filleted so the edges that
-define these corners need to be isolated. The following code, placed to follow the previous
-code block, captures just these edges:*
+If the part connects to others, add the holes, slots and other features
+that make the connection, and place them from the faces they belong to so
+that they stay in the right place when the part changes.
 
-.. code-block:: build123d
+The bracket has a hole in each arm and a slot in its base.
 
-    corners = bracket.edges().filter_by(Axis.X).group_by(Axis.Y)[-1]
-    fillet(corners, fillet_radius)
+.. tab-set::
 
-*These lines isolates specific corner edges that are then filleted.*
+    .. tab-item:: Builder
+        :sync: builder
 
-    corners = bracket.edges().filter_by(Axis.X).group_by(Axis.Y)[-1]
-        *This line is used to select specific edges from the 3D part (bracket) that was 
-        created by the extrusion.*
+        .. literalinclude:: /tutorials/tutorial_design.py
+            :language: build123d
+            :start-after: [holes_builder]
+            :end-before: [holes_builder]
 
-        - bracket.edges() *retrieves all the edges of the bracket part.*
-        - filter_by(Axis.X) *filters the edges to only those that are aligned along the 
-          X-axis.*
-        - group_by(Axis.Y) *groups the edges by their positions along the Y-axis. This 
-          operation essentially organizes the filtered X-axis edges into groups based on 
-          their Y-coordinate positions.*
-        - [-1] *selects the last group of edges along the Y-axis, which corresponds 
-          to the back of the part - the edges we are looking for.*
+    .. tab-item:: Algebra
+        :sync: algebra
 
-
-    fillet(corners, fillet_radius)
-        *This function applies a fillet (a rounded edge) to the selected corners, with a 
-        specified radius (fillet_radius). The fillet smooths the sharp edges at the corners, 
-        giving the part a more refined shape.*
-
-Step 9. Design for Assembly
-***************************
-If the part is intended to connect with others, add features like joints, holes, or other 
-attachment points. Ensure that these features are precisely located to ensure proper fitment 
-and functionality in the final assembly.
-
-*Our example has two circular holes and a slot that need to be created. First we'll create
-the two circular holes:*
-
-.. code-block:: build123d
-
-    with Locations(bracket.faces().sort_by(Axis.X)[-1]):
-        Hole(hole_diameter / 2)
-
-*This code creates a hole in a specific face of the bracket part.*
-
-    with Locations(bracket.faces().sort_by(Axis.X)[-1]):
-        *This context sets a location(s) for subsequent operations.*
-
-        - bracket.faces() *retrieves all the faces of the bracket part.*
-        - sort_by(Axis.X) *sorts these faces based on their position along the X-axis (from 
-          one side of the bracket to the other).*
-        - [-1] *selects the last face in this sorted list, which would be the face farthest 
-          along the X-axis, the extreme right side of the part.*
-        - Locations() *creates a new local context or coordinate system at the selected face, 
-          effectively setting this face as the working location for any subsequent operations 
-          inside the with block.*
-
-    Hole(hole_diameter / 2)
-        *This creates a hole in the selected face. The radius of the hole is specified as 
-        hole_diameter / 2. The hole is placed at the origin of the selected face, based on 
-        the local coordinate system created by Locations(). As the depth of the hole is
-        not provided it is assumed to go entirely through the part.*
-
-*Next the slot needs to be created in the bracket with will be done by sketching a slot on 
-the front of the bracket and extruding the sketch through the part.*
-
-.. code-block:: build123d
-
-    with BuildSketch(bracket.faces().sort_by(Axis.Y)[0]):
-        SlotOverall(20 * MM, hole_diameter)
-    extrude(amount=-thickness, mode=Mode.SUBTRACT)
-
-*Here’s a detailed explanation of what each part does:*
-
-    with BuildSketch(bracket.faces().sort_by(Axis.Y)[0]):
-        *This line sets up a sketching context.*
-
-        - bracket.faces() *retrieves all the faces of the bracket part.*
-        - sort_by(Axis.Y) *sorts the faces along the Y-axis, arranging them from the lowest 
-          Y-coordinate to the highest.*
-        - [0] *selects the first face in this sorted list, which is the one located at the 
-          lowest Y-coordinate, the nearest face of the part.*
-        - BuildSketch() *creates a new sketching context on this selected face, where 2D 
-          geometry will be drawn.*
-
-    SlotOverall(20, hole_diameter)
-        *This command draws a slot (a rounded rectangle or elongated hole) on the selected 
-        face. The slot has a total length of 20 mm and a width equal to hole_diameter. 
-        The slot is defined within the 2D sketch on the selected face of the bracket.*
-
-    extrude(amount=-thickness, mode=Mode.SUBTRACT)
-        extrude() *takes the 2D sketch (the slot) and extends it into the 3D space by a 
-        distance equal to -thickness, creating a cut into the part. The negative value 
-        (-thickness) indicates that the extrusion is directed inward into the part (a cut).*
-        mode=Mode.SUBTRACT *specifies that the extrusion is a subtractive operation, 
-        meaning it removes material from the bracket, effectively cutting the slot through 
-        the face of the part.*
-
-*Although beyond the scope of this tutorial, joints could be defined for each of the
-holes to allow programmatic connection to other parts.* 
-
-Step 10. Plan for Parametric Flexibility
-****************************************
-Wherever possible, make your design parametric, allowing dimensions and features to be 
-easily adjusted later. This flexibility can be crucial if the design needs modifications 
-or if variations of the part are needed.
-
-*The dimensions of the bracket are defined as follows:*
-
-.. code-block:: build123d
-
-    thickness = 3 * MM
-    width = 25 * MM
-    length = 50 * MM
-    height = 25 * MM
-    hole_diameter = 5 * MM
-    bend_radius = 5 * MM
-    fillet_radius = 2 * MM
-
-Step 11. Test Fit and Tolerances
-********************************
-Visualize the fit of the part within its intended assembly. Consider tolerances for 
-manufacturing, such as clearance between moving parts or shrinkage for 3D-printed parts. 
-Adjust the design as needed to ensure real-world functionality.
-
-Summary
-*******
-These steps should guide you through a logical and efficient workflow in build123d
-(or any CAD tool), helping you to design parts with accuracy and ease.
-
-*The entire code block for the bracket example is shown here:*
-
-.. code-block:: build123d
-
-    from build123d import *
-    from ocp_vscode import show_all
-
-    thickness = 3 * MM
-    width = 25 * MM
-    length = 50 * MM
-    height = 25 * MM
-    hole_diameter = 5 * MM
-    bend_radius = 5 * MM
-    fillet_radius = 2 * MM
-
-    with BuildPart() as bracket:
-        with BuildSketch() as sketch:
-            with BuildLine() as profile:
-                FilletPolyline(
-                    (0, 0), (length / 2, 0), (length / 2, height), radius=bend_radius
-                )
-                offset(amount=thickness, side=Side.LEFT)
-            make_face()
-            mirror(about=Plane.YZ)
-        extrude(amount=width / 2)
-        mirror(about=Plane.XY)
-        corners = bracket.edges().filter_by(Axis.X).group_by(Axis.Y)[-1]
-        fillet(corners, fillet_radius)
-        with Locations(bracket.faces().sort_by(Axis.X)[-1]):
-            Hole(hole_diameter / 2)
-        with BuildSketch(bracket.faces().sort_by(Axis.Y)[0]):
-            SlotOverall(20 * MM, hole_diameter)
-        extrude(amount=-thickness, mode=Mode.SUBTRACT)
-
-    show_all()
+        .. literalinclude:: /tutorials/tutorial_design.py
+            :language: build123d
+            :start-after: [holes_algebra]
+            :end-before: [holes_algebra]
 
 .. image:: /tutorials/assets/design/bracket.png
     :align: center
+
+Both features start from a selected face, as in
+:ref:`tutorial_selecting_and_finishing`.
+
+* The face furthest along X is the outside of one arm. A ``Hole`` created
+  there is centred on the face and cuts inwards. In builder mode it is
+  given no depth and so goes all the way through the part, which takes it
+  through the other arm as well: one ``Hole`` makes both holes. In algebra
+  mode it is given ``depth=length`` to do the same.
+* The face with the lowest Y is the front of the base. A ``SlotOverall`` is
+  sketched on it and extruded by ``-thickness``, the negative amount
+  sending it into the part, and ``Mode.SUBTRACT`` (``-=`` in algebra mode)
+  cuts it out.
+
+Holes like these can also carry *joints*, which let parts be connected to
+one another in code. :ref:`joint_tutorial` introduces them.
+
+****************************************
+Step 11: Test fit and tolerances
+****************************************
+
+Look at the part in the assembly it is meant for. Allow for how it will be
+made: clearance between parts that move, and shrinkage or over-sized
+features for a 3D-printed part. Because the dimensions have names, an
+allowance can be one more name, added where it is needed.
+
+***********
+Summary
+***********
+
+The eleven steps, in short:
+
+#. Look at the part from three sides and find its symmetry.
+#. Find anything that is a shape turned round an axis.
+#. Put the origin where it saves the most work.
+#. Name every dimension.
+#. Draw the 2D profiles, mirroring where you can.
+#. Extrude what is prismatic.
+#. Revolve what is round.
+#. Combine pieces in the sketch where possible, as solids where necessary.
+#. Add chamfers and fillets last, by selecting edges.
+#. Add what connects the part to others, placed from its faces.
+#. Check the fit and allow for manufacture.
+
+The code of step 10 is the whole bracket: eight named dimensions and, in
+builder mode, eighteen lines. To use a design like this in more than one
+place, make it a custom object, as described in
+:ref:`tutorial_parametric_part`.

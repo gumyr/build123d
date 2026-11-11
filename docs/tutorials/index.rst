@@ -18,7 +18,6 @@ as later tutorials build on the concepts introduced in earlier ones.
     beyond_extrude.rst
     combining_solids.rst
     parametric_part.rst
-    introductory_examples.rst
     tutorial_design.rst
     tutorial_selectors.rst
     tutorial_constraints.rst

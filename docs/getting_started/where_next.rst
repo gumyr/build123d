@@ -30,11 +30,11 @@ shown both ways.
 What to read next
 *****************
 
-* To learn by doing, work through the :doc:`/tutorials/introductory_examples`, which go
-  from simple to complex in both modes, then
-  :doc:`Designing a Part </tutorials/tutorial_design>` and the
-  :doc:`Selector Tutorial </tutorials/tutorial_selectors>`. The other
-  :doc:`tutorials </tutorials/index>` each take up one subject.
+* To learn by doing, work through the :doc:`tutorials </tutorials/index>`. The
+  first seven, starting with :ref:`tutorial_sketch_then_extrude`, are a series
+  that builds one part each in both modes;
+  :doc:`Designing a Part </tutorials/tutorial_design>` then shows how to plan a
+  part of your own. The remaining tutorials each take up one subject.
 
 * To understand how build123d models shapes before going further, read
   :doc:`/explanation/key_concepts`.
