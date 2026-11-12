@@ -26,3 +26,4 @@ want to deepen your understanding rather than get something done.
     location_arithmetic.rst
     center.rst
     constraints.rst
+    surface_modeling.rst

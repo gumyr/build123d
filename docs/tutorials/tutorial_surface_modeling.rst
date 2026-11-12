@@ -1,4 +1,4 @@
-.. _surface_modeling:
+:orphan:
 
 #################
 Surface Modeling
