@@ -10,21 +10,23 @@ they can be treated as a unit - i.e. :meth:`~topology.Shape.moved` or exported.
 
 To create an assembly in build123d, one needs to
 create a tree of parts by simply assigning either a :class:`~topology.Compound` object's ``parent`` or
-``children`` attributes. To illustrate the process, we'll extend the
-:ref:`Joint Tutorial <joint_tutorial>`.
+``children`` attributes. To illustrate the process, we'll use the box, lid and
+hinge of the :ref:`joint_tutorial` tutorial.
 
 ****************
 Assigning Labels
 ****************
 
 In order keep track of objects one can assign a ``label`` to all :class:`~topology.Shape` objects.
-Here we'll assign labels to all of the components that will be part of the box
-assembly:
+Here labels are assigned to the box and the lid:
 
-.. literalinclude:: /tutorials/tutorial_joints.py
+.. literalinclude:: /tutorials/hinged_box.py
     :language: build123d
-    :start-after: [Add labels]
-    :end-before: [Create assembly]
+    :start-at: box.label, lid.label
+    :end-at: box.label, lid.label
+
+The two hinge leaves already have theirs, ``outer leaf`` and ``inner leaf``,
+which their class assigns when it creates them.
 
 The labels are just strings with no further limitations (they don't have to be unique
 within the assembly).
@@ -36,46 +38,54 @@ Create the Assembly Compound
 Creation of the assembly is done by simply creating a :class:`~topology.Compound` object and assigning
 appropriate ``parent`` and ``children`` attributes as shown here:
 
-.. literalinclude:: /tutorials/tutorial_joints.py
+.. literalinclude:: /tutorials/hinged_box.py
     :language: build123d
-    :start-after: [Create assembly]
-    :end-before: [Display assembly]
+    :start-at: hinged_box = Compound(
+    :end-at: hinged_box = Compound(
 
 To display the topology of an assembly :class:`~topology.Compound`, the :meth:`~topology.Shape.show_topology`
 method can be used as follows:
 
-.. literalinclude:: /tutorials/tutorial_joints.py
-    :language: build123d
-    :start-after: [Display assembly]
-    :end-before: [Add to the assembly by assigning the parent attribute of an object]
+.. code-block:: build123d
+
+    print(hinged_box.show_topology())
 
 which results in:
 
 .. code::
 
-        assembly        Compound at 0x7fc8ee235760, Location(p=(0, 0, 0), o=(-0, 0, -0))
-        ├── box         Compound at 0x7fc8ee2188b0, Location(p=(0, 0, 50), o=(-0, 0, -0))
-        ├── lid         Compound at 0x7fc8ee228460, Location(p=(-26, 0, 181), o=(-180, 30, -0))
-        ├── inner hinge Hinge    at 0x7fc9292c3f70, Location(p=(-119, 60, 122), o=(90, 0, -150))
-        └── outer hinge Hinge    at 0x7fc9292c3f40, Location(p=(-150, 60, 50), o=(90, 0, 90))
+        hinged box     Compound at 0x121233980, Location((0, 0, 0), (0, 0, 0))
+        ├── box        Part     at 0x1212333e0, Location((0, 0, 0), (0, 0, 0))
+        ├── outer leaf HingeLeafat 0x120c70740, Location((-150, 0, 114.5), (0, -90, 180))
+        ├── inner leaf HingeLeafat 0x120cfdb80, Location((-154.5, 0, 110), (0, 0, 0))
+        ├── lid        Part     at 0x120cb8650, Location((0, 0, 100), (0, 0, 0))
+        └── pin        Part     at 0x121271dc0, Location((-154.5, -60, 114.5), (-90, 0, 0))
 
 To add to an assembly :class:`~topology.Compound` one can change either ``children`` or ``parent`` attributes.
+Here six screws, each a copy of one imported screw, are placed in the holes of the
+hinge and added to the assembly by setting their ``parent``:
 
-.. literalinclude:: /tutorials/tutorial_joints.py
+.. literalinclude:: /tutorials/hinged_box.py
     :language: build123d
-    :start-after: [Add to the assembly by assigning the parent attribute of an object]
-    :end-before: [Check that the components in the assembly don't intersect]
+    :start-at: for leaf in (box_leaf, lid_leaf):
+    :end-at: new_screw.parent = hinged_box
 
-and now the screw is part of the assembly.
+and now the screws are part of the assembly.
 
 .. code::
 
-        assembly        Compound at 0x7fc8ee235760, Location(p=(0, 0, 0), o=(-0, 0, -0))
-        ├── box         Compound at 0x7fc8ee2188b0, Location(p=(0, 0, 50), o=(-0, 0, -0))
-        ├── lid         Compound at 0x7fc8ee228460, Location(p=(-26, 0, 181), o=(-180, 30, -0))
-        ├── inner hinge Hinge    at 0x7fc9292c3f70, Location(p=(-119, 60, 122), o=(90, 0, -150))
-        ├── outer hinge Hinge    at 0x7fc9292c3f40, Location(p=(-150, 60, 50), o=(90, 0, 90))
-        └── M6 screw    Compound at 0x7fc8ee235310, Location(p=(-157, -40, 70), o=(-0, -90, -60))
+        hinged box           Compound at 0x121233980, Location((0, 0, 0), (0, 0, 0))
+        ├── box              Part     at 0x1212333e0, Location((0, 0, 0), (0, 0, 0))
+        ├── outer leaf       HingeLeafat 0x120c70740, Location((-150, 0, 114.5), (0, -90, 180))
+        ├── inner leaf       HingeLeafat 0x120cfdb80, Location((-154.5, 0, 110), (0, 0, 0))
+        ├── lid              Part     at 0x120cb8650, Location((0, 0, 100), (0, 0, 0))
+        ├── pin              Part     at 0x121271dc0, Location((-154.5, -60, 114.5), (-90, 0, 0))
+        ├── outer leaf screw Solid    at 0x120cb82f0, Location((-152, 40, 84.5), (0, -90, 180))
+        ├── outer leaf screw Solid    at 0x121233770, Location((-152, 0, 84.5), (0, -90, 180))
+        ├── outer leaf screw Solid    at 0x120cfda90, Location((-152, -40, 84.5), (0, -90, 180))
+        ├── inner leaf screw Solid    at 0x120cfd700, Location((-124.5, -40, 112), (0, 0, 0))
+        ├── inner leaf screw Solid    at 0x120cfe270, Location((-124.5, 0, 112), (0, 0, 0))
+        └── inner leaf screw Solid    at 0x120cfcfb0, Location((-124.5, 40, 112), (0, 0, 0))
 
 .. _assembly_locations:
 

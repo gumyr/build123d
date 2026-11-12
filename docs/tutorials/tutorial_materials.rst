@@ -1,4 +1,6 @@
-.. _material_tutorial:
+:orphan:
+
+.. _material_tutorial_old:
 
 #################
 Material Tutorial

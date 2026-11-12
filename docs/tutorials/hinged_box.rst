@@ -13,8 +13,8 @@ and at what angle, is tedious and easy to get wrong.
 A *joint* does that work. It is a marked point on a part that says *another
 part connects here*, and in what way: fixed, turning, or sliding. Connect a
 joint on one part to a joint on another and the second part moves into
-place. In this tutorial you will put joints on a box, a lid, a hinge and
-its screws, and connect them into this:
+place. In this tutorial you will put joints on a box, a lid, a hinge, its
+pin and its screws, and connect them into this:
 
 .. image:: /tutorials/assets/hinged_box/hinged_open.svg
     :align: center
@@ -84,14 +84,15 @@ with a ``CounterSinkHole`` at each place.
 
 Notice that both leaves are made the same way round, with the rolled edge
 at X = 0. In the picture the second one has been turned to face the first
-by hand. From here on, joints will do that.
+by hand. From here on, joints will do that. The pin is a part of its own
+and comes in step 6.
 
 ************************************
 Step 3: Put joints on the leaf
 ************************************
 
-A leaf connects to three kinds of thing: the part it is screwed to, the
-other leaf, and its screws. Each connection gets a joint, and the joint is
+A leaf connects to several things: the part it is screwed to, the other
+leaf, its screws, and - for one of them - the pin. Each connection gets a joint, and the joint is
 made inside the ``BuildPart``, which is all it takes for it to belong to
 the part. Replace the class with this one, which has the joints added:
 
@@ -102,7 +103,7 @@ the part. Replace the class with this one, which has the joints added:
 
 .. code-block:: text
 
-    ['hole0', 'hole1', 'hole2', 'mount', 'hinge']
+    ['hole0', 'hole1', 'hole2', 'mount', 'hinge', 'pin']
 
 .. image:: /tutorials/assets/hinged_box/hinged_leaf_joints.svg
     :align: center
@@ -126,7 +127,7 @@ all: it marks a position and a direction, and whatever is attached to it is
 held there. ``mount`` is on the underside of the leaf, under the middle
 screw hole.
 
-**The pin.** One leaf turns about the other, and that is a
+**The hinge.** One leaf turns about the other, and that is a
 :class:`~joints.RevoluteJoint`: an axis to turn about and a range of angles
 it may turn through. Only one of a pair of joints needs to describe the
 movement, so the outer leaf has the ``RevoluteJoint`` and the inner leaf
@@ -144,6 +145,12 @@ and the inner leaf the last.
 The two leaves were made the same way round, but in a hinge they face each
 other, so the axis of one has to run the opposite way to the axis of the
 other. That is the ``reverse()``.
+
+**The pin.** The pin is pushed in from one end of the hinge, and the outer
+leaf, whose tubes are at both ends, is the one that holds it. Its ``pin``
+joint is a ``RigidJoint`` taken from a bend as well: the last one this
+time, whose axis starts at the very end of the leaf and runs back along
+the tubes. That is where the pin goes in and the way it points.
 
 The ``angular_range`` of 90 to 360 degrees is the angle between the leaves:
 180 is the hinge lying flat. Below 90 the tubes of one leaf would run into
@@ -240,13 +247,47 @@ Look at where the lid is: flat on ``Plane.XY``, in the same place as the
 bottom of the box. It was made where it was easiest to make. Nothing in
 its code says where it belongs, and nothing needs to.
 
-*********************
-Step 6: A screw
-*********************
+***********************************
+Step 6: The pin and a screw
+***********************************
 
-A joint does not have to be made in a builder. Any solid can be given one,
-including a part that was drawn somewhere else and imported. Download the
-screw :download:`M6-1x12-countersunk-screw.step </tutorials/M6-1x12-countersunk-screw.step>`
+The pin can be pulled out of a real hinge, so it is not part of either
+leaf. It is a part of its own: a round shank the length of the leaf, with
+a wider head at one end.
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /tutorials/hinged_box.py
+            :language: build123d
+            :start-after: [pin_builder]
+            :end-before: [pin_builder]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /tutorials/hinged_box.py
+            :language: build123d
+            :start-after: [pin_algebra]
+            :end-before: [pin_algebra]
+
+.. image:: /tutorials/assets/hinged_box/hinged_pin.svg
+    :align: center
+    :width: 55%
+
+The shank is a circle extruded upwards and the head is a larger circle
+extruded downwards, by a negative amount, so the two meet at the origin.
+That is where the ``head`` joint is: a ``RigidJoint`` with no location
+given sits at the origin, with its Z along the shank. (The picture shows
+the pin lying on its side.) The radius of the
+head is read from the leaf, to match its tubes.
+
+The last part is a screw, and it is not made here at all. A joint does not
+have to be made in a builder. Any solid can be given one, including a part
+that was drawn somewhere else and imported. Download the screw
+:download:`M6-1x12-countersunk-screw.step </tutorials/M6-1x12-countersunk-screw.step>`
 into the folder of your file.
 
 .. literalinclude:: /tutorials/hinged_box.py
@@ -267,7 +308,7 @@ Step 7: Connect the joints
 ************************************
 
 Every part now carries its joints, and the parts are all in the wrong
-places. Three lines put them right. This step, and the rest of the
+places. Four lines put them right. This step, and the rest of the
 tutorial, is the same in both modes.
 
 .. literalinclude:: /tutorials/hinged_box.py
@@ -311,15 +352,28 @@ Last, the inner leaf stays and the lid comes to it. The lid has travelled
 from the floor of the box to the top of it, and no line of the file says
 how far that is.
 
+.. literalinclude:: /tutorials/hinged_box.py
+    :language: build123d
+    :start-after: [connect_pin]
+    :end-before: [connect_pin]
+
+.. image:: /tutorials/assets/hinged_box/hinged_connect_pin.svg
+    :align: center
+    :width: 55%
+
+The pin goes to the ``pin`` joint of the outer leaf, which puts it through
+the tubes of both leaves with its head against the end of the hinge.
+
 The order matters. Each ``attach`` moves one part to a part that is already
 in its final place, so work outwards from the part that stays still: the
-box, then the leaf on it, then the other leaf, then the lid.
+box, then the leaf on it, then the other leaf, then the lid. The pin
+hangs from the first leaf, so it could have gone in any time after that.
 
 *************************
 Step 8: An assembly
 *************************
 
-The four parts are in the right places but are still four separate
+The five parts are in the right places but are still five separate
 variables. An assembly gathers them into one object.
 
 .. literalinclude:: /tutorials/hinged_box.py
@@ -333,7 +387,7 @@ variables. An assembly gathers them into one object.
 
 A ``Compound`` given ``children`` is an assembly: each child keeps its own
 shape, its place and its ``label``. The leaves were given labels by their
-class, and the box and the lid get theirs here. :ref:`assembly` has more
+class and the pin in step 6, and the box and the lid get theirs here. :ref:`assembly` has more
 about assemblies.
 
 ``do_children_intersect`` checks every part of an assembly against every
@@ -355,17 +409,18 @@ There is one screw and there are six holes. Each hole needs a copy.
 
 .. code-block:: text
 
-    hinged box           Compound at 0x1209061b0, Location((0, 0, 0), (0, 0, 0))
-    ├── box              Part     at 0x12089f9e0, Location((0, 0, 0), (0, 0, 0))
-    ├── outer leaf       HingeLeafat 0x11fce2630, Location((-75, 0, 96.5), (0, -90, 180))
-    ├── inner leaf       HingeLeafat 0x1202c3f80, Location((-79.5, 0, 92), (0, 0, 0))
-    ├── lid              Part     at 0x1202edf70, Location((0, 0, 80), (0, 0, 0))
-    ├── outer leaf screw Solid    at 0x1208df6b0, Location((-77, 40, 66.5), (0, -90, 180))
-    ├── outer leaf screw Solid    at 0x12092bcb0, Location((-77, 0, 66.5), (0, -90, 180))
-    ├── outer leaf screw Solid    at 0x1208dfb30, Location((-77, -40, 66.5), (0, -90, 180))
-    ├── inner leaf screw Solid    at 0x1208dfbc0, Location((-49.5, -40, 94), (0, 0, 0))
-    ├── inner leaf screw Solid    at 0x120258830, Location((-49.5, 0, 94), (0, 0, 0))
-    └── inner leaf screw Solid    at 0x1208df950, Location((-49.5, 40, 94), (0, 0, 0))
+    hinged box           Compound at 0x121233980, Location((0, 0, 0), (0, 0, 0))
+    ├── box              Part     at 0x1212333e0, Location((0, 0, 0), (0, 0, 0))
+    ├── outer leaf       HingeLeafat 0x120c70740, Location((-150, 0, 114.5), (0, -90, 180))
+    ├── inner leaf       HingeLeafat 0x120cfdb80, Location((-154.5, 0, 110), (0, 0, 0))
+    ├── lid              Part     at 0x120cb8650, Location((0, 0, 100), (0, 0, 0))
+    ├── pin              Part     at 0x121271dc0, Location((-154.5, -60, 114.5), (-90, 0, 0))
+    ├── outer leaf screw Solid    at 0x120cb82f0, Location((-152, 40, 84.5), (0, -90, 180))
+    ├── outer leaf screw Solid    at 0x121233770, Location((-152, 0, 84.5), (0, -90, 180))
+    ├── outer leaf screw Solid    at 0x120cfda90, Location((-152, -40, 84.5), (0, -90, 180))
+    ├── inner leaf screw Solid    at 0x120cfd700, Location((-124.5, -40, 112), (0, 0, 0))
+    ├── inner leaf screw Solid    at 0x120cfe270, Location((-124.5, 0, 112), (0, 0, 0))
+    └── inner leaf screw Solid    at 0x120cfcfb0, Location((-124.5, 40, 112), (0, 0, 0))
 
 .. image:: /tutorials/assets/hinged_box/hinged_finished.svg
     :align: center

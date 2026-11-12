@@ -43,8 +43,8 @@ from build123d import *
 leaf_width, leaf_length, leaf_thickness = 50, 120, 2
 pin_diameter = 5
 
-box_length, box_depth, box_height = 200, 150, 80
-wall_thickness, lid_thickness = 12, 12
+box_length, box_depth, box_height = 300, 300, 100
+wall_thickness, lid_thickness = 10, 10
 pilot_radius, pilot_depth = 3, 10
 # [setup]
 
@@ -218,6 +218,7 @@ class HingeLeaf(BasePartObject):
                 RevoluteJoint(
                     "hinge", axis=bend_axis.reverse(), angular_range=(90, 360)
                 )
+                RigidJoint("pin", joint_location=bends[-1].axis_of_rotation.location)
             else:
                 RigidJoint("hinge", joint_location=bend_axis.location)
 
@@ -234,8 +235,8 @@ print(list(box_leaf.joints))
 # [leaf_joints]
 
 assert all(same(old, new) for old, new in zip(bare_leaves, (box_leaf, lid_leaf)))
-assert list(box_leaf.joints) == ["hole0", "hole1", "hole2", "mount", "hinge"]
-assert list(lid_leaf.joints) == list(box_leaf.joints)
+assert list(box_leaf.joints) == ["hole0", "hole1", "hole2", "mount", "hinge", "pin"]
+assert list(lid_leaf.joints) == ["hole0", "hole1", "hole2", "mount", "hinge"]
 assert isinstance(box_leaf.joints["hinge"], RevoluteJoint)
 assert isinstance(lid_leaf.joints["hinge"], RigidJoint)
 render(
@@ -343,8 +344,34 @@ assert builder_lid.joints["hinge"].location == lid.joints["hinge"].location
 render([lid], "lid", joints=[lid.joints["hinge"]])
 
 # ---------------------------------------------------------------------------
-# Step 6: a screw
+# Step 6: the pin and a screw
 # ---------------------------------------------------------------------------
+# [pin_builder]
+with BuildPart() as pin_builder:
+    with BuildSketch() as shank:
+        Circle(pin_diameter / 2)
+    extrude(amount=leaf_length)
+    with BuildSketch() as head:
+        Circle(box_leaf.barrel_radius)
+    extrude(amount=-pin_diameter / 2)
+    RigidJoint("head")
+pin = pin_builder.part
+pin.label = "pin"
+# [pin_builder]
+builder_pin = pin
+
+# [pin_algebra]
+pin = extrude(Circle(pin_diameter / 2), amount=leaf_length)
+pin += extrude(Circle(box_leaf.barrel_radius), amount=-pin_diameter / 2)
+pin += RigidJoint("head")
+pin.label = "pin"
+# [pin_algebra]
+
+assert same(builder_pin, pin) and len(pin.solids()) == 1
+assert builder_pin.joints["head"].location == pin.joints["head"].location
+laid_flat = Rot(Y=90) * pin  # drawn lying down, to fit the page
+render([laid_flat], "pin", joints=[laid_flat.joints["head"]], viewpoint=(-60, -140, 80))
+
 # [screw]
 screw = import_step("M6-1x12-countersunk-screw.step")
 RigidJoint("head", screw, Location((0, 0, 0)))
@@ -371,6 +398,11 @@ lid_leaf.joints["mount"].attach(lid.joints["hinge"])
 # [connect_lid]
 render([box, box_leaf, lid_leaf, lid], "connect_lid")
 
+# [connect_pin]
+box_leaf.joints["pin"].attach(pin.joints["head"])
+# [connect_pin]
+render([box, box_leaf, lid_leaf, lid, pin], "connect_pin")
+
 # The lid has landed exactly on the box.
 lid_box = lid.bounding_box()
 assert abs(lid_box.min.Z - box_height) < 1e-6
@@ -381,7 +413,7 @@ assert (lid_box.center() - Vector(0, 0, box_height + lid_thickness / 2)).length 
 # ---------------------------------------------------------------------------
 # [assembly]
 box.label, lid.label = "box", "lid"
-hinged_box = Compound(label="hinged box", children=[box, box_leaf, lid_leaf, lid])
+hinged_box = Compound(label="hinged box", children=[box, box_leaf, lid_leaf, lid, pin])
 
 clash, clashing_parts, clash_volume = hinged_box.do_children_intersect()
 print(f"Do any of the parts overlap? {clash}")
@@ -401,7 +433,7 @@ for leaf in (box_leaf, lid_leaf):
 
 print(hinged_box.show_topology())
 # [screws]
-SCREWS += hinged_box.children[4:]
+SCREWS += hinged_box.children[5:]
 assert len(SCREWS) == 6
 render(list(hinged_box.children), "finished")
 
@@ -417,7 +449,7 @@ for hole, lid_screw in zip(("hole0", "hole1", "hole2"), lid_screws):
 # [open]
 render(list(hinged_box.children), "open")
 clash, _, _ = Compound(
-    children=[copy.copy(c) for c in hinged_box.children[:4]]
+    children=[copy.copy(c) for c in hinged_box.children[:5]]
 ).do_children_intersect()
 assert clash is False
 

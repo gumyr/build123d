@@ -22,7 +22,7 @@ as later tutorials build on the concepts introduced in earlier ones.
     dimensioned_drawing.rst
     lego_block.rst
     hinged_box.rst
-    tutorial_materials.rst
+    box_materials.rst
     examples_1.rst
     tttt.rst
     tutorial_stl_reconstruction.rst
