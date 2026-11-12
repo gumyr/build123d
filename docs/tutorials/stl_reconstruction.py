@@ -34,6 +34,7 @@ license:
 
 import contextlib
 import io
+import re
 import runpy
 import types
 from pathlib import Path
@@ -123,10 +124,12 @@ for clue in (
     "Plane.YZ.offset(22)",
     "Plane.YZ.offset(25)",
     "Plane.ZX.offset(3)",
-    "Circle(2.50",
     "Circle(2).edge()",
 ):
     assert clue in report, clue
+# The fitted radius of the hole differs in its last digits between platforms
+hole_radius_found = float(re.search(r"Circle\((2\.[45]\d*)\)", report).group(1))
+assert abs(hole_radius_found - 2.5) < 0.05, hole_radius_found
 
 # ---------------------------------------------------------------------------
 # Step 7: measure what was left over

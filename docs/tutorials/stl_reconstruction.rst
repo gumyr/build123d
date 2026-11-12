@@ -241,8 +241,9 @@ Then at what sits on them:
 * ``c2`` is a cylinder of radius 2.50137, 3 mm long, through the wall on
   ``Plane.YZ``. A cylinder exactly as long as the wall is thick is a
   **hole, 5 mm across**. The stray digits are the mesh speaking: a circle
-  made of straight pieces is not quite a circle. Round to the number a
-  designer would have chosen.
+  made of straight pieces is not quite a circle, and the last digits can
+  differ from one computer to another. Round to the number a designer
+  would have chosen.
 * ``c3`` is a cylinder of radius 2, also through that wall, with its
   centre 2 mm in from the wall's edges. That is a **corner rounded to
   2 mm**.
