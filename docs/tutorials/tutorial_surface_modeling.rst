@@ -1,3 +1,5 @@
+.. _surface_modeling:
+
 #################
 Surface Modeling
 #################
@@ -50,6 +52,5 @@ Methods on :class:`~topology.Face` for creating non‑planar surfaces:
 .. toctree::
    :maxdepth: 1
 
-   tutorial_surface_heart_token.rst
    tutorial_spitfire_wing_gordon.rst
 

@@ -28,6 +28,7 @@ as later tutorials build on the concepts introduced in earlier ones.
     tttt.rst
     tutorial_stl_reconstruction.rst
     tutorial_surface_modeling.rst
+    surface_heart_token.rst
 
 The :ref:`sheet metal tutorial <sheet_metal_tutorial>` lives with the rest of
 the :ref:`sheet metal <sheet_metal>` documentation.
