@@ -24,6 +24,14 @@ orthographic, the drawing kind; with a focal length it is a perspective
 view. The result is a :class:`~topology.DrawingViewOutput` named tuple that
 unpacks into ``visible, hidden`` and also answers by name.
 
+Each line of the drawing comes back once. Hidden-line removal can return the
+same line more than once, for instance where unfused parts of a compound meet
+or where a hidden edge lies directly under a visible one, so ``drawing_view``
+drops edges that lie on a visible edge and merges edges that lie on the same
+curve and touch or overlap, such as the pieces of an edge split where another
+crosses it in the view. A hidden line drawn dashed then never overprints a
+solid one.
+
 *****************
 Making a drawing
 *****************

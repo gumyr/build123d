@@ -54,7 +54,7 @@ from __future__ import annotations
 import copy
 import warnings
 from bisect import bisect_right
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from math import atan2, ceil, copysign, cos, floor, inf, isclose, pi, radians
@@ -217,6 +217,7 @@ from build123d.geometry import (
     TOL_DIGITS,
     TOLERANCE,
     Axis,
+    BoundBox,
     Color,
     Location,
     Plane,
@@ -588,7 +589,7 @@ def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
 
 
 class DrawingViewOutput(NamedTuple):
-    """What :meth:`~topology.Shape.drawing_view` gives back: the edges of the shape as
+    """What :meth:`~topology.Mixin1D.drawing_view` gives back: the edges of the shape as
     seen from the viewpoint, split by hidden-line removal.
 
     ``visible, hidden = part.drawing_view(viewpoint)`` unpacks it, and the fields are
@@ -601,6 +602,325 @@ class DrawingViewOutput(NamedTuple):
 
     visible: ShapeList[Edge]
     hidden: ShapeList[Edge]
+
+
+# Points sampled along an edge when its geometry is compared by sampling
+_OVERLAP_SAMPLES = 33
+
+
+def _sample_fractions() -> list[float]:
+    """Fractions along a curve to sample: both ends and the middle first, so a
+    shape that isn't on another is usually found out by the first few"""
+    inner = [i / (_OVERLAP_SAMPLES - 1) for i in range(1, _OVERLAP_SAMPLES - 1)]
+    return [0.0, 1.0, 0.5] + [f for f in inner if f != 0.5]
+
+
+def _sample_points(shape: Mixin1D) -> Iterator[Vector]:
+    """Points spread along an edge or a wire, produced one at a time"""
+    if isinstance(shape, Edge):
+        adaptor = BRepAdaptor_Curve(shape.wrapped)
+        first, last = adaptor.FirstParameter(), adaptor.LastParameter()
+        for fraction in _sample_fractions():
+            yield Vector(adaptor.Value(first + fraction * (last - first)))
+    else:
+        for fraction in _sample_fractions():
+            yield shape.position_at(fraction)
+
+
+def _distance_to(shape: Mixin1D) -> Callable[[Vector], float]:
+    """A function giving the distance from a point to an edge or a wire
+
+    For an edge this is the nearest of the edge's foot points and its two ends,
+    with the curve set up once for every point measured.
+    """
+    if not isinstance(shape, Edge):
+        return shape.distance_to
+
+    adaptor = BRepAdaptor_Curve(shape.wrapped)
+    ends = (
+        adaptor.Value(adaptor.FirstParameter()),
+        adaptor.Value(adaptor.LastParameter()),
+    )
+
+    def distance(point: Vector) -> float:
+        pnt = point.to_pnt()
+        nearest = min(pnt.Distance(ends[0]), pnt.Distance(ends[1]))
+        extrema = Extrema_ExtPC(pnt, adaptor)
+        if extrema.IsDone():
+            for i in range(1, extrema.NbExt() + 1):
+                nearest = min(nearest, extrema.SquareDistance(i) ** 0.5)
+        return nearest
+
+    return distance
+
+
+def _line_coordinates(
+    origin: Vector, direction: Vector, point: Vector
+) -> tuple[float, float]:
+    """Position of a point along a line and its distance off it"""
+    offset = point - origin
+    along = offset.dot(direction)
+    return along, (offset - direction * along).length
+
+
+def _same_circle(first: gp_Circ, second: gp_Circ, tolerance: float) -> bool:
+    """Do two circles coincide, whichever way their axes point?"""
+    axis_a = Vector(first.Axis().Direction())
+    axis_b = Vector(second.Axis().Direction())
+    return (
+        abs(first.Radius() - second.Radius()) <= tolerance
+        and (Vector(first.Location()) - Vector(second.Location())).length <= tolerance
+        and axis_a.cross(axis_b).length * first.Radius() <= tolerance
+    )
+
+
+def _angle_on_circle(circle: gp_Circ, point: Vector) -> float:
+    """Angle of a point around a circle, measured in the circle's own frame"""
+    frame = circle.Position()
+    offset = point - Vector(circle.Location())
+    return atan2(
+        offset.dot(Vector(frame.YDirection())), offset.dot(Vector(frame.XDirection()))
+    ) % (2 * pi)
+
+
+def _arc_interval(edge: Edge, circle: gp_Circ) -> tuple[float, float]:
+    """The angular range ``(start, span)`` an arc covers on a circle, counter
+    clockwise in the circle's frame whichever way the arc runs."""
+    if edge.is_closed:
+        return 0.0, 2 * pi
+    start = _angle_on_circle(circle, edge.start_point())
+    end = _angle_on_circle(circle, edge.end_point())
+    middle = _angle_on_circle(circle, edge @ 0.5)
+    span = (end - start) % (2 * pi)
+    if (middle - start) % (2 * pi) > span:
+        # The arc runs clockwise in this frame, so the range starts at its end
+        start, span = end, (start - end) % (2 * pi)
+    return start, span
+
+
+def _interval_offset(
+    start: float, ref_start: float, period: float, eps: float
+) -> float:
+    """How far ``start`` lies past ``ref_start`` on a periodic range, with values
+    just short of a whole period read as just before ``ref_start``"""
+    offset = (start - ref_start) % period
+    return offset - period if offset > period - eps else offset
+
+
+def _interval_within(
+    interval: tuple[float, float],
+    reference: tuple[float, float],
+    period: float,
+    eps: float,
+) -> bool:
+    """Does a periodic ``(start, span)`` interval lie within another?"""
+    if reference[1] >= period - eps:
+        return True
+    offset = _interval_offset(interval[0], reference[0], period, eps)
+    return offset >= -eps and offset + interval[1] <= reference[1] + eps
+
+
+def _interval_union(
+    first: tuple[float, float],
+    second: tuple[float, float],
+    period: float,
+    eps: float,
+) -> tuple[float, float] | None:
+    """The union of two periodic ``(start, span)`` intervals that touch or
+    overlap, or None if there is a gap between them"""
+    for lead, follow in ((first, second), (second, first)):
+        offset = _interval_offset(follow[0], lead[0], period, eps)
+        if -eps <= offset <= lead[1] + eps:
+            span = max(lead[1], offset + follow[1])
+            return lead[0], period if span >= period - eps else span
+    return None
+
+
+def _merge_on_curve(base: Edge, extra: Edge, tolerance: float) -> Edge | None:
+    """Merge ``extra`` into ``base`` by extending base's underlying curve, provided
+    samples of ``extra`` show it lies on that curve; None otherwise"""
+    curve = BRep_Tool.Curve_s(base.wrapped, 0.0, 0.0)
+    if isinstance(curve, Geom_TrimmedCurve):
+        curve = curve.BasisCurve()
+    params = []  # in the order of _sample_fractions: start, end, middle, ...
+    for point in _sample_points(extra):
+        projector = GeomAPI_ProjectPointOnCurve(point.to_pnt(), curve)
+        if projector.NbPoints() == 0 or projector.LowerDistance() > tolerance:
+            return None
+        params.append(projector.LowerDistanceParameter())
+
+    first, last = BRep_Tool.Range_s(base.wrapped)
+    length_scale = max(base.length / max(last - first, TOLERANCE), TOLERANCE)
+    eps = tolerance / length_scale  # tolerance as a curve parameter
+
+    if curve.IsPeriodic():
+        period = curve.Period()
+        start, end, middle = params[0], params[1], params[2]
+        span = (end - start) % period
+        if extra.is_closed:
+            start, span = first, period
+        elif (middle - start) % period > span:
+            start, span = end, (start - end) % period
+        union = _interval_union((first, last - first), (start, span), period, eps)
+        if union is None:
+            return None
+        low, high = union[0], union[0] + union[1]
+    else:
+        low, high = min(params), max(params)
+        if low > last + eps or high < first - eps:
+            return None
+        low, high = min(low, first), max(high, last)
+    builder = BRepBuilderAPI_MakeEdge(curve, low, high)
+    return Edge(builder.Edge()) if builder.IsDone() else None
+
+
+def _merge_lines(first: Edge, second: Edge, tolerance: float) -> Edge | None:
+    """Merge two touching lines if they are collinear, see :meth:`Edge.merge`"""
+    origin = first.start_point()
+    extent = (first.end_point() - origin).length
+    direction = (first.end_point() - origin).normalized()
+    spans = []
+    for point in (second.start_point(), second.end_point()):
+        along, off = _line_coordinates(origin, direction, point)
+        if off > tolerance:
+            return None
+        spans.append(along)
+    if min(spans) >= -tolerance and max(spans) <= extent + tolerance:
+        return first  # second lies within first
+    if min(spans) <= tolerance and max(spans) >= extent - tolerance:
+        return second  # first lies within second
+    low, high = min(0.0, *spans), max(extent, *spans)
+    return Edge.make_line(origin + direction * low, origin + direction * high)
+
+
+def _merge_arcs(first: Edge, second: Edge, tolerance: float) -> Edge | None:
+    """Merge two touching arcs if they are of one circle, see :meth:`Edge.merge`"""
+    circle = first.geom_adaptor().Circle()
+    if not _same_circle(circle, second.geom_adaptor().Circle(), tolerance):
+        return None
+    eps = tolerance / circle.Radius()
+    first_arc = _arc_interval(first, circle)
+    second_arc = _arc_interval(second, circle)
+    if _interval_within(second_arc, first_arc, 2 * pi, eps):
+        return first
+    if _interval_within(first_arc, second_arc, 2 * pi, eps):
+        return second
+    union = _interval_union(first_arc, second_arc, 2 * pi, eps)
+    if union is None:
+        return None
+    frame = circle.Position()
+    plane = Plane(
+        Vector(circle.Location()), Vector(frame.XDirection()), Vector(frame.Direction())
+    )
+    start, span = union
+    if span >= 2 * pi:
+        return Edge.make_circle(circle.Radius(), plane)
+    return Edge.make_circle(
+        circle.Radius(), plane, start / DEG2RAD, (start + span) / DEG2RAD
+    )
+
+
+def _merge_sampled(first: Edge, second: Edge, tolerance: float) -> Edge | None:
+    """Merge two touching edges of any other kind by sampling, see
+    :meth:`Edge.merge`"""
+    if second.is_subset_of(first, tolerance):
+        return first
+    if first.is_subset_of(second, tolerance):
+        return second
+    merged = _merge_on_curve(first, second, tolerance)
+    return merged if merged is not None else _merge_on_curve(second, first, tolerance)
+
+
+class _EdgeReach(NamedTuple):
+    """An edge with what's needed to rule out most pairs of edges cheaply"""
+
+    edge: Edge
+    box: BoundBox
+    ends: tuple[Vector, Vector]
+    distance: Callable[[Vector], float]
+
+    @classmethod
+    def of(cls, edge: Edge) -> _EdgeReach:
+        """Gather the box, ends and distance function of an edge"""
+        return cls(
+            edge,
+            edge.bounding_box(optimal=False),
+            (edge.start_point(), edge.end_point()),
+            _distance_to(edge),
+        )
+
+    def ends_on(self, other: _EdgeReach, tolerance: float) -> bool:
+        """Do both ends of this edge lie on ``other``, as they must if this
+        edge is a subset of it?"""
+        return self.box.intersects(other.box, tolerance) and all(
+            other.distance(end) <= tolerance for end in self.ends
+        )
+
+    def touches(self, other: _EdgeReach, tolerance: float) -> bool:
+        """Does an end of either edge lie on the other, as it must if the two
+        edges are to be merged?"""
+        return self.box.intersects(other.box, tolerance) and (
+            any(other.distance(end) <= tolerance for end in self.ends)
+            or any(self.distance(end) <= tolerance for end in other.ends)
+        )
+
+
+def _drop_subset_edges(
+    edges: list[Edge], references: list[Edge] | None, tolerance: float
+) -> list[Edge]:
+    """Remove the edges that lie on another edge
+
+    With ``references``, an edge is dropped when it is a subset of one of them;
+    without, when it is a subset of another of ``edges``, keeping one of each
+    set of identical edges. The order of the kept edges is unchanged.
+    """
+    reaches = [_EdgeReach.of(e) for e in edges]
+    if references is None:
+        # Longest first, so each edge is tested against those that can hold it
+        kept: list[_EdgeReach] = []
+        for reach in sorted(reaches, key=lambda r: -r.edge.length):
+            if not any(
+                reach.ends_on(k, tolerance)
+                and reach.edge.is_subset_of(k.edge, tolerance)
+                for k in kept
+            ):
+                kept.append(reach)
+        kept_ids = {id(k.edge) for k in kept}
+        return [e for e in edges if id(e) in kept_ids]
+
+    reference_reaches = [_EdgeReach.of(r) for r in references]
+    return [
+        reach.edge
+        for reach in reaches
+        if not any(
+            reach.ends_on(ref, tolerance)
+            and reach.edge.is_subset_of(ref.edge, tolerance)
+            for ref in reference_reaches
+        )
+    ]
+
+
+def _merge_edges(edges: list[Edge], tolerance: float) -> list[Edge]:
+    """Merge every pair of edges that lie on the same curve and touch or overlap"""
+    reaches = [_EdgeReach.of(e) for e in edges]
+    i = 0
+    while i < len(reaches):
+        j = i + 1
+        while j < len(reaches):
+            merged = (
+                reaches[i].edge.merge(reaches[j].edge, tolerance)
+                if reaches[i].touches(reaches[j], tolerance)
+                else None
+            )
+            if merged is None:
+                j += 1
+                continue
+            # Grow edge i and check it again against everything after it
+            reaches[i] = _EdgeReach.of(merged)
+            del reaches[j]
+            j = i + 1
+        i += 1
+    return [r.edge for r in reaches]
 
 
 class Mixin1D(Shape[TOPODS]):
@@ -1135,6 +1455,63 @@ class Mixin1D(Shape[TOPODS]):
                 results.extend(result)
 
         return results if results else None
+
+    def is_subset_of(self, other: Mixin1D, tolerance: float = TOLERANCE) -> bool:
+        """is_subset_of
+
+        Does this edge or wire lie entirely on ``other``? The test is geometric,
+        not topological: two independently made edges along the same stretch of
+        the same curve are subsets of each other, and neither direction matters.
+
+        Two lines are compared by checking that both ends of this one lie on the
+        other line and within its extent. Two circular arcs must share centre,
+        radius and plane, and this arc's angular range must lie within the
+        other's, allowing for full circles and for ranges that wrap past zero.
+        Any other pair, including a line and a curve, a curve seen edge-on that
+        has become a straight BSPLINE, or wires, is compared by sampling this
+        shape and requiring every sample to lie on ``other``.
+
+        Args:
+            other (Mixin1D): the edge or wire that may contain this one
+            tolerance (float, optional): how far off ``other`` a point may be
+                and still count as on it. Defaults to TOLERANCE.
+
+        Raises:
+            ValueError: either shape is empty
+
+        Returns:
+            bool: True if every point of this shape is within tolerance of ``other``
+        """
+        if self.is_empty or other.is_empty:
+            raise ValueError("Can't compare empty edges/wires")
+
+        if self.length > other.length + tolerance:
+            return False
+
+        if isinstance(self, Edge) and isinstance(other, Edge):
+            if self.geom_type == other.geom_type == GeomType.LINE:
+                origin, end = other.start_point(), other.end_point()
+                extent = (end - origin).length
+                direction = (end - origin).normalized()
+                for point in (self.start_point(), self.end_point()):
+                    along, off = _line_coordinates(origin, direction, point)
+                    if off > tolerance or not -tolerance <= along <= extent + tolerance:
+                        return False
+                return True
+
+            if self.geom_type == other.geom_type == GeomType.CIRCLE:
+                circle = other.geom_adaptor().Circle()
+                if not _same_circle(self.geom_adaptor().Circle(), circle, tolerance):
+                    return False
+                return _interval_within(
+                    _arc_interval(self, circle),
+                    _arc_interval(other, circle),
+                    2 * pi,
+                    tolerance / circle.Radius(),
+                )
+
+        distance = _distance_to(other)
+        return all(distance(point) <= tolerance for point in _sample_points(self))
 
     def location_at(
         self,
@@ -1694,6 +2071,13 @@ class Mixin1D(Shape[TOPODS]):
         The line drawing of this shape as seen from a viewpoint: its edges,
         split into visible and hidden by hidden-line removal.
 
+        Each line of the drawing is returned once. Edges that lie on another
+        visible edge are dropped, as are hidden edges that lie under a visible
+        one, and the remaining edges that lie on the same curve and touch or
+        overlap, such as the two copies of the join between unfused parts or
+        the pieces of an edge split by hidden-line removal, are merged into
+        one. Visible and hidden edges are merged separately.
+
         Args:
             viewpoint (VectorLike): where the view is taken from
             up (VectorLike, optional): direction of the view's y axis.
@@ -1774,10 +2158,17 @@ class Mixin1D(Shape[TOPODS]):
             BRepLib.BuildCurves3d_s(edge, TOLERANCE)
 
         # convert to native shape objects
-        visible_edges = ShapeList(Edge(e) for e in visible_edges)
-        hidden_edges = ShapeList(Edge(e) for e in hidden_edges)
+        visible = [Edge(e) for e in visible_edges]
+        hidden = [Edge(e) for e in hidden_edges]
 
-        return DrawingViewOutput(visible_edges, hidden_edges)
+        # The kernel can return the same line more than once: in two of the
+        # compounds above, once per part where unfused parts meet, or hidden
+        # under a visible line. Keep each line once, as visible or as hidden.
+        visible = _merge_edges(_drop_subset_edges(visible, None, TOLERANCE), TOLERANCE)
+        hidden = _drop_subset_edges(hidden, visible, TOLERANCE)
+        hidden = _merge_edges(hidden, TOLERANCE)
+
+        return DrawingViewOutput(ShapeList(visible), ShapeList(hidden))
 
     @deprecated("project_to_viewport is deprecated; use drawing_view instead.")
     def project_to_viewport(
@@ -3281,6 +3672,62 @@ class Edge(Mixin1D[TopoDS_Edge]):
                     if (self @ t) != (other @ t):
                         return False
                 return True
+
+    def merge(self, other: Edge, tolerance: float = TOLERANCE) -> Edge | None:
+        """merge
+
+        Join two edges that lie on the same curve and touch or overlap into one
+        edge covering both. Collinear lines that meet end to end or overlap
+        become one line, arcs of the same circle become one arc (or the full
+        circle), and other curves are merged by sampling ``other`` against the
+        underlying curve of this edge, or of ``other`` if that fails, and
+        extending it. If one edge is a subset of the other, the larger one is
+        returned unchanged.
+
+        The merged edge runs in this edge's direction.
+
+        Args:
+            other (Edge): edge to merge with this one
+            tolerance (float, optional): how far apart the edges may be and
+                still count as on the same curve and touching. Defaults to
+                TOLERANCE.
+
+        Raises:
+            ValueError: either edge is empty
+
+        Returns:
+            Edge | None: the merged edge, or None if the edges don't lie on the
+            same curve or have a gap between them
+        """
+        if self.is_empty or other.is_empty:
+            raise ValueError("Can't merge empty edges")
+
+        # The edges must at least touch: an end of one lies on the other
+        to_self, to_other = _distance_to(self), _distance_to(other)
+        if not any(
+            distance(end) <= tolerance
+            for distance, end in (
+                (to_self, other.start_point()),
+                (to_self, other.end_point()),
+                (to_other, self.start_point()),
+                (to_other, self.end_point()),
+            )
+        ):
+            return None
+
+        if self.geom_type == other.geom_type == GeomType.LINE:
+            merged = _merge_lines(self, other, tolerance)
+        elif self.geom_type == other.geom_type == GeomType.CIRCLE:
+            merged = _merge_arcs(self, other, tolerance)
+        else:
+            merged = _merge_sampled(self, other, tolerance)
+
+        if merged is None or merged is self or merged is other:
+            return merged
+        # Run the merged edge the same way as this one
+        if merged.tangent_at(self @ 0.5).dot(self.tangent_at(0.5)) < 0:
+            merged = merged.reversed()
+        return merged
 
     def _occt_param_at(
         self, position: float, position_mode: PositionMode = PositionMode.PARAMETER

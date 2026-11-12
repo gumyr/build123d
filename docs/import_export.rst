@@ -151,7 +151,7 @@ There are a couple ways to generate a 2D drawing of a 3D part:
 
 * Generate a section: The  :func:`~operations_part.section` operation can be used to
   create a 2D cross section of a 3D part at a given plane.
-* Generate a view: The :meth:`~topology.Shape.drawing_view` method can be
+* Generate a view: The :meth:`~topology.Mixin1D.drawing_view` method can be
   used to create a 2D line drawing of a 3D scene. Similar to a camera, the ``viewpoint``
   defines the location of camera, the ``up`` defines the orientation of the camera,
   and the ``look_at`` parameter defined where the camera is pointed.  By default, 

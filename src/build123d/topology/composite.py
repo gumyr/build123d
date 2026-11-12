@@ -904,6 +904,13 @@ class Compound(Mixin3D[TopoDS_Compound]):
         The line drawing of this shape as seen from a viewpoint: its edges,
         split into visible and hidden by hidden-line removal.
 
+        Each line of the drawing is returned once. Edges that lie on another
+        visible edge are dropped, as are hidden edges that lie under a visible
+        one, and the remaining edges that lie on the same curve and touch or
+        overlap, such as the two copies of the join between unfused parts or
+        the pieces of an edge split by hidden-line removal, are merged into
+        one. Visible and hidden edges are merged separately.
+
         Args:
             viewpoint (VectorLike): where the view is taken from
             up (VectorLike, optional): direction of the view's y axis.
