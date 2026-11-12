@@ -20,7 +20,7 @@ as later tutorials build on the concepts introduced in earlier ones.
     parametric_part.rst
     tutorial_design.rst
     dimensioned_drawing.rst
-    tutorial_lego.rst
+    lego_block.rst
     tutorial_joints.rst
     tutorial_materials.rst
     examples_1.rst

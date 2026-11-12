@@ -37,7 +37,7 @@ from build123d.topology import Shape
 
 # [setup]
 from build123d import *
-from bd_materials import metals
+from bd_materials import FinishedMaterial, metals
 
 length = 300  # mm
 load = 200  # N
@@ -132,14 +132,14 @@ class Beam(BasePartObject):
 
     def __init__(
         self,
-        length,
-        load,
-        max_deflection,
-        material,
-        width=20,
-        rotation=(0, 0, 0),
-        align=None,
-        mode=Mode.ADD,
+        length: float,
+        load: float,
+        max_deflection: float,
+        material: FinishedMaterial,
+        width: float = 20,
+        rotation: RotationLike = (0, 0, 0),
+        align: Align | tuple[Align, Align, Align] | None = None,
+        mode: Mode = Mode.ADD,
     ):
         modulus = material.material.modulus_of_elasticity.min * 1000
         section_depth = (
@@ -170,14 +170,14 @@ class Beam(BasePartObject):
 
     def __init__(
         self,
-        length,
-        load,
-        max_deflection,
-        material,
-        width=20,
-        rotation=(0, 0, 0),
-        align=None,
-        mode=Mode.ADD,
+        length: float,
+        load: float,
+        max_deflection: float,
+        material: FinishedMaterial,
+        width: float = 20,
+        rotation: RotationLike = (0, 0, 0),
+        align: Align | tuple[Align, Align, Align] | None = None,
+        mode: Mode = Mode.ADD,
     ):
         modulus = material.material.modulus_of_elasticity.min * 1000
         section_depth = (

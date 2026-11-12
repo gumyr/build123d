@@ -54,7 +54,9 @@ Notice what is missing: nothing says how deep the beam is.
 
 The material comes from ``bd_materials``, a library of real materials that
 is installed with build123d. ``metals.aluminum()`` is a common aluminium
-alloy, and it knows its own physical properties.
+alloy, and it knows its own physical properties. ``FinishedMaterial``,
+imported beside it, is the type of every material in the library, and is
+needed in step 4.
 
 Lengths are in millimetres and the load is in newtons. With those two,
 stiffness comes out in megapascals, and no other conversions are needed.
@@ -191,6 +193,12 @@ The class has four parts, and every custom object has the same four:
    requirement - ``length``, ``load``, ``max_deflection``, ``material`` and
    ``width`` - followed by three that every built-in object has:
    ``rotation``, ``align`` and ``mode``.
+   Each is followed by a colon and its type, such as ``length: float``.
+   These *type hints* change nothing when the code runs, but they tell
+   whoever uses a ``Beam``, and their editor, what each argument should
+   be. build123d itself is written this way, and its own types are there
+   to be used: ``RotationLike`` is anything that describes a rotation, and
+   ``FinishedMaterial`` is what ``bd_materials`` supplies.
 #. **It builds the shape with the ordinary tools.** These are the lines of
    steps 2 and 3, unchanged, in whichever mode you prefer.
 #. **It hands the finished shape to** ``super().__init__``, together with
