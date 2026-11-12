@@ -13,3 +13,16 @@ This project was originally derived from portions of the CadQuery codebase
 (https://github.com/CadQuery/cadquery) but has since been extensively
 refactored and restructured into an independent system.
 CadQuery is licensed under the Apache License, Version 2.0.
+
+-------------------------------------------------------------------------------
+
+This software makes use of or is based on facilities provided by the Open
+CASCADE Technology software (https://dev.opencascade.org), Copyright (c)
+OPEN CASCADE SAS and contributors, which it uses through separately
+distributed Python bindings. Open CASCADE Technology is licensed under the
+GNU Lesser General Public License version 2.1 with the Open CASCADE
+Exception version 1.0.
+
+build123d itself does not contain Open CASCADE Technology; it is installed
+as a dependency, in binary form, from the separately published bindings
+package, which carries its own licence notices.
