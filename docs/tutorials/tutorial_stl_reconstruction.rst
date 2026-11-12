@@ -1,4 +1,6 @@
-.. _stl_reconstruction_tutorial:
+:orphan:
+
+.. _stl_reconstruction_tutorial_old:
 
 #############################################
 Tutorial: Reconstructing a Design from an STL

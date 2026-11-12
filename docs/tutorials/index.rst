@@ -26,7 +26,7 @@ as later tutorials build on the concepts introduced in earlier ones.
     bracket_drawing.rst
     examples_1.rst
     tttt.rst
-    tutorial_stl_reconstruction.rst
+    stl_reconstruction.rst
     surface_heart_token.rst
     surface_spitfire_wing.rst
 
