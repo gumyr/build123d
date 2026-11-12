@@ -1,4 +1,6 @@
-.. _tech_drawing_tutorial:
+:orphan:
+
+.. _tech_drawing_tutorial_old:
 
 ##########################
 Technical Drawing Tutorial

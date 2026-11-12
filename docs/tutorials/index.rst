@@ -23,11 +23,11 @@ as later tutorials build on the concepts introduced in earlier ones.
     lego_block.rst
     hinged_box.rst
     box_materials.rst
+    bracket_drawing.rst
     examples_1.rst
     tttt.rst
     tutorial_stl_reconstruction.rst
     tutorial_surface_modeling.rst
-    tech_drawing_tutorial.rst
 
 The :ref:`sheet metal tutorial <sheet_metal_tutorial>` lives with the rest of
 the :ref:`sheet metal <sheet_metal>` documentation.
