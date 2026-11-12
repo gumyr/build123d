@@ -21,7 +21,7 @@ as later tutorials build on the concepts introduced in earlier ones.
     tutorial_design.rst
     dimensioned_drawing.rst
     lego_block.rst
-    tutorial_joints.rst
+    hinged_box.rst
     tutorial_materials.rst
     examples_1.rst
     tttt.rst

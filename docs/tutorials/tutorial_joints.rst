@@ -1,4 +1,6 @@
-.. _joint_tutorial:
+:orphan:
+
+.. _joint_tutorial_old:
 
 ##############
 Joint Tutorial
