@@ -1,12 +1,11 @@
-#######################
-The build123d Examples
-#######################
+.. _examples:
+
+########
+Examples
+########
 .. |siren| replace:: 🚨
 .. |Builder| replace:: 🔨
 .. |Algebra| replace:: ✏️
-
-Overview
---------------------------------
 
 In the GitHub repository you will find an `examples folder <https://github.com/gumyr/build123d/tree/dev/examples>`_.
 
@@ -20,52 +19,52 @@ Most of the examples show the builder and algebra modes.
 .. grid:: 3
 
     .. grid-item-card:: Benchy |Builder|
-        :img-top:  /tutorials/assets/examples/thumbnail_benchy_01.png
+        :img-top:  /examples/assets/thumbnail_benchy_01.png
         :link: examples-benchy
         :link-type: ref
 
     .. grid-item-card:: Bicycle Tire |Builder|
-        :img-top:  /tutorials/assets/examples/bicycle_tire.png
+        :img-top:  /examples/assets/bicycle_tire.png
         :link: examples-bicycle_tire
         :link-type: ref
 
     .. grid-item-card:: Bracelet |Algebra|
-        :img-top:  /tutorials/assets/examples/bracelet.png
+        :img-top:  /examples/assets/bracelet.png
         :link: examples-bracelet
         :link-type: ref
 
     .. grid-item-card:: Canadian Flag Blowing in The Wind |Builder| |Algebra|
-            :img-top: /tutorials/assets/examples/example_canadian_flag_01.png
+            :img-top: /examples/assets/example_canadian_flag_01.png
             :link: examples-canadian_flag
             :link-type: ref
 
     .. grid-item-card:: Cast Bearing Unit |Builder|
-            :img-top: /tutorials/assets/examples/cast_bearing_unit.png
+            :img-top: /examples/assets/cast_bearing_unit.png
             :link: examples-cast_bearing_unit
             :link-type: ref
 
     .. grid-item-card:: Circuit Board With Holes |Builder| |Algebra|
-            :img-top: /tutorials/assets/examples/thumbnail_circuit_board_01.png
+            :img-top: /examples/assets/thumbnail_circuit_board_01.png
             :link: examples-circuit_board
             :link-type: ref
 
     .. grid-item-card:: Clock Face |Builder| |Algebra|
-            :img-top: /tutorials/assets/examples/clock_face.png
+            :img-top: /examples/assets/clock_face.png
             :link: clock_face
             :link-type: ref
 
     .. grid-item-card:: Fast Grid Holes |Algebra|
-            :img-top: /tutorials/assets/examples/fast_grid_holes.png
+            :img-top: /examples/assets/fast_grid_holes.png
             :link: fast_grid_holes
             :link-type: ref
 
     .. grid-item-card:: Handle |Builder| |Algebra|
-            :img-top: /tutorials/assets/examples/handle.png
+            :img-top: /examples/assets/handle.png
             :link: handle
             :link-type: ref
 
     .. grid-item-card:: Heat Exchanger |Builder| |Algebra|
-            :img-top: /tutorials/assets/examples/heat_exchanger.png
+            :img-top: /examples/assets/heat_exchanger.png
             :link: heat_exchanger
             :link-type: ref
 
@@ -75,47 +74,47 @@ Most of the examples show the builder and algebra modes.
             :link-type: ref
 
     .. grid-item-card:: (former) build123d Logo |Builder| |Algebra|
-            :img-top: /tutorials/assets/examples/thumbnail_build123d_logo_01.png
+            :img-top: /examples/assets/thumbnail_build123d_logo_01.png
             :link: examples-build123d_logo
             :link-type: ref
 
     .. grid-item-card:: Maker Coin |Builder|
-            :img-top: /tutorials/assets/examples/maker_coin.png
+            :img-top: /examples/assets/maker_coin.png
             :link: maker_coin
             :link-type: ref
 
     .. grid-item-card:: Multi-Sketch Loft |Builder| |Algebra|
-            :img-top: /tutorials/assets/examples/loft.png
+            :img-top: /examples/assets/loft.png
             :link: multi_sketch_loft
             :link-type: ref
 
     .. grid-item-card:: Peg Board J Hook |Builder|  |Algebra|
-            :img-top: /tutorials/assets/examples/peg_board_hook.png
+            :img-top: /examples/assets/peg_board_hook.png
             :link: peg_board_hook
             :link-type: ref
 
     .. grid-item-card:: Platonic Solids |Algebra|
-            :img-top: /tutorials/assets/examples/platonic_solids.png
+            :img-top: /examples/assets/platonic_solids.png
             :link: platonic_solids
             :link-type: ref
 
     .. grid-item-card:: Playing Cards |Builder|
-            :img-top: /tutorials/assets/examples/playing_cards.png
+            :img-top: /examples/assets/playing_cards.png
             :link: playing_cards
             :link-type: ref
 
     .. grid-item-card:: Spring |Algebra|
-            :img-top: /tutorials/assets/examples/spring.svg
+            :img-top: /examples/assets/spring.svg
             :link: spring
             :link-type: ref
 
     .. grid-item-card:: Stud Wall |Algebra|
-            :img-top: /tutorials/assets/examples/stud_wall.png
+            :img-top: /examples/assets/stud_wall.png
             :link: stud_wall
             :link-type: ref
 
     .. grid-item-card:: Tea Cup |Builder| |Algebra|
-            :img-top: /tutorials/assets/examples/tea_cup_example.png
+            :img-top: /examples/assets/tea_cup_example.png
             :link: tea_cup
             :link-type: ref
 
@@ -125,7 +124,7 @@ Most of the examples show the builder and algebra modes.
             :link-type: ref
 
     .. grid-item-card:: Vase |Builder| |Algebra|
-            :img-top: /tutorials/assets/examples/vase.png
+            :img-top: /examples/assets/vase.png
             :link: vase
             :link-type: ref
 
@@ -145,7 +144,7 @@ Most of the examples show the builder and algebra modes.
 
 Benchy
 ------
-.. image:: /tutorials/assets/examples/example_benchy_01.png
+.. image:: /examples/assets/example_benchy_01.png
     :align: center
 
 
@@ -164,11 +163,11 @@ modify it by replacing chimney with a BREP version.
 
 .. dropdown:: Gallery
 
-    .. image:: /tutorials/assets/examples/example_benchy_02.png
+    .. image:: /examples/assets/example_benchy_02.png
         :align: center
 
 
-    .. image:: /tutorials/assets/examples/example_benchy_03.png
+    .. image:: /examples/assets/example_benchy_03.png
         :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -184,7 +183,7 @@ modify it by replacing chimney with a BREP version.
 
 Bicycle Tire
 --------------------------------
-.. image:: /tutorials/assets/examples/bicycle_tire.png
+.. image:: /examples/assets/bicycle_tire.png
     :align: center
 
 This example demonstrates how to model a realistic bicycle tire with a
@@ -207,7 +206,7 @@ label runs over several faces of a solid and is projected instead.
 
 Bracelet
 --------------------------------
-.. image:: /tutorials/assets/examples/bracelet.png
+.. image:: /examples/assets/bracelet.png
     :align: center
 
 Doubly-curved bracelet with an embossed label
@@ -241,7 +240,7 @@ Key techniques demonstrated:
 
 Former build123d Logo
 --------------------------------
-.. image:: /tutorials/assets/examples/example_build123d_logo_01.png
+.. image:: /examples/assets/example_build123d_logo_01.png
     :align: center
 
 
@@ -270,7 +269,7 @@ The builder mode example also generates the SVG file `logo.svg`.
 
 Cast Bearing Unit
 -----------------
-.. image:: /tutorials/assets/examples/cast_bearing_unit.png
+.. image:: /examples/assets/cast_bearing_unit.png
     :align: center
 
 This example demonstrates the creation of a castable flanged bearing housing
@@ -288,7 +287,7 @@ using the `draft` operation to add appropriate draft angles for mold release.
 
 Canadian Flag Blowing in The Wind
 ----------------------------------
-.. image:: /tutorials/assets/examples/example_canadian_flag_01.png
+.. image:: /examples/assets/example_canadian_flag_01.png
     :align: center
 
 
@@ -300,10 +299,10 @@ This example also demonstrates building complex lines that snap to existing feat
 
 .. dropdown:: More Images
 
-    .. image:: /tutorials/assets/examples/example_canadian_flag_02.png
+    .. image:: /examples/assets/example_canadian_flag_02.png
         :align: center
 
-    .. image:: /tutorials/assets/examples/example_canadian_flag_03.png
+    .. image:: /examples/assets/example_canadian_flag_03.png
         :align: center
 
 
@@ -327,7 +326,7 @@ This example also demonstrates building complex lines that snap to existing feat
 
 Circuit Board With Holes
 ------------------------
-.. image:: /tutorials/assets/examples/example_circuit_board_01.png
+.. image:: /examples/assets/example_circuit_board_01.png
     :align: center
 
 
@@ -341,7 +340,7 @@ This example demonstrates placing holes around a part.
 
 .. dropdown:: More Images
 
-    .. image:: /tutorials/assets/examples/example_circuit_board_02.png
+    .. image:: /examples/assets/example_circuit_board_02.png
         :align: center
 
 
@@ -364,7 +363,7 @@ This example demonstrates placing holes around a part.
 
 Clock Face
 ----------
-.. image:: /tutorials/assets/examples/clock_face.png
+.. image:: /examples/assets/clock_face.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -393,7 +392,7 @@ a detailed and visually appealing clock design.
 
 Fast Grid Holes
 ---------------
-.. image:: /tutorials/assets/examples/fast_grid_holes.png
+.. image:: /examples/assets/fast_grid_holes.png
     :align: center
 
 .. dropdown:: |Algebra| Reference Implementation (Algebra Mode)
@@ -421,7 +420,7 @@ compared to substantially longer runtimes for boolean subtraction of individual 
 
 Handle
 ------
-.. image:: /tutorials/assets/examples/handle.png
+.. image:: /examples/assets/handle.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -444,7 +443,7 @@ This example demonstrates multisection sweep creating a drawer handle.
 
 Heat Exchanger
 --------------
-.. image:: /tutorials/assets/examples/heat_exchanger.png
+.. image:: /examples/assets/heat_exchanger.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -494,7 +493,7 @@ extrude with a taper and extrude until next.
 
 Maker Coin
 ----------
-.. image:: /tutorials/assets/examples/maker_coin.png
+.. image:: /examples/assets/maker_coin.png
     :align: center
 
 This example creates the maker coin as defined by Angus on the Maker's Muse
@@ -520,7 +519,7 @@ YouTube channel. There are two key features:
 Multi-Sketch Loft
 -----------------
 
-.. image:: /tutorials/assets/examples/loft.png
+.. image:: /examples/assets/loft.png
     :align: center
 
 This example demonstrates lofting a set of sketches, selecting
@@ -545,7 +544,7 @@ the top and bottom by type, and shelling.
 
 Peg Board Hook
 --------------
-.. image:: /tutorials/assets/examples/peg_board_hook.png
+.. image:: /examples/assets/peg_board_hook.png
     :align: center
 
 This script creates a a J-shaped pegboard hook. These hooks are commonly used for
@@ -574,7 +573,7 @@ to aid 3D printing.
 
 Platonic Solids
 ---------------
-.. image:: /tutorials/assets/examples/platonic_solids.png
+.. image:: /examples/assets/platonic_solids.png
     :align: center
 
 This example creates a custom Part object PlatonicSolid.
@@ -600,7 +599,7 @@ embodying ideals of symmetry and balance.
 
 Playing Cards
 -------------
-.. image:: /tutorials/assets/examples/playing_cards.png
+.. image:: /examples/assets/playing_cards.png
     :align: center
 
 This example creates a customs Sketch objects: Club, Spade, Heart, Diamond,
@@ -619,7 +618,7 @@ imported as code from an SVG file and modified to the code found here.
 
 Spring
 ------
-.. image:: /tutorials/assets/examples/spring.svg
+.. image:: /examples/assets/spring.svg
     :align: center
 
 This example creates a compression spring by sweeping a circular profile along
@@ -637,7 +636,7 @@ helix before the sweep.
 
 Stud Wall
 ---------
-.. image:: /tutorials/assets/examples/stud_wall.png
+.. image:: /examples/assets/stud_wall.png
     :align: center
 
 This example demonstrates creating custom `Part` objects and putting them into
@@ -657,7 +656,7 @@ are used to position all of objects.
 
 Tea Cup
 -------
-.. image:: /tutorials/assets/examples/tea_cup_example.png
+.. image:: /examples/assets/tea_cup_example.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -698,7 +697,7 @@ Toy Truck
 .. image:: /assets/examples/toy_truck.png
     :align: center
 
-.. image:: /tutorials/assets/examples/toy_truck_picture.jpg
+.. image:: /examples/assets/toy_truck_picture.jpg
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)
@@ -719,7 +718,7 @@ build123d.
 
 Vase
 ----
-.. image:: /tutorials/assets/examples/vase.png
+.. image:: /examples/assets/vase.png
     :align: center
 
 .. dropdown:: |Builder| Reference Implementation (Builder Mode)

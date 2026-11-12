@@ -91,6 +91,8 @@ Table Of Contents
     how_to/index.rst
     reference/index.rst
     explanation/index.rst
+    examples/index.rst
+    challenges/index.rst
 
 ==================
 Indices and tables

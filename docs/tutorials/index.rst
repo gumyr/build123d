@@ -24,11 +24,8 @@ as later tutorials build on the concepts introduced in earlier ones.
     hinged_box.rst
     box_materials.rst
     bracket_drawing.rst
-    examples_1.rst
-    tttt.rst
     stl_reconstruction.rst
+    sheet_metal_enclosure.rst
+    sheet_metal_lid.rst
     surface_heart_token.rst
     surface_spitfire_wing.rst
-
-The :ref:`sheet metal tutorial <sheet_metal_tutorial>` lives with the rest of
-the :ref:`sheet metal <sheet_metal>` documentation.

@@ -18,7 +18,7 @@ import unittest
 
 _examples_dir = Path(os.path.abspath(os.path.dirname(__file__))).parent / "examples"
 _ttt_dir = (
-    Path(os.path.abspath(os.path.dirname(__file__))).parent / "docs/tutorials/ttt"
+    Path(os.path.abspath(os.path.dirname(__file__))).parent / "docs/challenges/ttt"
 )
 
 _MOCK_OCP_VSCODE_CONTENTS = """

@@ -1,4 +1,6 @@
-.. _sheet_metal_tutorial:
+:orphan:
+
+.. _sheet_metal_tutorial_old:
 
 ########
 Tutorial

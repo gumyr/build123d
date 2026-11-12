@@ -146,7 +146,6 @@ Recipes
 .. toctree::
     :hidden:
 
-    tutorial
     concepts
     flange
     bend
