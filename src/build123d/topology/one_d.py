@@ -241,6 +241,7 @@ from .shape_core import (
     Shape,
     ShapeList,
     SkipClean,
+    _topods_entities,
     downcast,
     find_same_topods,
     get_top_level_topods_shapes,
@@ -4252,6 +4253,21 @@ class Wire(Mixin1D[TopoDS_Wire]):
         return edges
 
     # ---- Instance Methods ----
+
+    def _split_parts(self, split_result: TopoDS_Shape) -> list[TopoDS_Shape]:
+        """A split wire is one connected wire, its halves sharing the section
+        vertices, so the pieces to classify by side are its edges"""
+        return _topods_entities(split_result, "Edge")
+
+    def _split_side(self, parts: list[TopoDS_Shape]) -> list[TopoDS_Shape]:
+        """The edges on one side of a split joined into a wire per connected
+        run"""
+        if not parts:
+            return parts
+        return [
+            wire.wrapped
+            for wire in Wire.combine(Edge(TopoDS.Edge(part)) for part in parts)
+        ]
 
     def chamfer_2d(
         self,

@@ -345,8 +345,9 @@ evaluate them, and they are the criteria most selectors start with.
   features of a given size within a tolerance:
   ``part.faces().filter_by_value(Face.radius, 2)`` keeps the R2 fillets.
 - **Direction**: an ``Axis`` passed to |filter_by| keeps the planar faces whose normal,
-  or the linear edges whose direction, is parallel to it; a ``Plane`` keeps those
-  parallel to the plane. Passed to |sort_by| or |group_by|, an ``Axis`` orders by
+  the faces with an axis of rotation - cylinders, cones, spheres, tori and surfaces
+  of revolution - whose axis, or the linear edges whose direction, is parallel to it; a ``Plane`` keeps the planar faces and edges parallel to the
+  plane. Passed to |sort_by| or |group_by|, an ``Axis`` orders by
   position along it.
 - **Position**: |filter_by_position| keeps features within a range along an axis, and
   |sort_by_distance| orders by distance from a point or another shape.

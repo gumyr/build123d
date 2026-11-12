@@ -2623,13 +2623,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # For speed the user may just want all the objects which they
         # can sort more efficiently then the generic algorithm below
         if keep == Keep.ALL:
-            pieces = ShapeList(
-                self.__class__.cast(part)._made_by(history)
-                for part in get_top_level_topods_shapes(split_result)
+            return ShapeList(
+                self._pieces(get_top_level_topods_shapes(split_result), history)
             )
-            for piece in pieces:
-                self.copy_attributes_to(piece, ["wrapped", "_NodeMixin__children"])
-            return pieces
 
         if not isinstance(tool, Plane):
             # Get a TopoDS_Face to work with from the tool
@@ -2659,22 +2655,19 @@ class Shape(NodeMixin, Generic[TOPODS]):
             # type: ignore
             tool_solid = half_space_maker.Solid()
 
-        tops: list[Shape] = []
-        bottoms: list[Shape] = []
+        tops: list[TopoDS_Shape] = []
+        bottoms: list[TopoDS_Shape] = []
         properties = GProp_GProps()
-        for part in get_top_level_topods_shapes(split_result):
-            sub_shape = self.__class__.cast(part)._made_by(history)
+        for part in self._split_parts(split_result):
             if isinstance(tool, Plane):
                 # A piece lies wholly on one side of the plane and so does its
                 # centre of mass. The geometric centre need not: that of a curved
                 # face is the middle of its surface, whether trimmed away or not.
                 calc_function = Shape.shape_properties_LUT[shapetype(part)]
-                if calc_function is None:  # pragma: no cover
-                    piece_center = sub_shape.center()
-                else:
-                    piece_properties = GProp_GProps()
-                    calc_function(part, piece_properties)
-                    piece_center = Vector(piece_properties.CentreOfMass())
+                assert calc_function is not None  # a split never yields a vertex
+                piece_properties = GProp_GProps()
+                calc_function(part, piece_properties)
+                piece_center = Vector(piece_properties.CentreOfMass())
                 is_up = tool.to_local_coords(piece_center).Z >= 0
             else:
                 # Intersect self and the thickened tool
@@ -2685,15 +2678,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 BRepGProp.LinearProperties_s(is_up_obj, properties)
                 # Mass represents the total length for linear properties
                 is_up = properties.Mass() >= TOLERANCE
-            self.copy_attributes_to(sub_shape, ["wrapped", "_NodeMixin__children"])
-            (tops if is_up else bottoms).append(sub_shape)
+            (tops if is_up else bottoms).append(part)
 
-        # a side with nothing on it is the empty shape of self's class
-        nothing = self._zero_class()()
-        top = nothing if not tops else tops[0] if len(tops) == 1 else tops
-        bottom = (
-            nothing if not bottoms else bottoms[0] if len(bottoms) == 1 else bottoms
-        )
+        top = self._one_or_list(self._pieces(self._split_side(tops), history))
+        bottom = self._one_or_list(self._pieces(self._split_side(bottoms), history))
 
         if keep == Keep.BOTH:
             return (top, bottom)
@@ -2704,6 +2692,34 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # Keep.ALL returned earlier and INSIDE/OUTSIDE were rejected above, so
         # this is unreachable until a Keep value is added
         raise ValueError(f"Unsupported Keep value {keep}")  # pragma: no cover
+
+    def _split_parts(self, split_result: TopoDS_Shape) -> list[TopoDS_Shape]:
+        """The pieces of a split to classify by side: the kernel's top-level
+        shapes. A shape whose halves the kernel leaves joined, a shell or a
+        wire, overrides this to classify its faces or edges instead."""
+        return get_top_level_topods_shapes(split_result)
+
+    def _split_side(self, parts: list[TopoDS_Shape]) -> list[TopoDS_Shape]:
+        """The pieces on one side of a split, reassembled where ``_split_parts``
+        took them apart; as they are by default."""
+        return parts
+
+    def _pieces(
+        self, parts: Iterable[TopoDS_Shape], history: ShapeHistory
+    ) -> list[Shape]:
+        """Kernel shapes an operation on this shape made, as shapes of this
+        class that carry its attributes and the operation's history"""
+        pieces = [self.__class__.cast(part)._made_by(history) for part in parts]
+        for piece in pieces:
+            self.copy_attributes_to(piece, ["wrapped", "_NodeMixin__children"])
+        return pieces
+
+    def _one_or_list(self, pieces: list[Shape]) -> Shape | list[Shape]:
+        """A result of pieces: the empty shape of this class for none, the one
+        piece, or a list of them"""
+        if not pieces:
+            return self._zero_class()()
+        return pieces[0] if len(pieces) == 1 else pieces
 
     def tessellate(
         self, tolerance: float, angular_tolerance: float = 0.1
@@ -3942,8 +3958,10 @@ class ShapeList(list[T]):
         """filter by
 
         Either:
-        - filter objects of type planar Face or linear Edge by their normal or tangent
-        (respectively) and sort the results by the given axis, or
+        - filter objects of type planar Face, Face with an axis of rotation (cylinder,
+        cone, sphere, torus or surface of revolution) or linear Edge by their normal,
+        axis of rotation or tangent (respectively) and sort the results by the given
+        axis, or
         - filter the objects by the provided type. Note that not all types apply to all
         objects.
 
@@ -3982,6 +4000,8 @@ class ShapeList(list[T]):
                         surface_normal.X(), surface_normal.Y(), surface_normal.Z()
                     ).normalized()
                     shape_axis = Axis(shape.center(), normalized_surface_normal)
+                elif getattr(shape, "axis_of_rotation", None) is not None:
+                    shape_axis = getattr(shape, "axis_of_rotation")
                 elif (
                     isinstance(shape.wrapped, TopoDS_Edge)
                     and shape.geom_type == GeomType.LINE

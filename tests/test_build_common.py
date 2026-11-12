@@ -571,6 +571,172 @@ class TestCommonOperations(unittest.TestCase):
 
 
 class TestLocations(unittest.TestCase):
+    def test_location_list_product(self):
+        """g1 * g2 composes two location lists as nesting g2 inside g1 does"""
+        g1 = GridLocations(1, 1, 2, 2)
+        g2 = GridLocations(4, 4, 2, 1)
+        product = g1 * g2
+        with g1:
+            nested = GridLocations(4, 4, 2, 1).locations
+        self.assertIsInstance(product, LocationList)
+        self.assertEqual(len(product.locations), 8)
+        for composed, expected in zip(product, nested):
+            self.assertEqual(composed, expected)
+
+        # the product is a context and a placement, like any location list
+        with BuildPart() as builder:
+            with product:
+                Box(0.1, 0.1, 0.1)
+        self.assertEqual(len(builder.part.solids()), 8)
+        placed = product * Box(0.1, 0.1, 0.1)
+        self.assertEqual(len(placed), 8)
+        self.assertIsInstance(Location((1, 0, 0)) * product, list)
+
+        with self.assertRaises(TypeError):
+            g1 * 3  # pylint: disable=pointless-statement
+
+    def test_location_list_is_a_list(self):
+        """A location list is a list of Location, with slices that are lists too"""
+        grid = GridLocations(1, 1, 2, 2)
+        self.assertIsInstance(grid, list)
+        self.assertEqual(len(grid), 4)
+        self.assertEqual(grid[0], Location((-0.5, -0.5, 0)))
+        self.assertIsInstance(grid[1:], LocationList)
+        self.assertEqual(grid[1:], list(grid)[1:])
+        self.assertIs(grid.locations, grid)
+        self.assertIs(grid.local_locations, grid)
+        self.assertIsInstance(grid.copy(), LocationList)
+        self.assertEqual(grid.copy(), grid)
+        self.assertEqual(grid, GridLocations(1, 1, 2, 2))
+
+    def test_location_list_editing(self):
+        """Edits behave as on a list, and the edited list places as it reads"""
+        grid = GridLocations(1, 1, 2, 1)
+        grid.append(Location((5, 0, 0)))
+        grid.extend([Location((6, 0, 0)), Location((7, 0, 0))])
+        grid.insert(0, Location((8, 0, 0)))
+        self.assertEqual(grid.pop(0), Location((8, 0, 0)))
+        grid.remove(Location((7, 0, 0)))
+        del grid[0]
+        grid[0] = Location((9, 0, 0))
+        grid += [Location((10, 0, 0))]
+        grid.reverse()
+        grid.sort(key=lambda loc: loc.position.X)
+        self.assertEqual([loc.position.X for loc in grid], [5, 6, 9, 10])
+
+        with BuildPart() as builder:
+            with grid:
+                Box(0.1, 0.1, 0.1)
+        self.assertEqual(
+            sorted(s.center().X for s in builder.part.solids()), [5, 6, 9, 10]
+        )
+        self.assertEqual(len(grid * Box(0.1, 0.1, 0.1)), 4)
+        grid.clear()
+        self.assertEqual(grid, [])
+
+    def test_location_list_concatenation(self):
+        both = GridLocations(1, 1, 2, 1) + PolarLocations(3, 3)
+        self.assertIsInstance(both, LocationList)
+        self.assertEqual(len(both), 5)
+        prefixed = [Location((1, 1, 1))] + GridLocations(1, 1, 2, 1)
+        self.assertIsInstance(prefixed, LocationList)
+        self.assertEqual(prefixed[0], Location((1, 1, 1)))
+        composed = GridLocations(1, 1, 2, 1)
+        composed *= GridLocations(1, 1, 1, 2)
+        self.assertEqual(len(composed), 4)
+        with self.assertRaises(TypeError):
+            3 * GridLocations(1, 1, 2, 1)  # pylint: disable=expression-not-assigned
+        with self.assertRaises(TypeError):
+            GridLocations(1, 1, 2, 1) + 3  # pylint: disable=expression-not-assigned
+
+    def test_location_list_edits_not_while_active(self):
+        grid = GridLocations(1, 1, 2, 1)
+        with grid:
+            with self.assertRaises(RuntimeError):
+                grid.append(Location())
+        grid.append(Location())
+        self.assertEqual(len(grid), 3)
+
+    def test_location_list_made_in_a_group_is_a_product(self):
+        """Inside a context of several locations the entries are a product and
+        can't be edited; a slice of them stands on its own"""
+        with Locations((0, 0, 0), (10, 0, 0)):
+            grid = GridLocations(1, 1, 2, 1)
+        self.assertEqual(len(grid), 4)
+        with self.assertRaises(ValueError):
+            grid.append(Location())
+        with self.assertRaises(ValueError):
+            grid + [Location()]  # pylint: disable=expression-not-assigned
+        head = grid[:2]
+        self.assertIsInstance(head, LocationList)
+        self.assertEqual(head._own_locations, list(head))
+        head.append(Location())
+
+    def test_edited_list_places_where_it_reads_from_a_function(self):
+        """A list made and edited in a function under a caller's context keeps
+        its own locations in step, so the inserted builder lands on the entries"""
+
+        def row() -> BuildPart:
+            locs = GridLocations(20, 0, 2, 1)
+            locs.append(Location((30, 0, 0)))
+            self.assertEqual(
+                [loc.position.X for loc in locs._own_locations], [-10, 10, 30]
+            )
+            with locs:
+                with BuildPart() as builder:
+                    Box(1, 1, 1)
+            return builder
+
+        with BuildPart() as outer:
+            with Locations((0, 0, 50)):
+                row_builder = row()
+                insert(row_builder)
+        # the grid entries carry the caller's Z=50, the appended entry reads Z=0,
+        # and each box is where its entry reads
+        centers = sorted((s.center().X, s.center().Z) for s in outer.part.solids())
+        self.assertEqual(centers, [(-10, 50), (10, 50), (30, 0)])
+
+    def test_location_times_location_list(self):
+        """A Location or Plane times a location list is a location list"""
+        grid = GridLocations(1, 1, 2, 1)
+        moved = Pos(10, 0, 0) * grid
+        self.assertIsInstance(moved, LocationList)
+        self.assertEqual([loc.position.X for loc in moved], [9.5, 10.5])
+        self.assertEqual(moved, grid.moved(Pos(10, 0, 0)))
+        on_plane = Plane.XZ * grid
+        self.assertIsInstance(on_plane, LocationList)
+        self.assertEqual(on_plane, [Plane.XZ * loc for loc in list(grid)])
+        self.assertIs(type(Pos(10, 0, 0) * list(grid)), list)
+
+        with BuildSketch() as sketch_builder:
+            with Plane.XY * Pos(5, 0, 0) * grid:
+                Circle(0.1)
+        self.assertEqual(len(sketch_builder.sketch.faces()), 2)
+        self.assertEqual(len(Pos(1, 0, 0) * grid * Box(1, 1, 1)), 2)
+
+        # own locations follow the move, in step with the entries
+        with Locations((0, 0, 50)):
+            inner = GridLocations(1, 1, 2, 1)
+        shifted = Pos(10, 0, 0) * inner
+        self.assertEqual(
+            [(loc.position.X, loc.position.Z) for loc in shifted._own_locations],
+            [(9.5, 0), (10.5, 0)],
+        )
+
+    def test_location_list_product_in_a_context(self):
+        """Lists made inside a Locations context carry that context once"""
+        with Locations((10, 0, 0)):
+            g1 = GridLocations(1, 1, 2, 2)
+            g2 = GridLocations(4, 4, 2, 1)
+            product = g1 * g2
+            with g1:
+                nested = GridLocations(4, 4, 2, 1).locations
+        for composed, expected in zip(product, nested):
+            self.assertEqual(composed, expected)
+        self.assertAlmostEqual(
+            sum(loc.position.X for loc in product) / len(product.locations), 10, 5
+        )
+
     def test_polar_locations(self):
         locs = PolarLocations(1, 5, 45, 90, False).local_locations
         for i, angle in enumerate(range(45, 135, 18)):

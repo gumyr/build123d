@@ -69,7 +69,9 @@ circular edges selects the counterbore faces that meet the joint criteria.
 Axis and Plane
 =================
 
-Filtering by an Axis will select faces perpendicular to the axis. Likewise filtering by
+Filtering by an Axis will select planar faces perpendicular to the axis, along with
+faces whose axis of rotation is parallel to it - cylinders, cones, spheres, tori and
+surfaces of revolution. Likewise filtering by
 Plane will select faces parallel to the plane.
 
 .. dropdown:: Setup
