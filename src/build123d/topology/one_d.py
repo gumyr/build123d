@@ -564,14 +564,16 @@ def _record_matching_vertices(
                 break
 
 
-def _fillet_wire_corner(wire: Wire, vertex: Vertex, radius: float) -> Wire:
+def _fillet_wire_corner(
+    wire: Wire, vertex: Vertex, radius: float, *, original_vertex: Vertex | None = None
+) -> Wire:
     """Fillet a single planar wire corner with the available 2D fillet solvers."""
 
     corner = _analyze_wire_fillet_corner(wire, vertex)
     if _wire_fillet_corner_is_tangent_continuous(corner):
         return wire
 
-    vertex_label = str(vertex)
+    vertex_label = str(original_vertex if original_vertex is not None else vertex)
     solution = _solve_wire_fillet_corner_geom2dgcc_circ2d2tanrad(corner, radius)
 
     if solution is not None:
@@ -4374,20 +4376,24 @@ class Wire(Mixin1D[TopoDS_Wire]):
             raise ValueError(f"Wire is not planar {self}")
 
         # Force the wire to Plane.XY for the fillet operation
-        filleted_wire = wire_pln.to_local_coords(self)
+        filleted_wire: Wire = tcast(Wire, wire_pln.to_local_coords(self))
         record = ShapeHistory.from_relocation(self.wrapped, filleted_wire.wrapped)
         for vertex in vertices:
-            vertex_local = wire_pln.to_local_coords(vertex)
+            vertex_local: Vertex = tcast(Vertex, wire_pln.to_local_coords(vertex))
             current_vertex = filleted_wire.vertices().sort_by_distance(vertex_local)[0]
-            if (Vector(current_vertex) - Vector(vertex_local)).length > TOLERANCE:
+            if (current_vertex.center() - vertex_local.center()).length > TOLERANCE:
                 raise ValueError(f"Could not find fillet vertex on wire: {vertex}")
             before_corner = filleted_wire
-            filleted_wire = _fillet_wire_corner(filleted_wire, current_vertex, radius)
+            filleted_wire = _fillet_wire_corner(
+                filleted_wire, current_vertex, radius, original_vertex=vertex
+            )
             if filleted_wire is not before_corner:
                 record.merge(filleted_wire._history)
 
         # Return the filleted wire to the wire plane
-        globalized_filleted_wire: Wire = wire_pln.from_local_coords(filleted_wire)
+        globalized_filleted_wire: Wire = tcast(
+            Wire, wire_pln.from_local_coords(filleted_wire)
+        )
         record.merge(
             ShapeHistory.from_relocation(
                 filleted_wire.wrapped, globalized_filleted_wire.wrapped
