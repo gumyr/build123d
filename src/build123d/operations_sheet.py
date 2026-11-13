@@ -2599,16 +2599,20 @@ def _square_relief_profile(size: float) -> Face:
 
 
 def _obround_relief_profile(length: float, width: float) -> Face:
-    """A slotted corner relief lying on the diagonal between the two bends."""
+    """A slotted corner relief lying on the diagonal between the two bends.
+
+    The slot is long along x and turned 45 degrees, so its long axis is the
+    corner's diagonal, which runs into the base.
+    """
     radius = width / 2
     flank = length / 2 - radius
     slot = Face(
         Wire(
             [
-                Edge.make_line((-radius, flank), (-radius, -flank)),
-                Edge.make_circle(radius, Plane((0, -flank, 0)), 180, 360),
-                Edge.make_line((radius, -flank), (radius, flank)),
-                Edge.make_circle(radius, Plane((0, flank, 0)), 0, 180),
+                Edge.make_line((-flank, -radius), (flank, -radius)),
+                Edge.make_circle(radius, Plane((flank, 0, 0)), -90, 90),
+                Edge.make_line((flank, radius), (-flank, radius)),
+                Edge.make_circle(radius, Plane((-flank, 0, 0)), 90, 270),
             ]
         )
     )
