@@ -768,6 +768,7 @@ def offset(
     Raises:
         ValueError: missing objects
         ValueError: Invalid object type
+        ValueError: a Face that is not planar
     """
     context: Builder | None = Builder._get_context("offset")
 
@@ -802,6 +803,13 @@ def offset(
 
     new_faces = []
     for face in faces:
+        # A Face is offset by offsetting its wires in its own plane, which
+        # a curved face does not have.
+        if face.is_planar is None:
+            raise ValueError(
+                "offset of a Face grows or shrinks its outline in its plane; "
+                f"this {face.geom_type.name.lower()} face is not planar"
+            )
         outer_wire = face.outer_wire().offset_2d(amount, kind=kind)
         if min_edge_length is not None:
             outer_wire = outer_wire.fix_degenerate_edges(min_edge_length)

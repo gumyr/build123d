@@ -693,6 +693,11 @@ class OffsetTests(unittest.TestCase):
             offset(amount=1, kind=Kind.INTERSECTION)
         self.assertAlmostEqual(test.sketch.area, 9, 5)
 
+    def test_non_planar_face_offset(self):
+        face = Cylinder(10, 20).faces().filter_by(GeomType.CYLINDER)[0]
+        with self.assertRaisesRegex(ValueError, "not planar"):
+            offset(face, 1)
+
     def test_face_offset_with_holes(self):
         sk = Rectangle(100, 100) - GridLocations(80, 80, 2, 2) * Circle(5)
         sk2 = offset(sk, -5)
