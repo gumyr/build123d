@@ -193,6 +193,7 @@ from .silhouette import (
     visible_regions,
 )
 from .utils import (
+    _check_sweep_profile,
     _extrude_topods_shape,
     _make_loft,
     _make_topods_face_from_wires,
@@ -2034,6 +2035,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
         Raises:
             ValueError: Only 1 Edge allowed in profile & path
+            ValueError: the profile contains a degenerated edge
 
         Returns:
             Face: resulting face, may be non-planar
@@ -2052,6 +2054,7 @@ class Face(Mixin2D[TopoDS_Face]):
         profile = Wire([profile_edge])
         path = Wire([path_edge])
         builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
+        _check_sweep_profile(profile.wrapped)
         builder.Add(profile.wrapped, False, False)
         builder.SetTransitionMode(Shape._transModeDict[transition])
         builder.Build()
@@ -3405,12 +3408,16 @@ class Shell(Mixin2D[TopoDS_Shell]):
             transition (Transition, optional): handling of profile orientation at C1 path
                 discontinuities. Defaults to Transition.TRANSFORMED.
 
+        Raises:
+            ValueError: the profile contains a degenerated edge
+
         Returns:
             Shell: resulting Shell, may be non-planar
         """
         profile = Wire(profile.edges())
         path = Wire(Wire(path.edges()).order_edges())
         builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
+        _check_sweep_profile(profile.wrapped)
         builder.Add(profile.wrapped, False, False)
         builder.SetTransitionMode(Shape._transModeDict[transition])
         builder.Build()

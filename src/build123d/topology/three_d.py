@@ -157,6 +157,7 @@ from .two_d import (
     sort_wires_by_build_order,
 )
 from .utils import (
+    _check_sweep_profile,
     _extrude_topods_shape,
     _make_loft,
     find_max_dimension,
@@ -1246,6 +1247,10 @@ class Solid(Mixin3D[TopoDS_Solid]):
             inner_wires (list[Wire], optional): holes - only used if section is of type Wire.
                 Defaults to None.
 
+        Raises:
+            ValueError: the section contains a degenerated edge, as the boundary of a
+                sphere or cone face does
+
         Returns:
             Solid: extruded object
         """
@@ -1269,6 +1274,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             """Helper function"""
             extrude_builder = BRepOffsetAPI_MakePipeShell(spine)
             extrude_builder.SetMode(aux_spine, False)  # auxiliary spine
+            _check_sweep_profile(wire)
             extrude_builder.Add(wire)
             extrude_builder.Build()
             extrude_builder.MakeSolid()
@@ -1955,6 +1961,10 @@ class Solid(Mixin3D[TopoDS_Solid]):
             transition (Transition, optional): handling of profile orientation at C1 path
                 discontinuities. Defaults to Transition.TRANSFORMED.
 
+        Raises:
+            ValueError: the section contains a degenerated edge, as the boundary of a
+                sphere or cone face does
+
         Returns:
             Solid: the swept cross section
         """
@@ -1979,6 +1989,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
             builder.SetTransitionMode(Shape._transModeDict[transition])
 
+            _check_sweep_profile(wire.wrapped)
             builder.Add(wire.wrapped, False, rotate)
 
             builder.Build()
@@ -2040,6 +2051,10 @@ class Solid(Mixin3D[TopoDS_Solid]):
             binormal (Union[Vector, Wire, Edge, None], optional): additional sweep mode parameters.
                 Defaults to None.
 
+        Raises:
+            ValueError: the profile contains a degenerated edge, as the boundary of a
+                sphere or cone face does
+
         Returns:
             Solid: swept object
         """
@@ -2061,6 +2076,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 if isinstance(profile, Wire)
                 else profile.outer_wire().wrapped
             )
+            _check_sweep_profile(path_as_wire)
             builder.Add(path_as_wire, translate, rotate)
 
         builder.Build()

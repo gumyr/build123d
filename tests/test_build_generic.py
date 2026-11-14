@@ -26,6 +26,9 @@ license:
 
 """
 
+import subprocess
+import sys
+import textwrap
 import unittest
 import warnings
 from math import pi, sqrt
@@ -1216,6 +1219,58 @@ class TestSweep(unittest.TestCase):
         e2 = Edge.make_line((2, 0), (3, 0))
         with self.assertRaises(ValueError):
             sweep(sections=Edge.make_line((0, 0), (0, 1)), path=ShapeList([e1, e2]))
+
+    def test_3d_section(self):
+        """A solid is not a cross section; its faces used to be swept one by one"""
+        path = CenterArc((0, 0, 0), 30, 0, 90)
+        with BuildPart() as box:
+            Box(4, 4, 4)
+        for solid in [Box(4, 4, 4), box.part, Compound([Solid.make_box(1, 1, 1)])]:
+            with self.subTest(section=type(solid).__name__):
+                with self.assertRaisesRegex(ValueError, "must be 1D or 2D"):
+                    sweep(solid, path)
+        with self.assertRaisesRegex(ValueError, "must be 1D or 2D"):
+            with BuildPart():
+                sweep(Cylinder(2, 4), path)
+
+        # a face of a solid is still a section
+        top = Box(4, 4, 4).faces().sort_by(Axis.Z)[-1]
+        self.assertAlmostEqual(sweep(top, Line((0, 0, 2), (0, 0, 12))).volume, 160, 5)
+
+    def test_crashing_sections(self):
+        """A sphere or a sphere face crashed the process inside OCCT; a cone or
+        a cone face raised an unhelpful kernel error. The calls run in a
+        subprocess so a regression that crashes the interpreter fails this test
+        instead of killing the test run."""
+        script = """
+            from build123d import *
+
+            path = CenterArc((0, 0, 0), 30, 0, 90)
+            sections = {
+                "sphere": (Sphere(3), "1D or 2D"),
+                "cone": (Cone(3, 0, 5), "1D or 2D"),
+                "sphere face": (Sphere(3).faces()[0], "degenerated"),
+                "cone face": (
+                    Cone(3, 0, 5).faces().filter_by(GeomType.CONE)[0],
+                    "degenerated",
+                ),
+            }
+            for name, (section, message) in sections.items():
+                for multisection in (False, True):
+                    try:
+                        sweep(section, path, multisection=multisection)
+                    except ValueError as err:
+                        assert message in str(err), (name, err)
+                    else:
+                        raise AssertionError(f"{name} was swept")
+            """
+        result = subprocess.run(
+            [sys.executable, "-c", textwrap.dedent(script)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 class TestProjectToPlane(unittest.TestCase):
