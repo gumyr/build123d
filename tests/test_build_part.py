@@ -1111,6 +1111,28 @@ class TestProjectToShape(unittest.TestCase):
             sorted(round(f.area, 6) for f in projection.faces()), [30, 30, 40]
         )
 
+    def test_sketch_and_curve_objects(self):
+        plate = Box(10, 10, 2)
+        # a Sketch stands for its faces, each projecting along its own normal
+        sketch = Plane((0, 0, 5), z_dir=(0, 0, -1)) * Sketch(
+            [Pos(X=-2) * Rectangle(1, 1).face(), Pos(X=2) * Circle(0.5).face()]
+        )
+        projection = project_to_shape(sketch, target=plate)
+        self.assertIsInstance(projection, Sketch)
+        self.assertEqual(len(projection.faces()), 4)
+        slot = Pos(Z=5) * SlotOverall(3, 1)
+        self.assertEqual(
+            len(project_to_shape(slot, plate, (0, 0, -1), hit=Hit.NEAREST).faces()), 1
+        )
+        # a Curve stands for its edges
+        curve = Pos(Z=5) * Curve([Line((-3, 0), (-1, 0)), Line((1, 1), (3, 1))])
+        projection = project_to_shape(curve, plate, (0, 0, -1), hit=Hit.NEAREST)
+        self.assertIsInstance(projection, Curve)
+        self.assertEqual(len(projection.edges()), 2)
+        # an empty one leaves nothing to project
+        with self.assertRaisesRegex(ValueError, "No object"):
+            project_to_shape(Sketch(), target=plate)
+
     def test_errors(self):
         with self.assertRaisesRegex(ValueError, "No object"):
             project_to_shape(target=Box(1, 1, 1))
