@@ -88,3 +88,4 @@ with BuildPart() as example_10:
     ConvexPolyhedron(example_10.vertices())
     # [Ex. 10]
     write_svg("convex_polyhedron_example")
+
