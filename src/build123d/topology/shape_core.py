@@ -2224,10 +2224,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         on this shape, by their x positions: the leftmost point of the set
         lands ``start`` of the way along the path and each face's centre as far
         beyond that as it is to the right of the leftmost point. Each face is
-        stood on the surface at its own point, x along the path's tangent and z
-        along the surface normal there, and projected onto the shape along that
-        normal with :meth:`~topology.Face.project_to_shape`. A line of text
-        follows the path this way.
+        stood above the surface at its own point, x along the path's tangent and
+        z along the surface normal there, and projected onto the shape along
+        that normal with :meth:`~topology.Face.project_to_shape`; the nearest
+        surface met is kept. A line of text follows the path this way.
 
         This is the tool for a target with several faces: a face that straddles
         the boundary between two faces of the target, a glyph running round a
@@ -2283,8 +2283,15 @@ class Shape(NodeMixin, Generic[TOPODS]):
             surface_point, surface_normal = self.find_intersection_points(
                 projection_axis
             )[0]
+            # Stand the face clear of the surface before projecting it back. A
+            # face that touches the target leaves it to rounding whether the
+            # surface beneath it is in front of the face or behind, and so
+            # whether that surface or one further on is the first one met.
+            clearance = 0.5 * max(bbox.size.X, bbox.size.Y)
             surface_normal_plane = Plane(
-                origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
+                origin=surface_point + surface_normal * clearance,
+                x_dir=path_tangent,
+                z_dir=surface_normal,
             )
             projection_face: Face = surface_normal_plane.from_local_coords(
                 face.moved(Location((-face_center_x, 0, 0)))

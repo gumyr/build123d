@@ -31,7 +31,11 @@ from math import pi
 
 from build123d.build_enums import Align
 from build123d.geometry import Axis, Location, Plane, Pos, Vector
+from build123d.objects_curve import Line, Spline
 from build123d.objects_part import Box
+from build123d.operations_generic import mirror
+from build123d.operations_part import revolve
+from build123d.operations_sketch import make_face
 from build123d.topology import Compound, Edge, Face, Solid, Wire
 from build123d.topology.silhouette import _edge_on
 
@@ -81,6 +85,28 @@ class TestProjection(unittest.TestCase):
         )
         self.assertEqual(len(projected_text.solids()), 0)
         self.assertEqual(len(projected_text.faces()), 3)
+
+    def test_text_projection_onto_a_hollow_shape(self):
+        """A letter stood exactly on the wall of a hollow shape could come
+        back on the inside of the far wall; it is now stood clear of the
+        surface first, and every letter lands on the wall the path is on"""
+        outer = Spline((0, 0), (14, 4), (20, 20), (17, 34), (10, 44))
+        inner = Spline((8.5, 44), (15.5, 34), (18.5, 20), (13, 5.5), (0, 1.5))
+        half = make_face(
+            [outer, Line(outer @ 1, inner @ 0), inner, Line(inner @ 1, outer @ 0)]
+        )
+        carcass = revolve(Pos(Y=-370) * (half + mirror(half, Plane.YZ)), Axis.X)
+        # the path is the widest circle of the near wall, where the fault showed
+        widest = max((outer @ (i / 1000) for i in range(1001)), key=lambda p: p.X)
+        path = Pos(X=widest.X) * Edge.make_circle(370 - widest.Y, Plane.YZ)
+        text = Compound.make_text("build123d", 10)
+
+        projected = carcass.project_faces(text, path, start=0.2)
+
+        self.assertEqual(len(projected), len(text.faces()))
+        for flat, curved in zip(text.faces(), projected):
+            self.assertGreater(curved.bounding_box().min.X, widest.X - 1)
+            self.assertAlmostEqual(curved.area / flat.area, 1, delta=0.02)
 
     def test_error_handling(self):
         sphere = Solid.make_sphere(50)
