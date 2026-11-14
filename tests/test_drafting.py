@@ -150,6 +150,16 @@ class TestDraftFunctionality(unittest.TestCase):
             imperial_fractional_drawing._number_with_units(math.pi * IN), '3 1/8"'
         )
 
+    def test_number_with_units_whole_fraction(self):
+        drawing = Draft(
+            unit=Unit.IN, number_display=NumberDisplay.FRACTION, fractional_precision=64
+        )
+        self.assertEqual(drawing._number_with_units(18 * IN), '18"')
+        self.assertEqual(drawing._number_with_units(17.999 * IN), '18"')
+        self.assertEqual(drawing._number_with_units(0.999 * IN), '1"')
+        self.assertEqual(drawing._number_with_units(0.001 * IN), '0"')
+        self.assertEqual(drawing._number_with_units(0), '0"')
+
     def test_label_to_str(self):
         metric_drawing = Draft(decimal_precision=0)
         line = Edge.make_line((0, 0, 0), (100, 0, 0))
