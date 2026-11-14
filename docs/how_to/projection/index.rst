@@ -45,6 +45,20 @@ basis of technical drawings.
         extrude(amount=-0.5, mode=Mode.SUBTRACT)
 
 **********
+Start here
+**********
+
+.. grid:: 1 2 2 2
+    :gutter: 3
+
+    .. grid-item-card:: Tutorial
+        :link: tutorial_projection_chalice
+        :link-type: ref
+
+        Emboss a scalloped band on a chalice: cast the part onto a plane,
+        draw on its footprint, and cast the drawing back onto the part.
+
+**********
 Operations
 **********
 

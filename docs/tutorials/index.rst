@@ -29,3 +29,4 @@ as later tutorials build on the concepts introduced in earlier ones.
     sheet_metal_lid.rst
     surface_heart_token.rst
     surface_spitfire_wing.rst
+    projection_chalice.rst
