@@ -163,6 +163,21 @@ class TestWire(unittest.TestCase):
         hull_wire = Wire.make_convex_hull(adjoining_edges)
         self.assertAlmostEqual(Face(hull_wire).area, 319.9612, 4)
 
+        # A vertex on the hull is a sharp corner
+        teardrop = Wire.make_convex_hull([Vertex(0, 3), Edge.make_circle(1)])
+        self.assertAlmostEqual(
+            Face(teardrop).area, math.sqrt(8) + math.pi - math.acos(1 / 3), 4
+        )
+        self.assertAlmostEqual(
+            Vector(teardrop.vertices().sort_by(Axis.Y)[-1]), (0, 3, 0), 5
+        )
+
+        square = Wire.make_convex_hull(
+            [Vertex(0, 0), Vertex(1, 0), Vertex(1, 1), Vertex(0, 1), Vertex(0.5, 0.5)]
+        )
+        self.assertEqual(len(square.edges()), 4)
+        self.assertAlmostEqual(Face(square).area, 1, 5)
+
     def test_fix_degenerate_edges(self):
         e0 = Edge.make_line((0, 0), (1, 0))
         e1 = Edge.make_line((2, 0), (1, 0))
