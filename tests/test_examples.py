@@ -16,9 +16,10 @@ import sys
 import tempfile
 import unittest
 
-
 _examples_dir = Path(os.path.abspath(os.path.dirname(__file__))).parent / "examples"
-_ttt_dir = Path(os.path.abspath(os.path.dirname(__file__))).parent / "docs/assets/ttt"
+_ttt_dir = (
+    Path(os.path.abspath(os.path.dirname(__file__))).parent / "docs/challenges/ttt"
+)
 
 _MOCK_OCP_VSCODE_CONTENTS = """
 from pathlib import Path

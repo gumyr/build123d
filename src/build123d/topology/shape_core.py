@@ -2242,7 +2242,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         the surface along the whole path, and a face placed at a sharp corner
         of the target projects poorly.
 
-        .. image:: /projectText.png
+        .. image:: /reference/assets/api/projectText.png
 
         Args:
             faces (Union[list[Face], Compound]): planar faces on ``Plane.XY``

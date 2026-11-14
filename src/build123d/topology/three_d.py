@@ -2090,7 +2090,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         Create a solid from a potentially non planar face or shell by thickening along
         the normals.
 
-        .. image:: thickenFace.png
+        .. image:: /reference/assets/api/thickenFace.png
 
         Non-planar faces are thickened both towards and away from the center of the sphere.
 

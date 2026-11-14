@@ -25,7 +25,7 @@
 
 .. highlight:: python
 
-.. image:: ./assets/build123d_logo/logo-banner.svg
+.. image:: /assets/build123d_logo/logo-banner.svg
   :align: center
   :alt: build123d logo
 
@@ -56,7 +56,7 @@ Python code—as demonstrated by the tea cup example below.
 
 .. dropdown:: Teacup Example
 
-    .. literalinclude:: ../examples/tea_cup.py
+    .. literalinclude:: /../examples/tea_cup.py
         :language: build123d
         :start-after: [Code]
         :end-before: [End]
@@ -86,30 +86,13 @@ Table Of Contents
 .. toctree::
     :maxdepth: 2
 
-    introduction.rst
-    installation.rst
-    key_concepts.rst
-    key_concepts_builder.rst
-    key_concepts_algebra.rst
-    moving_objects.rst
-    OpenSCAD.rst
-    introductory_examples.rst
-    tutorials.rst
-    objects.rst
-    operations.rst
-    topology_selection.rst
-    builders.rst
-    sheet_metal/index.rst
-    projection/index.rst
-    joints.rst
-    assemblies.rst
-    tips.rst
-    import_export.rst
-    advanced.rst
-    cheat_sheet.rst
-    external.rst
-    builder_api_reference.rst
-    direct_api_reference.rst
+    getting_started/index.rst
+    tutorials/index.rst
+    how_to/index.rst
+    reference/index.rst
+    explanation/index.rst
+    examples/index.rst
+    challenges/index.rst
 
 ==================
 Indices and tables

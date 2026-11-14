@@ -1,0 +1,118 @@
+
+####################
+Direct API Reference
+####################
+
+The Direct API is an interface layer between the primary user interface APIs
+(Algebra and Builders) and the OpenCascade (OCCT) API.
+
+The original Direct API work began from CadQuery's Direct API. build123d has
+since diverged substantially in structure, naming, typing, topology handling,
+selection tools, object composition, and Builder integration. The build123d
+project gratefully acknowledges the CadQuery contributors whose work helped make
+this API possible.
+
+*****************
+Geometric Objects
+*****************
+The geometric classes defined by build123d are defined below. This parameters to the
+CAD objects described in the following section are frequently of these types.
+
+.. inheritance-diagram:: geometry
+   :parts: 1
+
+.. py:module:: geometry
+
+.. autoclass:: Axis
+   :special-members: __copy__,__deepcopy__, __neg__
+.. autoclass:: BoundBox
+.. autoclass:: Color
+   :special-members: __copy__,__deepcopy__
+.. autoclass:: Location
+   :special-members: __copy__,__deepcopy__, __mul__, __pow__, __eq__, __neg__
+.. autoclass:: Pos
+.. autoclass:: Rot
+.. autoclass:: Matrix
+   :special-members: __copy__,__deepcopy__
+.. autoclass:: Plane
+   :special-members: __copy__,__deepcopy__, __eq__, __ne__, __neg__, __mul__
+.. autoclass:: Rotation
+.. autoclass:: Vector
+   :special-members: __add__, __sub__, __mul__, __truediv__, __rmul__, __neg__, __abs__, __eq__, __copy__, __deepcopy__
+
+*******************
+Topological Objects
+*******************
+The topological object classes defined by build123d are defined below.
+
+Note that the :class:`~topology.Mixin1D` and :class:`~topology.Mixin3D` classes add
+supplementary functionality specific to 1D
+(:class:`~topology.Edge` and :class:`~topology.Wire`) and 3D (:class:`~topology.Compound` and
+`~topology.Solid`) objects respectively.
+Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~topology.Face`)  or 3D objects.
+
+.. inheritance-diagram:: topology.shape_core topology.zero_d topology.one_d topology.two_d topology.three_d topology.composite topology.utils
+   :parts: 1
+
+.. py:module:: topology
+
+.. autoclass:: Compound
+.. autoclass:: Edge
+.. autoclass:: Face
+   :special-members: __neg__
+.. autoclass:: Mixin1D
+   :special-members: __matmul__, __mod__
+.. autoclass:: Mixin2D
+.. autoclass:: Mixin3D
+.. autoclass:: Shape
+   :special-members: __add__, __sub__, __and__, __rmul__, __eq__, __copy__, __deepcopy__, __hash__
+.. autoclass:: ShapeList
+   :special-members: __gt__, __lt__, __rshift__, __lshift__, __or__, __and__, __sub__, __getitem__
+.. autoclass:: Shell
+.. autoclass:: Solid
+.. autoclass:: Wire
+.. autoclass:: Vertex
+   :special-members: __add__, __sub__
+.. autoclass:: DrawingViewOutput
+.. autoclass:: UVFrame
+.. autoclass:: Curve
+   :special-members: __matmul__, __mod__
+.. autoclass:: Part
+.. autoclass:: Sketch
+
+.. autofunction:: new_edges
+.. autofunction:: topo_distance_to
+
+
+*************
+Import/Export
+*************
+Methods and functions specific to exporting and importing build123d objects are defined below.
+
+.. py:module:: importers
+   :noindex:
+
+.. autofunction:: import_brep
+   :noindex:
+.. autofunction:: import_step
+   :noindex:
+.. autofunction:: import_stl
+   :noindex:
+.. autofunction:: import_svg
+   :noindex:
+.. autofunction:: import_svg_as_buildline_code
+   :noindex:
+
+
+************
+Joint Object
+************
+Base Joint class which is used to position Solid and Compound objects relative to each
+other, and the dictionary of joints a part holds, are defined below. The :ref:`joints`
+section contains the class description of the derived Joint classes.
+
+.. py:module:: topology
+   :noindex:
+
+.. autoclass:: Joint
+.. autoclass:: JointDict
