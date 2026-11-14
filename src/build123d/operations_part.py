@@ -571,7 +571,15 @@ def project_workplane(
 
 
 def project_to_shape(
-    objects: Face | Edge | Wire | Iterable[Face | Edge | Wire] | None = None,
+    objects: (
+        Face
+        | Edge
+        | Wire
+        | Sketch
+        | Curve
+        | Iterable[Face | Edge | Wire | Sketch | Curve]
+        | None
+    ) = None,
     target: Shape | None = None,
     direction: VectorLike | None = None,
     # Any, not Face: the one selector serves both the face projection, which
@@ -585,7 +593,8 @@ def project_to_shape(
 
     Project faces, edges or wires onto the surface of a shape along a direction,
     as a label is cast onto a curved part. The result lies on the target's
-    surface: faces ready to be extruded into the part, or edges to follow.
+    surface: faces ready to be extruded into the part, or edges to follow. A
+    Sketch stands for its faces and a Curve for its edges.
 
     In BuildPart the objects default to the pending faces and edges, those of
     the sketches drawn since the last operation; the target to the part; and the
@@ -615,8 +624,8 @@ def project_to_shape(
     To project onto a plane, see :func:`~operations_generic.project`.
 
     Args:
-        objects (Face | Edge | Wire | Iterable of, optional): what to project.
-            Defaults to the pending faces and edges.
+        objects (Face | Edge | Wire | Sketch | Curve | Iterable of, optional):
+            what to project. Defaults to the pending faces and edges.
         target (Shape, optional): shape to project onto. Defaults to the part.
         direction (VectorLike, optional): projection direction. Defaults to the
             normal of the pending sketch plane, or of each planar face, as drawn.
@@ -651,7 +660,14 @@ def project_to_shape(
             pending_plane = context.pending_face_planes[0]
             context.pending_face_planes = []
     else:
-        object_list = flatten_sequence(objects)
+        object_list = ShapeList()
+        for obj in flatten_sequence(objects):
+            if isinstance(obj, Sketch):
+                object_list.extend(obj.faces())
+            elif isinstance(obj, Curve):
+                object_list.extend(obj.edges())
+            else:
+                object_list.append(obj)
     if not object_list:
         raise ValueError("No object to project")
     for obj in object_list:
