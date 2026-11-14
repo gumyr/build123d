@@ -154,7 +154,7 @@ or ``until=Until.LAST`` it carries on until it meets another shape - the
 rest of the part, or a ``target`` you name - and ends on that shape's
 surface, whatever its form. Use this where a feature has to reach
 something, so that it still reaches it when the dimensions change.
-:ref:`Example 36 <ex 36>` shows it.
+:ref:`tutorial_key_cap` uses it for the ribs of a key cap.
 
 The bracket is its profile extruded, and the second plane of symmetry is
 used here: the profile is extruded by half the width and the result is

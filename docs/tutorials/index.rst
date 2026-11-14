@@ -21,6 +21,7 @@ as later tutorials build on the concepts introduced in earlier ones.
     tutorial_design.rst
     dimensioned_drawing.rst
     lego_block.rst
+    key_cap.rst
     hinged_box.rst
     box_materials.rst
     bracket_drawing.rst
