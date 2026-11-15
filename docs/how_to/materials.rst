@@ -10,6 +10,34 @@ Materials come from `bd_materials <https://github.com/bernhard-42/bd_materials>`
 which is installed with build123d. For a guided introduction see
 :ref:`material_tutorial`.
 
+A material is assigned to a finished shape, so everything here is the same
+whether the shape was made in builder or algebra mode.
+
+.. list-table::
+    :header-rows: 1
+    :widths: 45 55
+
+    * - To
+      - use
+    * - say what a part is made of
+      - ``part.material = metals.aluminum()``
+    * - give it a surface finish
+      - ``metals.aluminum(finish=finishes.brushed())``
+    * - look up a property
+      - ``part.material.material.density``
+    * - weigh a part
+      - ``part.mass()``
+    * - weigh a model drawn in inches
+      - ``part.mass(Unit.LB, Unit.IN)``
+    * - give an assembly a default material
+      - ``assembly.material = ...``
+    * - see how it will be rendered
+      - ``part.material.pbr``
+    * - save the appearance with the model
+      - ``export_gltf(part, "part.glb", binary=True)``
+    * - use a material the library lacks
+      - ``plastics.custom_plastic(name, density=...)``
+
 ******************
 Assign a material
 ******************
@@ -326,3 +354,13 @@ hinges:
     a binary package which is not available for every system and Python
     version, so it is optional: install it with
     ``pip install threejs-materials[materialx]``.
+
+********
+See also
+********
+
+* :ref:`material_tutorial` gives the hinged box its materials step by step.
+* :ref:`assembly` covers building the assemblies that materials are
+  inherited through.
+* :doc:`/how_to/import_export` covers ``export_gltf`` and the other
+  formats.
