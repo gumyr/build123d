@@ -1,5 +1,5 @@
 ##################
-Filter Examples
+Filtering examples
 ##################
 
 .. _filter_geomtype:

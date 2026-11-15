@@ -1,5 +1,5 @@
 ################
-Sort Examples
+Sorting examples
 ################
 
 .. _sort_property:

@@ -1,11 +1,52 @@
-#####################################
-Topology Selection and Exploration
-#####################################
+.. _selecting_features:
 
-:ref:`topology` is the structure of build123d geometric features, and traversing the
-topology of a part is often required to specify objects for an operation or to locate a
-CAD feature. In a GUI you would click on a feature; in code you describe it. That
-description has three parts:
+##################
+Selecting features
+##################
+
+An operation has to be told what to work on: the edges to round, the face to sketch
+on, the corner to measure from. In a GUI you would click on the feature; in code you
+describe it. The features of a shape - its vertices, edges, wires, faces and solids -
+make up its :ref:`topology`, and this guide shows how to pick out the ones you mean.
+
+.. list-table::
+    :header-rows: 1
+    :widths: 38 62
+
+    * - To select
+      - use
+    * - the top face
+      - ``part.faces().sort_by(Axis.Z)[-1]`` (:ref:`sort_axis`)
+    * - every edge at the top
+      - ``part.edges().group_by(Axis.Z)[-1]`` (:ref:`group_axis`)
+    * - the upright edges
+      - ``part.edges().filter_by(Axis.Z)`` (:ref:`filter_axis_plane`)
+    * - the circular edges, or the cylindrical faces
+      - ``part.edges().filter_by(GeomType.CIRCLE)`` (:ref:`filter_geomtype`)
+    * - the circular edges of one radius
+      - ``part.edges().filter_by(GeomType.CIRCLE).filter_by_value(Edge.radius, 2)``
+    * - the largest face
+      - ``part.faces().sort_by(Face.area)[-1]`` (:ref:`sort_property`)
+    * - the vertex nearest a point
+      - ``part.vertices().sort_by_distance((0, 0, 0))[0]``
+        (:ref:`sort_distance_from`)
+    * - the edges of one face
+      - ``face.edges()`` (:ref:`selectors`)
+    * - the faces with a hole in them
+      - ``part.faces().filter_by(lambda f: len(f.inner_wires()) == 1)``
+        (:ref:`filter_inner_wire_count`)
+    * - outside corners, or inside ones
+      - ``part.edges().filter_by(Convexity.CONVEX)`` (:ref:`relations`)
+    * - the faces that touch a face
+      - ``part.faces().group_by(topo_distance_to(face))[1]`` (:ref:`relations`)
+    * - what the last operation made
+      - ``part.edges(Select.LAST)``, ``part.edges(Select.NEW)`` (:ref:`when`)
+
+Selection is the same in builder and algebra mode. The selectors are methods of every
+shape and of every builder, and what they return is refined in the same way wherever
+it came from, so the examples on this page are not shown twice.
+
+A selection has three parts:
 
 - a :ref:`selector <selectors>` names the *kind* of feature - vertices, edges, wires,
   faces or solids - and returns them all in a |ShapeList|;
@@ -346,7 +387,8 @@ evaluate them, and they are the criteria most selectors start with.
   ``part.faces().filter_by_value(Face.radius, 2)`` keeps the R2 fillets.
 - **Direction**: an ``Axis`` passed to |filter_by| keeps the planar faces whose normal,
   the faces with an axis of rotation - cylinders, cones, spheres, tori and surfaces
-  of revolution - whose axis, or the linear edges whose direction, is parallel to it; a ``Plane`` keeps the planar faces and edges parallel to the
+  of revolution - whose axis, or the linear edges whose direction, is parallel to it; a
+  ``Plane`` keeps the planar faces and edges parallel to the
   plane. Passed to |sort_by| or |group_by|, an ``Axis`` orders by
   position along it.
 - **Position**: |filter_by_position| keeps features within a range along an axis, and
@@ -605,6 +647,19 @@ report, so this is rare.
 The standalone :func:`~topology.new_edges` function predates the record. It compares
 shapes geometrically and still works, but ``edges(Select.NEW)`` answers the same
 question from the record, for every shape type.
+
+********
+See also
+********
+
+* :ref:`tutorial_selecting_and_finishing` introduces selection step by step, on one
+  part.
+* :ref:`tutorial_key_cap` uses ``Convexity`` to tell the outside edges of a shell from
+  the inside ones.
+* :ref:`placing_sketches` and :ref:`moving_objects` use a selected face or vertex as
+  the place to build next.
+* :class:`~topology.ShapeList` in the reference lists every operator and its
+  arguments.
 
 .. |vertices| replace:: :meth:`~topology.Shape.vertices`
 .. |edges| replace:: :meth:`~topology.Shape.edges`

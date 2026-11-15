@@ -1,5 +1,5 @@
 #################
-Group Examples
+Grouping examples
 #################
 
 .. _group_axis:
