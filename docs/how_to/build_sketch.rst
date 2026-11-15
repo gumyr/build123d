@@ -1,161 +1,465 @@
-###########
-BuildSketch
-###########
+.. _sketching:
 
-BuildSketch is a python context manager that is used to create planar two dimensional
-objects - objects with the property of area but not volume - that are typically
-used as profiles for BuildPart operations like :func:`~operations_part.extrude` or
-:func:`~operations_part.revolve`.
+#########
+Sketching
+#########
 
-The complete API for BuildSketch is located at the end of this section.
+A sketch is a flat shape with area: one or more faces, all in one plane.
+It is the usual starting point for a part, the profile that
+:func:`~operations_part.extrude`, :func:`~operations_part.revolve` and the
+other part operations turn into a solid. This guide shows how to make the
+sketch you want.
 
-*******************
-Basic Functionality
-*******************
+Sketch objects are filled shapes, not outlines. That is what lets them be
+combined: one added to another, cut out of it, or used to trim it.
 
-The following is a simple BuildSketch example:
+In builder mode a sketch is made inside a ``BuildSketch``, which combines
+the objects created in it. In algebra mode the objects are combined with
+``+``, ``-`` and ``&``.
 
-.. literalinclude:: /reference/objects_2d.py
-    :language: build123d
-    :start-after: [Ex. 13]
-    :end-before: [Ex. 13]
+.. list-table::
+    :header-rows: 1
+    :widths: 45 55
 
-The ``with`` statement creates the ``BuildSketch`` context manager with the
-identifier ``circle_with_hole``. The objects and operations that are within the
-scope (i.e. indented) of this context will contribute towards the object
-being created by the context manager.  For ``BuildSketch``, this object is
-``sketch`` and it's referenced as ``circle_with_hole.sketch``.
+    * - To
+      - use
+    * - add, cut or trim with shapes
+      - ``mode=``, or ``+``, ``-``, ``&``
+    * - pick the right object
+      - the table under "Choose the object"
+    * - put a feature where it belongs
+      - ``Locations``, ``Pos``, ``align=``, ``rotation=``
+    * - make a shape no object makes
+      - lines and ``make_face``
+    * - round or bevel corners
+      - ``fillet``, ``chamfer``
+    * - grow, shrink or make a frame
+      - ``offset``
+    * - draw half and reflect it
+      - ``mirror``
+    * - add lettering
+      - ``Text``
+    * - use a shape to build from, not to keep
+      - ``mode=Mode.PRIVATE``
+    * - start from a face of the part
+      - ``insert(face)``, or the face itself
+    * - put the sketch somewhere else
+      - see :ref:`placing_sketches`
+    * - get the edges, corners or area back
+      - ``edges()``, ``vertices()``, ``area``
 
-The first object in this example is a ``Circle`` object which is used to create
-a filled circular shape on the default XY plane. The second object is a ``Rectangle``
-that is subtracted from the circle as directed by the ``mode=Mode.SUBTRACT`` parameter.
-A key aspect of sketch objects is that they are all filled shapes and not just
-a shape perimeter which enables combining subsequent shapes with different modes
-(the valid values of Mode are ``ADD``, ``SUBTRACT``, ``INTERSECT``, ``REPLACE``,
-and ``PRIVATE``).
+*********************************
+Add, cut and trim with shapes
+*********************************
 
-.. image:: /how_to/assets/build_sketch/circle_with_hole.svg
+.. image:: /how_to/assets/build_sketch/sketch_combine.svg
     :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [combine]
+            :end-before: [combine]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [combine_algebra]
+            :end-before: [combine_algebra]
+
+The first object starts the sketch and each later one is combined with
+what is there. In builder mode every object has a ``mode``:
+
+* ``Mode.ADD``, the default, joins the object to the sketch;
+* ``Mode.SUBTRACT`` cuts it out;
+* ``Mode.INTERSECT`` keeps only what the sketch and the object have in
+  common, shown here by the large circle that trims the corners.
+
+In algebra mode the three are the operators ``+``, ``-`` and ``&``.
+
+In builder mode the result is ``plate.sketch``. In algebra mode ``plate``
+is the sketch.
+
+*********************
+Choose the object
+*********************
+
+.. list-table::
+    :header-rows: 1
+    :widths: 50 50
+
+    * - For
+      - Use
+    * - a rectangle
+      - :class:`~objects_sketch.Rectangle`, or
+        :class:`~objects_sketch.RectangleRounded` with rounded corners
+    * - a circle or an ellipse
+      - :class:`~objects_sketch.Circle`, :class:`~objects_sketch.Ellipse`
+    * - a polygon with equal sides
+      - :class:`~objects_sketch.RegularPolygon`
+    * - a polygon from its corner points
+      - :class:`~objects_sketch.Polygon`
+    * - a four-sided shape with sloping sides
+      - :class:`~objects_sketch.Trapezoid`
+    * - a triangle from sides and angles
+      - :class:`~objects_sketch.Triangle`
+    * - a slot from its overall length
+      - :class:`~objects_sketch.SlotOverall`
+    * - a slot from the distance between its centres
+      - :class:`~objects_sketch.SlotCenterToCenter`
+    * - a slot that follows an arc
+      - :class:`~objects_sketch.SlotArc`
+    * - lettering
+      - :class:`~objects_sketch.Text`
+
+The complete list, with a picture of each, is in the
+:doc:`Objects reference </reference/objects>`.
+
+**********************************
+Put a feature where it belongs
+**********************************
+
+.. image:: /how_to/assets/build_sketch/sketch_position.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [position]
+            :end-before: [position]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [position_algebra]
+            :end-before: [position_algebra]
+
+Three things decide where an object lands.
+
+**align** says which part of the object sits on its place. Objects are
+centred by default; ``align=Align.MIN`` puts the lower-left corner there
+instead, so this panel has a corner at the origin and its features can
+be measured from that corner. Each direction can be set on its own:
+``align=(Align.MIN, Align.CENTER)``.
+
+**The place** is the origin unless another is given: a ``with
+Locations(...)`` block in builder mode, ``Pos(x, y) *`` in algebra mode.
+Places nest, so the grid of four holes here is centred on ``(40, 25)``.
+:class:`~build_common.GridLocations`,
+:class:`~build_common.PolarLocations` and
+:class:`~build_common.HexLocations` lay out patterns, and
+:ref:`tutorial_placing_features` goes through them.
+
+**rotation** turns the object about its own place, in degrees.
+
+********************************
+Make a shape no object makes
+********************************
+
+.. image:: /how_to/assets/build_sketch/sketch_outline.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [outline]
+            :end-before: [outline]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [outline_algebra]
+            :end-before: [outline_algebra]
+
+Draw the outline with lines and arcs and
+:func:`~operations_sketch.make_face` fills it. In builder mode the
+``BuildLine`` is written inside the sketch, and ``make_face`` turns the
+lines it leaves there into a face. In algebra mode ``make_face`` is given
+the lines.
+
+The face is then a shape like any other, and the hole is cut from it in
+the usual way. :ref:`drawing_lines_and_curves` covers drawing the
+outline.
+
+******************************
+Round or bevel the corners
+******************************
+
+.. image:: /how_to/assets/build_sketch/sketch_corners.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [corners]
+            :end-before: [corners]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [corners_algebra]
+            :end-before: [corners_algebra]
+
+The corners of a sketch are its vertices.
+:func:`~operations_generic.fillet` rounds the ones it is given and
+:func:`~operations_generic.chamfer` bevels them. Here
+``group_by(Axis.X)[-1]`` is the two corners furthest to the right and
+``[0]`` the two furthest to the left; :ref:`selectors` covers choosing
+them. In builder mode the sketch is changed; in algebra mode the changed
+sketch is returned.
+
+********************************
+Grow, shrink or make a frame
+********************************
+
+.. image:: /how_to/assets/build_sketch/sketch_offset.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [offset]
+            :end-before: [offset]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [offset_algebra]
+            :end-before: [offset_algebra]
+
+:func:`~operations_generic.offset` moves the whole edge of a sketch
+outward by a positive ``amount`` and inward by a negative one, keeping
+its shape. On its own it grows or shrinks the sketch.
+
+To make a frame, shrink the shape and cut the result out of the
+original, which leaves a band the width of the offset. In builder mode
+that is one line, ``offset`` with ``mode=Mode.SUBTRACT``. In algebra mode
+the original is kept in a variable and the offset is subtracted from it.
+
+***************************
+Draw half and mirror it
+***************************
+
+.. image:: /how_to/assets/build_sketch/sketch_mirror.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [mirror]
+            :end-before: [mirror]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [mirror_algebra]
+            :end-before: [mirror_algebra]
+
+:func:`~operations_generic.mirror` reflects a sketch in a plane, here
+``Plane.YZ``, drawn dashed. In builder mode it reflects what the sketch
+holds so far and adds the reflection. In algebra mode it returns the
+reflection, to be added. Where the two halves touch they become one face.
+
+*****************
+Add lettering
+*****************
+
+.. image:: /how_to/assets/build_sketch/sketch_text.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [text]
+            :end-before: [text]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [text_algebra]
+            :end-before: [text_algebra]
+
+:class:`~objects_sketch.Text` makes a sketch of the given text at the
+given size, one face for each separate piece of each character. It
+combines like any other object: added, it is raised lettering once
+extruded; subtracted, as here, it is cut through.
+
+Text can also follow a path, and the font matters when the letters are
+to become solid geometry; :ref:`tutorial_bicycle_tire` covers both.
+
+*****************************
+Use construction geometry
+*****************************
+
+Some shapes are wanted only for what can be measured from them.
+
+.. image:: /how_to/assets/build_sketch/sketch_construction.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [construction]
+            :end-before: [construction]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [construction_algebra]
+            :end-before: [construction_algebra]
+
+The hexagon is never part of the flange. It is there for its six
+corners, which are where the holes go.
+
+In builder mode ``mode=Mode.PRIVATE`` makes an object without adding it
+to the sketch. In algebra mode nothing is combined until you combine it,
+so the hexagon is simply never added.
+
+*********************************
+Start from a face of the part
+*********************************
+
+A face of a part is already a flat shape, and can be the start of a
+sketch.
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [from_face]
+            :end-before: [from_face]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [from_face_algebra]
+            :end-before: [from_face_algebra]
+
+The top of the box is taken, shrunk by 4 all round, and cut 6 deep into
+the box, which leaves a tray with a wall 4 thick. Because the recess is
+made from the face, it follows the box when its size changes.
+
+In builder mode the sketch is placed on the face, and
+:func:`~operations_generic.insert` brings the face into it. A face
+inserted into a sketch is laid flat in the sketch's own coordinates
+first, like everything else drawn there. In algebra mode the face is
+used where it is: ``offset`` is given the face and returns a sketch in
+the same place.
+
+To bring the outline or the silhouette of a whole part into a sketch,
+see :ref:`projection_plane`.
 
 .. _sketching_on_other_planes:
 
-*************************
-Sketching on other Planes
-*************************
+**************************
+Where a sketch ends up
+**************************
 
-Often when designing parts one needs to build on top of other features.  To facilitate
-doing this ``BuildSketch`` allows one to publish sketches to any placement while
-allowing the designer to work in a local X, Y coordinate system. It might be
-helpful to think of what is happening with this metaphor:
+A sketch is always drawn flat, in its own X and Y, and is then carried
+to wherever it belongs, like a sticker drawn on a table and stuck on the
+part. ``BuildSketch`` is given the plane, face or location to put it on,
+or several of them; in algebra mode the sketch is multiplied by one.
+:ref:`placing_sketches` covers choosing it.
 
-#. When instantiating ``BuildSketch`` one or more placements can be passed as parameters.
-   These are the placement targets for the completed sketch.
-#. The designer draws on a flat "drafting table" which is ``Plane.XY``.
-#. Once the sketch is complete, it's applied like a sticker to all of the placements
-   passed in step 1.
+In builder mode both versions are kept, and places given outside the
+sketch are applied to the finished sketch in the same way:
 
-As an example, let's build the following simple control box with a display on an angled plane:
-
-.. image:: /how_to/assets/build_sketch/controller.svg
-    :align: center
-
-Here is the code:
-
-.. literalinclude:: /reference/objects_2d.py
+.. literalinclude:: /how_to/build_sketch.py
     :language: build123d
-    :start-after: [Ex. 14]
-    :end-before: [Ex. 14]
-    :emphasize-lines: 14-25
+    :start-after: [local]
+    :end-before: [local]
 
-The highlighted part of the code shows how a face is extracted from the design,
-a placement is constructed from this face and finally this placement is passed
-to ``BuildSketch`` as the target for the complete sketch.  Notice how the
-``display`` sketch uses local coordinates for its features thus avoiding having
-the user to determine how to move and rotate the sketch to get it where it
-should go.
+``sketch_local`` is the sketch as it was drawn. ``sketch`` is the sketch
+where it was put, which is what an enclosing ``BuildPart`` receives.
 
-Note that ``BuildSketch`` accepts a sequence of planes, faces, and locations for
-placements so creation of an explicit ``Plane`` is often not required. Being
-able to publish to multiple placements at once allows for features to be created
-on multiple sides of an object - say both the top and bottom - which is convenient
-for symmetric parts.
+***********************
+Get the pieces back
+***********************
 
-:ref:`placing_sketches` shows each way of choosing the placement: standard
-and offset planes, faces, the direction of X on a face, moving the origin to
-a corner, tilted planes and places along an edge.
+.. tab-set::
 
-*************************
-Local vs. Global Sketches
-*************************
+    .. tab-item:: Builder
+        :sync: builder
 
-In the above example the target for the sketch was not ``Plane.XY`` but a placement
-passed by the user.  Internally ``BuildSketch`` is always creating the sketch
-on ``Plane.XY`` which one can see by looking at the ``sketch_local`` property of your
-sketch.  For example, to display the local version of the ``display`` sketch from
-above, one would use:
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [pieces]
+            :end-before: [pieces]
 
-.. code-block:: build123d
+    .. tab-item:: Algebra
+        :sync: algebra
 
-    show_object(display.sketch_local, name="sketch on Plane.XY")
+        .. literalinclude:: /how_to/build_sketch.py
+            :language: build123d
+            :start-after: [pieces_algebra]
+            :end-before: [pieces_algebra]
 
-while the sketches as applied to their target placements is accessible through
-the ``sketch`` property, as follows:
+A sketch can be asked for its ``faces()``, ``edges()`` and
+``vertices()``, as lists that can be sorted, grouped and filtered, and
+for its ``area``. In builder mode the selectors are on the builder and
+the measurements on ``plate.sketch``.
 
-.. code-block:: build123d
+************
+See also
+************
 
-    show_object(display.sketch, name="sketch on target placement(s)")
-
-``Locations`` contexts outside a ``BuildSketch`` apply to the completed sketch
-when the builder publishes its output. For example:
-
-.. code-block:: build123d
-
-    with GridLocations(20, 20, 2, 2):
-        with BuildSketch() as repeated:
-            Rectangle(8, 4)
-
-    show_object(repeated.sketch_local, name="one local rectangle")
-    show_object(repeated.sketch, name="four placed rectangles")
-
-The ``repeated.sketch_local`` property contains one rectangle on local
-``Plane.XY`` while ``repeated.sketch`` contains the four rectangles placed by
-the enclosing ``GridLocations`` context.
-
-When using the :func:`~operations_generic.insert` operation to insert an external Face
-to a sketch the face will automatically be reoriented to ``Plane.XY`` before being
-combined with the sketch.  As Faces don't provide an x-direction it's possible
-that the new Face may not be oriented as expected. To reorient the Face manually
-to ``Plane.XY`` one can use the :meth:`~geometry.Plane.to_local_coords` method as
-follows:
-
-.. code-block:: build123d
-
-    reoriented_face = plane.to_local_coords(face)
-
-where ``plane`` is the plane that ``face`` was constructed on.
-
-*****************
-Locating Features
-*****************
-
-Within a sketch features are positioned with ``Locations`` contexts
-(see :ref:`Location Context <location_context_link>`) in local sketch coordinates.
-The following location contexts are available within a sketch:
-
-* :class:`~build_common.GridLocations` : a X/Y grid of locations
-* :class:`~build_common.HexLocations` : a hex grid of locations ideal for nesting circles
-* :class:`~build_common.Locations` : a sequence of arbitrary locations
-* :class:`~build_common.PolarLocations` : locations defined by radius and angle
-
-Generally one would specify tuples of (X, Y) values when defining locations but
-there are many options available to the user.
-
-
-*********
-Reference
-*********
-
-.. py:module:: build_sketch
-
-.. autoclass:: BuildSketch
-    :members:
+* :ref:`tutorial_sketch_then_extrude` builds a part from a sketch step by
+  step.
+* :ref:`placing_sketches` covers the planes a sketch can be put on.
+* :ref:`drawing_lines_and_curves` covers the outlines that ``make_face``
+  fills.
+* :class:`~build_sketch.BuildSketch` in the reference lists the members
+  of the builder itself.

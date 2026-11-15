@@ -1,8 +1,35 @@
 .. _builder_api_reference:
 
-############################
-Builder Common API Reference
-############################
+#####################
+Builder API Reference
+#####################
+
+The four builders, followed by the attributes, selector methods and enums
+they share.
+
+************
+The Builders
+************
+
+.. py:module:: build_line
+
+.. autoclass:: BuildLine
+    :members:
+
+.. py:module:: build_sketch
+
+.. autoclass:: BuildSketch
+    :members:
+
+.. py:module:: build_part
+
+.. autoclass:: BuildPart
+    :members:
+
+.. py:module:: build_sheet
+
+.. autoclass:: BuildSheet
+    :members:
 
 The following are common to all the builders.
 

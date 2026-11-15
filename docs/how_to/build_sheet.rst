@@ -113,11 +113,5 @@ until :ref:`thicken <sheet_metal_thicken>` gives it material, and
 pattern. A part that arrives as a solid is taken apart again by
 :ref:`sheet_shells <sheet_metal_sheet_shells>`.
 
-*********
-Reference
-*********
-
-.. py:module:: build_sheet
-
-.. autoclass:: BuildSheet
-    :members:
+The members of the ``BuildSheet`` class itself are listed in the reference:
+:class:`~build_sheet.BuildSheet`.
