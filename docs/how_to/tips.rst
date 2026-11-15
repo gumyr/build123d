@@ -177,7 +177,8 @@ If you want to align all objects so that they are "placed" on the zero Z coordin
 function has an `align_z` argument. When set to `True`, this will align all objects. 
 
 This can be useful, for example, when preparing print setups for 3D printing, giving you full control 
-over this alignment so you don't have to leave it to the slicer.
+over this alignment so you don't have to leave it to the slicer. :ref:`packing` goes through
+both settings.
 
 
 .. _are_glob_imports_bad_practice:

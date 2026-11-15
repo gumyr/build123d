@@ -29,6 +29,7 @@ the reasoning behind how build123d works see the
     projection/index.rst
     assemblies.rst
     joints.rst
+    packing.rst
     materials.rst
     import_export.rst
     OpenSCAD.rst

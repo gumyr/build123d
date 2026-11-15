@@ -156,3 +156,7 @@ Reference
 .. autofunction:: build_common.vertices
 .. autofunction:: build_common.wire
 .. autofunction:: build_common.wires
+
+.. py:module:: pack
+
+.. autofunction:: pack

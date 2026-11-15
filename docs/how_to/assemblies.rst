@@ -4,130 +4,101 @@
 Assemblies
 ##########
 
-Most CAD designs consist of more than one part which are naturally arranged in
-some type of assembly. Once parts have been assembled in a :class:`~topology.Compound` object
-they can be treated as a unit - i.e. :meth:`~topology.Shape.moved` or exported.
+Most designs are more than one part. An assembly gathers the parts into a
+tree, so that they can be named, moved, inspected and exported as one thing
+while each stays a part in its own right.
 
-To create an assembly in build123d, one needs to
-create a tree of parts by simply assigning either a :class:`~topology.Compound` object's ``parent`` or
-``children`` attributes. To illustrate the process, we'll use the box, lid and
-hinge of the :ref:`joint_tutorial` tutorial.
+In build123d an assembly is a :class:`~topology.Compound` with children.
+Every shape can have a ``label``, a ``parent`` and ``children``, and the tree
+is made by setting them. This guide shows how to build one and work with it.
+Assemblies are made from finished parts, so everything here is the same
+whichever mode the parts were built in.
+
+.. list-table::
+    :header-rows: 1
+    :widths: 45 55
+
+    * - To
+      - use
+    * - name a part
+      - ``part.label = "..."``
+    * - group parts into an assembly
+      - ``Compound(label=..., children=[...])``
+    * - see the tree
+      - ``assembly.show_topology()``
+    * - use one part many times
+      - ``copy.copy(part)``
+    * - add or remove a part
+      - ``part.parent = ...``, ``assembly.children = ...``
+    * - move the assembly, or find where a part is
+      - ``location``, ``global_location``
+    * - visit the parts
+      - ``children``, ``descendants``, ``leaves``
+    * - measure the whole assembly
+      - ``solids()``, ``bounding_box()``
+    * - check for parts that collide
+      - ``do_children_intersect()``
+    * - position parts against each other
+      - see :ref:`joints`
+
+The examples build a small enclosure: a base, a lid, and four posts between
+them. :ref:`joint_tutorial` assembles a hinged box with its hinge and screws
+in the same way.
+
+*********************************
+Name the parts and group them
+*********************************
+
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [group]
+    :end-before: [group]
+
+A ``label`` is any string, and labels do not have to be unique. The
+assembly is a ``Compound`` given its own label and its ``children``. Each
+child's ``parent`` is set for it, and the tree is in place.
+
+A shape has one parent. Putting a part into a second assembly takes it out
+of the first, so use a copy when the same part belongs in two places.
 
 ****************
-Assigning Labels
+See the tree
 ****************
 
-In order keep track of objects one can assign a ``label`` to all :class:`~topology.Shape` objects.
-Here labels are assigned to the box and the lid:
-
-.. literalinclude:: /tutorials/hinged_box.py
+.. literalinclude:: /how_to/assemblies.py
     :language: build123d
-    :start-at: box.label, lid.label
-    :end-at: box.label, lid.label
+    :start-after: [tree]
+    :end-before: [tree]
 
-The two hinge leaves already have theirs, ``outer leaf`` and ``inner leaf``,
-which their class assigns when it creates them.
+.. code-block:: text
 
-The labels are just strings with no further limitations (they don't have to be unique
-within the assembly).
+    enclosure Compound at 0x105e79910, Location((0, 0, 0), (0, 0, 0))
+    ├── base  Box      at 0x105e798e0, Location((0, 0, 0), (0, 0, 0))
+    └── lid   Box      at 0x11c04dd30, Location((0, 0, 15), (0, 0, 0))
 
-****************************
-Create the Assembly Compound
-****************************
-
-Creation of the assembly is done by simply creating a :class:`~topology.Compound` object and assigning
-appropriate ``parent`` and ``children`` attributes as shown here:
-
-.. literalinclude:: /tutorials/hinged_box.py
-    :language: build123d
-    :start-at: hinged_box = Compound(
-    :end-at: hinged_box = Compound(
-
-To display the topology of an assembly :class:`~topology.Compound`, the :meth:`~topology.Shape.show_topology`
-method can be used as follows:
-
-.. code-block:: build123d
-
-    print(hinged_box.show_topology())
-
-which results in:
-
-.. code::
-
-        hinged box     Compound at 0x121233980, Location((0, 0, 0), (0, 0, 0))
-        ├── box        Part     at 0x1212333e0, Location((0, 0, 0), (0, 0, 0))
-        ├── outer leaf HingeLeafat 0x120c70740, Location((-150, 0, 114.5), (0, -90, 180))
-        ├── inner leaf HingeLeafat 0x120cfdb80, Location((-154.5, 0, 110), (0, 0, 0))
-        ├── lid        Part     at 0x120cb8650, Location((0, 0, 100), (0, 0, 0))
-        └── pin        Part     at 0x121271dc0, Location((-154.5, -60, 114.5), (-90, 0, 0))
-
-To add to an assembly :class:`~topology.Compound` one can change either ``children`` or ``parent`` attributes.
-Here six screws, each a copy of one imported screw, are placed in the holes of the
-hinge and added to the assembly by setting their ``parent``:
-
-.. literalinclude:: /tutorials/hinged_box.py
-    :language: build123d
-    :start-at: for leaf in (box_leaf, lid_leaf):
-    :end-at: new_screw.parent = hinged_box
-
-and now the screws are part of the assembly.
-
-.. code::
-
-        hinged box           Compound at 0x121233980, Location((0, 0, 0), (0, 0, 0))
-        ├── box              Part     at 0x1212333e0, Location((0, 0, 0), (0, 0, 0))
-        ├── outer leaf       HingeLeafat 0x120c70740, Location((-150, 0, 114.5), (0, -90, 180))
-        ├── inner leaf       HingeLeafat 0x120cfdb80, Location((-154.5, 0, 110), (0, 0, 0))
-        ├── lid              Part     at 0x120cb8650, Location((0, 0, 100), (0, 0, 0))
-        ├── pin              Part     at 0x121271dc0, Location((-154.5, -60, 114.5), (-90, 0, 0))
-        ├── outer leaf screw Solid    at 0x120cb82f0, Location((-152, 40, 84.5), (0, -90, 180))
-        ├── outer leaf screw Solid    at 0x121233770, Location((-152, 0, 84.5), (0, -90, 180))
-        ├── outer leaf screw Solid    at 0x120cfda90, Location((-152, -40, 84.5), (0, -90, 180))
-        ├── inner leaf screw Solid    at 0x120cfd700, Location((-124.5, -40, 112), (0, 0, 0))
-        ├── inner leaf screw Solid    at 0x120cfe270, Location((-124.5, 0, 112), (0, 0, 0))
-        └── inner leaf screw Solid    at 0x120cfcfb0, Location((-124.5, 40, 112), (0, 0, 0))
-
-.. _assembly_locations:
-
-**************************
-Local and Global Locations
-**************************
-
-Each shape's :attr:`~topology.Shape.location` is relative to its parent in the
-assembly tree. To find the accumulated placement in the global coordinate
-system, use :attr:`~topology.Shape.global_location`. For example:
-
-.. code:: python
-
-    child = Box(1, 1, 1)
-    child.location = Location((0, 2, 0))
-    assembly = Compound(children=[child])
-    assembly.location = Location((3, 0, 0))
-
-    child.location.position         # (0, 2, 0), relative to assembly
-    child.global_location.position  # (3, 2, 0), relative to world origin
+:meth:`~topology.Shape.show_topology` gives each node's label, type and
+location. The location is the node's own, relative to its parent.
 
 .. _shallow_copy:
 
-*********************************
-Shallow vs. Deep Copies of Shapes
-*********************************
+***************************
+Use one part many times
+***************************
 
-Build123d supports the standard python ``copy`` module which provides two different types of
-copy operations ``copy.copy()`` and ``copy.deepcopy()``.
+An assembly often holds many copies of one part: screws, posts, feet. Make
+them with ``copy.copy``.
 
-Build123d's implementation of ``deepcopy()`` for the :class:`~topology.Shape` class (e.g. ``Solid``, ``Face``, etc.)
-does just that, creates a complete copy of the original  all the way down to the CAD object.
-``deepcopy`` is therefore suited to the case where the copy will be subsequently modified to
-become its own unique item.
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [copies]
+    :end-before: [copies]
 
-However, when building an assembly a common use case is to include many instances of an
-object, each one identical but in a different location. This is where ``copy.copy()`` is
-very useful as it copies all of the :class:`~topology.Shape` except for the actual CAD object
-which instead is a reference to the original (OpenCascade refers this as a ``TShape``). As
-it's a reference any changes to the original will be seen in all of the shallow copies.
+``copy.copy`` makes a new shape that shares the geometry of the original,
+so each post costs almost nothing, and ``locate`` puts each at its own
+place. ``copy.deepcopy`` duplicates the geometry too, and is for a copy
+that is going to be changed into something different.
 
-Consider this example where 100 screws are added to an assembly:
+The difference shows when the assembly is saved. Consider this example where 100 screws are added to an assembly:
 
 .. image:: /how_to/assets/assemblies/reference_assembly.svg
     :align: center
@@ -162,147 +133,123 @@ for assemblies can substantially reduce the time and resources used
 to create and store that assembly.
 
 ************************
-Shapes are Anytree Nodes
+Add and remove parts
 ************************
 
-The build123d assembly constructs are built using the python
-`anytree <https://anytree.readthedocs.io/en/latest/>`_ package by making the build123d
-:class:`~topology.Shape` class a sub-class of anytree's ``NodeMixin`` class. Doing so
-adds the following attributes to :class:`~topology.Shape`:
+Setting a part's ``parent`` adds it to that assembly:
 
-* ``parent`` - Parent Node. On set, the node is detached from any previous parent node and attached to the new node.
-* ``children`` - Tuple of all child nodes.
-* ``path`` - Path of this ``Node``.
-* ``iter_path_reverse`` - Iterate up the tree from the current node.
-* ``ancestors`` - All parent nodes and their parent nodes.
-* ``descendants`` - All child nodes and all their child nodes.
-* ``root`` - Tree Root Node.
-* ``siblings`` - Tuple of nodes with the same parent.
-* ``leaves`` - Tuple of all leaf nodes.
-* ``is_leaf`` - ``Node`` has no children (External Node).
-* ``is_root`` - ``Node`` is tree root.
-* ``height`` - Number of edges on the longest path to a leaf ``Node``.
-* ``depth`` - Number of edges to the root ``Node``.
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [add]
+    :end-before: [add]
 
-.. note::
+and setting it to ``None`` takes it out again:
 
-    Changing the ``children`` attribute
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [remove]
+    :end-before: [remove]
 
-    Any iterator can be assigned to the ``children`` attribute but subsequently the children
-    are stored as immutable ``tuple`` objects.  To add a child to an existing :class:`~topology.Compound`
-    object, the ``children`` attribute will have to be reassigned.
+The ``children`` of an assembly can be read as a tuple and assigned as a
+whole, which is the way to add several parts at once or to reorder them. It
+cannot be appended to in place:
 
-    .. _pack:
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [replace]
+    :end-before: [replace]
 
-************************
-Iterating Over Compounds
-************************
+.. _assembly_locations:
 
-As Compounds are containers for shapes, build123d can iterate over these as required.
-Complex nested assemblies (compounds within compounds) do not need to be looped over with recursive functions.
-In the example below, the variable total_volume holds the sum of all the volumes in each solid in an assembly.
-Compare this to assembly3_volume which only results in the volume of the top level part.
+***********************************************
+Move the assembly, and find where a part is
+***********************************************
 
-.. code:: python
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [locations]
+    :end-before: [locations]
 
-    # [import]
-    from build123d import *
-    from ocp_vscode import *
+Each shape's :attr:`~topology.Shape.location` is relative to its parent.
+Moving the enclosure therefore moves everything in it, and the lid's own
+location does not change. :attr:`~topology.Shape.global_location` adds up
+the locations from the top of the tree down and gives the part's place in
+the world.
 
-    # Each assembly has a box and the previous assembly.
-    assembly1 = Compound(label='Assembly1', children=[Box(1, 1, 1),])
-    assembly2 = Compound(label='Assembly2', children=[assembly1, Box(1, 1, 1)])
-    assembly3 = Compound(label='Assembly3', children=[assembly2, Box(1, 1, 1)])
-    total_volume = sum(part.volume for part in assembly3.solids()) # 3
-    assembly3_volume = assembly3.volume # 1
+An assembly can also be moved like any shape, which gives a moved copy of
+the whole tree and leaves the original where it was:
 
-******
-pack
-******
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [moved]
+    :end-before: [moved]
 
-The  :meth:`pack.pack` function arranges objects in a compact, non-overlapping layout within a square(ish) 2D area. It is designed to minimize the space between objects while ensuring that no two objects overlap.
+*******************
+Visit the parts
+*******************
 
-.. py:module:: pack
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [walk]
+    :end-before: [walk]
 
+The tree comes from the `anytree <https://anytree.readthedocs.io/en/latest/>`_
+package, which gives every shape these attributes:
 
-.. autofunction:: pack
+* ``parent`` - the node above; setting it moves the node to a new parent.
+* ``children`` - a tuple of the nodes directly below.
+* ``ancestors`` - the parent, its parent, and so on up.
+* ``descendants`` - every node below, at any depth.
+* ``root`` - the top of the tree.
+* ``siblings`` - the other nodes with the same parent.
+* ``leaves`` - every node below that has no children.
+* ``is_leaf``, ``is_root`` - whether the node is at the bottom or the top.
+* ``depth`` - how many steps the node is from the root.
+* ``height`` - how many steps it is from its furthest leaf.
+* ``path`` - the nodes from the root down to this one.
 
+******************************
+Measure the whole assembly
+******************************
 
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [measure]
+    :end-before: [measure]
 
-Detailed Description
----------------------
+The selectors of an assembly reach all the way down the tree, so
+``solids()`` gives every solid in every sub-assembly, and a total is a sum
+over them. ``bounding_box()`` covers the whole assembly.
 
-The ``pack`` function uses a bin-packing algorithm to efficiently place objects within a 2D plane, ensuring that there is no overlap and that the space between objects is minimized. This is particularly useful in scenarios where spatial efficiency is crucial, such as layout design and object arrangement in constrained spaces.
+********************************
+Check for parts that collide
+********************************
 
-The function begins by calculating the bounding boxes for each object, including the specified padding. It then uses a helper function ``_pack2d`` to determine the optimal positions for each object within the 2D plane. The positions are then translated back to the original objects, ensuring that they are arranged without overlapping.
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [interference]
+    :end-before: [interference]
 
-Usage Note
-----------
+:meth:`~topology.Compound.do_children_intersect` compares the parts of an
+assembly with one another, where they stand, and reports the first pair
+that share a volume. It returns three things: whether there is a clash,
+the two parts, and the volume they have in common. The posts here touch
+the base and the lid without entering them, and that is not a clash.
 
-The ``align_z`` parameter is especially useful when creating print-plates for 3D printing. By aligning the bottoms of the shapes to the same XY plane, you ensure that the objects are perfectly positioned for slicing software, which will no longer need to perform this alignment for you. This can streamline the process and improve the accuracy of the print setup.
+A post placed too low is caught:
 
-Example Usage
--------------
+.. literalinclude:: /how_to/assemblies.py
+    :language: build123d
+    :start-after: [interference_found]
+    :end-before: [interference_found]
 
-.. code:: python
+************
+See also
+************
 
-    # [import]
-    from build123d import *
-    from ocp_vscode import *
-
-
-    # [initial space]
-    b1 = Box(100, 100, 100, align=(Align.CENTER, Align.CENTER, Align.MIN))
-    b2 = Box(54, 54, 54, align=(Align.CENTER, Align.CENTER, Align.MAX), mode=Mode.SUBTRACT)
-    b3 = Box(34, 34, 34, align=(Align.MIN, Align.MIN, Align.CENTER), mode=Mode.SUBTRACT)
-    b4 = Box(24, 24, 24, align=(Align.MAX, Align.MAX, Align.CENTER), mode=Mode.SUBTRACT)
-
-
-
-.. image:: /how_to/assets/assemblies/pack_demo_initial_state.svg
-    :align: center
-
-
-.. code:: python
-
-    # [pack 2D]
-
-    xy_pack = pack(
-        [b1, b2, b3, b4],
-        padding=5,
-        align_z=False
-    )
-
-
-.. image:: /how_to/assets/assemblies/pack_demo_packed_xy.svg
-    :align: center
-
-
-.. code:: python
-
-    # [Pack and align_z]
-
-    z_pack = pack(
-        [b1, b2, b3, b4],
-        padding=5,
-        align_z=True
-    )
-
-.. image:: /how_to/assets/assemblies/pack_demo_packed_z.svg
-    :align: center
-
-
-Tip
----
-
-If you place the arranged objects into a ``Compound``, you can easily determine their bounding box and check whether the objects fit on your print bed.
-
-
-.. code:: python
-
-    # [bounding box]
-    print(Compound(xy_pack).bounding_box())
-    # bbox: 0.0 <= x <= 159.0, 0.0 <= y <= 129.0, -54.0 <= z <= 100.0
-
-    print(Compound(z_pack).bounding_box())
-    # bbox: 0.0 <= x <= 159.0, 0.0 <= y <= 129.0, 0.0 <= z <= 100.0
+* :ref:`joints` position parts against one another before they go into an
+  assembly.
+* :ref:`joint_tutorial` builds and assembles a hinged box step by step.
+* :ref:`moving_objects` covers locations and rotations.
+* The import and export guide covers saving an assembly as STEP, where
+  shared copies are saved once.

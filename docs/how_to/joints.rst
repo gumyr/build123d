@@ -34,79 +34,173 @@ has built-in support for displaying joints).
     scope to the part created. The same holds inside a :class:`~build_sheet.BuildSheet` nested in a
     ``BuildPart``: its joints, placed with the sheet, become the part's.
 
-The following sections provide more detail on the available joints and describes how they are used.
+.. list-table::
+    :header-rows: 1
+    :widths: 45 55
 
-.. py:module:: joints
+    * - To
+      - use
+    * - give a part a joint
+      - make it in the part's ``BuildPart``, or pass ``to_part``
+    * - put a joint at every hole
+      - make it inside ``GridLocations``, or ``locations * joint``
+    * - connect two parts
+      - ``joint.attach(other_joint)``
+    * - fix two parts together
+      - ``RigidJoint`` to ``RigidJoint``
+    * - hinge one part on another
+      - ``RevoluteJoint``, with ``attach(..., angle=)``
+    * - slide one part along another
+      - ``LinearJoint``, with ``attach(..., position=)``
+    * - screw one part into another
+      - ``CylindricalJoint``, with ``position`` and ``angle``
+    * - swivel one part on another
+      - ``BallJoint``, with ``attach(..., angles=)``
+    * - keep connected parts together afterwards
+      - put them in an :ref:`assembly <assembly>`
 
-****************
-Attaching Joints
-****************
+The first sections cover making and connecting joints; the later ones take
+each kind of joint in turn.
 
-A joint is bound to a part in one of three ways. Giving the constructor a ``to_part``
-binds it on the spot; constructing it inside a :class:`~build_part.BuildPart` binds it
-to the part being built; and a joint made with neither is *free* - it has a location
-of its own and no parent - until it is assigned into a part's ``joints`` under its
-label, or added to a part with ``+``:
+***********************
+Give a part a joint
+***********************
 
-.. code-block:: build123d
+.. tab-set::
 
-    RigidJoint("top", part, Location((0, 0, 5)))               # bound on construction
-    part.joints["top"] = RigidJoint(joint_location=Location((0, 0, 5)))  # the same thing
-    part += RigidJoint("top", joint_location=Location((0, 0, 5)))        # a new part with the joint
+    .. tab-item:: Builder
+        :sync: builder
 
-``part.joints`` is a dictionary of the part's joints by label. Assigning a joint to it
-binds the joint where it is in the world, so a joint can also be moved from one part
-to another this way, and deleting a joint frees it again. ``part.joints |= joints``
-binds several at once, from a mapping of label to joint or from labelled joints such
-as ``locations * joint`` gives, and is the form for a part that must stay the same
-object, as ``self`` in a subclass's ``__init__``. The ``+`` form follows the algebra
-rules: the operand is untouched and the result is a new part, sharing the geometry,
-with copies of the joints.
+        .. literalinclude:: /how_to/joints_examples.py
+            :language: build123d
+            :start-after: [bind]
+            :end-before: [bind]
 
-A free joint can be placed with ``*`` like a shape, which is how joints are made in
-bulk in algebra mode: a :class:`~build_common.GridLocations` (or any iterable of
-locations) gives one copy per location, with the label suffixed by the location's
-index: ``"mount"`` becomes ``mount0``, ``mount1``, ``mount2``, ``mount3``. A joint made
-under a label the part already has replaces the earlier joint, as does assigning to
-``part.joints[label]``; the labels a context generates or a sequence lists must be new,
-and one the part already has raises ``ValueError``.
+    .. tab-item:: Algebra
+        :sync: algebra
 
-.. code-block:: build123d
+        .. literalinclude:: /how_to/joints_examples.py
+            :language: build123d
+            :start-after: [bind_algebra]
+            :end-before: [bind_algebra]
 
-    plate = Box(100, 100, 10)
-    top = plate.faces().sort_by(Axis.Z)[-1]
-    plate -= Plane(top) * GridLocations(60, 60, 2, 2) * Cylinder(5, 10)
-    plate += Plane(top) * GridLocations(60, 60, 2, 2) * RigidJoint("mount")
-    plate.joints["mount0"]  # ... mount3
-    plate.joints |= Plane(top) * GridLocations(60, 60, 2, 2) * RigidJoint("pin")  # in place
+A joint has a label, a part it belongs to, and a location on that part. In
+builder mode a joint made inside a ``BuildPart`` belongs to the part being
+built. In algebra mode the part is given as ``to_part``, the second
+argument.
 
-In builder mode the same comes from constructing the joint inside a locations
-context, alongside the geometry it belongs to:
+A joint made with neither is *free*: it has a location of its own and no
+part. It can be bound afterwards in two ways. Assigning it into the part's
+``joints`` under its label binds it where it stands and leaves the part the
+same object:
 
-.. code-block:: build123d
+.. literalinclude:: /how_to/joints_examples.py
+    :language: build123d
+    :start-after: [bind_free]
+    :end-before: [bind_free]
 
-    with BuildPart() as joints_on_holes:
-        Box(100, 100, 10)
-        with Locations(joints_on_holes.faces().sort_by(Axis.Z)[-1]):
-            with GridLocations(60, 60, 2, 2):
-                Hole(5)
-                RigidJoint("mount")
+Adding it with ``+`` follows the algebra rules instead: the result is a new
+part, sharing the geometry, with a copy of the joint:
 
-``label`` may also be a sequence with one label per location, used as given.
+.. literalinclude:: /how_to/joints_examples.py
+    :language: build123d
+    :start-after: [bind_plus]
+    :end-before: [bind_plus]
 
-Joints follow their part. Moving or rotating a part moves its joints with it, and the
-operations that regenerate the geometry - ``mirror``, ``scale``, and ``rotate`` or
-``translate`` with ``transform=True`` - transform the joints the same way. A mirrored
-joint keeps a right-handed frame: its origin, axis and reference direction are reflected
-and the remaining direction recomputed, as :meth:`~geometry.Location.mirror` does, and its
-ranges are unchanged. A reflection reverses the sense of every rotation, so a mirrored
-hinge at an angle points its reference where the mirror image of the original hinge at
-the *negated* angle does; a mirrored slide at a position sits at the mirror image of the
-original at that position. Because the frame is rebuilt right-handed rather than
-reflected, a part connected to a mirrored joint and offset along the joint's recomputed
-axis lands on the opposite side from the reflected original. In a builder, ``mirror`` with
-``Mode.ADD`` keeps the original geometry alongside the mirrored copy and leaves the
-builder's joints as they are.
+``part.joints`` is a dictionary of the part's joints by label, and labels
+are unique within a part. A joint made or assigned under a label the part
+already has replaces the earlier one. Deleting an entry frees the joint
+again, and a joint can be moved from one part to another by assigning it.
+``part.joints |= joints`` binds several at once and keeps the part the same
+object, which is the form to use on ``self`` in the ``__init__`` of a
+subclass.
+
+*****************************
+Put a joint at every hole
+*****************************
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/joints_examples.py
+            :language: build123d
+            :start-after: [bulk]
+            :end-before: [bulk]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/joints_examples.py
+            :language: build123d
+            :start-after: [bulk_algebra]
+            :end-before: [bulk_algebra]
+
+A joint is placed like any object. In builder mode a joint made inside a
+locations context is made once at each place, alongside the hole it belongs
+to. In algebra mode a free joint multiplied by a set of locations gives one
+copy for each.
+
+The copies are labelled by adding the index of the place to the label:
+``"mount"`` becomes ``mount0``, ``mount1``, ``mount2`` and ``mount3``. To
+choose the names, give ``label`` a sequence with one label for each place.
+Labels made this way must be new to the part; one it already has raises
+``ValueError``.
+
+*********************
+Connect two parts
+*********************
+
+.. literalinclude:: /how_to/joints_examples.py
+    :language: build123d
+    :start-after: [attach]
+    :end-before: [attach]
+
+:meth:`~topology.Joint.attach` is called on a joint of the part that is to
+stay where it is, and given a joint of the part that is to move. The second
+part is moved so that the two joints coincide. Here the post lands on the
+first hole of the plate.
+
+``attach`` places the part once and does not tie the two together. To keep
+them together afterwards, put them into an :ref:`assembly <assembly>`, or
+combine them.
+
+Joints with freedom of movement take the position in that freedom as
+arguments to ``attach``, within the range the joint was given:
+
+.. literalinclude:: /how_to/joints_examples.py
+    :language: build123d
+    :start-after: [hinge]
+    :end-before: [hinge]
+
+The door is attached at 60 degrees. Attach it again with another ``angle``
+and it swings there; an angle outside ``angular_range`` raises
+``ValueError``.
+
+****************************
+Joints follow their part
+****************************
+
+Moving or rotating a part moves its joints with it. The operations that
+regenerate the geometry do the same to the joints: ``mirror``, ``scale``,
+and ``rotate`` or ``translate`` with ``transform=True``.
+
+Mirroring needs more care, because a joint's frame has a handedness:
+
+* A mirrored joint keeps a right-handed frame. Its origin, axis and
+  reference direction are reflected and the remaining direction is
+  recomputed, as :meth:`~geometry.Location.mirror` does. Its ranges are
+  unchanged.
+* A reflection reverses the sense of every rotation. A mirrored hinge at an
+  angle therefore points its reference where the mirror image of the
+  original hinge at the *negated* angle does. A mirrored slide at a position
+  sits at the mirror image of the original at that position.
+* Because the frame is rebuilt right-handed and not simply reflected, a part
+  connected to a mirrored joint and offset along the joint's recomputed
+  axis lands on the opposite side from the reflected original.
+* In a builder, ``mirror`` with ``Mode.ADD`` keeps the original geometry
+  beside the mirrored copy and leaves the builder's joints as they are.
 
 ***********
 Rigid Joint
@@ -128,46 +222,48 @@ attach another part to it: ``self`` stays fixed and the other joint's part is mo
 
     pipe.joints["outlet"].attach(flange_outlet.joints["pipe"])
 
-.. note::
-    Within a part all of the joint labels must be unique.
-
 The :meth:`~topology.Joint.attach` method only does a one time re-position of a part and does not
-bind them in any way; however, putting them into an :ref:`assembly` will maintain there relative locations
+bind them in any way; however, putting them into an :ref:`assembly` will maintain their relative locations
 as will combining parts with boolean operations or within a :class:`~build_part.BuildPart` context.
 
-As a example of creating parts with joints and connecting them together, consider the following code where
+As an example of creating parts with joints and connecting them together, consider the following code where
 flanges are attached to the ends of a curved pipe:
 
 .. image:: /how_to/assets/joints/rigid_joints_pipe.png
 
-.. literalinclude:: /how_to/rigid_joints_pipe.py
-    :language: build123d
-    :emphasize-lines: 19-20, 23-24
+.. tab-set::
 
-Note how the locations of the joints are determined by the :meth:`~topology.Mixin1D.location_at` method
-and how the ``-`` negate operator is used to reverse the direction of the location without changing its
-position.  Also note that the ``WeldNeckFlange`` class predefines two joints, one at the pipe end and
-one at the face end - both of which are shown in the above image (generated by ocp-vscode with the
-``render_joints=True`` flag set in the ``show`` function).
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/rigid_joints_pipe.py
+            :language: build123d
+            :start-after: [pipe]
+            :end-before: [pipe]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/rigid_joints_pipe.py
+            :language: build123d
+            :start-after: [pipe_algebra]
+            :end-before: [pipe_algebra]
+
+The pipe's two joints are made from its path. :meth:`~topology.Mixin1D.location_at`
+gives a location at each end of the path, facing along it, and the ``-`` negate
+operator reverses the one at the inlet without moving it, so that both joints
+face out of the pipe.
+
+The flange has two joints of its own: ``pipe``, at the end of its neck, and
+``face``, on its mating face. The last two lines attach each flange by its
+``pipe`` joint to an end of the pipe. The second flange is a ``copy.copy`` of
+the first, and the copy carries the joints with it.
+
+All of the joints are drawn in the picture, which the viewer does when ``show``
+is given ``render_joints=True``.
 
 
-.. autoclass:: RigidJoint
-
-..
-    :exclude-members: attach
-
-    .. method:: attach(other: BallJoint, *, angles: RotationLike = None)
-    .. method:: attach(other: CylindricalJoint, *, position: float = None, angle: float = None)
-        :noindex:
-    .. method:: attach(other: LinearJoint, *, position: float = None)
-        :noindex:
-    .. method:: attach(other: RevoluteJoint, *, angle: float = None)
-        :noindex:
-    .. method:: attach(other: RigidJoint)
-        :noindex:
-
-        Attach another joint's part to the ``RigidJoint``.
-..
+The class and its arguments are in the reference: :class:`~joints.RigidJoint`.
 
 
 
@@ -184,14 +280,7 @@ defined.
 When using :meth:`~topology.Joint.attach` with a Revolute Joint, an extra ``angle`` parameter is present
 which allows one to change the relative position of joined parts by changing a single value.
 
-.. autoclass:: RevoluteJoint
-
-..
-    :exclude-members: attach
-
-    .. method:: attach(other: RigidJoint, *, angle: float = None)
-
-        Attach a ``RigidJoint``'s part to the ``RevoluteJoint``
+The class and its arguments are in the reference: :class:`~joints.RevoluteJoint`.
 
 ************
 Linear Joint
@@ -203,35 +292,42 @@ Component moves along a single axis as with a sliding latch shown here:
 
 The code to generate these components follows:
 
-.. literalinclude:: /how_to/slide_latch.py
-    :language: build123d
-    :emphasize-lines: 30, 52, 55
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/slide_latch.py
+            :language: build123d
+            :start-after: [latch]
+            :end-before: [latch]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/slide_latch.py
+            :language: build123d
+            :start-after: [latch_algebra]
+            :end-before: [latch_algebra]
 
 .. image:: /how_to/assets/joints/joint-latch.png
     :width: 65 %
 .. image:: /how_to/assets/joints/joint-slide.png
     :width: 27.5 %
 
-Note how the slide is constructed in a different orientation than the direction of motion. The
-three highlighted lines of code show how the joints are created and connected together:
+The slide is built standing upright, in a different orientation from the
+direction it moves in. Three lines make and connect the joints:
 
-* The :class:`~joints.LinearJoint` has an axis and limits of movement
-* The :class:`~joints.RigidJoint` has a single location, orientated such that the knob will ultimately be "up"
-* The ``attach`` specifies a position that must be within the predefined limits.
+* The :class:`~joints.LinearJoint` on the latch has an axis and the limits of
+  movement along it.
+* The :class:`~joints.RigidJoint` on the slide has a single location, turned so
+  that the slide lies along the axis and its knob ends up on top.
+* ``attach`` is given a ``position``, which must be within the limits.
 
-The slider can be moved back and forth by just changing the ``position`` value.  Values outside
-of the limits will raise an exception.
+The slide is moved back and forth by changing ``position``. A value outside the
+limits raises ``ValueError``.
 
-.. autoclass:: LinearJoint
-
-..
-    :exclude-members: attach
-
-    .. method:: attach(other: RevoluteJoint, *, position: float = None, angle: float = None)
-    .. method:: attach(other: RigidJoint, *, position: float = None)
-        :noindex:
-
-        Connect the ``LinearJoint`` to either a ``RevoluteJoint`` or ``RigidJoint``
+The class and its arguments are in the reference: :class:`~joints.LinearJoint`.
 
 *****************
 Cylindrical Joint
@@ -247,14 +343,7 @@ like a screw combining the functionality of a :class:`~joints.LinearJoint` and a
 
     hinge_outer.joints["hole2"].attach(m6_joint, position=5 * MM, angle=30)
 
-.. autoclass:: CylindricalJoint
-
-..
-    :exclude-members: attach
-
-    .. method:: attach(other: RigidJoint, *, position: float = None, angle: float = None)
-
-        Attach a ``RigidJoint``'s part to the ``CylindricalJoint``
+The class and its arguments are in the reference: :class:`~joints.CylindricalJoint`.
 
 **********
 Ball Joint
@@ -265,19 +354,39 @@ is found within a rod end as shown here:
 
 .. image:: /how_to/assets/joints/rod_end.png
 
-.. literalinclude:: /how_to/rod_end.py
-    :language: build123d
-    :emphasize-lines: 40-44,51,53
+.. tab-set::
 
-Note how limits are defined during the instantiation of the ball joint when ensures that the pin or bolt
-within the rod end does not interfere with the rod end itself. The ``attach`` sets the three angles
-(only two are significant in this example).
+    .. tab-item:: Builder
+        :sync: builder
 
-.. autoclass:: BallJoint
+        .. literalinclude:: /how_to/rod_end.py
+            :language: build123d
+            :start-after: [rod_end]
+            :end-before: [rod_end]
 
-..
-    :exclude-members: attach
+    .. tab-item:: Algebra
+        :sync: algebra
 
-    .. method:: attach(other: RigidJoint, *, angles: RotationLike = None)
+        .. literalinclude:: /how_to/rod_end.py
+            :language: build123d
+            :start-after: [rod_end_algebra]
+            :end-before: [rod_end_algebra]
 
-        Attach a ``RigidJoint``'s part to the ``BallJoint``
+The ``BallJoint`` is at the centre of the socket. Its ``angular_range`` limits
+the tilt about X and about Y to 14 degrees either way, which keeps a pin or
+bolt through the ball clear of the rod end, and leaves the spin about Z free.
+The ball has a ``RigidJoint`` at its own centre, and ``attach`` sets the three
+angles; only the first two matter here, since the ball is the same all the way
+round. An angle outside its range raises ``ValueError``.
+
+The class and its arguments are in the reference: :class:`~joints.BallJoint`.
+
+********
+See also
+********
+
+* :ref:`joint_tutorial` builds a hinged box and connects it with joints
+  step by step.
+* :ref:`assembly` covers keeping connected parts together.
+* :ref:`moving_objects` covers the locations joints are made from.
+* :ref:`joints_reference` lists the joint classes and their arguments.

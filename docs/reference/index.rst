@@ -23,6 +23,7 @@ and the :ref:`explanation <explanation>` do that.
     operations.rst
     Sheet Metal Reference <sheet_metal.rst>
     Projection Reference <projection.rst>
+    Joints Reference <joints.rst>
     builder_api_reference.rst
     direct_api_reference.rst
     external.rst
