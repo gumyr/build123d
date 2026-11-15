@@ -33,4 +33,5 @@ the reasoning behind how build123d works see the
     materials.rst
     import_export.rst
     tips.rst
+    faq.rst
     debugging_logging.rst
