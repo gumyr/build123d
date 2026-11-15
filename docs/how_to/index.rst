@@ -32,6 +32,5 @@ the reasoning behind how build123d works see the
     packing.rst
     materials.rst
     import_export.rst
-    OpenSCAD.rst
     tips.rst
     debugging_logging.rst

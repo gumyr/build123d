@@ -18,6 +18,7 @@ want to deepen your understanding rather than get something done.
     :maxdepth: 1
 
     introduction.rst
+    openscad.rst
     key_concepts.rst
     key_concepts_builder.rst
     key_concepts_algebra.rst

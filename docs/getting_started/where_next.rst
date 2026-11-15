@@ -39,6 +39,6 @@ What to read next
 * To understand how build123d models shapes before going further, read
   :doc:`/explanation/key_concepts`.
 
-* If you are coming from OpenSCAD, start with :doc:`/how_to/OpenSCAD`.
+* If you are coming from OpenSCAD, start with :ref:`coming_from_openscad`.
 
 * To look something up, use the :ref:`cheat_sheet`.
