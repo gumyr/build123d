@@ -80,6 +80,10 @@ able to publish to multiple placements at once allows for features to be created
 on multiple sides of an object - say both the top and bottom - which is convenient
 for symmetric parts.
 
+:ref:`placing_sketches` shows each way of choosing the placement: standard
+and offset planes, faces, the direction of X on a face, moving the origin to
+a corner, tilted planes and places along an edge.
+
 *************************
 Local vs. Global Sketches
 *************************

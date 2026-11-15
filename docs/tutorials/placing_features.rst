@@ -329,4 +329,5 @@ What you learned
 
 The places in this tutorial were all worked out from dimensions. The next
 step is to take them from the part itself - the top face, that corner, the
-longest edge - which is the subject of the next tutorial.
+longest edge - which is the subject of the next tutorial. For the other
+ways of choosing the plane a sketch sits on, see :ref:`placing_sketches`.

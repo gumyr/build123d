@@ -20,6 +20,7 @@ the reasoning behind how build123d works see the
 
     build_line.rst
     build_sketch.rst
+    placing_sketches.rst
     build_part.rst
     moving_objects.rst
     topology_selection.rst

@@ -441,7 +441,8 @@ What you learned
 * :func:`~operations_generic.fillet` rounds the edges it is given and
   :func:`~operations_generic.chamfer` bevels them.
 * A **face is a place**. A sketch can be drawn on it, and features such as
-  :class:`~objects_part.Hole` can be created at it.
+  :class:`~objects_part.Hole` can be created at it. :ref:`placing_sketches`
+  shows how to turn the sketch on the face or measure it from a corner.
 * The edges an operation has just made can be selected with
   ``Select.LAST``.
 * A selection describes what you mean, so it goes on meaning it when the
