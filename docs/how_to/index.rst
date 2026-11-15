@@ -19,6 +19,7 @@ the reasoning behind how build123d works see the
     :maxdepth: 1
 
     build_line.rst
+    constraints.rst
     build_sketch.rst
     placing_sketches.rst
     build_part.rst
