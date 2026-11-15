@@ -19,7 +19,7 @@
 [![DOI](https://zenodo.org/badge/510925389.svg)](https://zenodo.org/badge/latestdoi/510925389)
 
 [Documentation](https://build123d.readthedocs.io/en/latest/index.html) |
-[Cheat Sheet](https://build123d.readthedocs.io/en/latest/cheat_sheet.html) |
+[Cheat Sheet](https://build123d.readthedocs.io/en/latest/reference/cheat_sheet.html) |
 [Discord](https://discord.com/invite/Bj9AQPsCfx) |
 [Discussions](https://github.com/gumyr/build123d/discussions) |
 [Issues](https://github.com/gumyr/build123d/issues ) |
@@ -205,11 +205,11 @@ export_step(part_context.part, "bracket.step")
 
 ### Further reading
 
-More [Examples](https://build123d.readthedocs.io/en/latest/introductory_examples.html) and [Tutorials](https://build123d.readthedocs.io/en/latest/tutorials.html) are found in the documentation.
+More [Examples](https://build123d.readthedocs.io/en/latest/examples/index.html) and [Tutorials](https://build123d.readthedocs.io/en/latest/tutorials/index.html) are found in the documentation.
 
 ## Installation
 
-For additional installation options see [Installation](https://build123d.readthedocs.io/en/latest/installation.html)
+For additional installation options see [Installation](https://build123d.readthedocs.io/en/latest/getting_started/installation.html)
 
 ### Current release
 
@@ -236,7 +236,7 @@ pip install git+https://github.com/gumyr/build123d
 
 ### Viewers
 
-build123d is best used with a viewer. The most popular viewer is [ocp_vscode](https://github.com/bernhard-42/vscode-ocp-cad-viewer), a Python package with a standalone viewer and VS Code extension. Other [Editors & Viewers](https://build123d.readthedocs.io/en/latest/external.html#external) are found in the documentation.
+build123d is best used with a viewer. The most popular viewer is [ocp_vscode](https://github.com/bernhard-42/vscode-ocp-cad-viewer), a Python package with a standalone viewer and VS Code extension. Other [Editors & Viewers](https://build123d.readthedocs.io/en/latest/reference/external.html#external) are found in the documentation.
 
 ## Contributing
 
