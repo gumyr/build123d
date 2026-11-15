@@ -14,10 +14,23 @@ measure, assemble with others, or subtract from.
 .. image:: /how_to/assets/sheet_metal/thicken_basic.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [thicken_basic]
-    :end-before: [thicken_basic]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [thicken_basic]
+            :end-before: [thicken_basic]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [thicken_basic_algebra]
+            :end-before: [thicken_basic_algebra]
 
 *******************
 Nested in BuildPart
@@ -50,17 +63,6 @@ explicitly:
 
     part = thicken(tray.sheet, sheet_parameters=tray.sheet_parameters)
 
-************
-Algebra mode
-************
-
-.. code-block:: build123d
-
-    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
-    blank = Rectangle(60, 40)
-    sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
-    part = thicken(sheet, sheet_parameters=parameters)
-
 ******************
 Brake-formed parts
 ******************
@@ -71,9 +73,9 @@ to make a folded part directly, without a reference shell. It has no bend
 allowance, relief or unfolding, so it suits a quick bracket whose flat pattern
 is not needed. ``BuildSheet`` is not the context for it.
 
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Unfold <sheet_metal_unfold>` is the other way out of the model.
 * The :ref:`tutorial <sheet_metal_tutorial>` thickens an enclosure and unfolds

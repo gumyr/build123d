@@ -12,10 +12,23 @@ model, the cylindrical **bend** and the flat **wall** beyond it.
 .. image:: /how_to/assets/sheet_metal/flange_basic.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [flange_basic]
-    :end-before: [flange_basic]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_basic]
+            :end-before: [flange_basic]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_basic_algebra]
+            :end-before: [flange_basic_algebra]
 
 ``flange`` takes one or more **rims**, the free edges of the sheet's flats,
 and the ``length`` of the wall. Rims come from ``tray.rims()``, or from the
@@ -34,10 +47,23 @@ angle of 45 gives a sloping wall and 90 a square one.
 .. image:: /how_to/assets/sheet_metal/flange_angle.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [flange_angle]
-    :end-before: [flange_angle]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_angle]
+            :end-before: [flange_angle]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_angle_algebra]
+            :end-before: [flange_angle_algebra]
 
 The bend's inside ``radius`` defaults to the sheet's ``bend_radius`` and can
 be given per flange.
@@ -66,10 +92,23 @@ other does.
 .. image:: /how_to/assets/sheet_metal/flange_gaps.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [flange_gaps]
-    :end-before: [flange_gaps]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_gaps]
+            :end-before: [flange_gaps]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_gaps_algebra]
+            :end-before: [flange_gaps_algebra]
 
 Gaps leave each bend stopping short of the edge of the blank, and the corner
 between two of them is where :ref:`corner relief <sheet_metal_corner_relief>`
@@ -106,10 +145,23 @@ Position               What lands on the edge
 ``CENTER``             The middle of the bend, which straddles the edge.
 =====================  ========================================================
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [flange_position]
-    :end-before: [flange_position]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_position]
+            :end-before: [flange_position]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_position_algebra]
+            :end-before: [flange_position_algebra]
 
 Only the bend's own span between the gaps is taken from the face; beside it,
 the face keeps its edge as tabs that still reach the corner it was drawn to.
@@ -142,10 +194,23 @@ Length from        ``length`` is measured from
                    outside size a drawing gives.
 =================  ============================================================
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [flange_length]
-    :end-before: [flange_length]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_length]
+            :end-before: [flange_length]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_length_algebra]
+            :end-before: [flange_length_algebra]
 
 With ``position`` placing one corner on the edge and ``length_from`` measuring
 to the other, a part can be modelled straight from its drawing dimensions. The
@@ -167,10 +232,23 @@ Length mode        ``length`` is
 ``HORIZONTAL``     The wall's run along that face.
 =================  ============================================================
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [flange_length_mode]
-    :end-before: [flange_length_mode]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_length_mode]
+            :end-before: [flange_length_mode]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [flange_length_mode_algebra]
+            :end-before: [flange_length_mode_algebra]
 
 The two combine as a drawing does: a leg at 60 degrees dimensioned by the
 overall height between its outside faces is ``length_mode=LengthMode.VERTICAL``
@@ -183,16 +261,9 @@ Algebra mode
 ************
 
 The same call takes the edges of a blank face or of a sheet and returns the
-new ``Shell``. The parameters are passed explicitly:
-
-.. code-block:: build123d
-
-    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
-    blank = Rectangle(60, 40)
-    sheet = flange(
-        blank.edges().sort_by(Axis.X)[-1], length=15, sheet_parameters=parameters
-    )
-    sheet = flange(sheet.rims().sort_by(Axis.X)[0], length=15, sheet_parameters=parameters)
+new ``Shell``, and the material is passed explicitly as ``sheet_parameters``.
+The blank can be a sketch such as ``Rectangle(60, 40)``; once it has been
+flanged the result is a sheet, and its free edges are its ``rims()``.
 
 ***************
 What it refuses
@@ -205,9 +276,9 @@ What it refuses
 * Gaps that leave no edge to bend, and set-back positions whose strip would
   reach past the face.
 
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Hem <sheet_metal_hem>` is a flange folded all the way back onto the
   sheet.

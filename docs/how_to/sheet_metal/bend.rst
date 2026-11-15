@@ -16,10 +16,23 @@ blank, then bend along the lines.
 .. image:: /how_to/assets/sheet_metal/bend_basic.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [bend_basic]
-    :end-before: [bend_basic]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [bend_basic]
+            :end-before: [bend_basic]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [bend_basic_algebra]
+            :end-before: [bend_basic_algebra]
 
 *********************
 Marking the fold line
@@ -52,10 +65,23 @@ images depending on which flat the line was taken through:
 .. image:: /how_to/assets/sheet_metal/bend_side.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [bend_side]
-    :end-before: [bend_side]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [bend_side]
+            :end-before: [bend_side]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [bend_side_algebra]
+            :end-before: [bend_side_algebra]
 
 A line taken straight off the sheet with ``sheet.edges()`` is refused rather
 than guessed at, because both of its faces are equally its own. Select it
@@ -78,19 +104,6 @@ Whatever the blank's outline does across that strip, a taper, a corner round,
 a notch, a hole, rolls into the bend with it, so the strip need not be the
 same width at both ends.
 
-************
-Algebra mode
-************
-
-.. code-block:: build123d
-
-    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
-    blank = Shell.make_sheet(
-        [(Pos(-30, 0) * Rectangle(20, 40)).face(), (Pos(10, 0) * Rectangle(60, 40)).face()]
-    )
-    line = blank.flats().sort_by(Axis.X)[0].fold_lines()[0]
-    sheet = bend(line, angle=90, sheet_parameters=parameters)
-
 ***************
 What it refuses
 ***************
@@ -107,9 +120,9 @@ What it refuses
 The sheet is not checked for running into itself, so a large angle on a blank
 with other features can fold one part through another.
 
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Jog <sheet_metal_jog>` is two opposite bends along a line, stepping
   the far side sideways.

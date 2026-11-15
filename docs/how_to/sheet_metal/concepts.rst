@@ -255,8 +255,8 @@ parameters travel with every call:
     )
     part = thicken(sheet, sheet_parameters=parameters)
 
-What makes a shell a sheet, flats and bends sewn into one connected manifold
-shell, is enforced by :meth:`~topology.Shell.make_sheet`, which is what
-``BuildSheet`` calls to take faces in and the way to assemble a sheet from
-faces by hand. ``+`` on a ``Shell`` sews rather than fuses, as described under
+What makes a shell a sheet is flats and bends joined into one connected
+manifold shell. To assemble one from faces by hand, as for a blank with a fold
+line drawn across it, pass the faces to ``Shell(...)``. ``+`` on a ``Shell``
+sews rather than fuses, as described under
 :ref:`sewing sheet surfaces <algebra_sewing>`.

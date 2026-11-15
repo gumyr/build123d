@@ -14,10 +14,23 @@ instead. Any partial-width flange or tab needs it.
 .. image:: /how_to/assets/sheet_metal/bend_relief_basic.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [bend_relief_basic]
-    :end-before: [bend_relief_basic]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [bend_relief_basic]
+            :end-before: [bend_relief_basic]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [bend_relief_basic_algebra]
+            :end-before: [bend_relief_basic_algebra]
 
 ``bend_relief`` takes the **bend faces** themselves, from ``tray.bends()``,
 and relieves both ends of each. An end that already runs out to the edge of
@@ -47,10 +60,23 @@ Shape          What it is and when to use it
                is the choice for punched blanks.
 =============  ================================================================
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [bend_relief_types]
-    :end-before: [bend_relief_types]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [bend_relief_types]
+            :end-before: [bend_relief_types]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [bend_relief_types_algebra]
+            :end-before: [bend_relief_types_algebra]
 
 ``CONSTANT_WIDTH`` is not accepted here: it continues the gap two flanges
 leave, so it is only defined where two of them meet.
@@ -78,19 +104,6 @@ reports that rather than doing it. That corner belongs to
 :ref:`corner relief <sheet_metal_corner_relief>`, which opens it in a single
 cut.
 
-************
-Algebra mode
-************
-
-.. code-block:: build123d
-
-    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
-    blank = Rectangle(60, 40)
-    sheet = flange(
-        blank.edges().sort_by(Axis.X)[-1], length=15, gaps=8, sheet_parameters=parameters
-    )
-    sheet = bend_relief(sheet.bends(), ReliefType.SQUARE, sheet_parameters=parameters)
-
 ***************
 What it refuses
 ***************
@@ -101,9 +114,9 @@ What it refuses
 * A relief that would cut a corner of the sheet loose, as at a flange corner,
   or a round relief too large for the sheet past the bend end.
 
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Corner relief <sheet_metal_corner_relief>` where two bends meet.
 * :ref:`Flange <sheet_metal_flange>` gaps are what make a bend stop inside

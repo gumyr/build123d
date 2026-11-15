@@ -14,10 +14,23 @@ with a negative angle they *extend* it into a flare.
 .. image:: /how_to/assets/sheet_metal/miter_basic.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [miter_basic]
-    :end-before: [miter_basic]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [miter_basic]
+            :end-before: [miter_basic]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [miter_basic_algebra]
+            :end-before: [miter_basic_algebra]
 
 ``miter`` takes **vertices**: the corners where a flange's free rim meets a
 straight side running back to the bend. A positive angle trims the rim toward
@@ -43,10 +56,23 @@ the wall and an extending one widens it.
 .. image:: /how_to/assets/sheet_metal/miter_through_bend.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [miter_through_bend]
-    :end-before: [miter_through_bend]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [miter_through_bend]
+            :end-before: [miter_through_bend]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [miter_through_bend_algebra]
+            :end-before: [miter_through_bend_algebra]
 
 The angle is held in the flat pattern rather than on the reference surface,
 since that is where a miter is laid out, so the cut is very slightly skewed on
@@ -65,10 +91,23 @@ line rather than starting at the tangent line:
 .. image:: /how_to/assets/sheet_metal/miter_flare.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [miter_flare]
-    :end-before: [miter_flare]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [miter_flare]
+            :end-before: [miter_flare]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [miter_flare_algebra]
+            :end-before: [miter_flare_algebra]
 
 Two miters that eat past each other meet inside the flange and leave a
 triangle, as does a lone one whose cut leaves through the far side.
@@ -76,19 +115,6 @@ triangle, as does a lone one whose cut leaves through the far side.
 ************
 Algebra mode
 ************
-
-.. code-block:: build123d
-
-    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
-    blank = Rectangle(60, 40)
-    sheet = flange(blank.edges().sort_by(Axis.X)[-1], length=20, sheet_parameters=parameters)
-    wall = sheet.flats().sort_by(Axis.Z)[-1]
-    sheet = miter(
-        wall.vertices().group_by(Axis.Z)[-1],
-        30,
-        through_bend=True,
-        sheet_parameters=parameters,
-    )
 
 ``sheet_parameters`` is only needed for ``through_bend`` in Algebra mode,
 since that is the case where the cut is laid out on the blank.
@@ -104,9 +130,9 @@ What it refuses
   bend with ``through_bend``: only the rim and the side that meet at the
   corner are redrawn, so the rest of the outline must stay clear of the cut.
 
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Corner relief <sheet_metal_corner_relief>` is the alternative at a
   corner: open it instead of closing it.

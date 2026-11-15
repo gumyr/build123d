@@ -19,16 +19,23 @@ Everything here works in both of build123d's styles. In Builder mode the
 in Algebra mode each operation takes a ``Shell`` and a
 ``SheetMetalParameters`` and returns the updated ``Shell``.
 
-.. code-block:: build123d
+.. tab-set::
 
-    with BuildPart() as tray_part:
-        with BuildSheet(thickness=1, bend_radius=2) as tray:
-            with BuildSketch():
-                Rectangle(100, 60)
-            flange(tray.rims(), length=15, gaps=3.1)
-            corners = tray.flats().sort_by(Axis.Z)[0].vertices()
-            corner_relief(corners.filter_by(Convexity.CONVEX), ReliefType.ROUND, radius=3)
-        thicken()
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [index_tray]
+            :end-before: [index_tray]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [index_tray_algebra]
+            :end-before: [index_tray_algebra]
 
 **********
 Start here
@@ -50,6 +57,13 @@ Start here
 
         The reference surface, bend radius and K-factor, how a drawing's
         dimensions become face sizes, and how a sheet is selected from.
+
+    .. grid-item-card:: BuildSheet
+        :link: build_sheet
+        :link-type: ref
+
+        The builder that collects the work: its parameters, its selectors
+        and how it nests in ``BuildPart``.
 
 **********
 Operations

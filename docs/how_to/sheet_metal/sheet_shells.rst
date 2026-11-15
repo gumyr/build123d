@@ -13,10 +13,23 @@ constant-thickness solid apart into its two sheet surfaces and its thickness.
 .. image:: /how_to/assets/sheet_metal/sheet_shells_basic.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [sheet_shells_basic]
-    :end-before: [sheet_shells_basic]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [sheet_shells_basic]
+            :end-before: [sheet_shells_basic]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [sheet_shells_basic_algebra]
+            :end-before: [sheet_shells_basic_algebra]
 
 The two surfaces come back larger area first, and no more is claimed about
 them than that. On a part bent one way the larger one is the outside, but a
@@ -83,9 +96,9 @@ What it refuses
   closed surface, or a welded assembly of sheets.
 * A ``tolerance`` that is not positive.
 
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Unfold <sheet_metal_unfold>` develops a recovered surface into the
   flat pattern.

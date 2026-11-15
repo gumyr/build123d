@@ -13,10 +13,23 @@ bends made as one feature so that the step comes out at the right height.
 .. image:: /how_to/assets/sheet_metal/jog_basic.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [jog_basic]
-    :end-before: [jog_basic]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [jog_basic]
+            :end-before: [jog_basic]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [jog_basic_algebra]
+            :end-before: [jog_basic_algebra]
 
 ****************
 Offset and angle
@@ -55,25 +68,23 @@ for a flange.
 .. image:: /how_to/assets/sheet_metal/jog_rim.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [jog_rim]
-    :end-before: [jog_rim]
+.. tab-set::
 
-************
-Algebra mode
-************
+    .. tab-item:: Builder
+        :sync: builder
 
-.. code-block:: build123d
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [jog_rim]
+            :end-before: [jog_rim]
 
-    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
-    blank = Rectangle(60, 40)
-    sheet = jog(
-        blank.edges().sort_by(Axis.X)[-1],
-        offset=10,
-        length=15,
-        sheet_parameters=parameters,
-    )
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [jog_rim_algebra]
+            :end-before: [jog_rim_algebra]
 
 ***************
 What it refuses
@@ -88,9 +99,9 @@ What it refuses
 * Everything a :ref:`bend <sheet_metal_bend>` refuses, since a jog is two of
   them.
 
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Bend <sheet_metal_bend>` for a single fold along a line.
 * :ref:`Flange <sheet_metal_flange>` for a wall off a rim without the step.

@@ -33,8 +33,6 @@ license:
 
 # pylint: disable=redefined-outer-name, wildcard-import, unused-wildcard-import
 
-import os
-import tempfile
 from pathlib import Path
 
 from build123d import *
@@ -190,6 +188,17 @@ def drawing_order(shapes: list[Shape]) -> list[Shape]:
     return sorted(pieces, key=key)
 
 
+def same_sheet(first: Shape, second: Shape) -> bool:
+    """Do the builder and algebra versions of an example make the same sheet?"""
+    box_1, box_2 = first.bounding_box(), second.bounding_box()
+    return (
+        len(first.faces()) == len(second.faces())
+        and abs(first.area - second.area) < 1e-6
+        and (box_1.min - box_2.min).length < 1e-6
+        and (box_1.max - box_2.max).length < 1e-6
+    )
+
+
 def render(shape: Shape, name: str, view: VectorLike = ISO_VIEW) -> None:
     """A single unlabelled projection."""
     write_layout([projected(shape, view)], name)
@@ -205,6 +214,18 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
         Rectangle(60, 40)
     flange(bracket.rims().sort_by(Axis.X)[-1], length=15)
 # [flange_basic]
+
+builder_sheet = bracket.sheet
+
+# [flange_basic_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(
+    blank.edges().sort_by(Axis.X)[-1], length=15, sheet_parameters=parameters
+)
+# [flange_basic_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(bracket.sheet, "flange_basic")
 
 # [flange_angle]
@@ -215,6 +236,22 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
     flange(bracket.rims().sort_by(Axis.X)[-1], length=15, angle=60)
     flange(bracket.rims().sort_by(Axis.X)[0], length=15, angle=-60)
 # [flange_angle]
+
+builder_sheet = bracket.sheet
+
+# [flange_angle_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+# positive folds toward the face normal (+Z), negative away from it
+sheet = flange(
+    blank.edges().sort_by(Axis.X)[-1], length=15, angle=60, sheet_parameters=parameters
+)
+sheet = flange(
+    sheet.rims().sort_by(Axis.X)[0], length=15, angle=-60, sheet_parameters=parameters
+)
+# [flange_angle_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 write_layout([profile(bracket.sheet)], "flange_angle")
 
 # [flange_gaps]
@@ -224,6 +261,17 @@ with BuildSheet(thickness=1, bend_radius=2) as tray:
     # gaps leave the corners unbent so the four walls do not collide
     flange(tray.rims(), length=15, gaps=3.1)
 # [flange_gaps]
+
+builder_sheet = tray.sheet
+
+# [flange_gaps_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+# gaps leave the corners unbent so the four walls do not collide
+sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
+# [flange_gaps_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(tray.sheet, "flange_gaps")
 
 
@@ -238,6 +286,25 @@ def flanged_at(position: BendPosition) -> Shell:
 
 
 # [flange_position]
+
+
+# [flange_position_algebra]
+def flanged_at_algebra(position: BendPosition) -> Shell:
+    """A blank with one wall, its bend placed relative to the edge."""
+    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+    blank = Rectangle(60, 40)
+    return flange(
+        blank.edges().sort_by(Axis.X)[-1],
+        length=15,
+        position=position,
+        sheet_parameters=parameters,
+    )
+
+
+# [flange_position_algebra]
+
+for position in BendPosition:
+    assert same_sheet(flanged_at(position), flanged_at_algebra(position))
 # close up on the bend, with the edge the face was drawn to marked at x = 30
 write_layout(
     [
@@ -269,6 +336,26 @@ def wall_measured(length_from: LengthFrom) -> Shell:
 
 
 # [flange_length]
+
+
+# [flange_length_algebra]
+def wall_measured_algebra(length_from: LengthFrom) -> Shell:
+    """A 20 long wall, measured the way a drawing gives it."""
+    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+    blank = Rectangle(60, 40)
+    return flange(
+        blank.edges().sort_by(Axis.X)[-1],
+        length=20,
+        position=BendPosition.MATERIAL_OUTSIDE,
+        length_from=length_from,
+        sheet_parameters=parameters,
+    )
+
+
+# [flange_length_algebra]
+
+for origin in LengthFrom:
+    assert same_sheet(wall_measured(origin), wall_measured_algebra(origin))
 write_layout(
     [
         profile(wall_measured(origin), origin.name, marker=vertical(30, -3, 22))
@@ -296,6 +383,28 @@ def wall_sized(length_mode: LengthMode) -> Shell:
 
 
 # [flange_length_mode]
+
+
+# [flange_length_mode_algebra]
+def wall_sized_algebra(length_mode: LengthMode) -> Shell:
+    """A 60 degree wall whose 20 is the side of its triangle the mode names."""
+    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+    blank = Rectangle(60, 40)
+    return flange(
+        blank.edges().sort_by(Axis.X)[-1],
+        length=20,
+        angle=60,
+        position=BendPosition.MATERIAL_OUTSIDE,
+        length_mode=length_mode,
+        length_from=LengthFrom.OUTER_SHARP,
+        sheet_parameters=parameters,
+    )
+
+
+# [flange_length_mode_algebra]
+
+for mode in (LengthMode.DIAGONAL, LengthMode.VERTICAL, LengthMode.HORIZONTAL):
+    assert same_sheet(wall_sized(mode), wall_sized_algebra(mode))
 # the plate's outside face is at z = -1 and its corner on the edge at x = 30,
 # so the wall's height is marked 20 above the face and its run 20 past the edge
 write_layout(
@@ -330,6 +439,20 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
     fold_line = bracket.flats().sort_by(Axis.X)[-1].fold_lines()[0]
     bend(fold_line, angle=90)
 # [bend_basic]
+
+builder_sheet = bracket.sheet
+
+# [bend_basic_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+# a fold line at x = 20: two coplanar flats joined into one sheet
+halves = split(Rectangle(80, 40), bisect_by=Plane.YZ.offset(20), keep=Keep.BOTH)
+blank = Shell(halves.faces())
+# select the line through the flat that stays put; the other flat swings
+fold_line = blank.flats().sort_by(Axis.X)[-1].fold_lines()[0]
+sheet = bend(fold_line, angle=90, sheet_parameters=parameters)
+# [bend_basic_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(bracket.sheet, "bend_basic")
 
 
@@ -348,6 +471,24 @@ def held_by(side: int) -> Shell:
 
 
 # [bend_side]
+
+
+# [bend_side_algebra]
+def held_by_algebra(side: int) -> Shell:
+    """A blank split down the middle and bent 90 degrees, holding one flat."""
+    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+    halves = split(Rectangle(24, 16), bisect_by=Plane.YZ, keep=Keep.BOTH)
+    blank = Shell(halves.faces())
+    # the line through the flat on this side: that flat stays, the other
+    # rolls into the bend and swings
+    held = blank.flats().sort_by(Axis.X)[side]
+    return bend(held.fold_lines()[0], angle=90, sheet_parameters=parameters)
+
+
+# [bend_side_algebra]
+
+for side in (0, -1):
+    assert same_sheet(held_by(side), held_by_algebra(side))
 # profiles of the two results, with the fold line marked at x = 0
 write_layout(
     [
@@ -368,6 +509,19 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
     # the far flat steps 10 toward the face normal and carries on parallel
     jog(fold_line, offset=10)
 # [jog_basic]
+
+builder_sheet = bracket.sheet
+
+# [jog_basic_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+halves = split(Rectangle(80, 40), bisect_by=Plane.YZ.offset(20), keep=Keep.BOTH)
+blank = Shell(halves.faces())
+fold_line = blank.flats().sort_by(Axis.X)[-1].fold_lines()[0]
+# the far flat steps 10 toward the face normal and carries on parallel
+sheet = jog(fold_line, offset=10, sheet_parameters=parameters)
+# [jog_basic_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(bracket.sheet, "jog_basic")
 
 # the same jog with a shallower run, for the profile comparison
@@ -388,6 +542,19 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
     # from a free edge a jog is a stepped flange running on for length
     jog(bracket.rims().sort_by(Axis.X)[-1], offset=10, length=15)
 # [jog_rim]
+
+builder_sheet = bracket.sheet
+
+# [jog_rim_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+# from a free edge a jog is a stepped flange running on for length
+sheet = jog(
+    blank.edges().sort_by(Axis.X)[-1], offset=10, length=15, sheet_parameters=parameters
+)
+# [jog_rim_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 write_layout([profile(bracket.sheet, window=(20, 52, -3, 14))], "jog_rim")
 
 # ---------------------------------------------------------------------------
@@ -415,6 +582,23 @@ with BuildSheet(thickness=1, bend_radius=2) as rolled_hem:
         Rectangle(60, 40)
     hem(rolled_hem.rims().sort_by(Axis.X)[-1], HemType.ROLLED, radius=3, roll_angle=270)
 # [hem_types]
+
+builder_hems = [flat_hem.sheet, open_hem.sheet, teardrop_hem.sheet, rolled_hem.sheet]
+
+# [hem_types_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+edge = Rectangle(60, 40).edges().sort_by(Axis.X)[-1]
+
+flat = hem(edge, HemType.FLAT, width=8, sheet_parameters=parameters)
+opened = hem(edge, HemType.OPEN, width=8, opening=2, sheet_parameters=parameters)
+teardrop = hem(edge, HemType.TEARDROP, width=12, radius=3, sheet_parameters=parameters)
+rolled = hem(
+    edge, HemType.ROLLED, radius=3, roll_angle=270, sheet_parameters=parameters
+)
+# [hem_types_algebra]
+
+for builder_hem, algebra_hem in zip(builder_hems, [flat, opened, teardrop, rolled]):
+    assert same_sheet(builder_hem, algebra_hem)
 hem_window = (12, 36, -4, 12)  # the hemmed end of the blank, curls included
 write_layout(
     [
@@ -439,6 +623,21 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
     wall = bracket.flats().sort_by(Axis.Z)[-1]
     miter(wall.vertices().group_by(Axis.Z)[-1], 30)
 # [miter_basic]
+
+builder_sheet = bracket.sheet
+
+# [miter_basic_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(
+    blank.edges().sort_by(Axis.X)[-1], length=20, sheet_parameters=parameters
+)
+wall = sheet.flats().sort_by(Axis.Z)[-1]
+# the wall's two free corners, at the top of the flange
+sheet = miter(wall.vertices().group_by(Axis.Z)[-1], 30)
+# [miter_basic_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(bracket.sheet, "miter_basic")
 
 # [miter_through_bend]
@@ -450,6 +649,26 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
     # carry the cut through the bend to the fold line
     miter(wall.vertices().group_by(Axis.Z)[-1], 30, through_bend=True)
 # [miter_through_bend]
+
+builder_sheet = bracket.sheet
+
+# [miter_through_bend_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(
+    blank.edges().sort_by(Axis.X)[-1], length=20, sheet_parameters=parameters
+)
+wall = sheet.flats().sort_by(Axis.Z)[-1]
+# carry the cut through the bend to the fold line
+sheet = miter(
+    wall.vertices().group_by(Axis.Z)[-1],
+    30,
+    through_bend=True,
+    sheet_parameters=parameters,
+)
+# [miter_through_bend_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(bracket.sheet, "miter_through_bend")
 
 # [miter_flare]
@@ -461,6 +680,26 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
     # a negative angle extends the sides instead of trimming them
     miter(wall.vertices().group_by(Axis.Z)[-1], -15, through_bend=True)
 # [miter_flare]
+
+builder_sheet = bracket.sheet
+
+# [miter_flare_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(
+    blank.edges().sort_by(Axis.X)[-1], length=20, sheet_parameters=parameters
+)
+wall = sheet.flats().sort_by(Axis.Z)[-1]
+# a negative angle extends the sides instead of trimming them
+sheet = miter(
+    wall.vertices().group_by(Axis.Z)[-1],
+    -15,
+    through_bend=True,
+    sheet_parameters=parameters,
+)
+# [miter_flare_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(bracket.sheet, "miter_flare")
 
 # ---------------------------------------------------------------------------
@@ -478,6 +717,24 @@ with BuildSheet(thickness=1, bend_radius=2) as tray:
         base.vertices().filter_by(Convexity.CONVEX), ReliefType.ROUND, radius=3
     )
 # [corner_relief_basic]
+
+builder_sheet = tray.sheet
+
+# [corner_relief_basic_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
+# the four corners of the base, where two bends meet
+base = sheet.flats().sort_by(Axis.Z)[0]
+sheet = corner_relief(
+    base.vertices().filter_by(Convexity.CONVEX),
+    ReliefType.ROUND,
+    radius=3,
+    sheet_parameters=parameters,
+)
+# [corner_relief_basic_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(tray.sheet, "corner_relief_basic")
 
 
@@ -498,6 +755,36 @@ square_blank = relieved_blank(ReliefType.SQUARE, size=8)
 obround_blank = relieved_blank(ReliefType.OBROUND, length=12, width=5)
 constant_blank = relieved_blank(ReliefType.CONSTANT_WIDTH, depth=6)
 # [corner_relief_types]
+
+builder_blanks = [round_blank, square_blank, obround_blank, constant_blank]
+
+
+# [corner_relief_types_algebra]
+def relieved_blank_algebra(relief_type: ReliefType, **sizes) -> Shell:
+    """The flat pattern of a tray with its four corners relieved."""
+    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+    blank = Rectangle(60, 40)
+    sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
+    base = sheet.flats().sort_by(Axis.Z)[0]
+    sheet = corner_relief(
+        base.vertices().filter_by(Convexity.CONVEX),
+        relief_type,
+        sheet_parameters=parameters,
+        **sizes,
+    )
+    return unfold(sheet, sheet_parameters=parameters, align=Align.MIN).flat
+
+
+round_blank = relieved_blank_algebra(ReliefType.ROUND, radius=4)
+square_blank = relieved_blank_algebra(ReliefType.SQUARE, size=8)
+obround_blank = relieved_blank_algebra(ReliefType.OBROUND, length=12, width=5)
+constant_blank = relieved_blank_algebra(ReliefType.CONSTANT_WIDTH, depth=6)
+# [corner_relief_types_algebra]
+
+for builder_blank, algebra_blank in zip(
+    builder_blanks, [round_blank, square_blank, obround_blank, constant_blank]
+):
+    assert same_sheet(builder_blank, algebra_blank)
 
 
 def base_corner_window(blank: Shell, size: float = 26) -> Window:
@@ -535,6 +822,20 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
     flange(bracket.rims().sort_by(Axis.X)[-1], length=15, gaps=8)
     bend_relief(bracket.bends(), ReliefType.SQUARE)
 # [bend_relief_basic]
+
+builder_sheet = bracket.sheet
+
+# [bend_relief_basic_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+# gaps stop the bend 8 short of each end, inside the sheet
+sheet = flange(
+    blank.edges().sort_by(Axis.X)[-1], length=15, gaps=8, sheet_parameters=parameters
+)
+sheet = bend_relief(sheet.bends(), ReliefType.SQUARE, sheet_parameters=parameters)
+# [bend_relief_basic_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(bracket.sheet, "bend_relief_basic")
 
 
@@ -553,6 +854,35 @@ round_blank = relieved_bend(ReliefType.ROUND)
 square_blank = relieved_bend(ReliefType.SQUARE)
 obround_blank = relieved_bend(ReliefType.OBROUND)
 # [bend_relief_types]
+
+builder_blanks = [round_blank, square_blank, obround_blank]
+
+
+# [bend_relief_types_algebra]
+def relieved_bend_algebra(relief_type: ReliefType) -> Shell:
+    """The flat pattern of a short flange with both bend ends relieved."""
+    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+    blank = Rectangle(60, 40)
+    sheet = flange(
+        blank.edges().sort_by(Axis.X)[-1],
+        length=15,
+        gaps=8,
+        sheet_parameters=parameters,
+    )
+    # default shop-rule sizes
+    sheet = bend_relief(sheet.bends(), relief_type, sheet_parameters=parameters)
+    return unfold(sheet, sheet_parameters=parameters, align=Align.MIN).flat
+
+
+round_blank = relieved_bend_algebra(ReliefType.ROUND)
+square_blank = relieved_bend_algebra(ReliefType.SQUARE)
+obround_blank = relieved_bend_algebra(ReliefType.OBROUND)
+# [bend_relief_types_algebra]
+
+for builder_blank, algebra_blank in zip(
+    builder_blanks, [round_blank, square_blank, obround_blank]
+):
+    assert same_sheet(builder_blank, algebra_blank)
 
 # close up on the lower end of the bend, which the flat pattern puts at
 # (60, 8): the fold line 30 past the blank's shift to the origin, the bend
@@ -583,6 +913,25 @@ with BuildSheet(thickness=1, bend_radius=2) as tray:
     # the blank the tray is cut from, cornered on the origin
     flat_pattern = unfold(align=Align.MIN).flat
 # [unfold_basic]
+
+builder_flat_pattern = flat_pattern
+
+# [unfold_basic_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
+base = sheet.flats().sort_by(Axis.Z)[0]
+sheet = corner_relief(
+    base.vertices().filter_by(Convexity.CONVEX),
+    ReliefType.ROUND,
+    radius=3,
+    sheet_parameters=parameters,
+)
+# the blank the tray is cut from, cornered on the origin
+flat_pattern = unfold(sheet, sheet_parameters=parameters, align=Align.MIN).flat
+# [unfold_basic_algebra]
+
+assert same_sheet(builder_flat_pattern, flat_pattern)
 write_layout([drawn(flat_pattern)], "unfold_basic")
 
 # ---------------------------------------------------------------------------
@@ -601,6 +950,22 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
     with Locations(Plane(wall)):
         Circle(4, mode=Mode.SUBTRACT)  # a hole in the wall
 # [cutout_face]
+
+builder_sheet = bracket.sheet
+
+# [cutout_face_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(
+    blank.edges().sort_by(Axis.Y)[-1], length=20, sheet_parameters=parameters
+)
+# a sketch cutter trims the sheet face it lies on
+sheet -= [place * Circle(3) for place in GridLocations(20, 15, 2, 2)]  # the base
+wall = sheet.flats().sort_by(Axis.Z)[-1]
+sheet -= Plane(wall) * Circle(4)  # a hole in the wall
+# [cutout_face_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(bracket.sheet, "cutout_face")
 
 # [cutout_solid]
@@ -612,6 +977,20 @@ with BuildSheet(thickness=1, bend_radius=2) as bracket:
     with Locations((30, 0)):
         Box(12, 8, 60, mode=Mode.SUBTRACT)
 # [cutout_solid]
+
+builder_sheet = bracket.sheet
+
+# [cutout_solid_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(
+    blank.edges().sort_by(Axis.X)[-1], length=20, sheet_parameters=parameters
+)
+# a solid cutter cuts every face it passes through, bend included
+sheet -= Pos(30, 0) * Box(12, 8, 60)
+# [cutout_solid_algebra]
+
+assert same_sheet(builder_sheet, sheet)
 render(bracket.sheet, "cutout_solid")
 
 # ---------------------------------------------------------------------------
@@ -627,6 +1006,20 @@ with BuildPart() as bracket_part:
     # the sheet and its parameters are pending input for thicken
     thicken()
 # [thicken_basic]
+
+builder_part = bracket_part.part
+
+# [thicken_basic_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(
+    blank.edges().sort_by(Axis.X)[-1], length=15, sheet_parameters=parameters
+)
+# the sheet and its parameters are given to thicken
+part = thicken(sheet, sheet_parameters=parameters)
+# [thicken_basic_algebra]
+
+assert abs(builder_part.volume - part.volume) < 1e-6
 render(bracket_part.part, "thicken_basic")
 
 # ---------------------------------------------------------------------------
@@ -644,66 +1037,263 @@ with BuildPart() as tray_part:
 # the solid, as an imported part would arrive, taken apart again
 larger, smaller, thickness = sheet_shells(tray_part.part)
 # [sheet_shells_basic]
+
+builder_shells = (larger, smaller, thickness)
+
+# [sheet_shells_basic_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
+part = thicken(sheet, sheet_parameters=parameters)
+
+# the solid, as an imported part would arrive, taken apart again
+larger, smaller, thickness = sheet_shells(part)
+# [sheet_shells_basic_algebra]
+
+assert abs(builder_shells[2] - thickness) < 1e-6
+assert abs(builder_shells[1].area - smaller.area) < 1e-6
 render(smaller, "sheet_shells_basic")
 
 # ---------------------------------------------------------------------------
-# tutorial: an open enclosure base
+# the landing page
+# ---------------------------------------------------------------------------
+
+# [index_tray]
+with BuildPart() as tray_part:
+    with BuildSheet(thickness=1, bend_radius=2) as tray:
+        with BuildSketch():
+            Rectangle(100, 60)
+        flange(tray.rims(), length=15, gaps=3.1)
+        corners = tray.flats().sort_by(Axis.Z)[0].vertices()
+        corner_relief(corners.filter_by(Convexity.CONVEX), ReliefType.ROUND, radius=3)
+    thicken()
+# [index_tray]
+
+builder_part = tray_part.part
+
+# [index_tray_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(100, 60)
+sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
+corners = sheet.flats().sort_by(Axis.Z)[0].vertices()
+sheet = corner_relief(
+    corners.filter_by(Convexity.CONVEX),
+    ReliefType.ROUND,
+    radius=3,
+    sheet_parameters=parameters,
+)
+tray_part = thicken(sheet, sheet_parameters=parameters)
+# [index_tray_algebra]
+
+assert abs(builder_part.volume - tray_part.volume) < 1e-6
+
+# ---------------------------------------------------------------------------
+# recipes
+# ---------------------------------------------------------------------------
+
+# [recipe_tab]
+with BuildSheet(thickness=1, bend_radius=1) as bracket:
+    with BuildSketch():
+        Rectangle(100, 60)
+        SlotCenterToCenter(30, 8, mode=Mode.SUBTRACT)
+    slot_edge = bracket.rims().filter_by(Axis.X).sort_by(Axis.Y)[1]
+    flange(slot_edge, length=12, gaps=2)
+# [recipe_tab]
+
+builder_sheet = bracket.sheet
+
+# [recipe_tab_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=1)
+blank = Rectangle(100, 60) - SlotCenterToCenter(30, 8)
+slot_edge = blank.edges().filter_by(Axis.X).sort_by(Axis.Y)[1]
+sheet = flange(slot_edge, length=12, gaps=2, sheet_parameters=parameters)
+# [recipe_tab_algebra]
+
+assert same_sheet(builder_sheet, sheet)
+# the tab is 26 wide in a 30 slot and stands 13 high, its bend included
+tab = sheet.flats().sort_by(Axis.Z)[-1]
+assert abs(tab.bounding_box().size.X - 26) < 1e-6
+assert abs(sheet.bounding_box().max.Z - 13) < 1e-6
+
+# [recipe_cut]
+with BuildSheet(thickness=1, bend_radius=2) as tray:
+    with BuildSketch():
+        Rectangle(100, 60)
+    flange(tray.rims().sort_by(Axis.X)[-1], length=20)
+    with Locations((50, 0)):
+        Box(20, 6, 60, mode=Mode.SUBTRACT)
+# [recipe_cut]
+
+builder_sheet = tray.sheet
+
+# [recipe_cut_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(100, 60)
+sheet = flange(
+    blank.edges().sort_by(Axis.X)[-1], length=20, sheet_parameters=parameters
+)
+sheet -= Pos(50, 0) * Box(20, 6, 60)
+# [recipe_cut_algebra]
+
+assert same_sheet(builder_sheet, sheet)
+
+# [recipe_flare]
+with BuildSheet(thickness=1, bend_radius=2) as leg:
+    with BuildSketch():
+        Rectangle(40, 20)
+    flange(leg.rims().sort_by(Axis.X)[-1], length=30)
+    wall = leg.flats().sort_by(Axis.Z)[-1]
+    miter(wall.vertices().group_by(Axis.Z)[-1], -15, through_bend=True)
+# [recipe_flare]
+
+builder_sheet = leg.sheet
+
+# [recipe_flare_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(40, 20)
+sheet = flange(
+    blank.edges().sort_by(Axis.X)[-1], length=30, sheet_parameters=parameters
+)
+wall = sheet.flats().sort_by(Axis.Z)[-1]
+sheet = miter(
+    wall.vertices().group_by(Axis.Z)[-1],
+    -15,
+    through_bend=True,
+    sheet_parameters=parameters,
+)
+# [recipe_flare_algebra]
+
+assert same_sheet(builder_sheet, sheet)
+# the wall's free end is 38.2 wide on a 20 edge, and the bend widens to 22.1
+wall = sheet.flats().sort_by(Axis.Z)[-1]
+assert abs(wall.bounding_box().size.Y - 38.2) < 0.05
+assert abs(sheet.bends()[0].bounding_box().size.Y - 22.1) < 0.05
+
+# [recipe_narrow]
+with BuildSheet(thickness=1, bend_radius=2) as plate:
+    with BuildSketch():
+        Rectangle(100, 60)
+    flange(
+        plate.rims().sort_by(Axis.X)[-1],
+        length=15,
+        gaps=(10, 30),
+        position=BendPosition.MATERIAL_INSIDE,
+    )
+blank = unfold(plate.sheet, plate.sheet_parameters).flat
+# [recipe_narrow]
+
+builder_sheet, builder_blank = plate.sheet, blank
+
+# [recipe_narrow_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+plate = flange(
+    Rectangle(100, 60).edges().sort_by(Axis.X)[-1],
+    length=15,
+    gaps=(10, 30),
+    position=BendPosition.MATERIAL_INSIDE,
+    sheet_parameters=parameters,
+)
+blank = unfold(plate, parameters).flat
+# [recipe_narrow_algebra]
+
+assert same_sheet(builder_sheet, plate) and same_sheet(builder_blank, blank)
+# the bend is 20 wide on a 60 edge
+assert abs(plate.bends()[0].bounding_box().size.Y - 20) < 1e-6
+
+# [recipe_corners]
+with BuildSheet(thickness=1, bend_radius=2) as box:
+    with BuildSketch():
+        Rectangle(60, 40)
+    flange(box.rims(), length=15, gaps=3.1)
+    walls = box.flats().group_by(Axis.Z)[-1]
+    miter(walls.vertices().group_by(Axis.Z)[-1], 45, through_bend=True)
+# [recipe_corners]
+
+builder_sheet = box.sheet
+
+# [recipe_corners_algebra]
+parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+blank = Rectangle(60, 40)
+sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
+walls = sheet.flats().group_by(Axis.Z)[-1]
+sheet = miter(
+    walls.vertices().group_by(Axis.Z)[-1],
+    45,
+    through_bend=True,
+    sheet_parameters=parameters,
+)
+# [recipe_corners_algebra]
+
+assert same_sheet(builder_sheet, sheet)
+
+# [recipe_channel]
+with BuildPart() as channel_part:
+    with BuildSheet(thickness=2, bend_radius=3) as channel:
+        with BuildSketch():
+            Rectangle(60, 100)
+        flange(
+            channel.rims().filter_by(Axis.Y),
+            length=40,
+            position=BendPosition.MATERIAL_OUTSIDE,
+            length_from=LengthFrom.OUTER_SHARP,
+        )
+    thicken()
+# [recipe_channel]
+
+builder_part = channel_part.part
+
+# [recipe_channel_algebra]
+parameters = SheetMetalParameters(thickness=2, bend_radius=3)
+channel = flange(
+    Rectangle(60, 100).edges().filter_by(Axis.Y),
+    length=40,
+    position=BendPosition.MATERIAL_OUTSIDE,
+    length_from=LengthFrom.OUTER_SHARP,
+    sheet_parameters=parameters,
+)
+channel_part = thicken(channel, sheet_parameters=parameters)
+# [recipe_channel_algebra]
+
+assert abs(builder_part.volume - channel_part.volume) < 1e-6
+# 60 x 100 x 40 outside, and a flat pattern 132.566 long
+assert (channel_part.bounding_box().size - Vector(60, 100, 40)).length < 1e-6
+assert abs(unfold(channel, parameters).flat.bounding_box().size.X - 132.566) < 1e-3
+
+# [recipe_reuse]
+with BuildSheet(thickness=1, bend_radius=2) as lug:
+    with BuildSketch():
+        Rectangle(20, 10)
+    flange(lug.rims().sort_by(Axis.X)[-1], length=10)
+
+with BuildSheet(thickness=1, bend_radius=2) as plate:
+    with BuildSketch():
+        Rectangle(60, 40)
+    with Locations((20, 0)):
+        insert(lug)
+# [recipe_reuse]
+
+# one connected sheet: the plate, the lug's bend and its wall
+assert len(plate.sheet.faces()) == 3 and plate.sheet.is_valid
+
+# ---------------------------------------------------------------------------
+# the picture at the head of the section: an open enclosure base
 # ---------------------------------------------------------------------------
 
 with BuildPart() as enclosure_part:
     with BuildSheet(thickness=1.5, bend_radius=2) as enclosure:
-        # [tutorial_1]
         with BuildSketch():
             Rectangle(120, 80)
-        # [tutorial_1]
-        step_1 = enclosure.sheet
-        # [tutorial_2]
         flange(enclosure.rims(), length=25, gaps=3.5)
-        # [tutorial_2]
-        step_2 = enclosure.sheet
-        # [tutorial_3]
         base = enclosure.flats().sort_by(Axis.Z)[0]
         corner_relief(
             base.vertices().filter_by(Convexity.CONVEX), ReliefType.ROUND, radius=3
         )
-        # [tutorial_3]
-        step_3 = enclosure.sheet
-        # [tutorial_4]
         with GridLocations(90, 50, 2, 2):
             Circle(2, mode=Mode.SUBTRACT)  # mounting holes in the base
         with Locations((0, 40)):
             Box(20, 8, 20, mode=Mode.SUBTRACT)  # a slot across the +Y wall's bend
-        # [tutorial_4]
-        step_4 = enclosure.sheet
-        # [tutorial_5]
         long_rims = enclosure.rims().filter_by(Axis.X).group_by(Axis.Z)[-1]
         hem(long_rims, HemType.OPEN, width=6, opening=1.5)
-        # [tutorial_5]
-        step_5 = enclosure.sheet
-    # [tutorial_6]
     thicken()
-    # [tutorial_6]
 
-render(step_1, "tutorial_1")
-render(step_2, "tutorial_2")
-render(step_3, "tutorial_3")
-render(step_4, "tutorial_4")
-render(step_5, "tutorial_5")
-render(enclosure_part.part, "tutorial_6")
 render(enclosure_part.part, "hero")
-
-# the DXF is written to a scratch directory so that running this script
-# leaves nothing but the images behind
-with tempfile.TemporaryDirectory() as scratch:
-    docs_directory = os.getcwd()
-    os.chdir(scratch)
-    # [tutorial_7]
-    flat_pattern = unfold(
-        enclosure.sheet, enclosure.sheet_parameters, align=Align.MIN
-    ).flat
-    exporter = ExportDXF()
-    exporter.add_shape(flat_pattern)
-    exporter.write("enclosure_flat_pattern.dxf")
-    # [tutorial_7]
-    os.chdir(docs_directory)
-write_layout([drawn(flat_pattern)], "tutorial_7")

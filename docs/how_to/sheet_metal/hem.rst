@@ -34,10 +34,23 @@ Type           Profile and when to use it
                and where a rounded edge is wanted.
 =============  =================================================================
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [hem_types]
-    :end-before: [hem_types]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [hem_types]
+            :end-before: [hem_types]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [hem_types_algebra]
+            :end-before: [hem_types_algebra]
 
 *******************
 Sizing each profile
@@ -77,22 +90,6 @@ faces of a hemmed part and expects every face to be sheet-sized. The flat
 pattern is not affected: a fold this tight adds only its neutral-axis length
 to the blank, which is what a closed hem does in practice.
 
-************
-Algebra mode
-************
-
-.. code-block:: build123d
-
-    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
-    blank = Rectangle(60, 40)
-    sheet = hem(
-        blank.edges().sort_by(Axis.X)[-1],
-        HemType.OPEN,
-        width=8,
-        opening=2,
-        sheet_parameters=parameters,
-    )
-
 ***************
 What it refuses
 ***************
@@ -104,9 +101,9 @@ What it refuses
 * Everything a :ref:`flange <sheet_metal_flange>` refuses, since the rims are
   the same.
 
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Flange <sheet_metal_flange>` for a wall at any other angle.
 * :ref:`Corner relief <sheet_metal_corner_relief>` where two hemmed walls

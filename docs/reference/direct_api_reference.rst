@@ -69,6 +69,7 @@ Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~top
 .. autoclass:: ShapeList
    :special-members: __gt__, __lt__, __rshift__, __lshift__, __or__, __and__, __sub__, __getitem__
 .. autoclass:: Shell
+   :exclude-members: make_sheet, cut_sheet
 .. autoclass:: Solid
 .. autoclass:: Wire
 .. autoclass:: Vertex

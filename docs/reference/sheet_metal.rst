@@ -90,14 +90,8 @@ Operations
 Shell methods
 *************
 
-The ``Shell`` methods the operations are built on, for Algebra mode and for
-assembling a sheet from faces by hand.
-
-.. automethod:: topology.Shell.make_sheet
-    :noindex:
-
-.. automethod:: topology.Shell.cut_sheet
-    :noindex:
+The ``Shell`` methods for selecting from a sheet and unfolding it, in both
+modes.
 
 .. automethod:: topology.Shell.unfold
     :noindex:

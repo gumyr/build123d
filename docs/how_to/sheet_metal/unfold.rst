@@ -13,10 +13,23 @@ produces it from the reference shell.
 .. image:: /how_to/assets/sheet_metal/unfold_basic.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [unfold_basic]
-    :end-before: [unfold_basic]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [unfold_basic]
+            :end-before: [unfold_basic]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [unfold_basic_algebra]
+            :end-before: [unfold_basic_algebra]
 
 Each bend is developed at its **neutral radius**, worked out from the
 thickness, the K-factor and the reference surface, so the flat it becomes is
@@ -91,17 +104,6 @@ geometric radius on the reference surface, which produces a pattern that will
 not fold back to the requested part. Prefer the operation unless you
 specifically want the geometric development.
 
-************
-Algebra mode
-************
-
-.. code-block:: build123d
-
-    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
-    blank = Rectangle(60, 40)
-    sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
-    flat, face_map = unfold(sheet, sheet_parameters=parameters, align=Align.MIN)
-
 ***************
 What it refuses
 ***************
@@ -121,9 +123,9 @@ What it refuses
 * A surface other than a plane or a cylinder, or a sheet with no planar face
   at all.
 
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Thicken <sheet_metal_thicken>` is the other way out of the model: the
   solid part rather than the blank.

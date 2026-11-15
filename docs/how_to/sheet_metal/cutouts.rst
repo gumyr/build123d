@@ -22,10 +22,23 @@ Where the shape lies is where it cuts:
 .. image:: /how_to/assets/sheet_metal/cutout_face.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [cutout_face]
-    :end-before: [cutout_face]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [cutout_face]
+            :end-before: [cutout_face]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [cutout_face_algebra]
+            :end-before: [cutout_face_algebra]
 
 A nested ``BuildSketch`` in ``Mode.SUBTRACT`` cuts the same way, which is how
 a pattern of holes lands on one face: a sketch on the plane of a selected
@@ -67,10 +80,23 @@ a cutter built before the context comes in with
 .. image:: /how_to/assets/sheet_metal/cutout_solid.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [cutout_solid]
-    :end-before: [cutout_solid]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [cutout_solid]
+            :end-before: [cutout_solid]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [cutout_solid_algebra]
+            :end-before: [cutout_solid_algebra]
 
 .. code-block:: build123d
 
@@ -100,21 +126,14 @@ cylindrical geometry and still unfolds. Three things follow:
 Algebra mode
 ************
 
-:meth:`~topology.Shell.cut_sheet` is the operation behind both kinds of
-cutter. It trims a sheet with solids, which cut every face they pass through,
-or with faces coplanar with one of its flats:
+In Algebra mode a cutter is subtracted from the sheet with ``-``, and the
+result is the cut sheet. The two kinds of cutter behave as they do in a
+builder: a solid cuts every face it passes through, and a sketch trims the
+flat it lies on.
 
-.. code-block:: build123d
-
-    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
-    blank = Rectangle(60, 40)
-    sheet = flange(blank.edges().sort_by(Axis.X)[-1], length=20, sheet_parameters=parameters)
-    sheet = sheet.cut_sheet(Pos(30, 0) * Box(12, 8, 60))
-    sheet = sheet.cut_sheet(Pos(-10, 0) * Circle(4))
-
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Bend relief <sheet_metal_bend_relief>` and :ref:`corner relief
   <sheet_metal_corner_relief>` are cuts too, but laid out on the blank by the

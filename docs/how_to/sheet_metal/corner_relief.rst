@@ -14,10 +14,23 @@ enclosure with folded-up sides has it.
 .. image:: /how_to/assets/sheet_metal/corner_relief_basic.svg
     :align: center
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [corner_relief_basic]
-    :end-before: [corner_relief_basic]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [corner_relief_basic]
+            :end-before: [corner_relief_basic]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [corner_relief_basic_algebra]
+            :end-before: [corner_relief_basic_algebra]
 
 ``corner_relief`` takes the **corner vertices** of a flat face, each with a
 bend on both sides of it, and cuts the chosen shape there. After flanging with
@@ -61,10 +74,23 @@ Shape               What it is and when to use it
                     stops at.
 ==================  ===========================================================
 
-.. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
-    :language: build123d
-    :start-after: [corner_relief_types]
-    :end-before: [corner_relief_types]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [corner_relief_types]
+            :end-before: [corner_relief_types]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [corner_relief_types_algebra]
+            :end-before: [corner_relief_types_algebra]
 
 Each shape has its own keyword and the others are refused: ``ROUND`` takes
 ``radius``, ``SQUARE`` takes ``size``, ``OBROUND`` takes ``length`` and
@@ -88,23 +114,6 @@ axis, whose position depends on the K-factor. That is why
 ``corner_relief`` needs ``sheet_parameters`` in Algebra mode even though it
 only cuts.
 
-************
-Algebra mode
-************
-
-.. code-block:: build123d
-
-    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
-    blank = Rectangle(60, 40)
-    sheet = flange(blank.edges(), length=15, gaps=3.1, sheet_parameters=parameters)
-    base = sheet.flats().sort_by(Axis.Z)[0]
-    sheet = corner_relief(
-        base.vertices().filter_by(Convexity.CONVEX),
-        ReliefType.ROUND,
-        radius=3,
-        sheet_parameters=parameters,
-    )
-
 ***************
 What it refuses
 ***************
@@ -115,9 +124,9 @@ What it refuses
 * A relief that would cut the corner of the sheet loose, or reach through a
   flange.
 
-*******
-Related
-*******
+********
+See also
+********
 
 * :ref:`Bend relief <sheet_metal_bend_relief>` is for a bend that stops inside
   the sheet without meeting a second bend: one fold line runs through the
