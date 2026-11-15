@@ -30,8 +30,12 @@ multiplied by a location, ``location * object``.
       - ``Rot(...) * Pos(...) *``
     * - give it a position and a rotation together
       - ``Location((x, y, z), (rx, ry, rz))``
+    * - put an object on vertices of the part
+      - ``Locations(*vertices)`` or ``Pos(vertex) *``
     * - make copies round the Z axis
       - ``PolarLocations(radius, count)``
+    * - mirror it in a face of the part
+      - ``mirror(about=Plane(face))``
     * - turn something that is already in place
       - ``Rot(...) *``, about a world axis
 
@@ -254,6 +258,44 @@ be kept in a variable, put in a list and used wherever a place is wanted.
 which then places everything it makes there:
 ``with BuildPart(Location((20, 30, 0), (0, 0, 30))):``.
 
+*******************************
+At the vertices of the part
+*******************************
+
+A place does not have to be worked out from dimensions. A vertex of the
+part is a point, and can be used as one.
+
+.. image:: /how_to/assets/moving_objects/vertices.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/moving_objects.py
+            :language: build123d
+            :start-after: [vertices]
+            :end-before: [vertices]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/moving_objects.py
+            :language: build123d
+            :start-after: [vertices_algebra]
+            :end-before: [vertices_algebra]
+
+``top.vertices()`` is the four corners of the top face. ``Locations``
+takes vertices as it takes points, and ``Pos(vertex)`` is the position
+of one. Move the corners, by changing the size of the plate, and the
+posts go with them. :ref:`selectors` covers picking out the vertices
+wanted.
+
+This is for objects placed in the part. Inside a sketch that is drawn
+on a plane, places are measured in the sketch, not in space;
+:ref:`placing_sketches` shows how to use a vertex there.
+
 ************************
 Copies round an axis
 ************************
@@ -284,6 +326,43 @@ axis, here six of them at a radius of 25. Each place is turned to face
 outward, so the spokes point along their own radius; ``rotate=False``
 leaves them all facing the same way. :ref:`tutorial_placing_features`
 covers this and the other patterns.
+
+**********************
+Mirrored in a face
+**********************
+
+:func:`~operations_generic.mirror` reflects an object in a plane, and the
+plane can be taken from the part: ``Plane(face)`` is the plane a flat
+face lies in.
+
+.. image:: /how_to/assets/moving_objects/mirror.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/moving_objects.py
+            :language: build123d
+            :start-after: [mirror]
+            :end-before: [mirror]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/moving_objects.py
+            :language: build123d
+            :start-after: [mirror_algebra]
+            :end-before: [mirror_algebra]
+
+``side`` is the face of the pentagon furthest toward ``-Y``. Mirrored in
+that face, the copy meets the original on it, and the two make one part.
+In builder mode ``mirror`` reflects what the part holds so far and adds
+the reflection; in algebra mode it returns the reflection, to be added.
+
+The standard planes work the same way, and are the usual choice for a
+part designed about the origin: ``mirror(about=Plane.YZ)``.
 
 **************************************
 Something that is already in place

@@ -325,6 +325,45 @@ assert (at_local.origin - at_global.origin).length < 1e-6
 assert (at_axis.origin - at_global.origin).length < 1e-6
 
 # ---------------------------------------------------------------------------
+# features at the vertices of a face
+# ---------------------------------------------------------------------------
+
+# [vertices]
+with BuildPart() as console:
+    with BuildSketch(Plane.XZ) as profile:
+        Polygon((0, 0), (60, 0), (60, 10), (30, 25), (0, 25), align=None)
+    extrude(amount=20, both=True)
+    slope = console.faces().sort_by(Axis.Z)[-2]
+    on_slope = Plane(slope, x_dir=(0, 1, 0))
+    lower_corners = slope.vertices().group_by(Axis.Z)[0]
+    with BuildSketch(on_slope) as notches:
+        with Locations(*[on_slope.to_local_coords(v) for v in lower_corners]):
+            Circle(5)
+    extrude(amount=-3, mode=Mode.SUBTRACT)
+# [vertices]
+
+builder_result, builder_sketch = console.part, notches.sketch
+
+# [vertices_algebra]
+profile = Plane.XZ * Polygon((0, 0), (60, 0), (60, 10), (30, 25), (0, 25), align=None)
+console = extrude(profile, amount=20, both=True)
+slope = console.faces().sort_by(Axis.Z)[-2]
+on_slope = Plane(slope, x_dir=(0, 1, 0))
+lower_corners = slope.vertices().group_by(Axis.Z)[0]
+notches = [
+    on_slope * Pos(on_slope.to_local_coords(v)) * Circle(5) for v in lower_corners
+]
+console -= [extrude(notch, amount=-3) for notch in notches]
+# [vertices_algebra]
+
+assert same(builder_result, console)
+# each circle is centred on a corner of the sloping face
+assert len(builder_sketch.faces()) == len(notches) == 2
+for notch, corner in zip(notches, lower_corners):
+    assert (notch.center() - Vector(corner)).length < 1e-6
+write_layout([seen(console, ISO_VIEW, Compound(notches), hidden=False)], "vertices")
+
+# ---------------------------------------------------------------------------
 # tilted
 # ---------------------------------------------------------------------------
 

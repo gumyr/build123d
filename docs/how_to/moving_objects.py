@@ -324,6 +324,41 @@ assert same(right * Box(30, 10, 5), Pos(20, 30, 0) * Rot(Z=30) * Box(30, 10, 5))
 write_layout([moved_picture(start, bars)], "location")
 
 # ---------------------------------------------------------------------------
+# at the vertices of a part
+# ---------------------------------------------------------------------------
+
+# [vertices]
+with BuildPart() as plate:
+    Box(60, 40, 10)
+    top = plate.faces().sort_by(Axis.Z)[-1]
+    with Locations(*top.vertices()):
+        Cylinder(4, 6, align=(Align.CENTER, Align.CENTER, Align.MIN))
+# [vertices]
+
+builder_result = plate.part
+
+# [vertices_algebra]
+plate = Box(60, 40, 10)
+top = plate.faces().sort_by(Axis.Z)[-1]
+plate += [
+    Pos(corner) * Cylinder(4, 6, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    for corner in top.vertices()
+]
+# [vertices_algebra]
+
+assert same(builder_result, plate)
+# a post stands on each of the four corners of the top
+assert abs(plate.bounding_box().size.X - 68) < 1e-6
+assert abs(plate.bounding_box().max.Z - 11) < 1e-6
+posts = Compound(
+    [
+        Pos(corner) * Cylinder(4, 6, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        for corner in top.vertices()
+    ]
+)
+write_layout([moved_picture(Box(60, 40, 10), posts, axes=20)], "vertices")
+
+# ---------------------------------------------------------------------------
 # copies round an axis
 # ---------------------------------------------------------------------------
 
@@ -341,6 +376,32 @@ spokes = Part() + [place * Box(12, 4, 5) for place in PolarLocations(25, 6)]
 
 assert same(builder_result, spokes) and len(spokes.solids()) == 6
 write_layout([moved_picture(Box(12, 4, 5), spokes)], "polar")
+
+# ---------------------------------------------------------------------------
+# mirrored in a face
+# ---------------------------------------------------------------------------
+
+# [mirror]
+with BuildPart() as pair:
+    with BuildSketch() as outline:
+        RegularPolygon(20, 5)
+    extrude(amount=10)
+    side = pair.faces().sort_by(Axis.Y)[0]
+    mirror(about=Plane(side))
+# [mirror]
+
+builder_result = pair.part
+
+# [mirror_algebra]
+half = extrude(RegularPolygon(20, 5), amount=10)
+side = half.faces().sort_by(Axis.Y)[0]
+pair = half + mirror(half, about=Plane(side))
+# [mirror_algebra]
+
+assert same(builder_result, pair)
+# two pentagons joined on the face they were mirrored in: twice the volume
+assert abs(pair.volume - 2 * half.volume) < 1e-6 and len(pair.solids()) == 1
+write_layout([moved_picture(half, pair - half, axes=25)], "mirror")
 
 # ---------------------------------------------------------------------------
 # something that is already in place

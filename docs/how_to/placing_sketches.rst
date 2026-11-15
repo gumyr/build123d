@@ -29,6 +29,8 @@ planes below is the same in both.
       - ``Plane(face, x_dir=...)``
     * - with its origin at a corner
       - ``plane.shift_origin(vertex)``
+    * - with features at vertices of a face
+      - ``plane.to_local_coords(vertex)``
     * - at an angle
       - ``plane.rotated((0, 25, 0))``
     * - across the start of a path
@@ -229,6 +231,50 @@ moves the plane.
     the feature: ``Locations`` in builder mode, ``Pos(x, y) *`` in algebra
     mode. Move the origin when the whole sketch is measured from somewhere
     else.
+
+*******************************************
+With features at the vertices of a face
+*******************************************
+
+``shift_origin`` moves the whole sketch to one vertex. To put a feature
+on each of several vertices, keep the plane where it is and turn the
+vertices into places in the sketch.
+
+.. image:: /how_to/assets/placing_sketches/vertices.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/placing_sketches.py
+            :language: build123d
+            :start-after: [vertices]
+            :end-before: [vertices]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/placing_sketches.py
+            :language: build123d
+            :start-after: [vertices_algebra]
+            :end-before: [vertices_algebra]
+
+A vertex is a point in space, and the places inside a sketch are
+measured in the sketch's own X and Y. ``to_local_coords`` converts one
+to the other: it gives the vertex as the plane sees it. Here the two
+lower corners of the sloping face each get a circle, which is then cut
+into the part.
+
+.. note::
+
+    The conversion is needed even in builder mode. ``Locations`` inside a
+    sketch reads a vertex's coordinates as sketch coordinates, without
+    converting them. On a face that lies square to ``Plane.XY`` with its
+    centre over the origin, such as the top of a centred box, the two
+    happen to agree and the vertex can be passed as it is. On any other
+    face it cannot.
 
 **********
 Tilted
