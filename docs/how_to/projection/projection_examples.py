@@ -150,7 +150,6 @@ def drawing_order(shapes: list[Shape]) -> list[Shape]:
 # ---------------------------------------------------------------------------
 # onto a plane
 # ---------------------------------------------------------------------------
-
 # [plane_faces]
 housing = Box(40, 30, 20) - Pos(0, 0, 10) * Cylinder(8, 20)
 with BuildSketch() as top_view:

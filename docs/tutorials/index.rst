@@ -31,3 +31,4 @@ as later tutorials build on the concepts introduced in earlier ones.
     surface_heart_token.rst
     surface_spitfire_wing.rst
     projection_chalice.rst
+    bicycle_tire.rst
