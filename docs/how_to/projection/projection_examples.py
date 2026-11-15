@@ -156,6 +156,15 @@ with BuildSketch() as top_view:
     project_to_plane(housing.faces().sort_by(Axis.Z)[-1])  # the top, hole included
 # [plane_faces]
 
+builder_top_view = top_view.sketch
+
+# [plane_faces_algebra]
+housing = Box(40, 30, 20) - Pos(0, 0, 10) * Cylinder(8, 20)
+top_view = project_to_plane(housing.faces().sort_by(Axis.Z)[-1], Plane.XY)
+# [plane_faces_algebra]
+
+assert abs(builder_top_view.area - top_view.area) < 1e-6
+
 # [plane_silhouette]
 with BuildPart() as knob:
     Cylinder(10, 6)
@@ -186,15 +195,28 @@ outline = project_to_plane(top.edges(), Plane.XY)  # edges give a Curve
 corners = project_to_plane(housing.vertices(), Plane.XY)  # points, as positions
 # [plane_edges_algebra]
 
-# [plane_algebra]
+# [plane_side]
+with BuildSketch(Plane.XZ) as side_view:
+    # bring the part into the sketch's coordinates, then project it
+    project_to_plane(Plane.XZ.to_local_coords(housing))
+# [plane_side]
+
+builder_side_view = side_view.sketch_local
+
+# [plane_side_algebra]
 side_view = project_to_plane(housing, workplane=Plane.XZ)  # in XZ coordinates
 points = project_to_plane([Vertex(5, 5, 5), (10, 0, 20)], workplane=Plane.XZ)
-# [plane_algebra]
+# [plane_side_algebra]
+
+assert abs(builder_side_view.area - side_view.area) < 1e-6
+assert (
+    builder_side_view.bounding_box().size - side_view.bounding_box().size
+).length < 1e-6
 
 write_layout(
     [
         seen(housing, ISO_VIEW, label="housing"),
-        flat(top_view.sketch_local, label="top face onto the sketch"),
+        flat(top_view, label="top face onto the sketch"),
     ],
     "plane_faces",
 )
@@ -223,32 +245,98 @@ with BuildPart() as badge:
     extrude(amount=-0.5, mode=Mode.SUBTRACT)  # and are engraved into it
 # [shape_emboss]
 
+# [shape_emboss_algebra]
+blank = Cylinder(20, 4)
+blank = fillet(blank.edges().sort_by(Axis.Z)[-1], 3)
+letters = Plane.XY.offset(10) * Text("b3d", 12)
+on_top = project_to_shape(letters, blank, direction=(0, 0, -1), hit=Hit.NEAREST)
+engraved = blank - extrude(on_top, amount=-0.5)  # and are engraved into it
+# [shape_emboss_algebra]
+
+assert abs(badge.part.volume - engraved.volume) < 1e-4 * engraved.volume
+assert engraved.volume < blank.volume
+
 # [shape_hits]
-stepped = Box(40, 40, 4) + Pos(0, 0, 10) * Box(8, 40, 12)
-label = Face.make_rect(24, 24, Plane.XY.offset(30))
+with BuildPart() as stepped_part:
+    Box(40, 40, 4)
+    with Locations((0, 0, 8)):
+        Box(8, 40, 12)
+    with BuildSketch(Plane.XY.offset(30), mode=Mode.PRIVATE) as label:
+        Rectangle(24, 24)
+    every_surface = project_to_shape(
+        label.sketch, direction=(0, 0, -1), mode=Mode.PRIVATE
+    )
+    in_sight = project_to_shape(
+        label.sketch, direction=(0, 0, -1), hit=Hit.VISIBLE, mode=Mode.PRIVATE
+    )
+# [shape_hits]
+
+builder_hits = every_surface.area, in_sight.area
+
+# [shape_hits_algebra]
+stepped = Box(40, 40, 4) + Pos(0, 0, 8) * Box(8, 40, 12)
+label = Plane.XY.offset(30) * Rectangle(24, 24)
 every_surface = project_to_shape(label, target=stepped, direction=(0, 0, -1))
 in_sight = project_to_shape(
     label, target=stepped, direction=(0, 0, -1), hit=Hit.VISIBLE
 )
-# [shape_hits]
+# [shape_hits_algebra]
+
+assert abs(builder_hits[0] - every_surface.area) < 1e-6
+assert abs(builder_hits[1] - in_sight.area) < 1e-6
+assert in_sight.area < every_surface.area
 
 # [shape_curve]
+with BuildPart() as drum_part:
+    Cylinder(15, 40)
+    with BuildLine() as guide:
+        Line((-30, -20), (30, 20))
+    on_drum = project_to_shape(direction=(0, 0, -1), hit=Hit.NEAREST)
+# [shape_curve]
+
+builder_on_drum = on_drum
+
+# [shape_curve_algebra]
 drum = Cylinder(15, 40)
-helix_guide = Edge.make_line((-30, -20, 0), (30, 20, 0))
-on_drum = helix_guide.project_to_shape(drum, direction=(0, 0, -1), hit=Hit.NEAREST)
-# [shape_curve]
+guide = Line((-30, -20), (30, 20))
+on_drum = project_to_shape(guide, drum, direction=(0, 0, -1), hit=Hit.NEAREST)
+# [shape_curve_algebra]
 
-write_layout(
-    [
-        seen(stepped, ISO_VIEW, every_surface, label="Hit.ALL"),
-        seen(stepped, ISO_VIEW, in_sight, label="Hit.VISIBLE"),
-    ],
-    "shape_hits",
+assert len(builder_on_drum.edges()) == len(on_drum.edges())
+assert (
+    abs(
+        sum(e.length for e in builder_on_drum.edges())
+        - sum(e.length for e in on_drum.edges())
+    )
+    < 1e-6
 )
+
+# [index_badge]
+with BuildPart() as simple_badge:
+    Cylinder(20, 4)
+    with BuildSketch(Plane.XY.offset(10)):
+        Text("b3d", 12)
+    project_to_shape(direction=(0, 0, -1), hit=Hit.NEAREST)  # onto the top
+    extrude(amount=-0.5, mode=Mode.SUBTRACT)
+# [index_badge]
+
+builder_simple_badge = simple_badge.part
+
+# [index_badge_algebra]
+simple_badge = Cylinder(20, 4)
+letters = Plane.XY.offset(10) * Text("b3d", 12)
+on_top = project_to_shape(letters, simple_badge, direction=(0, 0, -1), hit=Hit.NEAREST)
+simple_badge -= extrude(on_top, amount=-0.5)
+# [index_badge_algebra]
+
+assert (
+    abs(builder_simple_badge.volume - simple_badge.volume) < 1e-4 * simple_badge.volume
+)
+assert simple_badge.volume < Cylinder(20, 4).volume
+
+# the pictures of the hit options are rendered by projection_shots.py
 write_layout([seen(badge.part, ISO_VIEW, label="engraved badge")], "shape_emboss")
-write_layout(
-    [seen(drum, ISO_VIEW, Compound(on_drum), label="line onto a drum")], "shape_curve"
-)
+write_layout([seen(drum, ISO_VIEW, on_drum, label="line onto a drum")], "shape_curve")
 
 # ---------------------------------------------------------------------------
 # a drawing view

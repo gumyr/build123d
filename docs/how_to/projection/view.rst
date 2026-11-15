@@ -9,6 +9,9 @@ seen from a viewpoint, split by hidden-line removal into those in sight and
 those behind the shape's own surface. Whatever it is given, a solid, a
 compound of parts or a single face, it returns edges.
 
+It is a method of the shape, so it is used the same way in both modes. On a
+builder, call it on what the builder made: ``bracket.part.drawing_view(...)``.
+
 .. image:: /how_to/assets/projection/view_basic.svg
     :align: center
 
@@ -49,3 +52,12 @@ Notes
 * A silhouette on a plane for a sketch is the job of
   :ref:`project_to_plane <projection_plane>` given a solid; ``drawing_view`` gives the edges of
   the drawing, not a face.
+
+********
+See also
+********
+
+* :ref:`tech_drawing_tutorial` lays out several views of a part as a finished
+  drawing.
+* :ref:`projection_plane` gives a filled silhouette for a sketch, where
+  ``drawing_view`` gives the edges of a drawing.

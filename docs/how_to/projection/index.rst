@@ -9,8 +9,10 @@ part's outline onto a drawing sheet, a label onto a curved surface, a path
 onto the ground beneath it. build123d has three projections, told apart by
 what they project onto and what comes back.
 
-.. image:: /how_to/assets/projection/shape_hits.svg
+.. image:: /how_to/assets/projection/shape_hits_visible.png
     :align: center
+    :width: 60%
+    :alt: A square sketch projected down onto a stepped part, landing on the step and on the plate either side of it
 
 .. list-table::
     :header-rows: 1
@@ -35,14 +37,23 @@ The first two keep the dimension of their input and are operations in both
 Builder and Algebra mode. The third is a method on any shape and is the
 basis of technical drawings.
 
-.. code-block:: build123d
+.. tab-set::
 
-    with BuildPart() as badge:
-        Cylinder(20, 4)
-        with BuildSketch(Plane.XY.offset(10)):
-            Text("b3d", 12)
-        project_to_shape()  # the letters land on the top of the badge
-        extrude(amount=-0.5, mode=Mode.SUBTRACT)
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/projection/projection_examples.py
+            :language: build123d
+            :start-after: [index_badge]
+            :end-before: [index_badge]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/projection/projection_examples.py
+            :language: build123d
+            :start-after: [index_badge_algebra]
+            :end-before: [index_badge_algebra]
 
 **********
 Start here

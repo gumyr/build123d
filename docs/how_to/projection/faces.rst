@@ -8,6 +8,11 @@ A label on a curved part is a row of flat letters laid along a curve on the
 surface, each standing on the surface at its own place. Two methods do that,
 and they differ in how they put a letter onto the surface.
 
+Both are methods, of a face and of a shape, so they are used the same way in
+both modes. On a builder, call them on what the builder made, such as
+``can.part``, and bring the result into the part with ``insert`` or
+``thicken``.
+
 .. image:: /how_to/assets/projection/faces.svg
     :align: center
 
@@ -59,3 +64,12 @@ Notes
   and a letter placed at a sharp corner projects poorly.
 * The :ref:`bicycle tire <examples-bicycle_tire>` wraps a tread onto one
   face; the :ref:`bracelet <examples-bracelet>` projects a label over several.
+
+********
+See also
+********
+
+* :ref:`tutorial_bicycle_tire` wraps a tread pattern onto one face of a tire
+  and thickens it into blocks.
+* :ref:`projection_shape` projects a sketch along one direction, with no
+  path.

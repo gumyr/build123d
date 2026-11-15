@@ -12,10 +12,23 @@ sketch or a line, enhance it there, and use the result to modify the object.
 .. image:: /how_to/assets/projection/plane_faces.svg
     :align: center
 
-.. literalinclude:: /how_to/projection/projection_examples.py
-    :language: build123d
-    :start-after: [plane_faces]
-    :end-before: [plane_faces]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/projection/projection_examples.py
+            :language: build123d
+            :start-after: [plane_faces]
+            :end-before: [plane_faces]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/projection/projection_examples.py
+            :language: build123d
+            :start-after: [plane_faces_algebra]
+            :end-before: [plane_faces_algebra]
 
 In ``BuildSketch`` or ``BuildLine`` the objects are projected onto the
 builder's construction plane, ``Plane.XY``, and ``workplane`` must not be
@@ -88,17 +101,37 @@ A builder takes what it can hold and reduces or refuses the rest.
             :start-after: [plane_edges_algebra]
             :end-before: [plane_edges_algebra]
 
-************
-Algebra mode
-************
+******************
+Onto another plane
+******************
 
-The same rules hold with an explicit workplane, and points come back as
-``Vector`` positions in the plane's coordinates.
+In Algebra mode the plane is the ``workplane`` argument, and the result comes
+back in that plane's coordinates. A sketch has only its own flat coordinates
+to project onto, so in Builder mode the part is first expressed in the
+plane's coordinates with ``to_local_coords`` and then projected; the sketch,
+placed on the plane, carries the result there.
 
-.. literalinclude:: /how_to/projection/projection_examples.py
-    :language: build123d
-    :start-after: [plane_algebra]
-    :end-before: [plane_algebra]
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/projection/projection_examples.py
+            :language: build123d
+            :start-after: [plane_side]
+            :end-before: [plane_side]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/projection/projection_examples.py
+            :language: build123d
+            :start-after: [plane_side_algebra]
+            :end-before: [plane_side_algebra]
+
+Points come back as ``Vector`` positions in the plane's coordinates, as the
+last line of the Algebra example shows.
+
 
 *****************************
 Choosing the plane for a view
@@ -127,3 +160,14 @@ Notes
   above does what it did.
 * Projection onto a plane is a parallel projection. For a perspective view
   of a part see :ref:`drawing_view <projection_view>`.
+
+********
+See also
+********
+
+* :ref:`tutorial_projection_chalice` casts a part onto a plane, draws on its
+  footprint and casts the drawing back.
+* :ref:`projection_shape` is the projection in the other direction, from a
+  sketch onto a part.
+* :ref:`sketching` covers what can be done with the sketch once the
+  projection is in it.
