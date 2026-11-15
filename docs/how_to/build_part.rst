@@ -14,24 +14,28 @@ Basic Functionality
 
 The following is a simple BuildPart example:
 
-.. literalinclude:: /tutorials/general_examples.py
-    :language: build123d
-    :start-after: [Ex. 2]
-    :end-before: [Ex. 2]
+.. code-block:: build123d
+
+    length, width, thickness = 80.0, 60.0, 10.0
+    center_hole_dia = 22.0
+
+    with BuildPart() as plate:
+        Box(length, width, thickness)
+        Cylinder(radius=center_hole_dia / 2, height=thickness, mode=Mode.SUBTRACT)
 
 The ``with`` statement creates the ``BuildPart`` context manager with the
-identifier ``ex2`` (this code is the second of the introductory examples).
+identifier ``plate``.
 The objects and operations that are within the
 scope (i.e. indented) of this context will contribute towards the object
 being created by the context manager.  For ``BuildPart``, this object is
-``part`` and it's referenced as ``ex2.part``.
+``part`` and it's referenced as ``plate.part``.
 
 The first object in this example is a ``Box`` object which is used to create
 a polyhedron with rectangular faces centered on the default ``Plane.XY``.
 The second object is a ``Cylinder`` that is subtracted from the box as directed
 by the ``mode=Mode.SUBTRACT`` parameter thus creating a hole.
 
-.. image:: /tutorials/assets/introductory_examples/general_ex2.svg
+.. image:: /how_to/assets/build_part/plate_with_hole.svg
     :align: center
 
 *******************
