@@ -548,6 +548,16 @@ class TestWire(unittest.TestCase):
         with self.assertRaises(ValueError):
             Wire(bob="fred")
 
+    def test_constructor_keeps_first_of_near_coincident_vertices(self):
+        # Issue #1492: a join whose end vertices differ by less than their
+        # tolerance keeps the vertex of the edge listed first, in either order
+        line = Edge.make_line((0, 0, 0), (1e-12, 0, 10))
+        arc = Edge.make_three_point_arc((0, 0, 10), (-3, 0, 13), (0, 0, 16))
+        for edges, x_value in (([line, arc], 1e-12), ([arc, line], 0.0)):
+            with self.subTest(first=edges[0].geom_type):
+                joint = min(Wire(edges).vertices(), key=lambda v: abs(v.Z - 10))
+                self.assertEqual(joint.X, x_value)
+
 
 class TestWireFilletHelpers(unittest.TestCase):
 
