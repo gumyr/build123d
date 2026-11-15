@@ -1,181 +1,247 @@
-#############
-Import/Export
-#############
+.. _import_export:
 
-Methods and functions specific to exporting and importing build123d objects are defined below.
+#######################
+Importing and exporting
+#######################
 
-For example:
+A model leaves build123d as a file, for a slicer, another CAD system, a
+web page or a drawing, and geometry made elsewhere comes in the same way.
+Which format to use depends on what the file has to carry, so this guide
+starts there.
 
-.. code-block:: build123d
+Export and import work on finished shapes, so everything here is the same
+whether the shape was made in builder or algebra mode. In builder mode,
+pass the builder's result: ``export_step(my_part.part, "part.step")``.
 
-    with BuildPart() as box_builder:
-        Box(1, 1, 1)
-    export_step(box_builder.part, "box.step")
+.. list-table::
+    :header-rows: 1
+    :widths: 50 50
 
-File Formats
-============
+    * - To
+      - use
+    * - exchange a model with another CAD system
+      - ``export_step``, ``import_step``
+    * - keep exact geometry for build123d or OpenCascade
+      - ``export_brep``, ``import_brep``
+    * - send a part to a slicer
+      - ``export_stl``, or ``Mesher`` for 3MF
+    * - show a model on the web or in a renderer
+      - ``export_gltf``, ``export_obj``
+    * - make a 2D drawing
+      - ``ExportSVG``, ``ExportDXF``
+    * - bring in a mesh
+      - ``import_stl``, ``Mesher.read``
+    * - bring in a drawing
+      - ``import_svg``, ``import_dxf``
+    * - turn an SVG outline into code
+      - ``import_svg_as_buildline_code``
 
-3MF
----
+*******************
+Choose a format
+*******************
 
-The 3MF (3D Manufacturing Format) file format is a versatile and modern standard 
-for representing 3D models used in additive manufacturing, 3D printing, and other 
-applications. Developed by the 3MF Consortium, it aims to overcome the limitations 
-of traditional 3D file formats by providing a more efficient and feature-rich solution. 
-The 3MF format supports various advanced features like color information, texture mapping, 
-multi-material definitions, and precise geometry representation, enabling seamless 
-communication between design software, 3D printers, and other manufacturing devices. 
-Its open and extensible nature makes it an ideal choice for exchanging complex 3D data 
-in a compact and interoperable manner.
+.. list-table::
+    :header-rows: 1
+    :widths: 10 30 12 14 12 22
 
-BREP
-----
+    * - Format
+      - Holds
+      - Colour
+      - Labels and tree
+      - Units
+      - Functions
+    * - STEP
+      - exact geometry
+      - yes
+      - yes
+      - yes
+      - :func:`~exporters3d.export_step`, :func:`~importers.import_step`
+    * - BREP
+      - exact geometry
+      - no
+      - no
+      - no
+      - :func:`~exporters3d.export_brep`, :func:`~importers.import_brep`
+    * - 3MF
+      - triangle meshes
+      - yes
+      - labels
+      - yes
+      - :class:`~mesher.Mesher`
+    * - STL
+      - triangles
+      - no
+      - no
+      - no
+      - :func:`~exporters3d.export_stl`, :func:`~importers.import_stl`,
+        :class:`~mesher.Mesher`
+    * - glTF
+      - triangle meshes with materials
+      - yes
+      - \-
+      - yes
+      - :func:`~exporters3d.export_gltf` (export only)
+    * - OBJ
+      - triangle meshes with texture coordinates
+      - no
+      - no
+      - no
+      - :func:`~exporters3d.export_obj` (export only)
+    * - SVG
+      - 2D lines and filled shapes
+      - yes
+      - layers
+      - yes
+      - :class:`~exporters.ExportSVG`, :func:`~importers.import_svg`
+    * - DXF
+      - 2D lines and arcs
+      - by layer
+      - layers
+      - yes
+      - :class:`~exporters.ExportDXF`, :func:`~import_dxf.import_dxf`
 
-The BREP (Boundary Representation) file format is a widely used data format in 
-computer-aided design (CAD) and computer-aided engineering (CAE) applications. 
-BREP represents 3D geometry using topological entities like vertices, edges, 
-and faces, along with their connectivity information. It provides a precise 
-and comprehensive representation of complex 3D models, making it suitable for 
-advanced modeling and analysis tasks. BREP files are widely supported by various 
-CAD software, enabling seamless data exchange between different systems. Its ability 
-to represent both geometric shapes and their topological relationships makes it a 
-fundamental format for storing and sharing detailed 3D models.
+*Exact geometry* means the surfaces themselves: a cylinder is saved as a
+cylinder and comes back as one. A *mesh* is an approximation in flat
+triangles, good for printing and display, and it cannot be turned back
+into the surfaces it was made from.
 
-DXF
----
+An STL file holds triangles and nothing else: no colour, no names and no
+units. Whoever reads it has to be told, or guess, what one unit of length
+is.
 
-The DXF (Drawing Exchange Format) file format is a widely used standard for 
-representing 2D and 3D drawings, primarily used in computer-aided design (CAD) 
-applications. Developed by Autodesk, DXF files store graphical and geometric data, 
-such as lines, arcs, circles, and text, as well as information about layers, colors, 
-and line weights. Due to its popularity, DXF files can be easily exchanged and 
-shared between different CAD software. The format's simplicity and human-readable 
-structure make it a versatile choice for sharing designs, drawings, and models 
-across various CAD platforms, facilitating seamless collaboration in engineering 
-and architectural projects.
+The examples below save this small assembly, a plate and a knob, each with
+a label and a colour:
 
-glTF
-----
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [model]
+    :end-before: [model]
 
-The glTF (GL Transmission Format) is a royalty-free specification for the efficient 
-transmission and loading of 3D models and scenes by applications. Developed by the 
-Khronos Group, glTF is designed as a compact, interoperable format that enables the 
-quick display of assets across various platforms and devices. glTF supports a rich 
-feature set, including detailed meshes, materials, textures, skeletal animations, 
-and more, facilitating complex 3D visualizations. It streamlines the process of 
-sharing and deploying 3D content in web applications, game engines, and other 
-visualization tools, making it the "JPEG of 3D." glTF's versatility and efficiency 
-have led to its widespread adoption in the 3D content industry.
+********************************************
+Exchange a model with another CAD system
+********************************************
 
-OBJ
----
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [step]
+    :end-before: [step]
 
-Wavefront OBJ is a widely supported text-based mesh format. The
-:func:`~exporters3d.export_obj` function exports triangulated geometry, including
-vertex positions, normals, and UV texture coordinates. UV coordinates map each
-mesh face to a two-dimensional texture, allowing an external application to paint
-or bake textures onto the model.
+STEP is the format to use between CAD systems. It carries the exact
+geometry and, for an assembly, the tree of parts with their labels and
+colours. The panel read back here is a ``Compound`` labelled ``panel``
+with two children, ``plate`` and ``knob``, in their colours, and the hole
+in the plate is still a cylinder.
 
-By default, the exporter packs the UV islands for all faces into one normalized
-texture atlas. Set ``atlas_gutter`` to reserve empty space around every island and
-avoid texture bleeding when the atlas is sampled with interpolation:
+A STEP file states its unit of length. build123d models are in
+millimetres unless you decide otherwise, and ``unit`` says what the
+numbers in this model mean:
 
-.. code-block:: build123d
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [step_units]
+    :end-before: [step_units]
 
-    box = Box(20, 10, 5)
-    export_obj(box, "box.obj", atlas_gutter=0.002)
+``import_step`` converts to millimetres as it reads, so this panel would
+come back 25.4 times as large.
+
+BREP is the native format of the OpenCascade kernel that build123d is
+built on. It is exact and quick to read and write, and it holds geometry
+only: the two solids come back, without their labels, colours or tree.
+
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [brep]
+    :end-before: [brep]
+
+***************************
+Send a part to a slicer
+***************************
+
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [stl]
+    :end-before: [stl]
+
+:func:`~exporters3d.export_stl` writes the shape as triangles.
+``tolerance`` is how far a triangle may lie from the true surface, and
+``angular_tolerance`` limits how much the surface may turn from one
+triangle to the next. Smaller values give a smoother part and a larger
+file: the second file here is several times the size of the first.
+
+3MF is the better format where the slicer accepts it. It holds one mesh
+for each shape, with its label and colour, and states its units.
+:class:`~mesher.Mesher` writes it, and can attach a part number and other
+metadata:
+
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [threemf]
+    :end-before: [threemf]
+
+``Mesher`` writes STL too: ``exporter.write("panel.stl")`` saves the same
+meshes without the extras.
+
+To lay several parts out on the bed before saving them, see
+:ref:`packing`.
+
+********************************************
+Show a model on the web or in a renderer
+********************************************
+
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [gltf]
+    :end-before: [gltf]
+
+glTF is the format web viewers and game engines read. It holds meshes
+with their colours and, where a shape has a material, how that material
+should be rendered. ``binary=True`` with a ``.glb`` name keeps everything
+in one file. :ref:`materials` covers giving shapes an appearance.
+
+Wavefront OBJ is a widely supported text-based mesh format.
+:func:`~exporters3d.export_obj` exports triangulated geometry, including
+vertex positions, normals and UV texture coordinates. UV coordinates map
+each mesh face to a two-dimensional texture, allowing an external
+application to paint or bake textures onto the model.
+
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [obj]
+    :end-before: [obj]
+
+By default the exporter packs the UV islands for all faces into one
+normalized texture atlas. ``atlas_gutter`` reserves empty space around
+every island, which avoids texture bleeding when the atlas is sampled
+with interpolation.
 
 The OBJ exporter writes geometry and UV data only. It does not create a material
 library (``.mtl``) file or embed, reference, or assign texture image files. Use the
 exported UV atlas with a separate texture-painting, baking, or material-authoring
 workflow.
 
-STL
----
+*********************
+Make a 2D drawing
+*********************
 
-The STL (STereoLithography) file format is a widely used file format in 3D printing 
-and computer-aided design (CAD) applications. It represents 3D geometry using 
-triangular facets to approximate the surface of a 3D model. STL files are widely 
-supported and can store both the geometry and color information of the model. 
-They are used for rapid prototyping and 3D printing, as they provide a simple and 
-efficient way to represent complex 3D objects. The format's popularity stems from 
-its ease of use, platform independence, and ability to accurately describe the 
-surface of intricate 3D models with a minimal file size.
+A drawing is made in two steps: get 2D shapes from the model, then hand
+them to an exporter. There are two ways to get the shapes:
 
-STEP
-----
+* **A view.** :meth:`~topology.Mixin3D.drawing_view` gives the edges of a
+  shape as seen from a viewpoint, like a camera, split into ``visible``
+  and ``hidden``. ``up`` sets the camera's orientation and ``look_at``
+  where it points; by default it looks at the centre of the shape with Z
+  up. :ref:`projection_view` covers it.
+* **A section.** :func:`~operations_part.section` cuts the part with a
+  plane and gives the cut as a sketch.
 
-The STEP (Standard for the Exchange of Product model data) file format is a widely 
-used standard for representing 3D product and manufacturing data in computer-aided 
-design (CAD) and computer-aided engineering (CAE) applications. It is an ISO standard 
-(ISO 10303) and supports the representation of complex 3D geometry, product structure, 
-and metadata. STEP files store information in a neutral and standardized format, 
-making them highly interoperable across different CAD/CAM software systems. They 
-enable seamless data exchange between various engineering disciplines, facilitating 
-collaboration and data integration throughout the entire product development and 
-manufacturing process.
+:class:`~exporters.ExportSVG` and :class:`~exporters.ExportDXF` work the
+same way: create the document, add layers with their colours and line
+types, add shapes to the layers, and write the file.
 
-SVG
----
-
-The SVG (Scalable Vector Graphics) file format is an XML-based standard used for 
-describing 2D vector graphics. It is widely supported and can be displayed in modern 
-web browsers, making it suitable for web-based graphics and interactive applications. 
-SVG files define shapes, paths, text, and images using mathematical equations, 
-allowing for smooth scalability without loss of quality. The format is ideal for 
-logos, icons, illustrations, and other graphics that require resolution independence. 
-SVG files are also easily editable in text editors or vector graphic software, making 
-them a popular choice for designers and developers seeking flexible and versatile graphic 
-representation.
-
-
-2D Exporters 
-============
-
-Exports to DXF (Drawing Exchange Format) and SVG (Scalable Vector Graphics) 
-are provided by the 2D Exporters: ExportDXF and ExportSVG classes. 
-
-DXF is a widely used file format for exchanging CAD (Computer-Aided Design) 
-data between different software applications. SVG is a widely used vector graphics
-format that is supported by web browsers and various graphic editors.  
-
-The core concept to these classes is the creation of a DXF/SVG document with 
-specific properties followed by the addition of layers and shapes to the documents.
-Once all of the layers and shapes have been added, the document can be written
-to a file. 
-
-3D to 2D Projection
--------------------
-
-There are a couple ways to generate a 2D drawing of a 3D part:
-
-* Generate a section: The  :func:`~operations_part.section` operation can be used to
-  create a 2D cross section of a 3D part at a given plane.
-* Generate a view: The :meth:`~topology.Mixin3D.drawing_view` method can be
-  used to create a 2D line drawing of a 3D scene. Similar to a camera, the ``viewpoint``
-  defines the location of camera, the ``up`` defines the orientation of the camera,
-  and the ``look_at`` parameter defined where the camera is pointed.  By default, 
-  ``up`` is the positive z axis and ``look_at`` is the center of the shape.  The
-  return value is a :class:`~topology.DrawingViewOutput` of two lists of edges, ``visible``
-  and ``hidden``, which unpacks as a tuple.  
-  
-Each of these Edges and Faces can be assigned different line color/types and fill colors
-as described below (as ``drawing_view`` only generates Edges, fill doesn't apply).  
-The shapes generated from the above steps are to be added as shapes 
-in one of the exporters described below and written as either a DXF or SVG file as shown
-in this example:
-
-.. code-block:: build123d
-
-    view_port_origin=(-100, -50, 30)
-    visible, hidden = part.drawing_view(view_port_origin)
-    max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
-    exporter = ExportSVG(scale=100 / max_dimension)
-    exporter.add_layer("Visible")
-    exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
-    exporter.add_shape(visible, layer="Visible")
-    exporter.add_shape(hidden, layer="Hidden")
-    exporter.write("part_projection.svg")
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [svg]
+    :end-before: [svg]
 
 ``ExportSVG`` accepts the standard ``ColorLike`` interface for
 layer fill and line colors. When a layer color is omitted, a Face color is used
@@ -187,8 +253,25 @@ deprecated for SVG export and will be removed at or before version 1.0.0. They
 are converted with a ``DeprecationWarning`` during the transition. Use color
 names, hexadecimal values, or normalized RGB(A) tuples instead.
 
-LineType
---------
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [dxf]
+    :end-before: [dxf]
+
+A shape given to either exporter has to lie flat in the XY plane, as a
+section by ``Plane.XY`` and the edges of a ``drawing_view`` do.
+
+``ExportDXF`` accepts the standard ``ColorLike`` interface for
+document and layer colors. ColorLike alpha is written as DXF layer transparency.
+True-color black is always ``0x000000``; unlike ACI 7, DXF viewers do not switch
+it to white on dark backgrounds. DXF versions before R2004 have no true color,
+so for those the nearest AutoCAD Color Index is written instead. The older
+``ColorIndex`` values remain supported
+during the transition but emit a ``DeprecationWarning`` and will be removed at or
+before version 1.0.0.
+
+Line types
+==========
 
 ANSI (American National Standards Institute) and ISO (International Organization for 
 Standardization) standards both define line types in drawings used in DXF and SVG
@@ -216,140 +299,82 @@ Enum and are shown in the following diagram:
 .. image:: /how_to/assets/import_export/line_types.svg
     :align: center
 
-.. autoclass:: exporters.LineType
+.. image:: /how_to/assets/import_export/line_types.svg
+    :align: center
 
+******************************
+Bring in a model or a mesh
+******************************
 
-ExportDXF
----------
+``import_step`` and ``import_brep``, shown above, bring in exact
+geometry, which can be selected from and built on like anything made in
+build123d.
 
-``ExportDXF`` accepts the standard ``ColorLike`` interface for
-document and layer colors. ColorLike alpha is written as DXF layer transparency.
-True-color black is always ``0x000000``; unlike ACI 7, DXF viewers do not switch
-it to white on dark backgrounds. DXF versions before R2004 have no true color,
-so for those the nearest AutoCAD Color Index is written instead. The older
-``ColorIndex`` values remain supported
-during the transition but emit a ``DeprecationWarning`` and will be removed at or
-before version 1.0.0.
+A mesh is different:
 
-.. autoclass:: exporters.ExportDXF
-    :noindex:
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [stl_import]
+    :end-before: [stl_import]
 
-ExportSVG
----------
+:func:`~importers.import_stl` returns a single faceted ``Face``, which
+can be shown and measured and not much more. Its ``model_unit`` argument
+says what unit the file's numbers are in, since the file does not.
+Rebuilding a real model from such a mesh is the subject of
+:ref:`stl_reconstruction_tutorial`, which uses
+:func:`~build123d.detect_primitives` to find the planes, cylinders and
+spheres in it.
 
-.. autoclass:: exporters.ExportSVG
-    :noindex:
+A 3MF file is read with ``Mesher``, which returns one shape for each mesh
+with its label and colour restored:
 
-3D Exporters
-============
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [threemf_import]
+    :end-before: [threemf_import]
 
-.. py:module:: exporters3d
+**********************
+Bring in a drawing
+**********************
 
-.. autofunction:: export_brep
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [svg_import]
+    :end-before: [svg_import]
 
-.. autofunction:: export_gltf
+:func:`~importers.import_svg` returns a list: a ``Wire`` for each outline
+and a ``Face``, with its colour, for each filled shape. By default the
+drawing is moved so that its lower left corner is at the origin and
+flipped so that Y points up, as build123d has it; ``align`` and
+``flip_y`` change that.
 
-.. autofunction:: export_obj
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [dxf_import]
+    :end-before: [dxf_import]
 
-.. autofunction:: export_step
+:func:`~import_dxf.import_dxf` returns the lines and arcs of the drawing
+as separate edges, here four lines and a circle, ready for ``make_face``
+or to be used as they are.
 
-.. autofunction:: export_stl
+To turn an SVG outline into code that can be edited, not just geometry:
 
-3D Mesh Export
---------------
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [svg_code]
+    :end-before: [svg_code]
 
-Both 3MF and STL export (and import) are provided with the :class:`~mesher.Mesher` class.
-As mentioned above, the 3MF format it provides is feature-rich and therefore has a slightly
-more complex API than the simple Shape exporters.
+:func:`~importers.import_svg_as_buildline_code` returns the source of a
+``BuildLine`` that draws the paths of the file, and the name it gave the
+builder. :ref:`drawing_lines_and_curves` has more on using it.
 
-For example:
+************
+See also
+************
 
-.. code-block:: build123d
-
-    # Create the shapes and assign attributes
-    blue_shape = Solid.make_cone(20, 0, 50)
-    blue_shape.color = Color("blue")
-    blue_shape.label = "blue"
-    blue_uuid = uuid.uuid1()
-    red_shape = Solid.make_cylinder(5, 50).move(Location((0, -30, 0)))
-    red_shape.color = Color("red")
-    red_shape.label = "red"
-
-    # Create a Mesher instance as an exporter, add shapes and write
-    exporter = Mesher()
-    exporter.add_shape(blue_shape, part_number="blue-1234-5", uuid_value=blue_uuid)
-    exporter.add_shape(red_shape)
-    exporter.add_meta_data(
-        name_space="custom",
-        name="test_meta_data",
-        value="hello world",
-        metadata_type="str",
-        must_preserve=False,
-    )
-    exporter.add_code_to_metadata()
-    exporter.write("example.3mf")
-    exporter.write("example.stl")
-
-.. autoclass:: mesher.Mesher
-
-.. note::
-
-    If you need to align multiple components for 3D printing, you can use the  :ref:`pack() <packing>` function to arrange the objects side by side and align them on the same plane. This ensures that your components are well-organized and ready for the printing process.
-
-
-2D Importers
-============
-
-.. py:module:: import_dxf
-.. autofunction:: import_dxf
-
-.. py:module:: importers
-.. autofunction:: import_svg
-.. autofunction:: import_svg_as_buildline_code
-
-3D Importers
-============
-
-.. autofunction:: import_brep
-.. autofunction:: import_step
-.. autofunction:: import_stl
-
-STL Reconstruction
-------------------
-
-The :func:`~build123d.detect_primitives` helper can be used during STL
-reconstruction to detect analytic planes, cylinders, and spheres in a mesh-like
-shape and generate algebra-mode code fragments to aid manual redesign.
-
-See :ref:`stl_reconstruction_tutorial` for the full workflow and limitations.
-
-.. autofunction:: build123d.detect_primitives
-
-3D Mesh Import
---------------
-
-Both 3MF and STL import (and export) are provided with the :class:`~mesher.Mesher` class.
-
-For example:
-
-.. code-block:: build123d
-
-    importer = Mesher()
-    cone, cyl = importer.read("example.3mf")
-    print(
-        f"{importer.mesh_count=}, {importer.vertex_counts=}, {importer.triangle_counts=}"
-    )
-    print(f"Imported model unit: {importer.model_unit}")
-    print(f"{cone.label=}")
-    print(f"{cone.color=}")
-    print(f"{cyl.label=}")
-    print(f"{cyl.color=}")
-
-.. code-block:: none
-
-    importer.mesh_count=2, importer.vertex_counts=[66, 52], importer.triangle_counts=[128, 100]
-    Imported model unit: Unit.MM
-    cone.label='blue'
-    cone.color.to_tuple()=(0.0, 0.0, 1.0, 1.0)
-    cyl.label='red'
-    cyl.color.to_tuple()=(1.0, 0.0, 0.0, 1.0)
+* :ref:`import_export_reference` lists every exporter and importer with
+  its arguments.
+* :ref:`projection_view` and :ref:`tech_drawing_tutorial` cover making
+  drawings.
+* :ref:`packing` arranges parts for a print bed.
+* :ref:`materials` covers the appearance that glTF carries.

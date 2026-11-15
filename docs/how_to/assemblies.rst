@@ -251,5 +251,5 @@ See also
   assembly.
 * :ref:`joint_tutorial` builds and assembles a hinged box step by step.
 * :ref:`moving_objects` covers locations and rotations.
-* The import and export guide covers saving an assembly as STEP, where
+* :ref:`import_export` covers saving an assembly as STEP, where
   shared copies are saved once.

@@ -449,7 +449,7 @@ These are defined:
 
 Writing ``* MM`` after a dimension changes nothing and says what the
 number means. Some export formats, DXF among them, can be told which
-unit to declare; see the import and export guide.
+unit to declare; see :ref:`import_export`.
 
 ************
 See also

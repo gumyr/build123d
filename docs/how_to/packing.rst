@@ -68,4 +68,4 @@ See also
 ************
 
 * :func:`~pack.pack` in the operations reference.
-* The import and export guide covers saving the arranged parts.
+* :ref:`import_export` covers saving the arranged parts.
