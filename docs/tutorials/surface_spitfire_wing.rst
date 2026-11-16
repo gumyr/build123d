@@ -206,9 +206,10 @@ closed loop, which is the airfoil at the root, and ``Face`` fills a flat
 loop with a flat face, shown in red.
 
 Taking the edge from the surface, instead of using ``airfoil_root`` again,
-is the rule of the heart token at work: the two faces must share exactly
-the same edge, and the surest way is to take the edge from the face that
-already has it. The two faces then make a ``Shell``, and the shell a
+is the rule of the heart token at work: the edges of the two faces must
+coincide, and the surest way is to take the edge from the face that
+already has it. The surface follows the airfoil closely but not exactly,
+so the airfoil itself would leave a small gap. The two faces then make a ``Shell``, and the shell a
 ``Solid``, as before.
 
 Check it: the solid is valid, and one wing has a volume of about two cubic

@@ -217,11 +217,12 @@ solid to measure.
 
 .. note::
 
-    Faces only join where their edges are exactly the same. The surest way
-    to get that is the one used here: make each edge once, keep it in a
-    variable, and build every face that shares it from that variable. Two
-    edges that were calculated separately and merely look the same are the
-    usual reason a shell will not close.
+    Faces join where their edges coincide. The surest way to get that is
+    the one used here: make each edge once, keep it in a variable, and
+    build every face that shares it from that variable. Two edges that
+    were arrived at by different routes and are only very nearly the same
+    are the usual reason a shell will not close, and ``Shell`` then raises
+    an error. :ref:`surface_modeling` explains the tolerance involved.
 
 ***********************
 Step 8: A frame
@@ -277,8 +278,8 @@ What you learned
   given points.
 * Faces can be mirrored, and ``Shell.extrude`` turns edges into side
   faces.
-* A shell only closes if neighbouring faces share exactly the same edges,
-  so make each edge once and reuse it.
+* A shell only closes if the edges of neighbouring faces coincide, so make
+  each edge once and reuse it.
 * The result is an ordinary solid that can be combined with anything
   else.
 
