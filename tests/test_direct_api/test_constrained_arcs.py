@@ -506,6 +506,38 @@ def test_tan3_4():
     assert len(tan3) == 0
 
 
+@pytest.mark.parametrize("sagitta", [Sagitta.SHORT, Sagitta.LONG, Sagitta.BOTH])
+def test_arcs_run_from_first_to_second_tangency(sagitta):
+    """arcs start on the first tangency and end on the second, issue #1578"""
+    v1, v2 = Vertex(0, 0), Vertex(1, 0)
+    c5 = PolarLine((0, 0), 4, 60)
+    c6 = PolarLine((0, 0), 4, 40)
+    c7 = CenterArc((0, 0), 4, 0, 90)
+    cases = [
+        (v1, v2, Edge.make_constrained_arcs(v1, v2, radius=1, sagitta=sagitta)),
+        (
+            v1,
+            v2,
+            Edge.make_constrained_arcs(
+                v1, v2, center_on=Line((-5, 1), (5, 1)), sagitta=sagitta
+            ),
+        ),
+        (
+            v1,
+            v2,
+            Edge.make_constrained_arcs(
+                v1, v2, center_on=Line((-5, -1), (5, -1)), sagitta=sagitta
+            ),
+        ),
+        (c5, c6, Edge.make_constrained_arcs(c5, c6, c7, sagitta=sagitta)),
+    ]
+    for first, second, arcs in cases:
+        assert arcs
+        for arc in arcs:
+            assert first.distance_to(arc @ 0) < TOLERANCE
+            assert second.distance_to(arc @ 1) < TOLERANCE
+
+
 def test_make_constrained_arcs_3tan():
     """test correct trimming in _make_3tan_arcs"""
     c1 = CenterArc((0, 20), 20, -90, 90)

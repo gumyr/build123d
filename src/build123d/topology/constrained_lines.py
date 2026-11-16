@@ -138,9 +138,14 @@ def _edge_to_qualified_2d(
     return qcurve, hcurve2d, first, last, adapt2d
 
 
-def _edge_from_circle(h2d_circle: Geom2d_Circle, u1: float, u2: float) -> TopoDS_Edge:
-    """Build a 3D edge on XY from a trimmed 2D circle segment [u1, u2]."""
+def _edge_from_circle(
+    h2d_circle: Geom2d_Circle, u1: float, u2: float, reverse: bool = False
+) -> TopoDS_Edge:
+    """Build a 3D edge on XY from a trimmed 2D circle segment [u1, u2].
+    With ``reverse`` the edge runs backwards from u2 to u1."""
     arc2d = Geom2d_TrimmedCurve(h2d_circle, u1, u2, True)  # sense=True
+    if reverse:
+        arc2d.Reverse()
     circle_edge = BRepBuilderAPI_MakeEdge(arc2d, _surf_xy).Edge()
     BRepLib.BuildCurves3d_s(circle_edge)
 
@@ -197,8 +202,8 @@ def _two_arc_edges_from_params(
 ) -> list[TopoDS_Edge]:
     """
     Given two parameters on a circle, return both the forward (minor)
-    and complementary (major) arcs as TopoDS_Edge(s).
-    Uses centralized normalization utilities.
+    and complementary (major) arcs as TopoDS_Edge(s). Both arcs start at u1
+    and end at u2. Uses centralized normalization utilities.
     """
     h2d_circle = Geom2d_Circle(circ)
     period = h2d_circle.Period()  # usually 2*pi
@@ -213,7 +218,7 @@ def _two_arc_edges_from_params(
         return ShapeList()
 
     minor = _edge_from_circle(h2d_circle, u1n, u1n + d)
-    major = _edge_from_circle(h2d_circle, u2n, u2n + (period - d))
+    major = _edge_from_circle(h2d_circle, u2n, u2n + (period - d), reverse=True)
     return [minor, major]
 
 
