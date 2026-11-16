@@ -33,38 +33,43 @@
 About
 ########
 
-Build123d is a Python-based, parametric (BREP) modeling framework for 2D and 3D CAD. 
-Built on the Open Cascade geometric kernel, it provides a clean, fully Pythonic interface 
-for creating precise models suitable for 3D printing, CNC machining, laser cutting, and 
-other manufacturing processes. Models can be exported to popular CAD tools such as FreeCAD 
-and SolidWorks.
-
-Designed for modern, maintainable CAD-as-code, build123d combines clear architecture with 
-expressive, algebraic modeling. It offers:
-
-* Minimal or no internal state depending on mode
-* Explicit 1D, 2D, and 3D geometry classes with well-defined operations
-* Extensibility through subclassing and functional composition—no monkey patching
-* Standards-compliant code (PEP 8, mypy, pylint) with rich pylance type hints
-* Deep Python integration—selectors as lists, locations as iterables, and natural 
-  conversions (``Solid(shell)``, ``tuple(Vector)``)
-* Operator-driven modeling (``obj += sub_obj``, ``Plane.XZ * Pos(X=5) * Rectangle(1, 1)``) 
-  for algebraic, readable, and composable design logic
-
-With build123d, intricate parametric models can be created in just a few lines of readable 
-Python code—as demonstrated by the tea cup example below.
-
-.. dropdown:: Teacup Example
-
-    .. literalinclude:: /../examples/tea_cup.py
-        :language: build123d
-        :start-after: [Code]
-        :end-before: [End]
+build123d is a Python library for 2D and 3D CAD. A model is a Python
+program: shapes are made, placed and combined in code, dimensions are
+variables, and changing one and running the program again gives the new
+part. It is built on the Open Cascade geometric kernel, the boundary
+representation (BREP) kernel behind FreeCAD, so its models are exact
+geometry, suitable for 3D printing, CNC machining and laser cutting, and
+can be exported as STEP to FreeCAD, SolidWorks and other CAD systems.
 
 .. raw:: html
 
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
     <model-viewer poster="_images/tea_cup.png" src="_static/tea_cup.glb" alt="A tea cup modelled in build123d" auto-rotate camera-controls style="width: 100%; height: 50vh;"></model-viewer>
+
+This tea cup is about forty lines of Python. :ref:`See how it is made
+<tea_cup>`, in both of the styles build123d can be written in.
+
+*****************
+Where to start
+*****************
+
+This documentation is organised on the `Diátaxis <https://diataxis.fr/>`_
+framework, which sorts documentation by what the reader needs at the time:
+tutorials for learning, how-to guides for getting a task done, reference
+for looking something up, and explanation for understanding.
+
+* **New to build123d?** :ref:`getting_started` covers installation, a first
+  model, and the two modes a model can be written in.
+* **Learning it?** The :ref:`tutorials` each build a complete part, step by
+  step.
+* **Working on a design?** The :ref:`how_to_guides` are organised by task,
+  and the :ref:`cheat_sheet` lists everything on one page.
+* **Deciding whether to use it, or wondering why it works the way it
+  does?** Start with :ref:`why_build123d`.
+* **Looking for ideas?** The :ref:`examples` are finished models with their
+  code.
+* **Want to test what you have learned?** The :ref:`challenges` each give
+  a drawing of a part to model, and the mass your result should come to.
 
 .. note::
 
