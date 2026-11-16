@@ -23,7 +23,6 @@ want to deepen your understanding rather than get something done.
     key_concepts_builder.rst
     key_concepts_algebra.rst
     algebra_definition.rst
-    algebra_performance.rst
     location_arithmetic.rst
     center.rst
     constraints.rst

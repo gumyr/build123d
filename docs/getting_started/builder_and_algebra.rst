@@ -116,4 +116,4 @@ Where the modes do not differ, for instance when selecting the edges of a
 finished part, the code is shown once.
 
 To understand what each mode is doing underneath, see
-:ref:`how_builder_mode_works` and :doc:`/explanation/key_concepts_algebra`.
+:ref:`how_builder_mode_works` and :ref:`how_algebra_mode_works`.

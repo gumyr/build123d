@@ -175,9 +175,9 @@ Each is a ``Compound``, and the ready-made objects belong to them:
     :start-after: [kinds]
     :end-before: [kinds]
 
-The kind is kept through every operation. Two parts added together make a
-part, a sketch with a hole cut in it is still a sketch, and a builder hands
-back the kind it is named for: ``BuildPart`` a ``Part``, ``BuildSketch`` a
+The kind is kept as a design is worked on. Two parts joined together make
+a part, a sketch with a hole cut in it is still a sketch, and a builder
+hands back the kind it is named for: ``BuildPart`` a ``Part``, ``BuildSketch`` a
 ``Sketch`` and ``BuildLine`` a ``Curve``. This is also why objects of
 different dimensions cannot be added to one another: a sketch is turned
 into a part by an operation such as ``extrude``, not by arithmetic.
