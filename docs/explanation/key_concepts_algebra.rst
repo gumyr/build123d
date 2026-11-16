@@ -208,7 +208,7 @@ plane's X, 2 along its Y, which is the world's Z, and 3 along its normal.
 
 ``Pos(...) * Rot(...)`` can be written as one ``Location`` with a position
 and three angles. :ref:`moving_objects` covers placement in practice, and
-:ref:`location_arithmetics` goes through the composition of locations and
+:ref:`location_arithmetic` goes through the composition of locations and
 planes in detail.
 
 A set of places can be multiplied by a shape, which gives a list with one
@@ -292,6 +292,6 @@ See also
 * :ref:`key_concepts` describes ``Part``, ``Sketch`` and ``Curve``, and
   locations and planes.
 * :ref:`algebra_definition` gives the formal definition of the arithmetic.
-* :ref:`location_arithmetics` works through placement on planes.
+* :ref:`location_arithmetic` works through placement on planes.
 * :ref:`tutorial_sketch_then_extrude` starts the tutorials, which build
   every model in both modes side by side.

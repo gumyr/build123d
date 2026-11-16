@@ -454,7 +454,7 @@ See also
 ************
 
 * :ref:`placing_sketches` covers choosing the plane a sketch is drawn on.
-* :ref:`location_arithmetics` explains how locations and planes combine
+* :ref:`location_arithmetic` explains how locations and planes combine
   in algebra mode.
 * :ref:`tutorial_placing_features` introduces ``Locations`` and the
   pattern locations step by step.
