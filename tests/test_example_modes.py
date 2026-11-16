@@ -12,12 +12,16 @@ desc:
     versions of each still make the same model, so that a change to one that
     is not made to the other is caught.
 
-    Each script is run on its own and every shape it leaves in its globals
-    is measured. The result of a pair is taken to be the largest shape that
-    both scripts call by the same name, and the two must agree in kind
+    Each script is run on its own and the shapes it leaves in its globals
+    under a name the other version also uses are measured. The result of a
+    pair is taken to be the largest of them, and the two must agree in kind
     (solid, face or line), in size (volume, area or length) and in extent.
+
+    A script that fails to run fails its pair, so test_examples.py leaves
+    the paired scripts to this file and each is run once.
 """
 
+import ast
 import json
 import os
 import subprocess
@@ -35,8 +39,8 @@ _ttt_dir = _root / "docs/challenges/ttt"
 # and by more where a fillet or draft is involved.
 TOLERANCE = 1e-3
 
-# Pairs that are not expected to agree, each with the reason. None of them is
-# shown on the Examples page.
+# Pairs that are not expected to agree, each with the reason. Both versions are
+# still run. None of them is shown on the Examples page.
 KNOWN_DIFFERENCES = {
     "boxes_on_faces": "the two versions give their result different names",
     "build123d_customizable_logo": "the two versions lay the logo out differently",
@@ -44,7 +48,16 @@ KNOWN_DIFFERENCES = {
     "intersecting_chamfers": "the algebra version's result is blocks2, not blocks",
 }
 
-# Runs one script with the viewer mocked, then prints what it made.
+# Pairs held to a looser tolerance, each with the reason.
+LOOSER = {
+    # A builder cleans the text it is given and algebra mode does not, and
+    # cleaning moves the outline of some fonts' glyphs: by 0.02% of the area
+    # in Arial, 0.27% in Courier, 0.28% in the font the Linux runners use.
+    "build123d_logo": 1e-2,
+}
+
+# Runs one script with the viewer mocked, then prints what it made under the
+# names it was asked about.
 _MEASURE = r"""
 import json, sys
 from unittest.mock import MagicMock
@@ -78,9 +91,8 @@ def _shapes(value):
 
 
 _found = {}
-for _name, _value in list(_scope.items()):
-    if _name.startswith("_"):
-        continue
+for _name in sys.argv[2:]:
+    _value = _scope.get(_name)
     _made = [shape for shape in _shapes(_value) if not shape.is_empty]
     if not _made:
         continue
@@ -88,13 +100,13 @@ for _name, _value in list(_scope.items()):
         _whole = _made[0] if len(_made) == 1 else Compound(children=list(_made))
         _box = _whole.bounding_box()
         _solids = [solid for shape in _made for solid in shape.solids()]
-        _faces = [face for shape in _made for face in shape.faces()]
-        _edges = [edge for shape in _made for edge in shape.edges()]
+        _faces = [] if _solids else [f for shape in _made for f in shape.faces()]
         if _solids:
             _kind, _measure = 3, sum(solid.volume for solid in _solids)
         elif _faces:
             _kind, _measure = 2, sum(face.area for face in _faces)
         else:
+            _edges = [edge for shape in _made for edge in shape.edges()]
             _kind, _measure = 1, sum(edge.length for edge in _edges)
     except Exception:  # a shape that cannot be measured is not the result
         continue
@@ -108,14 +120,26 @@ print("MEASURED " + json.dumps(_found))
 """
 
 
-def _measure(path: Path) -> dict:
-    """Run a script and return what it left behind, by name"""
+def _names(path: Path) -> set[str]:
+    """The names a script assigns, found without running it"""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name)
+        and isinstance(node.ctx, ast.Store)
+        and not node.id.startswith("_")
+    }
+
+
+def _measure(path: Path, names: list[str]) -> dict:
+    """Run a script and return what it left behind under the given names"""
     with tempfile.TemporaryDirectory(prefix=f"build123d_test_modes_{path.stem}") as tmp:
         # as in test_examples.py: scripts write files, so run them elsewhere,
         # except the one that reads a file from its own folder
         cwd = tmp if "benchy" not in path.name else str(path.parent)
         got = subprocess.run(
-            [sys.executable, "-c", _MEASURE, str(path)],
+            [sys.executable, "-c", _MEASURE, str(path), *names],
             capture_output=True,
             text=True,
             cwd=cwd,
@@ -127,12 +151,20 @@ def _measure(path: Path) -> dict:
     raise AssertionError(f"{path.name} did not run: {got.stderr[-2000:]}")
 
 
-def generate_mode_test(builder_path: Path, algebra_path: Path):
+def generate_mode_test(
+    builder_path: Path,
+    algebra_path: Path,
+    tolerance: float = TOLERANCE,
+    compare: bool = True,
+):
     """Generate and return a function to compare the two versions of an example."""
 
     def assert_modes_agree(self):
-        builder = _measure(builder_path)
-        algebra = _measure(algebra_path)
+        names = sorted(_names(builder_path) & _names(algebra_path)) if compare else []
+        builder = _measure(builder_path, names)
+        algebra = _measure(algebra_path, names)
+        if not compare:  # a known difference: it is enough that both ran
+            return
 
         common = [name for name in builder if name in algebra]
         self.assertTrue(
@@ -155,14 +187,14 @@ def generate_mode_test(builder_path: Path, algebra_path: Path):
         self.assertEqual(ours["kind"], theirs["kind"], f"dimension of {where}")
         self.assertLess(
             abs(ours["measure"] - theirs["measure"]),
-            TOLERANCE * abs(ours["measure"]),
+            tolerance * abs(ours["measure"]),
             f"volume, area or length of {where}: "
             f"{ours['measure']} / {theirs['measure']}",
         )
         for mine, yours in zip(ours["size"], theirs["size"]):
             self.assertLess(
                 abs(mine - yours),
-                TOLERANCE * max(ours["size"]),
+                tolerance * max(ours["size"]),
                 f"extent of {where}: {ours['size']} / {theirs['size']}",
             )
 
@@ -179,9 +211,12 @@ for directory in (_examples_dir, _ttt_dir):
         builder_version = directory / f"{stem}.py"
         if not builder_version.exists():
             continue
-        mode_check = generate_mode_test(builder_version, algebra_version)
-        if stem in KNOWN_DIFFERENCES:
-            mode_check = unittest.skip(KNOWN_DIFFERENCES[stem])(mode_check)
+        mode_check = generate_mode_test(
+            builder_version,
+            algebra_version,
+            LOOSER.get(stem, TOLERANCE),
+            compare=stem not in KNOWN_DIFFERENCES,
+        )
         setattr(
             TestExampleModes,
             f"test_{stem.replace('-', '_').replace('.', '_')}",

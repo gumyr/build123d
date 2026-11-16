@@ -158,15 +158,15 @@ assert block.part.is_valid and block.part.volume < 60 * 40 * 20 + Cylinder(8, 10
 
 # [fillet_limit]
 block = Box(60, 40, 20)
-upright = block.edges().filter_by(Axis.Z)
 
-largest = block.max_fillet(upright, max_iterations=30)  # just under 20
-block = fillet(upright, 15)
+largest = block.max_fillet(block.edges(), max_iterations=30)  # just under 10
+block = fillet(block.edges(), 8)
 # [fillet_limit]
 
-assert 19.5 < largest < 20
+assert 9.5 < largest < 10
+assert block.is_valid
 try:
-    fillet(Box(60, 40, 20).edges().filter_by(Axis.Z), 25)
+    fillet(Box(60, 40, 20).edges(), 12)
     raise AssertionError("a fillet wider than the part should be refused")
 except ValueError as error:
     assert "max_fillet" in str(error)

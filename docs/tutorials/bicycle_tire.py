@@ -440,7 +440,12 @@ assert same(builder_result, tread_unit)
 assert len(builder_result.solids()) == 6
 assert len(tread) == len(builder_tread) == 360 // tread_step
 assert all(len(unit.solids()) == 6 for unit in tread)
-assert abs(sum(u.volume for u in tread) - sum(u.volume for u in builder_tread)) < 1e-3
+# every unit is a copy of the one compared above, so the ends are enough
+for unit, builder_unit in (
+    (tread[0], builder_tread[0]),
+    (tread[-1], builder_tread[-1]),
+):
+    assert same(builder_unit, unit)
 
 
 # ---------------------------------------------------------------------------
@@ -983,7 +988,8 @@ print(f"volume +{tire.volume / smooth_tire.part.volume - 1:.1%}")
 print(f"moment +{tire_spin / smooth_spin - 1:.1%}")
 # [whole_builder]
 
-builder_mass, builder_gain = tire.mass(), tire_spin / smooth_spin
+# measuring the whole tire is slow, so it is done once for each mode
+builder_gain = tire_spin / smooth_spin
 builder_volume = tire.volume
 
 # [whole_algebra]
@@ -1065,10 +1071,10 @@ print(f"volume +{tire.volume / smooth_tire.volume - 1:.1%}")
 print(f"moment +{tire_spin / smooth_spin - 1:.1%}")
 # [whole_algebra]
 
-assert abs(builder_mass - tire.mass()) < 1e-3
+algebra_volume = tire.volume
 assert abs(builder_gain - tire_spin / smooth_spin) < 1e-4
-assert f"{tire.mass():.0f}" == "1177"
 # the volume counts the tread and the lettering as well as the tire
-assert abs(tire.volume - builder_volume) < 1e-3 * builder_volume
-assert f"{tire.volume / smooth_tire.volume - 1:.1%}" == "8.2%"
+assert abs(algebra_volume - builder_volume) < 1e-3 * builder_volume
+assert f"{tire.mass():.0f}" == "1177"
+assert f"{algebra_volume / smooth_tire.volume - 1:.1%}" == "8.2%"
 assert f"{tire_spin / smooth_spin - 1:.1%}" == "8.8%"

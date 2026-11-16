@@ -6,6 +6,8 @@ by:   fischman
 date: February 21 2025
 
 desc: Unit tests for the build123d examples, ensuring they don't raise.
+      Examples written in both builder and algebra mode are run, and the two
+      versions compared, by test_example_modes.py instead.
 """
 
 from pathlib import Path
@@ -76,8 +78,19 @@ class TestExamples(unittest.TestCase):
     """Tests build123d examples."""
 
 
+def _is_paired(path: Path) -> bool:
+    """True for a script with both a builder and an algebra version"""
+    stem = path.name[: -len(".py")]
+    if stem.endswith("_algebra"):
+        return (path.parent / f"{stem[: -len('_algebra')]}.py").exists()
+    return (path.parent / f"{stem}_algebra.py").exists()
+
+
 for example in sorted(list(_examples_dir.iterdir()) + list(_ttt_dir.iterdir())):
     if example.name.startswith("_") or not example.name.endswith(".py"):
+        continue
+    if _is_paired(example):
+        # test_example_modes.py runs both versions of a pair and compares them
         continue
     setattr(
         TestExamples,

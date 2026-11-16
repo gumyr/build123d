@@ -64,7 +64,7 @@ with BuildPart() as rod_end_builder:
     BallJoint(
         "socket",
         joint_location=Location(),
-        angular_range=((-14, 14), (-14, 14), (0, 360)),
+        angular_range=((-14, 14), (-14, 14), (-180, 180)),
     )
 
 with BuildPart() as ball_builder:
@@ -110,7 +110,7 @@ BallJoint(
     "socket",
     rod_end,
     Location(),
-    angular_range=((-14, 14), (-14, 14), (0, 360)),
+    angular_range=((-14, 14), (-14, 14), (-180, 180)),
 )
 
 ball = Sphere(inner_radius - inner_gap) & Box(50, 50, 13)
