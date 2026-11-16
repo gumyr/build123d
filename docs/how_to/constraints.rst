@@ -269,7 +269,6 @@ the ``arc_size`` of these arcs:
 
 - :class:`~objects_curve.CenterArc`
 - :class:`~objects_curve.EllipticalCenterArc`
-- :class:`~objects_curve.EllipticalStartArc`
 - :class:`~objects_curve.JernArc`
 - :class:`~objects_curve.ParabolicCenterArc`
 - :class:`~objects_curve.HyperbolicCenterArc`

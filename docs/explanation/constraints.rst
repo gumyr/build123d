@@ -67,7 +67,6 @@ relationship.
       - :class:`~objects_curve.PolarLine`,
         :class:`~objects_curve.CenterArc`,
         :class:`~objects_curve.EllipticalCenterArc`,
-        :class:`~objects_curve.EllipticalStartArc`,
         :class:`~objects_curve.JernArc`,
         :class:`~objects_curve.ParabolicCenterArc`,
         :class:`~objects_curve.HyperbolicCenterArc`
@@ -77,7 +76,8 @@ relationship.
     * - Tangency
       - Tangent to one, two or three other curves
       - :class:`~objects_curve.ConstrainedArcs`,
-        :class:`~objects_curve.ConstrainedLines`
+        :class:`~objects_curve.ConstrainedLines`,
+        :class:`~objects_curve.DoubleTangentArc`
     * - Continuity
       - Join two curves smoothly
       - :class:`~objects_curve.BlendCurve`
@@ -134,6 +134,9 @@ line-and-circle constructions. They take explicit numeric and geometric
 constraints relative to existing curves - a radius, an angle to another
 line, tangency to a curve, passing through a point, a centre fixed or lying
 on a curve - and return the arcs or lines that satisfy them.
+:class:`~objects_curve.DoubleTangentArc` solves one particular case: the arc
+that leaves a point in a given direction and arrives tangent to another
+curve.
 
 Continuity
 ==========
@@ -148,7 +151,8 @@ joins them at each end:
 * **C2**, curvature continuity: ends, tangents and curvature match, which
   reduces jumps in curvature and produces a fairer curve.
 
-``BlendCurve`` builds a cubic Bézier for a C1 blend (position and first
+A C0 blend is the straight line between the two ends. ``BlendCurve`` builds
+a cubic Bézier for a C1 blend (position and first
 derivative) and a quintic Bézier for a C2 blend (position, first and second
 derivatives). The derivatives are sampled from the two source edges at the
 chosen connection points and converted into control points that enforce the
@@ -160,11 +164,23 @@ Analytical
 ==========
 
 Some relationships are algebra and not geometry. A
-:class:`~objects_sketch.Triangle` is constructed from any three of its side
-lengths and interior angles and solves for the rest. For anything more
+:class:`~objects_sketch.Triangle` is constructed from three of its side
+lengths and interior angles and solves for the rest. At least one of the
+three must be a side, since three angles fix a shape but not a size, and
+the three must describe one triangle: two sides and an angle that is not
+between them can fit two, and are refused. For anything more
 involved, build123d code is Python: solve for the unknown values with
 whatever suits - ``sympy``, for instance - and feed the results into
 ordinary objects.
+
+Enclosure
+=========
+
+:func:`~operations_sketch.make_hull` returns the convex hull of a set of
+edges: the outline a rubber band would take if stretched round them. It
+relates a boundary to everything inside it, without saying how the
+boundary is made up, which suits covers, gaskets and outlines that must
+clear a set of features wherever those features are.
 
 ******************************
 More than one right answer
