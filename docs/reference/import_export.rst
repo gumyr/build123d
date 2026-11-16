@@ -11,12 +11,14 @@ The exporters and importers. :ref:`import_export` shows how they are used.
 ************
 
 .. autoclass:: exporters.ExportDXF
-    :noindex:
 
 .. autoclass:: exporters.ExportSVG
-    :noindex:
+
+.. autoclass:: exporters.Export2D
 
 .. autoclass:: exporters.LineType
+
+.. autoclass:: exporters.DotLength
 
 ************
 3D exporters
@@ -33,6 +35,8 @@ The exporters and importers. :ref:`import_export` shows how they are used.
 .. autofunction:: export_step
 
 .. autofunction:: export_stl
+
+.. autofunction:: export_to_pcbway
 
 ******
 Meshes

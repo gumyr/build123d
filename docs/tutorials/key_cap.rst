@@ -282,7 +282,7 @@ part can answer both.
     :align: center
     :width: 50%
 
-**How long.** :func:`~operations_generic.section` cuts the part with a
+**How long.** :func:`~operations_part.section` cuts the part with a
 plane and gives back the cut surface as a face. Cutting a shell gives a
 frame: the outer wire is the outside of the wall, and the one inner wire
 is the cavity. The size of that wire's bounding box, 13.8 each way, is the
@@ -354,7 +354,7 @@ What you learned
 * ``filter_by(Convexity.CONVEX)`` keeps outside corners and
   ``Convexity.CONCAVE`` inside ones, which separates the two skins of a
   shell.
-* :func:`~operations_generic.section` cuts a part with a plane, and the
+* :func:`~operations_part.section` cuts a part with a plane, and the
   cut can be measured.
 * ``extrude`` with ``until=Until.NEXT`` runs until it meets the part and
   ends on the surface it meets. ``Until.LAST`` carries on to the last

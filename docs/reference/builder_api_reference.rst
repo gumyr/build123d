@@ -102,6 +102,89 @@ Enums
 .. autoclass:: Unit
 .. autoclass:: Until
 
+*****
+Units
+*****
+
+build123d works in millimetres and grams. A dimension written as a bare
+number is in millimetres. The constants below are the size of each unit in
+those terms, so multiplying by one converts a value given in that unit:
+``2 * IN`` is 50.8, and ``3 * MM`` is 3. Dividing converts the other way:
+``part.volume / IN**3`` is a volume in cubic inches.
+
+.. py:module:: build_constants
+
+.. list-table::
+    :header-rows: 1
+    :widths: 20 30 50
+
+    * - Constant
+      - Value
+      - Unit
+    * - ``MC``
+      - 0.001
+      - micron (micrometre)
+    * - ``MM``
+      - 1
+      - millimetre
+    * - ``CM``
+      - 10
+      - centimetre
+    * - ``M``
+      - 1000
+      - metre
+    * - ``THOU``
+      - 0.0254
+      - thousandth of an inch
+    * - ``IN``
+      - 25.4
+      - inch
+    * - ``FT``
+      - 304.8
+      - foot
+    * - ``G``
+      - 1
+      - gram
+    * - ``KG``
+      - 1000
+      - kilogram
+    * - ``LB``
+      - 453.59237
+      - pound
+
+.. py:data:: MC
+             MM
+             CM
+             M
+             THOU
+             IN
+             FT
+
+    Length constants, as in the table above.
+
+.. py:data:: G
+             KG
+             LB
+
+    Mass constants, as in the table above.
+
+.. py:data:: G_PER_LB
+
+    The number of grams in a pound, 453.59237.
+
+.. py:data:: UNITS_PER_METER
+
+    A dictionary from each length :class:`~build_enums.Unit` to the number
+    of that unit in a metre.
+
+.. py:data:: UNITS_PER_KILOGRAM
+
+    A dictionary from each mass :class:`~build_enums.Unit` to the number of
+    that unit in a kilogram.
+
+The :class:`~build_enums.Unit` enum names the same units where a function
+takes one as a parameter, as ``mass(Unit.LB)`` does.
+
 *********
 Locations
 *********

@@ -183,7 +183,7 @@ largest face of the tire, so ``sort_by(Face.area)[-1]`` finds it.
 **The path.** The pattern is laid along a line on that face, the circle
 round the middle of the road surface. The tire has no edge there, since
 the road surface is one face from shoulder to shoulder, so the line is
-made by cutting: :func:`~operations_generic.section` cuts the tire with
+made by cutting: :func:`~operations_part.section` cuts the tire with
 ``Plane.YZ``, the plane through the middle of the wheel, and the longest
 edge of the cut is the one round the outside. In builder mode ``section``
 cuts the part being built, which is why these two lines are inside the
@@ -482,7 +482,7 @@ What you learned
   of each character, it can follow a ``path``, and
   ``font="singleline"`` gives clean single-stroke letters that are safe
   to turn into geometry.
-* :func:`~operations_generic.section` can make a line on a face where
+* :func:`~operations_part.section` can make a line on a face where
   the part has no edge.
 * :func:`~operations_part.thicken` turns faces on a curved surface into
   solids.

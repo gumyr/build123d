@@ -26,6 +26,7 @@ CAD objects described in the following section are frequently of these types.
 .. autoclass:: Axis
    :special-members: __copy__,__deepcopy__, __neg__
 .. autoclass:: BoundBox
+.. autoclass:: OrientedBoundBox
 .. autoclass:: Color
    :special-members: __copy__,__deepcopy__
 .. autoclass:: Location
@@ -39,6 +40,17 @@ CAD objects described in the following section are frequently of these types.
 .. autoclass:: Rotation
 .. autoclass:: Vector
    :special-members: __add__, __sub__, __mul__, __truediv__, __rmul__, __neg__, __abs__, __eq__, __copy__, __deepcopy__
+
+.. autoclass:: GeomEncoder
+
+Two type aliases appear throughout the signatures of build123d. Wherever one
+is asked for, any of the forms it lists may be given.
+
+.. autodata:: VectorLike
+   :no-value:
+
+.. autodata:: RotationLike
+   :no-value:
 
 *******************
 Topological Objects
@@ -83,6 +95,12 @@ Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~top
 
 .. autofunction:: new_edges
 .. autofunction:: topo_distance_to
+.. autofunction:: delta
+.. autofunction:: edges_to_wires
+.. autofunction:: polar
+.. autofunction:: topo_explore_common_vertex
+.. autofunction:: topo_explore_connected_edges
+.. autoexception:: DraftAngleError
 
 
 *************

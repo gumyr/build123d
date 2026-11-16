@@ -544,6 +544,12 @@ Text
 
 .. include:: /reference/objects/text.rst
 
+The fonts build123d can use are found with these:
+
+.. autofunction:: text.available_fonts
+
+.. autoclass:: text.FontManager
+
 
 .. _constrained_arcs_and_lines:
 
