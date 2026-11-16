@@ -394,15 +394,14 @@ outline was read correctly.
 
 .. tip::
 
-    If you use the `ocp-vscode
-    <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_ viewer, its
+    If you use `OCP Viewer <https://github.com/bernhard-42/ocp_viewer>`_, its
     ``ImageFace`` puts a picture into the scene as a flat face. Scaled and
     positioned so that it lies under the sketch, the drawing itself becomes
     something to trace over and compare with as you go:
 
     .. code-block:: build123d
 
-        from ocp_vscode import ImageFace, show
+        from ocp_viewer import ImageFace, show
 
         drawing = ImageFace(
             "complex_sketch.png",

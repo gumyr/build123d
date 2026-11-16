@@ -24,7 +24,7 @@ image_files:
 
 from math import sin, cos, pi
 from build123d import *
-from ocp_vscode import show_object, show, show_all
+from ocp_viewer import show_object, show, show_all
 
 # [Parameters]
 # Canadian Flags have a 2:1 aspect ratio

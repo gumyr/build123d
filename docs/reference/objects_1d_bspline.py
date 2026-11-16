@@ -1,6 +1,6 @@
 from build123d import *
 
-# from ocp_vscode import show_all
+# from ocp_viewer import show_all
 
 dot = Circle(0.05)
 

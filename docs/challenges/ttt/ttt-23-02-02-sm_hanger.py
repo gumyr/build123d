@@ -36,7 +36,7 @@ license:
 """
 
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 from bd_materials.materials.metals import mild_steel
 
 with BuildPart() as sm_hanger_builder:

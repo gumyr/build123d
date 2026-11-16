@@ -25,7 +25,7 @@ in pairs - a :class:`~topology.Joint` can only be connected to another :class:`~
 
 Objects may have many joints bound to them each with an identifying label. All :class:`~topology.Joint`
 objects have a ``symbol`` property that can be displayed to help visualize
-their position and orientation (the `ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_ viewer
+their position and orientation (`OCP Viewer <https://github.com/bernhard-42/ocp_viewer>`_
 has built-in support for displaying joints).
 
 .. note::

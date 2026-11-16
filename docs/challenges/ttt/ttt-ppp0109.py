@@ -6,7 +6,7 @@ from math import sqrt
 
 from build123d import *
 from bd_materials.materials.metals import aluminum
-from ocp_vscode import show
+from ocp_viewer import show
 
 with BuildPart() as corner_tie:
     # The base plate, rounded at one end, with a counterbored hole at the

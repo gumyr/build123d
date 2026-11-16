@@ -4,7 +4,7 @@ Too Tall Toby Party Pack 01-07 Flanged Hub
 
 from build123d import *
 from bd_materials.materials.metals import aluminum
-from ocp_vscode import show
+from ocp_viewer import show
 
 # The plane the rib is drawn on: it starts as the ceiling of the pocket,
 # facing down, is moved out to the wall of the bore, tilted 45 degrees

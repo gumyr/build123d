@@ -24,13 +24,14 @@ import sys
 from unittest.mock import MagicMock
 
 mock_ocp = MagicMock()
-# Explicitly add properties so `from ocp_vscode import *` pulls them in
+# Explicitly add properties so `from ocp_viewer import *` pulls them in
 for attr in [
     "show", "show_object", "show_all", "save_screenshot", 
     "set_port", "set_defaults", "Camera", "ColorMap", "reset_show"
 ]:
     setattr(mock_ocp, attr, MagicMock())
 
+sys.modules["ocp_viewer"] = mock_ocp
 sys.modules["ocp_vscode"] = mock_ocp
 
 # Mock heavy optional dependencies so they don't crash the CI runner

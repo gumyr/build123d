@@ -476,7 +476,7 @@ A ``RevoluteJoint`` refuses an angle outside its range:
 .. note::
 
     To see the joints in your viewer, show their symbols, as in
-    ``show(box, box.joints["hinge"].symbol)``. The ocp_vscode viewer can
+    ``show(box, box.joints["hinge"].symbol)``. OCP Viewer can
     also draw every joint of a part: ``show(box, render_joints=True)``.
 
 ********************

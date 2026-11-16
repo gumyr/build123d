@@ -1,6 +1,6 @@
 # [Code]
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 # Toy Truck Blue
 truck_color = Color(0x4683CE)

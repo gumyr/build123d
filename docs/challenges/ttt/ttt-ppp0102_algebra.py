@@ -4,7 +4,7 @@ Too Tall Toby Party Pack 01-02 Post Cap
 
 from build123d import *
 from bd_materials.materials.plastics import abs_
-from ocp_vscode import show
+from ocp_viewer import show
 
 # The outside: a cylinder with an elliptical dome, revolved from half its
 # cross section

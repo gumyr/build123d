@@ -4,7 +4,7 @@ Too Tall Toby 24-SPO-06 Buffer Stand
 
 from build123d import *
 from bd_materials.materials.metals import mild_steel
-from ocp_vscode import show
+from ocp_viewer import show
 
 with BuildPart() as stand:
     # The plan: a block with one side bowed out

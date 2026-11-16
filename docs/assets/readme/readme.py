@@ -2,7 +2,7 @@ import os
 from copy import copy
 
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 working_path = os.path.dirname(os.path.abspath(__file__))
 

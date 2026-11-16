@@ -1,7 +1,7 @@
 # license see [build123d_license](../LICENSE)
 # [Imports]
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 # [Code]
 b = Box(3, 3, 3)

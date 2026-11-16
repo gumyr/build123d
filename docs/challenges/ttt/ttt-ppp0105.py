@@ -4,7 +4,7 @@ Too Tall Toby Party Pack 01-05 Paste Sleeve
 
 from build123d import *
 from bd_materials.materials.plastics import abs_
-from ocp_vscode import show
+from ocp_viewer import show
 
 with BuildPart() as sleeve:
     # The outside of the tapered section: a loft from the round end to the

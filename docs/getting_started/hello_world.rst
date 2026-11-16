@@ -4,7 +4,7 @@
 Hello World
 ###########
 
-With build123d :doc:`installed <installation>`, this is a complete first model:
+With build123d :ref:`installed <installation>`, this is a complete first model:
 
 .. code-block:: build123d
 
@@ -23,9 +23,22 @@ height.
 Viewing it
 **********
 
-build123d creates the model; a separate viewer displays it. With one of the
-viewers listed in :ref:`external` installed - *ocp_vscode*, for example - add
-``show(box)`` to the end of the script.
+build123d creates the model; a separate viewer displays it. With OCP Viewer
+installed and running, as :ref:`installation` describes, two more lines send
+the box to it:
+
+.. code-block:: build123d
+
+    from build123d import *
+    from ocp_viewer import *
+
+    box = Box(80, 60, 10)
+
+    show(box)
+
+Run the script, and the box appears in the browser page. The viewer inside
+Visual Studio Code, one of those listed in :ref:`external`, is driven by the
+same ``show``.
 
 ************
 Exporting it

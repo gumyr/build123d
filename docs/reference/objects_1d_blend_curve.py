@@ -1,6 +1,6 @@
 from build123d import *
 
-# from ocp_vscode import show_all, set_defaults, Camera
+# from ocp_viewer import show_all, set_defaults, Camera
 
 # set_defaults(reset_camera=Camera.KEEP)
 

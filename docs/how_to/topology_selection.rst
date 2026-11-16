@@ -512,7 +512,7 @@ mesh faces are grouped into topological rings expanding away from that starting 
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from ocp_vscode import ColorMap, show
+    from ocp_viewer import ColorMap, show
 
     mesher = Mesher()
     mesher.add_shape(Sphere(1), linear_deflection=0.05, angular_deflection=1)

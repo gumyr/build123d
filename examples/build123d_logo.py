@@ -22,7 +22,7 @@ image_files:
 
 from build123d import *
 from build123d import Shape
-from ocp_vscode import *
+from ocp_viewer import *
 
 # [Parameters]
 # - none

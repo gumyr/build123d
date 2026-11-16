@@ -191,7 +191,7 @@ Missing Glyphs or Invalid Geometry
 ==================================
 
 Modern variable-width fonts often contain glyphs with overlapping stroke
-outlines, which produce invalid geometry. ``ocp_vscode`` ignores invalid
+outlines, which produce invalid geometry. OCP Viewer ignores invalid
 faces.
 
 .. image:: /reference/assets/objects/missing_glyph.png

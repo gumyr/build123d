@@ -1,6 +1,6 @@
 # [Code]
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 # Coin Parameters
 diameter, thickness = 50 * MM, 10 * MM

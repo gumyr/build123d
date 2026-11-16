@@ -4,7 +4,7 @@ Too Tall Toby Party Pack 01-03 C Clamp Base
 
 from build123d import *
 from bd_materials.materials.metals import aluminum
-from ocp_vscode import show
+from ocp_viewer import show
 
 with BuildPart() as clamp:
     # The C-shaped frame: a rounded rectangle with a rounded window, less

@@ -24,7 +24,7 @@ desc:
 
 # [Code]
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 # Define input parameters
 # - radii: ellipse radii (X, Y) controlling the bracelet centerline shape

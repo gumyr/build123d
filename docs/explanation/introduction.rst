@@ -44,7 +44,7 @@ program that makes it:
     from bd_warehouse.bearing import PressFitHole, SingleRowAngularContactBallBearing
     from bd_warehouse.fastener import ClearanceHole, SocketHeadCapScrew
     from build123d import *
-    from ocp_vscode import show
+    from ocp_viewer import show
 
     bearing = SingleRowAngularContactBallBearing("M17-47-14")
     screw = SocketHeadCapScrew("M10-1.5", length=30 * MM, simple=False)

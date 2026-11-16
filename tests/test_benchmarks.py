@@ -9,6 +9,7 @@ mock_module = Mock()
 mock_module.show = Mock()
 mock_module.show_object = Mock()
 mock_module.show_all = Mock()
+sys.modules["ocp_viewer"] = mock_module
 sys.modules["ocp_vscode"] = mock_module
 
 _ = pytest.importorskip("pytest_benchmark")

@@ -4,7 +4,7 @@ Too Tall Toby Party Pack 01-06 Bearing Jig
 
 from build123d import *
 from bd_materials.materials.metals import mild_steel
-from ocp_vscode import show
+from ocp_viewer import show
 
 r1, r2, r3, r4, r5 = 30 / 2, 13 / 2, 12 / 2, 10, 6  # radii used
 x1 = 44  # lengths used

@@ -23,7 +23,7 @@ image_files:
 # [Code]
 
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 # [Parameters]
 pcb_length = 70 * MM

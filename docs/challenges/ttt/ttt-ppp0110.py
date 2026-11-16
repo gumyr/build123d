@@ -4,7 +4,7 @@ Too Tall Toby Party Pack 01-10 Light Cap
 
 from build123d import *
 from bd_materials.materials.plastics import abs_
-from ocp_vscode import show
+from ocp_viewer import show
 
 # Half of the cross section, drawn in a sketch of its own so that it can be
 # used twice: revolved for the rounded ends and extruded for the middle

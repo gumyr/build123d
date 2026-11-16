@@ -36,7 +36,7 @@ license:
 """
 
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 from bd_materials.materials.metals import mild_steel
 
 parameters = SheetMetalParameters(thickness=4 * MM, bend_radius=4 * MM)

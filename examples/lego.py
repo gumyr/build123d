@@ -28,7 +28,7 @@ license:
 """
 
 from build123d import *
-from ocp_vscode import show_object
+from ocp_viewer import show_object
 
 GEN_DOCS = False
 pip_count = 6

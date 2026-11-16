@@ -6,7 +6,7 @@ for details see `circuit_board.py`
 
 from itertools import product
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 # [Parameters]
 pcb_length = 70 * MM

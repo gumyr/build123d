@@ -42,7 +42,7 @@ from math import sqrt
 from typing import Union, Literal
 from scipy.spatial import ConvexHull
 
-from ocp_vscode import show
+from ocp_viewer import show
 
 PHI = (1 + sqrt(5)) / 2  # The Golden Ratio
 

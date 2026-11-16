@@ -1,5 +1,5 @@
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 blocks = Pos(-1, -1, 0) * Box(1, 2, 1, align=(Align.CENTER, Align.MIN, Align.MIN))
 blocks += Box(1, 1, 2, align=(Align.CENTER, Align.MIN, Align.MIN))

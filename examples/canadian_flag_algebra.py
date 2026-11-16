@@ -7,7 +7,7 @@ for details see `canadian_flag.py`
 
 from math import sin, cos, pi
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 # [Parameters]
 # Canadian Flags have a 2:1 aspect ratio

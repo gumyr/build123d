@@ -1,6 +1,6 @@
 from build123d import *
 from build123d.exporters import ColorIndex
-from ocp_vscode import show_all
+from ocp_viewer import show_all
 
 # 2D Axes
 axes2 = Compound.make_triad(2).edges().group_by(Axis.Z)[0]

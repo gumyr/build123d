@@ -6,7 +6,7 @@ for details see `build123d_logo.py`
 # [Code]
 
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 # [Parameters]
 # - none

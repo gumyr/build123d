@@ -236,7 +236,7 @@ pip install git+https://github.com/gumyr/build123d
 
 ### Viewers
 
-build123d is best used with a viewer. The most popular viewer is [ocp_vscode](https://github.com/bernhard-42/vscode-ocp-cad-viewer), a Python package with a standalone viewer and VS Code extension. Other [Editors & Viewers](https://build123d.readthedocs.io/en/latest/reference/external.html#external) are found in the documentation.
+build123d is best used with a viewer. The simplest to set up is [OCP Viewer](https://github.com/bernhard-42/ocp_viewer), a Python package installed with `pip install ocp-viewer` that shows the model in a web browser. The same viewer is available inside VS Code as the [ocp_vscode](https://github.com/bernhard-42/vscode-ocp-cad-viewer) extension. Other [Editors & Viewers](https://build123d.readthedocs.io/en/latest/reference/external.html#external) are found in the documentation.
 
 ## Contributing
 

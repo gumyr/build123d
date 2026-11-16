@@ -3,7 +3,7 @@ Experimental Joint development file
 """
 
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 
 class JointBox(Solid):

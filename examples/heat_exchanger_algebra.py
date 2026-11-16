@@ -1,7 +1,7 @@
 # [Code]
 
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 exchanger_diameter = 10 * CM
 exchanger_length = 30 * CM

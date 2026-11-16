@@ -1,7 +1,7 @@
 # [Code]
 
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 pegd = 6.35 + 0.1  # mm ~0.25inch
 c2c = 25.4  # mm 1.0inch

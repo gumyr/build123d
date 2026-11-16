@@ -2,7 +2,7 @@ from copy import copy
 import os
 
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 working_path = os.path.dirname(os.path.abspath(__file__))
 filedir = os.path.join(working_path, "..", "assets", "topology_selection")

@@ -1,6 +1,6 @@
 # [Code]
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 A, A1, Db2, H, J = 26, 11, 57, 98.5, 76.5
 

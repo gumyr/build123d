@@ -11,11 +11,23 @@ that extend its functionality.
 Editors & Viewers
 *****************
 
+OCP Viewer
+==========
+
+A standalone viewer for OCP based Code-CAD (CadQuery, build123d) that shows
+the model in a web browser. It is one package installed beside build123d,
+``pip install ocp-viewer``, and is started with the command ``ocp-viewer``.
+It needs no particular editor, and is the viewer this documentation uses:
+:ref:`installation` shows how to set it up.
+
+See: `ocp_viewer <https://github.com/bernhard-42/ocp_viewer>`_ and its
+`documentation <https://bernhard-42.github.io/ocp_viewer_docs/>`_
+
 ocp-vscode
 ==========
 
-A viewer for OCP based Code-CAD (CadQuery, build123d) integrated into
-VS Code.
+The same viewer integrated into VS Code as an extension, driven by the same
+``show``. It adds visual debugging, described in :ref:`debugging`.
 
 See: `ocp-vscode <https://github.com/bernhard-42/vscode-ocp-cad-viewer>`_
 (formerly known as cq_vscode)

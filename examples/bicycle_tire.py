@@ -49,7 +49,7 @@ license:
 
 # [Code]
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 wheel_diameter = 740 * MM
 block_height = 3 * MM  # how far the tread blocks stand out
