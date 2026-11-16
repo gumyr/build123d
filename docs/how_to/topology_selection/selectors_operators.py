@@ -80,8 +80,6 @@ with BuildPart() as part:
         fillet(edges, 1)
         show_object([part, part.edges(Select.LAST)])
 
-save_screenshot(os.path.join(filedir, "selectors_select_new_fillet.png"))
-
 show(part, part.vertices().sort_by(Axis.X)[-4:])
 save_screenshot(os.path.join(filedir, "operators_sort_x.png"))
 
@@ -91,10 +89,3 @@ save_screenshot(os.path.join(filedir, "operators_group_area.png"))
 faces = part.faces().filter_by(lambda f: f.normal_at() == Vector(0, 0, 1))
 show(part, [f.translate(f.normal_at() * 0.01) for f in faces])
 save_screenshot(os.path.join(filedir, "operators_filter_z_normal.png"))
-
-box = Box(5, 5, 1)
-circle = Cylinder(2, 5)
-part = box + circle
-edges = new_edges(box, circle, combined=part)
-show(part, edges)
-save_screenshot(os.path.join(filedir, "selectors_new_edges.png"))

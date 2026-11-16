@@ -42,7 +42,6 @@ sys.modules["tcv_screenshots"] = mock_bd
 IGNORE_FILES = {
     "conf.py",
     "build123d_lexer.py",
-    "technical_drawing.py",  # ignored due to bd_warehouse dependency
 }  # fmt: on
 
 # skip "ttt" as that is covered by test_examples.py

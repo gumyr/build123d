@@ -4,49 +4,6 @@ from ocp_vscode import *
 
 dot = Circle(0.05)
 
-# [Ex. 1]
-with BuildLine() as example_1:
-    Line((0, 0), (2, 0))
-    ThreePointArc((0, 0), (1, 1), (2, 0))
-# [Ex. 1]
-s = 100 / max(*example_1.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(example_1.line)
-svg.write("../how_to/assets/build_line/buildline_example_1.svg")
-# [Ex. 2]
-with BuildLine() as example_2:
-    l1 = Line((0, 0), (2, 0))
-    l2 = ThreePointArc(l1 @ 0, (1, 1), l1 @ 1)
-# [Ex. 2]
-
-# [Ex. 3]
-with BuildLine() as example_3:
-    l1 = Line((0, 0), (2, 0))
-    l2 = ThreePointArc(l1 @ 0, l1 @ 0.5 + (0, 1), l1 @ 1)
-# [Ex. 3]
-
-# [Ex. 4]
-with BuildLine() as example_4:
-    l1 = Line((0, 0), (2, 0))
-    l2 = ThreePointArc(l1 @ 0, l1 @ 0.5 + (0, l1.length / 2), l1 @ 1)
-# [Ex. 4]
-
-# [Ex. 5]
-with BuildLine() as example_5:
-    l1 = Line((0, 0), (5, 0))
-    l2 = Line(l1 @ 1, l1 @ 1 + (0, l1.length - 1))
-    l3 = JernArc(start=l2 @ 1, tangent=l2 % 1, radius=0.5, arc_size=90)
-    l4 = Line(l3 @ 1, (0, l2.length + l3.radius))
-# [Ex. 5]
-s = 100 / max(*example_5.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(example_5.line)
-svg.add_shape(dot.moved(Location(l1 @ 1)))
-svg.add_shape(dot.moved(Location(l2 @ 1)))
-svg.add_shape(dot.moved(Location(l3 @ 1)))
-svg.add_shape(PolarLine(l2 @ 1, 0.5, direction=l2 % 1), "dashed")
-svg.write("../how_to/assets/build_line/buildline_example_5.svg")
 # [Ex. 6]
 with BuildSketch() as example_6:
     with BuildLine() as club_outline:
@@ -62,39 +19,6 @@ s = 100 / max(*example_6.sketch.bounding_box().size)
 svg = ExportSVG(scale=s, margin=5)
 svg.add_shape(example_6.sketch)
 svg.write("../how_to/assets/build_line/buildline_example_6.svg")
-
-# [Ex. 7]
-with BuildPart() as example_7:
-    with BuildLine() as example_7_path:
-        l1 = RadiusArc((0, 0), (1, 1), 2)
-        l2 = Spline(l1 @ 1, (2, 3), (3, 3), tangents=(l1 % 1, (0, -1)))
-        l3 = Line(l2 @ 1, (3, 0))
-    with BuildSketch(Plane(origin=l1 @ 0, z_dir=l1 % 0)) as example_7_section:
-        Circle(0.1)
-    sweep()
-# [Ex. 7]
-visible, hidden = example_7.part.drawing_view((100, -50, 100))
-s = 100 / max(*Compound(children=visible + hidden).bounding_box().size)
-exporter = ExportSVG(scale=s)
-exporter.add_layer("Visible")
-exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
-exporter.add_shape(visible, layer="Visible")
-exporter.add_shape(hidden, layer="Hidden")
-exporter.write("../how_to/assets/build_line/buildline_example_7.svg")
-# [Ex. 8]
-with BuildLine(Plane.YZ) as example_8:
-    l1 = Line((0, 0), (5, 0))
-    l2 = Line(l1 @ 1, l1 @ 1 + (0, l1.length - 1))
-    l3 = JernArc(start=l2 @ 1, tangent=l2 % 1, radius=0.5, arc_size=90)
-    l4 = Line(l3 @ 1, (0, l2.length + l3.radius))
-# [Ex. 8]
-scene = Compound(example_8.line) + Compound.make_triad(2)
-visible, _hidden = scene.drawing_view((100, -50, 100))
-s = 100 / max(*Compound(children=visible + hidden).bounding_box().size)
-exporter = ExportSVG(scale=s)
-exporter.add_layer("Visible")
-exporter.add_shape(visible, layer="Visible")
-exporter.write("../how_to/assets/build_line/buildline_example_8.svg")
 
 
 pts = [(0, 0), (2 / 3, 2 / 3), (0, 4 / 3), (-4 / 3, 0), (0, -2), (4, 0), (0, 3)]
@@ -261,12 +185,3 @@ svg.add_shape(l3)
 svg.add_shape(dot.scale(5).moved(Pos(p1)))
 svg.add_shape(PolarLine(p1, 1, direction=d1), "dashed")
 svg.write("assets/objects/double_tangent_line_example.svg")
-
-# show_object(example_1.line, name="Ex. 1")
-# show_object(example_2.line, name="Ex. 2")
-# show_object(example_3.line, name="Ex. 3")
-# show_object(example_4.line, name="Ex. 4")
-# show_object(example_5.line, name="Ex. 5")
-# show_object(example_6.line, name="Ex. 6")
-# show_object(example_7_path.line, name="Ex. 7 path")
-# show_object(example_8.line, name="Ex. 8")

@@ -140,59 +140,6 @@ svg.add_shape(
 svg.add_shape(example_12.sketch)
 svg.write("assets/objects/trapezoid_example.svg")
 
-# [Ex. 13]
-length, radius = 40.0, 60.0
-
-with BuildSketch() as circle_with_hole:
-    Circle(radius=radius)
-    Rectangle(width=length, height=length, mode=Mode.SUBTRACT)
-# [Ex. 13]
-s = 100 / max(*circle_with_hole.sketch.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_shape(circle_with_hole.sketch)
-svg.write("../how_to/assets/build_sketch/circle_with_hole.svg")
-
-# [Ex. 14]
-with BuildPart() as controller:
-    # Create the side view of the controller
-    with BuildSketch(Plane.YZ) as profile:
-        with BuildLine():
-            Polyline((0, 0), (0, 40), (20, 80), (40, 80), (40, 0), (0, 0))
-        # Create a filled face from the perimeter drawing
-        make_face()
-    # Extrude to create the basis controller shape
-    extrude(amount=30, both=True)
-    # Round off all the edges
-    fillet(controller.edges(), radius=3)
-    # Hollow out the controller
-    offset(amount=-1, mode=Mode.SUBTRACT)
-    # Extract the face that will house the display
-    display_face = (
-        controller.faces()
-        .filter_by(GeomType.PLANE)
-        .filter_by_position(Axis.Z, 50, 70)[0]
-    )
-    # Create a workplane from the face
-    display_workplane = Plane(
-        origin=display_face.center(), x_dir=(1, 0, 0), z_dir=display_face.normal_at()
-    )
-    # Place the sketch directly on the controller
-    with BuildSketch(display_workplane) as display:
-        RectangleRounded(40, 30, 2)
-        with GridLocations(45, 35, 2, 2):
-            Circle(1)
-    # Cut the display sketch through the controller
-    extrude(amount=-1, mode=Mode.SUBTRACT)
-# [Ex. 14]
-visible, hidden = controller.part.drawing_view((70, -50, 120))
-max_dimension = max(*Compound(children=visible + hidden).bounding_box().size)
-exporter = ExportSVG(scale=100 / max_dimension)
-exporter.add_layer("Visible")
-exporter.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
-exporter.add_shape(visible, layer="Visible")
-exporter.add_shape(hidden, layer="Hidden")
-exporter.write(f"../how_to/assets/build_sketch/controller.svg")
-
 d = Draft(line_width=0.1)
 # [Ex. 15]
 with BuildSketch() as isosceles_triangle:

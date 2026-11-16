@@ -27,9 +27,9 @@ build123d creates the model; a separate viewer displays it. With one of the
 viewers listed in :ref:`external` installed - *ocp_vscode*, for example - add
 ``show(box)`` to the end of the script.
 
-*********
-Saving it
-*********
+************
+Exporting it
+************
 
 To use the model outside of Python, export it:
 

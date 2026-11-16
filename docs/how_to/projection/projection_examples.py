@@ -354,7 +354,7 @@ drawing.add_layer("Visible")
 drawing.add_layer("Hidden", line_color=0x636363, line_type=LineType.ISO_DOT)
 drawing.add_shape(visible, "Visible")
 drawing.add_shape(hidden, "Hidden")
-drawing.write("../assets/projection/bracket_view.svg")
+drawing.write("bracket_view.svg")
 # [view_export]
 
 write_layout(
