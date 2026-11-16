@@ -24,6 +24,7 @@ the reasoning behind how build123d works see the
     placing_sketches.rst
     build_part.rst
     moving_objects.rst
+    custom_objects.rst
     topology_selection.rst
     sheet_metal/index.rst
     projection/index.rst

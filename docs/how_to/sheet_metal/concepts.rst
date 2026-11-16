@@ -228,15 +228,11 @@ Builder and Algebra
 
 ``BuildSheet`` is a builder like ``BuildPart``: it holds the sheet in progress,
 takes the regions of a nested ``BuildSketch`` in as flat faces, gives the
-operations their parameters, and offers the selectors above. Sketch objects
-written directly inside ``BuildSheet`` are not material: a sheet is never
-assembled from 2D pieces the way a sketch is, so ``Rectangle(100, 60)`` on its
-own in the sheet context is refused with ``Mode.ADD``, and with
-``Mode.SUBTRACT`` it is a cutter for the face it lies on. Nested inside ``BuildPart`` it publishes the
-finished shell so that a bare :func:`~operations_part.thicken` consumes it.
-The builder's own page, :ref:`BuildSheet <build_sheet>`, covers what it
-accepts as material and what it does with sketch objects and solids drawn
-inside it.
+operations their parameters, and offers the selectors above. Nested inside
+``BuildPart`` it publishes the finished shell so that a bare
+:func:`~operations_part.thicken` consumes it. The builder's own page,
+:ref:`BuildSheet <build_sheet>`, covers what it accepts as material and what
+it does with sketch objects and solids written directly inside it.
 
 In Algebra mode there is no context. A blank is a ``Face`` or a sketch object,
 a sheet is a ``Shell``, each operation returns the new ``Shell``, and the

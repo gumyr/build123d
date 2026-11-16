@@ -43,10 +43,7 @@ Sheet material
 
 Sheet material arrives as faces. A nested ``BuildSketch`` publishes its closed
 regions into the sheet as planar faces, and ``Mode.SUBTRACT`` regions cut
-holes and notches. A sketch object written directly inside ``BuildSheet`` is
-never material: ``Rectangle(100, 60)`` on its own in the sheet context is
-refused with ``Mode.ADD``, because a sheet is not assembled from 2D pieces the
-way a sketch is. Plain shapes built before the ``BuildSheet`` block come in
+holes and notches. Plain shapes built before the ``BuildSheet`` block come in
 with :func:`~operations_generic.insert`, which accepts faces, sketches, shells
 and other ``BuildSheet`` builders, with optional rotation and placement.
 Inserted geometry must sew into the current connected shell. Solids and Parts
@@ -62,12 +59,18 @@ made before an operation does not survive it, as described under
 Cutters
 *******
 
-A sketch object written directly inside the ``BuildSheet`` context is not
-material. With ``Mode.SUBTRACT`` it trims the sheet face it lies on, with
-``Mode.PRIVATE`` it is simply built where it is for a later ``insert``, and
-with ``Mode.ADD`` it is refused, since a sheet is never drawn from 2D pieces
-the way a sketch is. A solid or Part in ``Mode.SUBTRACT`` cuts every face it
-passes through, which is how a cutout crosses a bend. Both are covered under
+A sketch object written directly inside the ``BuildSheet`` context, and not
+in a nested ``BuildSketch``, is not material: a sheet is never assembled from
+2D pieces the way a sketch is. What it does depends on its mode:
+
+* with ``Mode.SUBTRACT`` it trims the sheet face it lies on;
+* with ``Mode.PRIVATE`` it is simply built where it is, for a later
+  ``insert``;
+* with ``Mode.ADD``, the default, it is refused, so ``Rectangle(100, 60)`` on
+  its own in the sheet context raises an error.
+
+A solid or Part in ``Mode.SUBTRACT`` cuts every face it passes through, which
+is how a cutout crosses a bend. Both kinds of cut are covered under
 :ref:`holes and cutouts <sheet_metal_cutouts>`.
 
 *********************

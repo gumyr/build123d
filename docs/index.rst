@@ -29,9 +29,9 @@
   :align: center
   :alt: build123d logo
 
-########
-About
-########
+##################
+What is build123d?
+##################
 
 build123d is a Python library for 2D and 3D CAD. A model is a Python
 program: shapes are made, placed and combined in code, dimensions are
