@@ -28,8 +28,8 @@ objects and operations are the same in both - the same ``RectangleRounded``,
 the same ``extrude`` - and only the way they are used differs: builder mode
 collects them inside ``with`` blocks, algebra mode combines them with
 operators. Pick whichever tab you prefer - the others on the page follow -
-and ignore the second one. Both make exactly the same part. :ref:`where_next`
-describes the difference between the two.
+and ignore the second one. Both make exactly the same part.
+:ref:`builder_and_algebra` describes the difference between the two.
 
 *************
 Step 1: Setup

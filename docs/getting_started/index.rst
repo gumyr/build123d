@@ -25,4 +25,5 @@ are left to the sections that follow.
 
     installation.rst
     hello_world.rst
+    builder_and_algebra.rst
     where_next.rst

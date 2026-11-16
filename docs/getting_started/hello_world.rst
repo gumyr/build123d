@@ -41,4 +41,5 @@ To use the model outside of Python, export it:
 STEP keeps the exact geometry for other CAD tools and STL is the usual input
 for a 3D printing slicer; :doc:`/how_to/import_export` covers the other formats.
 
-:ref:`where_next` suggests what to read from here.
+Before going further, :ref:`builder_and_algebra` explains the two ways of
+writing a model that the rest of this documentation uses.

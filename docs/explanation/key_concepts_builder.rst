@@ -1,556 +1,368 @@
-###########################
-Key Concepts (builder mode)
-###########################
-
-There are two primary APIs provided by build123d: builder and algebra. The builder
-API may be easier for new users as it provides some assistance and shortcuts; however,
-if you know what a Quaternion is you might prefer the algebra API which allows
-CAD objects to be created in the style of mathematical equations. Both API can
-be mixed in the same model with the exception that the algebra API can't be used
-from within a builder context. As with music, there is no "best" genre or API,
-use the one you prefer or both if you like.
-
-The following key concepts will help new users understand build123d quickly.
-
-Understanding the Builder Paradigm
-==================================
-
-The **Builder** paradigm in build123d provides a powerful and intuitive way to construct 
-complex geometric models. At its core, the Builder works like adding a column of numbers 
-on a piece of paper: a running "total" is maintained internally as each new object is 
-added or modified. This approach simplifies the process of constructing models by breaking 
-it into smaller, incremental steps.
-
-How the Builder Works
-----------------------
-
-When using a Builder (such as **BuildLine**, **BuildSketch**, or **BuildPart**), the 
-following principles apply:
-
-1. **Running Total**:
-   - The Builder maintains an internal "total," which represents the current state of 
-   the object being built. 
-   - Each operation updates this total by combining the new object with the existing one.
-
-2. **Combination Modes**:
-   - Just as numbers in a column may have a `+` or `-` sign to indicate addition or 
-   subtraction, Builders use **modes** to control how each object is combined with 
-   the current total.
-   - Common modes include:
-
-     - **ADD**: Adds the new object to the current total.
-     - **SUBTRACT**: Removes the new object from the current total.
-     - **INTERSECT**: Keeps only the overlapping regions of the new object and the current total.
-     - **REPLACE**: Entirely replace the running total.
-     - **PRIVATE**: Don't change the running total at all. 
-
-   - The mode can be set dynamically for each operation, allowing for flexible and precise modeling.
-
-3. **Extracting the Result**:
-   - At the end of the building process, the final object is accessed through the 
-   Builder's attributes, such as ``.line``, ``.sketch``, or ``.part``, depending on 
-   the Builder type.
-   - For example:
-   
-     - **BuildLine**: Use ``.line`` to retrieve a ``Curve`` containing the edges.
-     - **BuildSketch**: Use ``.sketch`` to retrieve a ``Sketch`` containing the faces.
-     - **BuildPart**: Use ``.part`` to retrieve a ``Part`` containing the solids.
-
-   These results are geometry containers, each of which may contain more than one
-   shape. See :ref:`part_sketch_curve` for their relationship to ``Edge``, ``Face``
-   and ``Solid``, and examples of using Builder results in algebra mode.
-
-Example Workflow
------------------
-
-Here is an example of using a Builder to create a simple part:
-
-.. code-block:: build123d
-
-    from build123d import *
-
-    # Using BuildPart to create a 3D model
-    with BuildPart() as example_part:
-        with BuildSketch() as base_sketch:
-            Rectangle(20, 20)
-        extrude(amount=10)  # Create a base block
-        with BuildSketch(Plane(example_part.faces().sort_by(Axis.Z).last)) as cut_sketch:
-            Circle(5)
-        extrude(amount=-5, mode=Mode.SUBTRACT)  # Subtract a cylinder
-
-    # Access the final part
-    result_part = example_part.part
-
-Builder Context Exit
---------------------
-
-A builder is a construction tool, not the object it creates. Builder settings that
-affect the completed output must be assigned before the builder context exits. When
-the context exits, the builder finalizes and publishes its output.
-
-For example, a builder's ``label``, ``color`` and ``material`` are assigned while
-building and are applied to its output when the context exits:
-
-.. code-block:: build123d
-
-    with BuildPart() as bracket_builder:
-        bracket_builder.label = "bracket"
-        bracket_builder.color = "steelblue"
-        bracket_builder.material = "stainless"
-        Box(20, 10, 5)
-
-    assert bracket_builder.part.label == "bracket"
-
-They may also be assigned to ``bracket_builder.part`` as the last step before
-the context exits. Any later operation makes a new part without them, so when
-the assignment is not the final step use the builder attributes.
-
-Changing the builder afterward does not modify the completed part:
-
-.. code-block:: build123d
-
-    bracket_builder.label = "late"
-    assert bracket_builder.part.label == "bracket"
-
-After context exit, modify the completed object directly:
-
-.. code-block:: build123d
-
-    bracket_builder.part.label = "late"
-    assert bracket_builder.part.label == "late"
-
-Key Concepts
-------------
-
-- **Incremental Construction**:
-  Builders allow you to build objects step-by-step, maintaining clarity and modularity.
-  
-- **Dynamic Mode Switching**:
-  The **mode** parameter gives you precise control over how each operation modifies 
-  the current total.
-
-- **Seamless Extraction**:
-  The Builder paradigm simplifies the retrieval of the final object, ensuring that you 
-  always have access to the most up-to-date result.
-
-Analogy: Adding Numbers on Paper
---------------------------------
-
-Think of the Builder as a running tally when adding numbers on a piece of paper:
-
-- Each number represents an operation or object.
-- The ``+`` or ``-`` sign corresponds to the **ADD** or **SUBTRACT** mode.
-- At the end, the total is the sum of all operations, which you can retrieve by referencing 
-  the Builder’s output.
-
-By adopting this approach, build123d ensures a natural, intuitive workflow for constructing 
-2D and 3D models.
-
-.. note::
-    **Why modifying objects directly doesn't work in Builder mode**
-
-    A common mistake in Builder mode is attempting to modify an object after it is created:
-
-    .. code-block:: build123d
-
-        with BuildPart() as invalid:
-            Cylinder(1, 2).moved(Location((1, 2, 3)))
-
-    Builder mode works by having objects add themselves to the active builder immediately when 
-    they are created. In the example above:
-
-    ``Cylinder(1, 2)`` creates the cylinder.
-
-    The cylinder immediately adds itself to the ``BuildPart`` builder.
-
-    ``.moved(...)`` is then applied to the temporary Python object returned by ``Cylinder``.
-
-    Because the cylinder was already added to the builder, the move operation has no effect on 
-    the model being built.
-
-    Placement must therefore be specified before the object is created, which is why Builder 
-    mode provides the ``Locations`` context (see below):
-
-    .. code-block:: build123d
-
-        with BuildPart() as valid:
-            with Locations((1, 2, 3)):
-                Cylinder(1, 2)
-
-    Here the builder knows the location before the cylinder is created, so the part is placed 
-    correctly.
-
-    A similar situation in normal Python
-
-    .. code-block:: python
-
-        with open("test.txt", "w") as f:
-            f.write("text").to_bytes(1, "big")
-
-    ``f.write("text")`` writes "text" to the file and returns 4.
-    ``.to_bytes(1, "big")`` is then called on that integer, producing b"\x04".
-
-    The file still contains only "text" because the additional operation happens after the 
-    write and its result is discarded.
-
-    Builder mode behaves similarly: once an object has been added to the builder, modifying 
-    the returned Python object does not change what was already added.
-
-Builders
-========
-
-The four builders, ``BuildLine``, ``BuildSketch``, ``BuildPart`` and ``BuildSheet`` are tools to create
-new objects - not the objects themselves. Objects and operations used with a builder
-update the builder's running result, while the completed geometry remains available
-through the builder's output properties.
-
-One can access the objects created by these builders by referencing the appropriate
-instance variable. The primary variables, ``part``, ``sketch``, and ``line``, return
-the builder's output after applying the builder's ``placements`` and any active
-``Locations`` context. The ``part_local``, ``sketch_local``, and ``line_local``
-variables return the same object in the builder's local construction coordinate
-system, before output placement.
-
-For example:
-
-.. code-block:: build123d
-
-    with BuildPart() as my_part:
-        ...
-
-    show(my_part.part)        # placed output
-    show(my_part.part_local)  # local construction result
-
-.. code-block:: build123d
-
-    with BuildSketch() as my_sketch:
-        ...
-
-    show(my_sketch.sketch)        # placed output
-    show(my_sketch.sketch_local)  # local construction result
-
-.. code-block:: build123d
-
-    with BuildLine() as my_line:
-        ...
-
-    show(my_line.line)        # placed output
-    show(my_line.line_local)  # local construction result
-
-Implicit Builder Instance Variables
+.. _how_builder_mode_works:
+
+######################
+How builder mode works
+######################
+
+In builder mode a model is made inside ``with`` blocks, and each object
+adds itself to the model as it is created. :ref:`builder_and_algebra`
+introduces the two modes and compares them.
+
+This page explains what is going on in builder mode: what a builder is,
+how an object knows which builder it belongs to, and when things are
+combined and placed. Knowing this explains the handful of surprises that
+builder mode has in store.
+
+***************************************
+A builder is a tool, not the object
+***************************************
+
+A builder works like adding up a column of figures. It keeps a running
+total, the model so far, and every object and operation written inside its
+block changes that total. When the block ends, the total is the result.
+
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [tool]
+    :end-before: [tool]
+
+There are four builders, one for each kind of thing that can be built:
+
+.. list-table::
+    :header-rows: 1
+    :widths: 25 35 40
+
+    * - Builder
+      - Builds
+      - Result
+    * - ``BuildLine``
+      - lines and curves
+      - ``.line``, a ``Curve``
+    * - ``BuildSketch``
+      - flat shapes
+      - ``.sketch``, a ``Sketch``
+    * - ``BuildPart``
+      - solids
+      - ``.part``, a ``Part``
+    * - ``BuildSheet``
+      - sheet metal
+      - ``.sheet``, a ``Shell``
+
+``example`` above is the builder. The part it built is ``example.part``.
+It is the part, not the builder, that is exported, measured or put in an
+assembly. :ref:`key_concepts` describes ``Part``, ``Sketch`` and ``Curve``.
+
+******************************
+Objects find their builder
+******************************
+
+Nothing in ``Box(10, 10, 10)`` says which builder the box is for. An object
+or an operation looks for the builder whose block it was written in, and
+acts on that one:
+
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [scope]
+    :end-before: [scope]
+
+This is what keeps builder code short. It also has a consequence that
+catches everyone once: **an object is added to its builder at the moment it
+is created**, not when the line finishes and not when the block ends.
+
+.. _builder_objects_combine_at_once:
+
+Changing an object after it is made
 ===================================
 
-One might expect to have to reference a builder's instance variable when using
-objects or operations that impact that builder like this:
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [moved_wrong]
+    :end-before: [moved_wrong]
 
-.. code-block:: build123d
+This does not move the cylinder. The line does three things, in this
+order:
 
-    with BuildPart() as part_builder:
-        Box(part_builder, 10,10,10)
+#. ``Cylinder(1, 2)`` creates the cylinder.
+#. The cylinder adds itself to the ``BuildPart`` at once, at the origin.
+#. ``.moved(...)`` is applied to the Python object that ``Cylinder``
+   returned, and makes a moved copy of it.
 
-Instead, build123d determines from the scope of the object or operation which
-builder it applies to thus eliminating the need for the user to provide this
-information - as follows:
+By the time the third step runs, the cylinder is already in the part.
+Nothing keeps the moved copy, so it is thrown away, and the part never sees
+it.
 
-.. code-block:: build123d
+A builder is a Python *context manager*, the same thing as the ``with
+open(...)`` block used to write a file, and the same mistake can be made
+there:
 
-    with BuildPart() as part_builder:
-        Box(10,10,10)
-        with BuildSketch() as sketch_builder:
-            Circle(2)
+.. literalinclude:: /explanation/builder_mode.py
+    :language: python
+    :start-after: [file_analogy]
+    :end-before: [file_analogy]
+    :dedent:
 
-In this example, ``Box`` is in the scope of ``part_builder`` while ``Circle``
-is in the scope of ``sketch_builder``.
+``f.write("text")`` writes the text to the file and returns 4, the number
+of characters written. ``.to_bytes(1, "big")`` is then called on that 4 and
+produces ``b"\x04"``, which is discarded. The file still holds only
+``text``: the second operation happened after the write, to what the write
+returned, and has nothing to do with the file.
 
-Placements
-==========
+Builder mode behaves the same way. Once an object has been added to its
+builder, changing the Python object that was returned does not change what
+was added.
 
-As build123d is a 3D CAD package one must be able to position objects anywhere.
-The first parameter or parameters passed to a builder are ``placements``. A
-placement can be a ``Plane``, ``Face``, or ``Location`` and describes where the
-completed builder output will be published.
+So in builder mode, where an object goes has to be said before the object
+is made. That is what ``Locations`` is for:
 
-All builders construct in their own local ``Plane.XY`` coordinate system. The
-builder's ``placements`` are not applied to objects and operations as they are
-created; they are applied once to the completed builder result when the builder
-output is requested or when the builder exits and publishes to its parent.
-Inside the builder, selectors and operations work against the local construction
-result.
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [moved_right]
+    :end-before: [moved_right]
 
-This rule applies to all four builders:
+Using algebra inside a builder
+==============================
 
-- ``BuildPart`` constructs ``part_local`` in local ``Plane.XY`` coordinates and
-  publishes ``part`` to its placements.
-- ``BuildSketch`` constructs ``sketch_local`` on local ``Plane.XY`` and publishes
-  ``sketch`` to its placements.
-- ``BuildLine`` constructs ``line_local`` in local ``Plane.XY`` coordinates and
-  publishes ``line`` to its single placement.
-- ``BuildSheet`` constructs ``sheet_local`` in local ``Plane.XY`` coordinates and
-  publishes ``sheet`` to its placements.
+The same thing happens, less obviously, when the algebra operators are used
+inside a builder:
 
-.. code-block:: build123d
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [algebra_wrong]
+    :end-before: [algebra_wrong]
 
-    with BuildSketch(Plane.XZ) as profile:
-        Circle(5)
+This looks like a ring. The variable ``ring`` is a ring. But each ``Circle``
+added itself to the sketch as it was created, so the sketch holds both
+circles joined together: a solid disc. The subtraction was done on the side,
+and its result was never given to the builder.
 
-    show(profile.sketch_local)  # circle on local Plane.XY
-    show(profile.sketch)        # circle placed on Plane.XZ
+Objects are combined with their builder as soon as they are created,
+unless they are made with ``mode=Mode.PRIVATE``. A private object is made
+and returned, and the builder is not told. Algebra inside a builder
+therefore works when its ingredients are private and the finished result is
+handed over with ``insert``:
 
-``Face`` objects can also be used as placements. In the following example all six
-faces of the first box are used as placements for one completed sketch. The
-rectangles are constructed once in ``sketch_local`` and are then published to all
-six face placements.
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [algebra_private]
+    :end-before: [algebra_private]
 
-.. code-block:: build123d
+Usually it is simpler to let the builder do the combining, which is what
+the modes are for:
 
-    import build123d as bd
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [algebra_builder]
+    :end-before: [algebra_builder]
 
-    with bd.BuildPart() as bp:
-        bd.Box(3, 3, 3)
-        with bd.BuildSketch(*bp.faces()):
-            bd.Rectangle(1, 2, rotation=45)
-        bd.extrude(amount=0.1)
+*********
+Modes
+*********
 
-This is the result:
+Every object and almost every operation has a ``mode``, which says how it
+is combined with the running total:
+
+.. list-table::
+    :header-rows: 1
+    :widths: 25 75
+
+    * - Mode
+      - Effect on the model so far
+    * - ``Mode.ADD``
+      - the new object is joined to it. This is the usual default.
+    * - ``Mode.SUBTRACT``
+      - the new object is cut out of it
+    * - ``Mode.INTERSECT``
+      - only what the two have in common is kept
+    * - ``Mode.REPLACE``
+      - the new object takes its place
+    * - ``Mode.PRIVATE``
+      - nothing. The object is made and returned, and the model is left
+        alone.
+
+On the column of figures, ``ADD`` and ``SUBTRACT`` are the plus and minus
+signs.
+
+The default is not always ``ADD``. A ``Hole`` exists to remove material and
+defaults to ``SUBTRACT``. Operations that reshape what is there, such as
+``fillet`` and ``offset``, replace it.
+
+Builders have modes too
+=======================
+
+A builder is given a ``mode`` in the same way, and it says how the
+builder's *finished* result is combined with the builder it is nested in.
+Everything inside the inner block is built first, on its own, and the whole
+of it is then added, subtracted or intersected in one step.
+
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [builder_mode_sketch]
+    :end-before: [builder_mode_sketch]
+
+The window is a rectangle joined to a circle. It is built as one shape, and
+that shape is then cut from the plate. Written as two separate objects with
+``Mode.SUBTRACT`` the result here would be the same, but a nested builder
+can hold any amount of construction, fillets, mirrors and all, and still
+combine as a single thing.
+
+It works the same way for parts:
+
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [builder_mode_part]
+    :end-before: [builder_mode_part]
+
+The plug, a cone on a peg, is built whole and then subtracted from the
+block to leave a cavity. Afterwards ``plug.part`` still holds the plug.
+
+``Mode.PRIVATE`` on a builder keeps its result out of the parent
+altogether, which is how a sketch can be made inside a part purely to
+measure or select from:
+
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [builder_mode_private]
+    :end-before: [builder_mode_private]
+
+*********************************
+Built locally, placed on exit
+*********************************
+
+A builder can be given one or more *placements*, planes, faces or
+locations, as its first arguments. They say where the finished result is
+to go.
+
+They do not change where things are drawn. Every builder constructs in its
+own coordinates, as if on ``Plane.XY`` at the origin, and the placement is
+applied once, to the completed result, when the block ends. Inside the
+block, positions and selections are in the builder's own coordinates.
+
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [placement]
+    :end-before: [placement]
+
+Both versions are kept: ``sketch`` and ``sketch_local``, and likewise
+``part`` and ``part_local``, ``line`` and ``line_local``, ``sheet`` and
+``sheet_local``.
+
+Given several placements, the result is put on all of them. Here one
+rectangle is drawn once and lands on each of the six faces of a box:
+
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [six_faces]
+    :end-before: [six_faces]
 
 .. image:: /explanation/assets/key_concepts_builder/boxes_on_faces.svg
-  :align: center
+    :align: center
 
-.. note::
-    ``BuildLine`` constructs in local coordinates and applies its placement to the
-    completed line when the builder output is published. This does **not** mean
-    that ``BuildLine`` is limited to planar curves. A ``BuildLine`` can construct
-    non-planar curves when the curve objects are given enough 3D information. The
-    placement parameter controls where the final line is published, not whether
-    the line is planar.
+A builder does not inherit a placement from the builder it is nested in.
+The sketch above is drawn flat, whatever the part round it is doing.
+``BuildLine`` takes a single placement; the others take any number.
 
 .. _location_context_link:
 
-Locations Context
-=================
+Locations inside a builder, and round one
+=========================================
 
-When positioning objects or operations within a builder, Location Contexts are used.
-They create a context where one or more local ``Location`` objects are active within
-a scope. For example:
+``Locations`` and the pattern contexts, ``GridLocations``,
+``PolarLocations`` and ``HexLocations``, make a set of places active for
+everything in their block. Inside a builder, each object is made once at
+every active place:
 
-.. code-block:: build123d
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [locations_inside]
+    :end-before: [locations_inside]
 
-    with BuildPart():
-        with Locations((0,10),(0,-10)):
-            Box(1,1,1)
-            with GridLocations(x_spacing=5, y_spacing=5, x_count=2, y_count=2):
-                Sphere(1)
-            Cylinder(1,1)
+Two boxes, two cylinders, and a grid of four spheres at each of the two
+places. Contexts nest, and an inner one is measured from each place of the
+outer one.
 
-In this example ``Locations`` creates two local positions at (0,10) and (0,-10).
-Since ``Box`` is within the scope of ``Locations``, two boxes are created at these
-locations in the builder's local coordinate system. The ``GridLocations`` context
-creates four positions which apply to the ``Sphere``. The ``Cylinder`` is out of
-the scope of ``GridLocations`` but in the scope of ``Locations`` so two cylinders
-are created.
+Put *round* a builder, the same contexts act on the builder's finished
+result, exactly as a placement does:
 
-Note that these contexts are creating Location objects not just simple points. The difference
-isn't obvious until the ``PolarLocations`` context is used which can also rotate objects within
-its scope - much as the hour and minute indicator on an analogue clock.
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [locations_around]
+    :end-before: [locations_around]
 
-Locations can also be used around a builder to move the completed builder output.
-In this case the enclosed builder still constructs locally and the active
-locations are applied once when the builder publishes its completed result.
+The circle is drawn once: ``holes.sketch_local`` has one face. It is placed
+twice: ``holes.sketch`` has two, and ``extrude`` makes two posts. The same
+goes for a whole part:
 
-.. code-block:: build123d
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [locations_part]
+    :end-before: [locations_part]
 
-    with BuildPart() as model:
-        with Locations((-20, 0), (20, 0)):
-            with BuildSketch() as holes:
-                Circle(3)
-            extrude(amount=5)
+A builder made inside a function is the exception. It is not part of the
+build that called the function, so it is not added to that build when it
+ends, and the caller's active locations are not applied to it. It is
+returned like any object, and the caller places it, usually with
+``insert``:
 
-Here ``holes.sketch_local`` contains one circle on local ``Plane.XY`` while
-``holes.sketch`` contains two placed circles because the enclosing ``Locations``
-context is active when the sketch is published to ``model``.
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [function]
+    :end-before: [function]
 
-The same rule applies to an entire ``BuildPart``:
+Each call returns a builder holding a row of boxes, and ``insert`` puts
+that row at the active location: three rows of one, two and three boxes.
 
-.. code-block:: build123d
+*******************
+Pending objects
+*******************
 
-    with Locations((-10, 0), (10, 0)):
-        with BuildPart() as placed_parts:
-            Box(5, 5, 5)
+When a builder inside another builder finishes, its result has to go
+somewhere. A sketch finished inside a ``BuildPart`` is not a solid and
+cannot be added to the part. It is handed to the part to hold, as a
+*pending* face, until an operation comes along that wants one:
 
-``placed_parts.part_local`` contains one local box, while ``placed_parts.part``
-contains the two placed boxes.
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [pending]
+    :end-before: [pending]
 
-A builder created inside a function is not part of the build that called the
-function - it isn't added to that build on exit, and that build's active locations
-are not applied to it. Like an object, it constructs in its own frame and the
-caller places it, typically with ``insert``:
+``extrude`` was given no sketch. It took the pending one, and used it up.
+``loft`` and ``revolve`` take pending faces in the same way, ``sweep``
+takes a pending face and a pending line, and ``make_face`` in a sketch
+takes the pending lines of a ``BuildLine``.
 
-.. code-block:: build123d
+This is why a builder-mode model reads as a sequence of sketch, operation,
+sketch, operation, with nothing passed between them. :ref:`building_parts`
+shows how to take control of it when the automatic choice is not the one
+wanted.
 
-    def knob(count: int) -> BuildPart:
-        with GridLocations(0, 20, 1, count):
-            with BuildPart() as builder:
-                Box(100, 10, 5)
-        return builder
+***********************
+When the block ends
+***********************
 
-    with BuildPart() as knobs:
-        for count in range(1, 4):
-            with Locations((0, 0, 20 * count)):
-                insert(knob(count))
+When its block ends, a builder finalises its result and, if it is nested,
+hands it to its parent. Anything about the result that is set on the
+*builder* has to be set before then. A builder's ``label``, ``color`` and
+``material`` are applied to the result as the block closes:
 
-``knob(count).part`` contains ``count`` boxes placed by the ``GridLocations`` in
-the function, and ``insert`` places that row at the active location, so
-``knobs`` holds three rows of 1, 2 and 3 boxes at Z = 20, 40 and 60. Writing
-``insert(knob(count).part)`` or wrapping the function in a ``BasePartObject``
-gives the same result.
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [exit]
+    :end-before: [exit]
 
-Locations are local to the current location(s), so ``Locations`` contexts can be
-nested. A user can retrieve the active local locations:
+Changing the builder afterwards does nothing to a part that is already
+made. Change the part:
 
-.. code-block:: build123d
+.. literalinclude:: /explanation/builder_mode.py
+    :language: build123d
+    :start-after: [exit_late]
+    :end-before: [exit_late]
 
-    with Locations(Plane.XY, Plane.XZ):
-        locs = GridLocations(1, 1, 2, 2)
-        for l in locs:
-            print(l)
+************
+See also
+************
 
-.. code-block::
-
-    Location: (position=(-0.5, -0.5, 0), orientation=(0, 0, 0))
-    Location: (position=(-0.5, 0.5, 0), orientation=(0, 0, 0))
-    Location: (position=(0.5, -0.5, 0), orientation=(0, 0, 0))
-    Location: (position=(0.5, 0.5, 0), orientation=(0, 0, 0))
-    Location: (position=(-0.5, 0, -0.5), orientation=(90, 0, 0))
-    Location: (position=(-0.5, 0, 0.5), orientation=(90, 0, 0))
-    Location: (position=(0.5, 0, -0.5), orientation=(90, 0, 0))
-    Location: (position=(0.5, 0, 0.5), orientation=(90, 0, 0))
-
-
-Operation Inputs
-================
-
-When one is operating on an existing object, e.g. adding a fillet to a part,
-an iterable of objects is often required (often a ShapeList).
-
-Here is the definition of :meth:`~operations_generic.fillet` to help illustrate:
-
-.. code-block:: build123d
-
-    def fillet(
-        objects: Edge | Vertex | Iterable[Edge | Vertex],
-        radius: float,
-    ):
-
-To use this fillet operation, an edge or vertex or iterable of edges or
-vertices must be provided followed by a fillet radius with or without the keyword as follows:
-
-.. code-block:: build123d
-
-    with BuildPart() as pipes:
-        Box(10, 10, 10, rotation=(10, 20, 30))
-        ...
-        fillet(pipes.edges(Select.LAST), radius=0.2)
-
-Here the fillet accepts the iterable ShapeList of edges from the last operation of
-the ``pipes`` builder and a radius is provided as a keyword argument.
-
-Combination Modes
-=================
-
-Almost all objects or operations have a ``mode`` parameter which is defined by the
-``Mode`` Enum class as follows:
-
-.. code-block:: build123d
-
-    class Mode(Enum):
-        ADD = auto()
-        SUBTRACT = auto()
-        INTERSECT = auto()
-        REPLACE = auto()
-        PRIVATE = auto()
-
-The ``mode`` parameter describes how the user would like the object or operation to
-interact with the object within the builder. For example, ``Mode.ADD`` will
-integrate a new object(s) in with an existing ``part``.  Note that a part doesn't
-necessarily have to be a single object so multiple distinct objects could be added
-resulting is multiple objects stored as a ``Compound`` object. As one might expect
-``Mode.SUBTRACT``, ``Mode.INTERSECT``, and ``Mode.REPLACE`` subtract, intersect, or replace
-(from) the builder's object. ``Mode.PRIVATE`` instructs the builder that this object
-should not be combined with the builder's object in any way.
-
-Most commonly, the default ``mode`` is ``Mode.ADD`` but this isn't always true.
-For example, the ``Hole`` classes use a default ``Mode.SUBTRACT`` as they remove
-a volume from the part under normal circumstances. However, the ``mode`` used in
-the ``Hole`` classes can be specified as ``Mode.ADD`` or ``Mode.INTERSECT`` to
-help in inspection or debugging.
-
-
-Using Locations & Rotating Objects
-==================================
-
-build123d stores points (to be specific ``Location`` (s)) internally to be used as
-positions for the placement of new objects.  By default, a single identity
-location will be active such that:
-
-.. code-block:: build123d
-
-    with BuildPart() as pipes:
-        Box(10, 10, 10, rotation=(10, 20, 30))
-
-will create a single 10x10x10 box centered at (0,0,0) - by default objects are
-centered. One can create multiple objects by pushing points prior to creating
-objects as follows:
-
-.. code-block:: build123d
-
-    with BuildPart() as pipes:
-        with Locations((-10, -10, -10), (10, 10, 10)):
-            Box(10, 10, 10, rotation=(10, 20, 30))
-
-which will create two boxes.
-
-To orient a part, a ``rotation`` parameter is available on ``BuildSketch`` and
-``BuildPart`` objects. When working in a sketch, the rotation is a single angle in
-degrees so the parameter is a float. When working on a part, the rotation is
-a three dimensional ``Rotation`` object of the form
-``Rotation(<about x>, <about y>, <about z>)`` although a simple three tuple of
-floats can be used as input.  As 3D rotations are not cumulative, one can
-combine rotations with the `*` operator like this:
-``Rotation(10, 20, 30) * Rotation(0, 90, 0)`` to generate any desired rotation.
-
-.. hint::
-    Experts Only
-
-    ``Locations`` will accept ``Location`` objects for input which allows one
-    to specify both the position and orientation.  However, the orientation
-    is often determined by the ``Plane`` that an object was created on.
-    ``Rotation`` is a subclass of ``Location`` and therefore will also accept
-    a position component.
-
-Builder's Pending Objects
-=========================
-
-When a builder exits, it will push the object created back to its parent if
-there was one.  Here is an example:
-
-.. code-block:: build123d
-
-    height, width, thickness, f_rad = 60, 80, 20, 10
-
-    with BuildPart() as pillow_block:
-        with BuildSketch() as plan:
-            Rectangle(width, height)
-            fillet(plan.vertices(), radius=f_rad)
-        extrude(amount=thickness)
-
-``BuildSketch`` exits after the ``fillet`` operation and when doing so it transfers
-the sketch to the ``pillow_block`` instance of ``BuildPart`` as the internal instance variable
-``pending_faces``. This allows the ``extrude`` operation to be immediately invoked as it
-extrudes these pending faces into ``Solid`` objects. Likewise, ``loft`` would take all of the
-``pending_faces`` and attempt to create a single ``Solid`` object from them.
-
-Normally the user will not need to interact directly with pending objects; however,
-one can see pending Edges and Faces with ``<builder_instance>.pending_edges`` and 
-``<builder_instance>.pending_faces`` attributes.  In the above example, by adding a 
-``print(pillow_block.pending_faces)`` prior to the ``extrude(amount=thickness)`` the
-pending ``Face`` from the ``BuildSketch`` will be displayed.
+* :ref:`building_parts`, :ref:`sketching` and
+  :ref:`drawing_lines_and_curves` are the guides to using each builder.
+* :ref:`moving_objects` covers locations and rotations.
+* :ref:`tutorial_sketch_then_extrude` starts the tutorials, which build
+  every model in both modes side by side.
