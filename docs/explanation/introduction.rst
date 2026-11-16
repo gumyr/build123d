@@ -1,278 +1,252 @@
-############
-Introduction
-############
+.. _why_build123d:
 
-***********
-Key Aspects
-***********
+##############
+Why build123d
+##############
 
-The following sections describe some of the key aspects of build123d and illustrate
-why one might choose this open source system over proprietary options like SolidWorks,
-OnShape, Fusion 360, or even other open source systems like Blender, or OpenSCAD.
+    "I made 5,127 prototypes of my vacuum before I got it right. There were
+    5,126 failures. But I learned from each one."
 
-Boundary Representation (BREP) Modelling
-========================================
+    -- James Dyson
 
-Boundary representation (BREP) and mesh-based CAD systems are both used to
-create and manipulate 3D models, but they differ in the way they represent and
-store the models.
+Design is iteration. Requirements change, and some things are only learned
+by making the part. A CAD system is therefore judged less by how quickly it
+produces the first version of a design than by how well it copes with the
+second, the tenth and the fiftieth.
 
-Advantages of BREP-based CAD systems (e.g. build123d & SolidWorks):
+Software developers have the same problem, at a larger scale, and have spent
+decades on tools for it: ways to hide complexity behind a simple interface,
+to record every change and who made it, to review a change before it is
+accepted, and to check automatically that a change has not broken anything.
+build123d exists to bring those tools to the design of physical objects. A
+build123d model is a Python program, and everything that works on programs
+works on it.
 
-* Precision: BREP-based CAD systems use mathematical representations to define
-  the shape of an object, which allows for more precise and accurate modeling of
-  complex shapes.
-* Topology: BREP-based CAD systems maintain topological information of the 3D
-  model, such as edges, faces and vertices. This allows for more robust and stable
-  modeling, such as Boolean operations.
-* Analytical modeling: BREP-based CAD systems can take advantage of the
-  topological information to perform analytical operations such as collision
-  detection, mass properties calculations, and finite element analysis.
-* Features-based modeling: BREP-based CAD systems are often feature-based, which
-  means that the model is built by creating and modifying individual features,
-  such as holes, fillets, and chamfers. This allows for parametric design and easy
-  modification of the model.
-* Efficient storage: BREP-based CAD systems use a compact representation to
-  store the 3D model, which is more efficient than storing a large number of
-  triangles used in mesh-based systems.
+**************
+An example
+**************
 
+.. image:: /explanation/assets/why_build123d/bearing_unit.png
+    :align: center
+    :width: 60%
+    :alt: An oval flanged bearing housing with a bearing pressed into it and a cap screw at each end
 
-Advantages of Mesh-based CAD systems (e.g. Blender, OpenSCAD):
+This is a flanged bearing unit: a cast housing with a bearing pressed into
+its seat, and a lug at each end with a screw to bolt it to a machine. The
+sides of the housing lean slightly so that it will come out of the mould,
+and its edges are rounded as a casting's are. This is the whole of the
+program that makes it:
 
-* Simplicity: Mesh-based CAD systems use a large number of triangles to
-  represent the surface of an object, which makes them easy to use and understand.
-* Real-time rendering: Mesh-based CAD systems can be rendered in real-time,
-  which is useful for applications such as video games and virtual reality.
-* Flexibility: Mesh-based CAD systems can be easily exported to other 3D
-  modeling and animation software, which makes them a good choice for use in the
-  entertainment industry.
-* Handling of freeform surfaces: Mesh-based systems are better equipped to
-  handle freeform surfaces, such as those found in organic shapes, as they do not
-  rely on mathematical representation.
-* Handling of large datasets: Mesh-based systems are more suitable for handling
-  large datasets such as point clouds, as they can be easily converted into a mesh
-  representation.
+.. code-block:: build123d
 
-Parameterized Models
-====================
+    import copy
 
-Parametrized CAD systems are more effective than non-parametric CAD systems in
-several ways:
+    from bd_warehouse.bearing import PressFitHole, SingleRowAngularContactBallBearing
+    from bd_warehouse.fastener import ClearanceHole, SocketHeadCapScrew
+    from build123d import *
+    from ocp_vscode import show
 
-* Reusability: Parametrized CAD models can be easily modified by changing a set
-  of parameters, such as the length or width of an object, rather than having to
-  manually edit the geometry. This makes it easy to create variations of a design
-  without having to start from scratch.
-* Design exploration: Parametrized CAD systems allow for easy exploration of
-  different design options by changing the parameters and quickly visualizing the
-  results.  This can save a lot of time and effort during the design process.
-* Constraints and relationships: Parametrized CAD systems allow for the
-  definition of constraints and relationships between different parameters. This
-  ensures that the model remains valid and functional even when parameters are
-  changed.
-* Automation: Parametrized CAD systems can be automated to perform repetitive
-  tasks, such as generating detailed drawings or creating parts lists. This can
-  save a lot of time and effort and reduce the risk of errors.
-* Collaboration: Parametrized CAD systems allow different team members to work
-  on different aspects of a design simultaneously and ensure that the model
-  remains consistent across different stages of the development process.
-* Document management: Parametrized CAD systems can generate engineering
-  drawings, BOMs, and other documents automatically, which makes it easier to
-  manage and track the design history.
+    bearing = SingleRowAngularContactBallBearing("M17-47-14")
+    screw = SocketHeadCapScrew("M10-1.5", length=30 * MM, simple=False)
 
-In summary, parametrized CAD systems are more effective than non-parametric CAD
-systems because they provide a more efficient and flexible way to create and
-modify designs, and can be easily integrated into the design, manufacturing, and
-documentation process.
+    A, A1, Db2, H, J = 26, 11, 57, 98.5, 76.5
+    with BuildPart() as oval_flanged_bearing_unit:
+        with BuildSketch() as plan:
+            housing = Circle(Db2 / 2)
+            with GridLocations(J, 0, 2, 1) as bolt_centers:
+                Circle((H - J) / 2)
+            make_hull()
+        extrude(amount=A1)
+        extrude(housing, amount=A)
+        drafted_faces = oval_flanged_bearing_unit.faces().filter_by(Axis.Z, reverse=True)
+        draft(drafted_faces, Plane.XY, 4)
+        fillet(oval_flanged_bearing_unit.edges(), 1)
+        with Locations(oval_flanged_bearing_unit.faces().sort_by(Axis.Z)[-1]):
+            PressFitHole(bearing)
+        with Locations(Pos(Z=A1)):
+            with Locations(*bolt_centers):
+                ClearanceHole(screw, counter_sunk=False)
 
-Python Programming Language
-===========================
+    oval_flanged_bearing_unit.part.color = Color(0x4C6377)
 
-Python is a popular, high-level programming language that has several advantages
-over other programming languages:
+    # Create an assembly of all the positioned parts
+    oval_flanged_bearing_unit_assembly = Compound(
+        children=[oval_flanged_bearing_unit.part, bearing.moved(bearing.hole_locations[0])]
+        + [copy.copy(screw).moved(l) for l in screw.hole_locations]
+    )
+    show(oval_flanged_bearing_unit_assembly)
 
-* Readability: Python code is easy to read and understand, with a clear and
-  consistent syntax. This makes it a great language for beginners and for teams of
-  developers who need to collaborate on a project.
-* Versatility: Python is a general-purpose language that can be used for a wide
-  range of tasks, including web development, scientific computing, data analysis,
-  artificial intelligence, and more. This makes it a great choice for developers
-  who need to work on multiple types of projects.
-* Large community: Python has a large and active community of developers who
-  contribute to the language and its ecosystem. This means that there are many
-  libraries and frameworks available for developers to use, which can save a lot
-  of time and effort.
-* Good for data science, machine learning, and CAD: Python has a number of libraries
-  such as numpy, pandas, scikit-learn, tensorflow, and cadquery which are popularly
-  used in data science and machine learning and CAD.
-* High-level language: Python is a high-level language, which means it abstracts
-  away many of the low-level details of the computer.  This makes it easy to write
-  code quickly and focus on solving the problem at hand.
-* Cross-platform: Python code runs on many different platforms, including
-  Windows, Mac, and Linux, making it a great choice for developers who need to
-  write code that runs on multiple operating systems.
-* Open-source: Python is an open-source programming language, which means it is
-  free to use and distribute.  This makes it accessible to developers of all
-  levels and budgets.
-* Large number of libraries and modules: Python has a vast collection of
-  libraries and modules that make it easy to accomplish complex tasks such as
-  connecting to web servers, reading and modifying files, and connecting to
-  databases.
+The bearing and the screws come from bd_warehouse, a library of standard
+parts described below, which has to be installed for this to run. A version
+of the housing that needs only build123d is among the
+:ref:`examples <examples-cast_bearing_unit>`.
 
-Open Source Software
-====================
+The rest of this page uses this one part to show what follows from a
+design being a program.
 
-Open source and proprietary software systems are different in several ways: B
-Licensing: Open source software is licensed in a way that allows users to view,
-modify, and distribute the source code, while proprietary software is closed
-source and the source code is not available to the public.
+************************************
+A design is described, not drawn
+************************************
 
-* Ownership: Open source software is usually developed and maintained by a
-  community of developers, while proprietary software is owned by a company or
-  individual.
-* Cost: Open source software is typically free to use, while proprietary
-  software may require payment for a license or subscription.  Customization: Open
-  source software can be modified and customized by users and developers, while
-  proprietary software is typically not modifiable by users.
-* Support: Open source software may have a larger community of users who can
-  provide support, while proprietary software may have a smaller community and
-  relies on the company for support.  Security: Open source software can be
-  audited by a large community of developers, which can make it more secure, while
-  proprietary software may have fewer eyes on the code and may be more vulnerable
-  to security issues.
-* Interoperability: Open source software may have better interoperability with
-  other software and platforms, while proprietary software may have more limited
-  compatibility.
-* Reliability: Open source software can be considered as reliable as proprietary
-  software. It is usually used by large companies, governments, and organizations
-  and has been tested by a large number of users.
+The program for the housing reads much as one would describe the part
+aloud. Draw a circle for the body and a smaller one at each bolt centre,
+and wrap an outline round them. Extrude it to make the flange, and the
+circle alone to make the body. Lean the sides. Round the edges. Make a
+press-fit hole for the bearing, and a clearance hole for a screw at each
+bolt centre.
 
-In summary, open source and proprietary software systems are different in terms
-of licensing, ownership, cost, customization, support, security,
-interoperability, and reliability. Open source software is typically free to use
-and can be modified by users and developers, while proprietary software is
-closed-source and may require payment for a license or subscription. Open source
-software may have a larger community of users who can provide support, while
-proprietary software may have a smaller community and relies on the company for
-support.
+Its dimensions are a handful of names at the top: the bolt spacing, the
+overall length, the diameter and height of the body. Everything else is
+worked out from them. The lugs are placed from the bolt spacing, so
+changing one number moves both lugs, their holes and the outline that
+wraps them. The change request that always arrives is then a new number,
+not a new drawing, and a whole family of housings in different sizes is
+the same program run with different values.
 
-Source Code Control Systems
-===========================
+******************************
+Parts carry their own data
+******************************
 
-Most GUI based CAD systems provide version control systems which represent the
-CAD design and its history. They allows developers to see changes made to the design
-over time, in a format that is easy to understand.
+A housing like this exists for the sake of two other parts, a bearing and
+the screws that hold it down, and most of its critical dimensions belong
+to them. The seat is the diameter of the bearing, less a little for the
+press fit, and as deep as the bearing is wide. The bolt holes are the
+diameter of the screws, plus a little for clearance.
 
-On the other hand, a source code control system like Git, is a command-line tool
-and it provides more granular control over the code. This makes it suitable for
-more advanced users and developers who are comfortable working with command-line
-interfaces. A source code control system like Git is more flexible and allows
-developers to perform tasks like branching and merging, which are not easily
-done with a GUI version control system. Systems like Git have several advantages,
-including:
+In a drawing those are numbers typed into the housing. When the load on
+the machine changes and a larger bearing is chosen, or the bearing comes
+from another maker, someone has to find each of them and retype it, and
+may miss one.
 
-* Version control: Git allows developers to keep track of changes made to the
-  code over time, making it easy to revert to a previous version if necessary.
-* Collaboration: Git makes it easy for multiple developers to work on the same
-  codebase simultaneously, with the ability to merge changes from different
-  branches of development.
-* Backup: Git provides a way to backup and store the codebase in a remote
-  repository, like GitHub. This can serve as a disaster recovery mechanism, in
-  case of data loss.
-* Branching: Git allows developers to create multiple branches of a project for
-  different features or bug fixes, which can be easily merged into the main
-  codebase once they are complete.
-* Auditing: Git allows you to see who made changes to the code, when and what
-  changes were made, which is useful for auditing and debugging.
-* Open-source development: Git makes it easy for open-source developers to
-  contribute to a project and share their work with the community.
-* Flexibility: Git is a distributed version control system, which means that
-  developers can work independently and offline.  They can then push their changes
-  to a remote repository when they are ready to share them with others.
+In a program the bearing and the screw can be objects that carry their
+own dimensions, and the housing can ask them. Programmers call this
+*encapsulation*: the knowledge lives with the thing it is about. That is
+how the bearing unit is written. Its program names a bearing and a screw
+by their designations and contains no diameter for the seat or the bolt
+holes. It says only that there is a press-fit hole for *this bearing* and
+a clearance hole for *this screw*, and when either is changed its hole
+follows.
 
-In summary, GUI version control systems are generally more user-friendly and
-easier to use, while source code control systems like Git offer more flexibility
-and control over the code. Both can be used to achieve the same goal, but they
-cater to different types of users and use cases.
+***************************************
+bd_warehouse: parts with attributes
+***************************************
 
-Automated Testing
-=================
+`bd_warehouse <https://bd-warehouse.readthedocs.io/en/latest/index.html>`_
+is build123d's companion library of standard parts, and it is that idea
+carried through. It has screws, nuts and washers to the common standards,
+ball and roller bearings, bushings, pipes and flanges, gears, sprockets,
+threads, O-rings, retaining rings and shaft keys.
 
-Users of source based CAD systems can benefit from automated testing which improves
-their source code by:
+A part in it is not a file to download. It is made on demand from its
+designation, the size of a screw or the catalogue number of a bearing, and
+its dimensions come from tables of the published standard. The part that
+results is real geometry, exact to those figures, and it keeps the figures
+with it: its diameters, its lengths, and the sizes of hole that the standard
+gives for it.
 
-* Finding bugs: Automated tests can detect bugs in the code, which can then be
-  fixed before the code is released.  This helps to ensure that the code is of
-  higher quality and less likely to cause issues when used.
-* Regression testing: Automated tests can be used to detect regressions, which
-  are bugs that are introduced by changes to the codebase. This helps to ensure
-  that changes to the code do not break existing functionality.
-* Documenting code behavior: Automated tests can serve as documentation for how
-  the code is supposed to behave. This makes it easier for developers to
-  understand the code and make changes without breaking it.
-* Improving code design: Writing automated tests often requires a good
-  understanding of the code and how it is supposed to behave. This can lead to a
-  better design of the code, as developers will have a better understanding of the
-  requirements and constraints.
-* Saving time and cost: Automated testing can save time and cost by reducing the
-  need for manual testing. Automated tests can be run quickly and often, which
-  means that bugs can be found and fixed early in the development process, which
-  is less expensive than finding them later.
-* Continuous integration and delivery: Automated testing can be integrated into
-  a continuous integration and delivery (CI/CD) pipeline. This means that tests
-  are run automatically every time code is committed and can be integrated with
-  other tools such as code coverage, static analysis and more.
-* Improving maintainability: Automated tests can improve the maintainability of
-  the code by making it easier to refactor and change the codebase. This is
-  because automated tests provide a safety net that ensures that changes to the
-  code do not introduce new bugs.
+That last point is what changes how a design is written. The holes are part
+of the library too, and each takes the part it is for. A clearance hole is
+given the screw and makes itself the right size for it, a tap hole
+likewise, and a press-fit hole is given the bearing and an interference.
+The design never states a hole diameter, so there is none to get wrong and
+none to update. The part records where its holes were made, and copies of
+the screw or bearing can then be placed at exactly those places to build
+the assembly.
 
-Overall, automated testing is an essential part of the software development
-process, it helps to improve the quality of the code by detecting bugs early,
-documenting code behavior, and reducing the cost of maintaining and updating the
-code.
+So a design that uses bd_warehouse says what it is fastened with and what
+it carries, and the sizes follow. The bearing and the screws in the picture
+are bd_warehouse parts, sitting in holes that were made from them. Change
+the screws from one standard to another, or the bearing to the next size
+up, and every hole and seat that depends on it is remade to suit.
 
-Automated Documentation
-=======================
+**********************
+A change is a diff
+**********************
 
-The Sphinx automated documentation system was used to create the page you are
-reading now and can be used for user design documentation as well.  Such systems
-are used for several reasons:
+When a design is a drawing, reviewing a change means putting two drawings
+side by side and looking for the difference. When it is text, the change
+*is* the difference. Widening the bolt spacing of the housing is one
+altered line, and a reviewer is shown that line, before and after, and
+nothing else.
 
-* Consistency: Sphinx and other automated documentation systems can generate
-  documentation in a consistent format and style, which makes it easier to
-  understand and use.
-* Automation: Sphinx can automatically generate documentation from source code
-  and comments, which saves time and effort compared to manually writing
-  documentation.
-* Up-to-date documentation: Automated documentation systems like Sphinx can
-  update the documentation automatically when the code changes, ensuring that the
-  documentation stays up-to-date with the code.
-* Searchability: Sphinx and other automated documentation systems can include
-  search functionality, which makes it easy to find the information you need.
-* Cross-referencing: Sphinx can automatically create links between different
-  parts of the documentation, making it easy to navigate and understand the
-  relationships between different parts of the code.
-* Customizable: Sphinx and other automated documentation systems can be
-  customized to match the look and feel of your company's documentation.
-* Multiple output formats: Sphinx can generate documentation in multiple formats
-  such as HTML, PDF, ePub, and more.
-* Support for multiple languages: Sphinx can generate documentation in multiple
-  languages, which can make it easier to support international users.
-* Integration with code management: Sphinx can be integrated with code
-  management tools like Git, which allows documentation to be versioned along with
-  the code.
+A version control system such as Git records every such change with its
+author, its date and its reason, and can return to any earlier state.
+Several people can work on one design at once and have their work merged.
+A proposed change can be reviewed and discussed before it is accepted. All
+of this is ordinary practice for software, and it comes with build123d
+for free because a model is a text file.
 
-In summary, automated documentation systems like Sphinx are used to generate
-consistent, up-to-date, and searchable documentation from source code and
-comments. They save time and effort compared to manual documentation, and can be
-customized to match the look and feel of your company's documentation. They also
-provide multiple output formats, support for multiple languages and can be
-integrated with code management tools.
+**************************
+A design can be tested
+**************************
 
+A design has rules it must keep. For the bearing unit one would be a
+minimum thickness of metal between the bearing's seat and the outside of
+the body; another, that the heads of the screws clear the body. Usually
+such rules live in the designer's head or in a checklist.
 
-************************
-Advantages Over CadQuery
-************************
+In code a rule can be written down once, as a test that measures the
+model and compares the result with the limit, and it is then checked
+every time the design changes. Fit a larger bearing to the same housing
+and the wall becomes too thin: the test fails and says so, at once, and
+nobody had to notice.
 
-.. include:: /explanation/advantages.rst
+Tests like this are run automatically, by the same tools that test
+software, whenever a change is proposed. They are what make it safe to
+change a design that someone else wrote.
+
+*************************
+The geometry is exact
+*************************
+
+build123d is built on the Open Cascade kernel, the same kind of *boundary
+representation* (BREP) modeller that commercial CAD systems use. The seat
+in the housing is a true cylinder, not a ring of flat facets. That is why
+a press fit can be specified to a few hundredths of a millimetre, why a
+part can be asked for its faces and edges, and why models go to other CAD
+systems as STEP files without loss. Triangles appear only on export to a
+mesh format for printing or display.
+
+****************
+It is Python
+****************
+
+A build123d model is ordinary Python, so the whole language is there:
+loops, functions, classes, and an editor with completion and a debugger
+that can step through a design as it is built.
+
+So is everything else written in Python. A dimension can come from a
+calculation in NumPy, an equation solved by SymPy, a spreadsheet, a
+database or a web service. Nothing has to be re-entered by hand, and no
+separate scripting language has to be learned.
+
+*********************
+It is open source
+*********************
+
+build123d is free to use and its source is open, under the Apache 2.0
+licence. Anyone can read how an operation works, fix it, extend it, or
+build a product on it. A design made with it is never held by a file
+format that only one vendor's program can open, and it will still build
+when a subscription has lapsed.
+
+***********************
+Where it comes from
+***********************
+
+build123d is derived from portions of
+`CadQuery <https://cadquery.readthedocs.io/en/latest/index.html>`_, but is
+extensively refactored and restructured into an independent framework over
+`Open Cascade <https://dev.opencascade.org/>`_.
+
+********************
+Where to go next
+********************
+
+* :ref:`getting_started` installs build123d and makes a first part.
+* :ref:`tutorials` teach it step by step, starting with
+  :ref:`tutorial_sketch_then_extrude`.
+* :ref:`examples` has the bearing unit and many other finished models,
+  with their code.
+* :ref:`coming_from_openscad` is for those arriving from another code-CAD
+  system.
