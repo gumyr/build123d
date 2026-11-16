@@ -327,3 +327,80 @@ assert same(builder_result, egg_plant)
 # a closed outline
 assert Wire(egg_plant.edges()).is_closed
 draw("tangent_to", [l3, l4], [l1, l2], construction=[c1, c2])
+
+# ---------------------------------------------------------------------------
+# arcs fixed only by what they touch
+# ---------------------------------------------------------------------------
+
+# [touching]
+with BuildLine() as profile:
+    # construction lines: a slope falling at 8 degrees, and a flat
+    slope = PolarLine((27.5, 50), 100, -8, mode=Mode.PRIVATE)
+    flat = Line((0, 32), (125, 32), mode=Mode.PRIVATE)
+
+    # a circle of radius 30, tangent to the slope from below, with its
+    # centre somewhere on the line X = 49.5
+    circle_30 = ConstrainedArcs(
+        slope,
+        radius=30,
+        center_on=Axis((49.5, 0), (0, 1)),
+        selector=lambda arcs: arcs.sort_by(Axis.Y)[0],
+        mode=Mode.PRIVATE,
+    ).edge()
+
+    # an arc of radius 66, tangent to that circle and to the flat, from above
+    l3 = ConstrainedArcs(
+        circle_30, flat, radius=66, selector=lambda arcs: arcs.sort_by(Axis.Y)[-1]
+    )
+
+    # the slope as far as it touches the circle, and the arc that joins them
+    touch = circle_30.arc_center + Vector(0, 0, 1).cross(slope % 0) * 30
+    l1 = Line(slope @ 0, touch)
+    l2 = RadiusArc(l1 @ 1, l3 @ 0, 30)
+# [touching]
+
+builder_result = profile.line
+
+# [touching_algebra]
+# construction lines: a slope falling at 8 degrees, and a flat
+slope = PolarLine((27.5, 50), 100, -8)
+flat = Line((0, 32), (125, 32))
+
+# a circle of radius 30, tangent to the slope from below, with its centre
+# somewhere on the line X = 49.5
+circle_30 = ConstrainedArcs(
+    slope,
+    radius=30,
+    center_on=Axis((49.5, 0), (0, 1)),
+    selector=lambda arcs: arcs.sort_by(Axis.Y)[0],
+).edge()
+
+# an arc of radius 66, tangent to that circle and to the flat, from above
+l3 = ConstrainedArcs(
+    circle_30, flat, radius=66, selector=lambda arcs: arcs.sort_by(Axis.Y)[-1]
+)
+
+# the slope as far as it touches the circle, and the arc that joins them
+touch = circle_30.arc_center + Vector(0, 0, 1).cross(slope % 0) * 30
+l1 = Line(slope @ 0, touch)
+l2 = RadiusArc(l1 @ 1, l3 @ 0, 30)
+profile = l1 + l2 + l3
+# [touching_algebra]
+
+assert same(builder_result, profile)
+# the three pieces run on smoothly from one to the next
+assert (l1 % 1 - l2 % 0).length < 1e-6 and (l2 % 1 - l3 % 0).length < 1e-6
+# the last arc lands on the flat, travelling along it
+assert abs((l3 @ 1).Y - 32) < 1e-6 and (l3 % 1 - Vector(1, 0, 0)).length < 1e-6
+# the values the four simultaneous equations of this problem give
+assert (circle_30.arc_center - Vector(49.5, 16.6133)).length < 1e-3
+assert (l3.edge().arc_center - Vector(100.4137, 98)).length < 1e-3
+assert (touch - Vector(53.6752, 46.3213)).length < 1e-3
+assert (l3 @ 0 - Vector(65.4105, 42.0466)).length < 1e-3
+draw(
+    "touching",
+    [],
+    [l1, l2, l3],
+    construction=[slope, flat, circle_30],
+    marks=[circle_30.arc_center, l3.edge().arc_center],
+)

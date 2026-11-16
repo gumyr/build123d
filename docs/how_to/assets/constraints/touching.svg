@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="110.7mm" height="99.984092mm" viewBox="-6.769184 -106.350769 140.065175 126.506679" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(30,78,163)" stroke-width="0.8856876481190993" id="Made">
+      <line x1="27.5" y1="50.0" x2="53.675193" y2="46.321317" />
+      <path d="M 53.675193,46.321317 A 30.00000000000014,30.00000000000014 81.99999999999989 0,0 65.410519,42.046626" />
+      <path d="M 65.410519,42.046626 A 66.0,66.0 0.0 0,1 100.413661,32.0" />
+    </g>
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.11387412618674134" id="Construction" stroke-dasharray="1.36649 0.341622">
+      <line x1="27.5" y1="50.0" x2="126.526807" y2="36.08269" />
+      <line x1="0.0" y1="32.0" x2="125.0" y2="32.0" />
+      <circle cx="49.5" cy="16.613274" r="30.0" />
+    </g>
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.11387412618674134" id="Marks">
+      <circle cx="49.5" cy="16.613274" r="1.581585085926963" />
+      <circle cx="100.413661" cy="98.0" r="1.581585085926963" />
+    </g>
+  </g>
+</svg>

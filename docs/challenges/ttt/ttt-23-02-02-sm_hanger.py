@@ -110,9 +110,10 @@ with BuildPart() as sm_hanger_builder:
         )
         fillet(sheet.flats(Select.LAST).vertices().group_by(Axis.Z)[0], 7)
 
-    thicken()  # Parameters taken from BuildSheet
+        # The flat pattern, with bend allowances from the sheet's parameters
+        sm_hanger_flat = unfold().flat
 
-    sm_hanger_flat = sheet.sheet.unfold().flat
+    thicken()  # Parameters taken from BuildSheet
 
 sm_hanger = sm_hanger_builder.part
 sm_hanger.material = mild_steel()  # 7800 kg/m³

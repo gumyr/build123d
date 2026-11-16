@@ -453,8 +453,8 @@ Solve for a dimension
 
 Where a dimension follows from others by trigonometry, the
 :class:`~objects_sketch.Triangle` object has a solver built in: give it
-any three of its sides and angles and it works out the rest. It is the
-same in both modes.
+three of its sides and angles, at least one of them a side, and it works
+out the rest. It is the same in both modes.
 
 .. code-block:: build123d
 
@@ -469,54 +469,50 @@ same in both modes.
     Vertex(-1.7763568394002505e-15, 17.32050807568877, 0.0)
 
 Here the sides ``a`` and ``b`` and the angle between them, ``C``, are
-given, and the remaining side, angles and vertices are computed. Side ``a``
-is opposite angle ``A``, ``b`` opposite ``B`` and ``c`` opposite ``C``.
-
-Here the sides ``a`` and ``b`` and the angle between them, ``C``, are
 given, and the remaining side, angles and vertices are computed. Side
 ``a`` is opposite angle ``A``, ``b`` opposite ``B`` and ``c`` opposite
 ``C``.
 
-When the governing relationships are algebraic and awkward to construct
-with objects, solve them first with an external solver and feed the solved
-values into ordinary build123d objects. This uses the symbolic solver
-``sympy``:
+A problem that seems to call for simultaneous equations is often a tangency
+problem, and :class:`~objects_curve.ConstrainedArcs` solves those. In this
+profile neither arc has a centre that the drawing gives. The first, of
+radius 30, has only the X of its centre and must touch a slope. The second,
+of radius 66, must touch the first arc and a flat. Written out, that is
+four equations in four unknowns. Stated as constraints it is two calls:
 
-.. code-block:: build123d
+.. image:: /how_to/assets/constraints/touching.svg
+    :align: center
 
-    from math import sin, cos, tan, radians
-    from build123d import *
-    from ocp_vscode import *
-    import sympy
+.. tab-set::
 
-    # This problem uses the sympy symbolic math solver
+    .. tab-item:: Builder
+        :sync: builder
 
-    # Define the symbols for the unknowns
-    # - the center of the radius 30 arc (x30, y30)
-    # - the center of the radius 66 arc (x66, y66)
-    # - end of the 8° line (l8x, l8y)
-    # - the point with the radius 30 and 66 arc meet i30_66
-    # - the start of the horizontal line lh
-    y30, x66, xl8, yl8 = sympy.symbols("y30 x66 xl8 yl8")
-    x30 = 77 - 55 / 2
-    y66 = 66 + 32
+        .. literalinclude:: /how_to/constraints.py
+            :language: build123d
+            :start-after: [touching]
+            :end-before: [touching]
 
-    # There are 4 unknowns so we need 4 equations
-    equations = [
-        (x66 - x30) ** 2 + (y66 - y30) ** 2 - (66 + 30) ** 2,  # distance between centers
-        xl8 - (x30 + 30 * sin(radians(8))),  # 8 degree slope
-        yl8 - (y30 + 30 * cos(radians(8))),  # 8 degree slope
-        (yl8 - 50) / (55 / 2 - xl8) - tan(radians(8)),  # 8 degree slope
-    ]
-    # There are two solutions but we want the 2nd one
-    solution = {k: float(v) for k,v in sympy.solve(equations, dict=True)[1].items()}
+    .. tab-item:: Algebra
+        :sync: algebra
 
-    # Create the critical points
-    c30 = Vector(x30, solution[y30])
-    c66 = Vector(solution[x66], y66)
-    l8 = Vector(solution[xl8], solution[yl8])
+        .. literalinclude:: /how_to/constraints.py
+            :language: build123d
+            :start-after: [touching_algebra]
+            :end-before: [touching_algebra]
 
-    ...
+``center_on`` says that the centre lies somewhere on a line, here the
+upright line at X = 49.5, and the solver finds where. Each call has two
+answers, one each side of what it touches, and the ``selector`` keeps the
+lower circle and then the upper arc. The dashed lines are the construction
+geometry, and the small circles mark the two centres that were found.
+This profile is the bridge of the :ref:`Curved Support <ttt-23-t-24>`
+challenge.
+
+When the relationships really are algebra and cannot be put as geometry,
+build123d code is Python: solve for the values with any solver, such as
+``scipy.optimize`` or the symbolic solver ``sympy``, and feed the results
+into ordinary objects. ``sympy`` is not installed with build123d.
 
 ************
 See also
