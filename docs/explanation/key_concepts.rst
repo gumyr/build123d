@@ -1,121 +1,260 @@
+.. _key_concepts:
+
 ############
-Key Concepts
+Key concepts
 ############
 
-The following key concepts will help new users understand build123d quickly.
+A handful of ideas lie underneath everything in build123d, in both of its
+modes. This page sets them out: what a shape is made of, the difference
+between a shape and its geometry, the three kinds of object a design is
+built from, and the ways of saying where something is.
 
 .. _topology:
 
-Topology
-========
+*****************************
+Shapes are made of shapes
+*****************************
 
-Topology, in the context of 3D modeling and computational geometry, is the
-branch of mathematics that deals with the properties and relationships of
-geometric objects that are preserved under continuous deformations. In the
-context of CAD and modeling software like build123d, topology refers to the
-hierarchical structure of geometric elements (vertices, edges, faces, etc.) and
-their relationships in a 3D model. This structure defines how the components of
-a model are connected, enabling operations like Boolean operations,
-transformations, and analysis of complex shapes. Topology provides a formal
-framework for understanding and manipulating geometric data in a consistent and
-reliable manner.
+A solid is bounded by faces, a face by edges, and an edge by vertices. This
+structure, which element is made of which and how they are joined, is the
+*topology* of a shape. It is what lets a model be asked for "the top face"
+or "the edges of that face", and what an operation such as a fillet works
+on.
 
-The following are the topological objects that compose build123d objects:
+.. literalinclude:: /explanation/key_concepts.py
+    :language: build123d
+    :start-after: [hierarchy]
+    :end-before: [hierarchy]
+
+The topological objects that make up build123d shapes are:
 
 :class:`~topology.Vertex`
-    A Vertex is a data structure representing a 0D topological element. It
-    defines a precise point in 3D space, often at the endpoints or intersections of
-    edges in a 3D model. These vertices are part of the topological structure used
-    to represent complex shapes in build123d.
+    A Vertex is a 0D element. It defines a precise point in 3D space, often
+    at the endpoints or intersections of edges in a 3D model.
 
 :class:`~topology.Edge`
-	An Edge in build123d is a fundamental geometric entity representing a 1D
-	element in a 3D model. It defines the shape and position of a 1D curve within
-	the model. Edges play a crucial role in defining the boundaries of faces and in
-	constructing complex 3D shapes.
+    An Edge is a 1D element: a single piece of a curve, such as a straight
+    line, an arc or a spline, between two vertices. Edges define the
+    boundaries of faces, and are what paths and outlines are drawn with.
 
 :class:`~topology.Wire`
-	A Wire in build123d is a topological construct that represents a connected
-	sequence of Edges, forming a 1D closed or open loop within a 3D model. Wires
-	define the boundaries of faces and can be used to create complex shapes, making
-	them essential for modeling in build123d.
+    A Wire is a connected sequence of Edges, joined end to end, forming an
+    open path or a closed loop. Wires define the boundaries of faces: every
+    face has one outer wire, and an inner wire for each hole in it.
 
 :class:`~topology.Face`
-	A Face in build123d represents a 2D surface in a 3D model. It defines the
-	boundary of a region and can have associated geometric and topological data.
-	Faces are vital for shaping solids, providing surfaces where other elements like
-	edges and wires are connected to form complex structures.
+    A Face is a 2D element: a bounded piece of a surface, flat or curved.
+    Faces are what solids are enclosed by, and a flat face is what a sketch
+    is made of.
 
 :class:`~topology.Shell`
-	A Shell in build123d represents a collection of Faces, defining a closed,
-	connected volume in 3D space. It acts as a container for organizing and grouping
-	faces into a single shell, essential for defining complex 3D shapes like solids
-	or assemblies within the build123d modeling framework.
+    A Shell is a set of Faces joined along their edges into one connected
+    surface. A shell may be *closed*, enclosing a volume, as the skin of a
+    solid is; or *open*, as a sheet metal part's reference surface is, or a
+    surface model that is not yet watertight.
 
 :class:`~topology.Solid`
-	A Solid in build123d is a 3D geometric entity that represents a bounded
-	volume with well-defined interior and exterior surfaces. It encapsulates a
-	closed and watertight shape, making it suitable for modeling solid objects and
-	enabling various Boolean operations such as union, intersection, and
-	subtraction.
+    A Solid is a 3D element: a volume bounded by a closed, watertight shell,
+    with a well-defined inside and outside. Solids are what the boolean
+    operations of union, intersection and subtraction work on.
 
 :class:`~topology.Compound`
-	A Compound in build123d is a container for grouping multiple geometric
-	shapes. It can hold various types of entities, such as vertices, edges, wires,
-	faces, shells, or solids, into a single structure. This makes it a versatile
-	tool for managing and organizing complex assemblies or collections of shapes
-	within a single container.
+    A Compound is a container that groups shapes of any kind, vertices,
+    edges, wires, faces, shells, solids and other compounds, into a single
+    shape. It is how a part made of several solids, a sketch of several
+    faces, or an assembly of many parts is held as one object.
 
 :class:`~topology.Shape`
-	A Shape in build123d represents a fundamental building block in 3D
-	modeling. It encompasses various topological elements like vertices, edges,
-	wires, faces, shells, solids, and compounds. The Shape class is the base class
-	for all of the above topological classes.
+    Shape is the base class of all of the above. What every shape can do,
+    be moved, be selected from, be measured, is defined there.
 
-One can use the :meth:`~topology.Shape.show_topology` method to display the
-topology of a shape as shown here for a unit cube:
+Three more classes are built on ``Compound``, and they are the ones a design
+is mostly made of. They are described :ref:`below <part_sketch_curve_concept>`:
 
-.. code::
-	
-	Solid                      at 0x7f94c55430f0, Center(0.5, 0.5, 0.5)
-	└── Shell                  at 0x7f94b95835f0, Center(0.5, 0.5, 0.5)
-	    ├── Face               at 0x7f94b95836b0, Center(0.0, 0.5, 0.5)
-	    │   └── Wire           at 0x7f94b9583730, Center(0.0, 0.5, 0.5)
-	    │       ├── Edge       at 0x7f94b95838b0, Center(0.0, 0.0, 0.5)
-	    │       │   ├── Vertex at 0x7f94b9583470, Center(0.0, 0.0, 1.0)
-	    │       │   └── Vertex at 0x7f94b9583bb0, Center(0.0, 0.0, 0.0)
-	    │       ├── Edge       at 0x7f94b9583a30, Center(0.0, 0.5, 1.0)
-	    │       │   ├── Vertex at 0x7f94b9583030, Center(0.0, 1.0, 1.0)
-	    │       │   └── Vertex at 0x7f94b9583e70, Center(0.0, 0.0, 1.0)
-	    │       ├── Edge       at 0x7f94b9583770, Center(0.0, 1.0, 0.5)
-	    │       │   ├── Vertex at 0x7f94b9583bb0, Center(0.0, 1.0, 1.0)
-	    │       │   └── Vertex at 0x7f94b9583e70, Center(0.0, 1.0, 0.0)
-	    │       └── Edge       at 0x7f94b9583db0, Center(0.0, 0.5, 0.0)
-	    │           ├── Vertex at 0x7f94b9583e70, Center(0.0, 1.0, 0.0)
-	    │           └── Vertex at 0x7f94b95862f0, Center(0.0, 0.0, 0.0)
-	...
-	    └── Face               at 0x7f94b958d3b0, Center(0.5, 0.5, 1.0)
-	        └── Wire           at 0x7f94b958d670, Center(0.5, 0.5, 1.0)
-	            ├── Edge       at 0x7f94b958e130, Center(0.0, 0.5, 1.0)
-	            │   ├── Vertex at 0x7f94b958e330, Center(0.0, 1.0, 1.0)
-	            │   └── Vertex at 0x7f94b958e770, Center(0.0, 0.0, 1.0)
-	            ├── Edge       at 0x7f94b958e630, Center(0.5, 1.0, 1.0)
-	            │   ├── Vertex at 0x7f94b958e8b0, Center(1.0, 1.0, 1.0)
-	            │   └── Vertex at 0x7f94b958ea70, Center(0.0, 1.0, 1.0)
-	            ├── Edge       at 0x7f94b958e7b0, Center(1.0, 0.5, 1.0)
-	            │   ├── Vertex at 0x7f94b958ebb0, Center(1.0, 1.0, 1.0)
-	            │   └── Vertex at 0x7f94b958ed70, Center(1.0, 0.0, 1.0)
-	            └── Edge       at 0x7f94b958eab0, Center(0.5, 0.0, 1.0)
-	                ├── Vertex at 0x7f94b958eeb0, Center(1.0, 0.0, 1.0)
-	                └── Vertex at 0x7f94b9592170, Center(0.0, 0.0, 1.0)
-	
-Users of build123d will often reference topological objects as part of the
-process of creating the object as described below.
+:class:`~topology.Part`
+    A Part is a Compound of Solids: a 3D object.
+
+:class:`~topology.Sketch`
+    A Sketch is a Compound of Faces lying in one plane: a 2D object.
+
+:class:`~topology.Curve`
+    A Curve is a Compound of Edges and Wires: a 1D object.
+
+:meth:`~topology.Shape.show_topology` prints the structure of a shape. Here
+is the top face of the box, with its one wire, four edges and their
+vertices:
+
+.. literalinclude:: /explanation/key_concepts.py
+    :language: build123d
+    :start-after: [topology]
+    :end-before: [topology]
+
+.. code-block:: text
+
+    Face               at 0x11e611a70, Center(0, 0, 2)
+    └── Wire           at 0x11db5e7f0, Center(0, 0, 2)
+        ├── Edge       at 0x11e4fb0b0, Center(-1, 0, 2)
+        │   ├── Vertex at 0x11e5f2630, Center(-1, 1.5, 2)
+        │   └── Vertex at 0x11e18a2b0, Center(-1, -1.5, 2)
+        ├── Edge       at 0x11e18a2b0, Center(0, 1.5, 2)
+        │   ├── Vertex at 0x11e4fb0b0, Center(1, 1.5, 2)
+        │   └── Vertex at 0x11e611cb0, Center(-1, 1.5, 2)
+        ├── Edge       at 0x11e5f2130, Center(1, 0, 2)
+        │   ├── Vertex at 0x11e4fb0b0, Center(1, 1.5, 2)
+        │   └── Vertex at 0x11e18a2b0, Center(1, -1.5, 2)
+        └── Edge       at 0x11e18a2b0, Center(0, -1.5, 2)
+            ├── Vertex at 0x11e5f2130, Center(1, -1.5, 2)
+            └── Vertex at 0x11e611f70, Center(-1, -1.5, 2)
+
+Picking out particular faces, edges and vertices is the subject of
+:ref:`selecting_features`.
+
+*************************
+Topology and geometry
+*************************
+
+The topology of a shape says what is joined to what. It does not say what
+shape anything is. That is the *geometry*: the curve an edge lies on and the
+surface a face lies on.
+
+An edge is a piece of a curve, cut off at two points. A face is a piece of a
+surface, cut off along its wires. The curve may be a line, a circle or a
+spline, and the surface a plane, a cylinder, a sphere or something freer,
+and each element knows which:
+
+.. literalinclude:: /explanation/key_concepts.py
+    :language: build123d
+    :start-after: [geometry]
+    :end-before: [geometry]
+
+A cylinder has two flat faces and one cylindrical one, two circular edges
+and one straight one, the seam where the curved face meets itself.
+
+This is what it means that build123d's geometry is exact. The curved face of
+the can is a cylinder, held as an axis and a radius, not as a ring of flat
+facets. Its radius can be read back, it meets the end faces in true circles,
+and a hole cut in it has the true curve of that intersection. Triangles
+appear only when a model is exported to a mesh.
+
+.. _part_sketch_curve_concept:
+
+******************************
+Parts, sketches and curves
+******************************
+
+A design is seldom one solid or one face. A part with a loose pin has two
+solids, a sketch of four holes has four faces, and a path drawn in pieces
+has several edges. build123d therefore works in three kinds of object, one
+for each dimension, each able to hold any number of pieces:
+
+.. list-table::
+    :header-rows: 1
+    :widths: 15 15 30 40
+
+    * - Object
+      - Dimension
+      - Made of
+      - Built with
+    * - ``Curve``
+      - 1D
+      - edges and wires
+      - ``BuildLine``, or lines and arcs joined with ``+``
+    * - ``Sketch``
+      - 2D
+      - faces in one plane
+      - ``BuildSketch``, or sketch objects such as ``Rectangle``
+    * - ``Part``
+      - 3D
+      - solids
+      - ``BuildPart``, or part objects such as ``Box``
+
+Each is a ``Compound``, and the ready-made objects belong to them:
+
+.. literalinclude:: /explanation/key_concepts.py
+    :language: build123d
+    :start-after: [kinds]
+    :end-before: [kinds]
+
+The kind is kept through every operation. Two parts added together make a
+part, a sketch with a hole cut in it is still a sketch, and a builder hands
+back the kind it is named for: ``BuildPart`` a ``Part``, ``BuildSketch`` a
+``Sketch`` and ``BuildLine`` a ``Curve``. This is also why objects of
+different dimensions cannot be added to one another: a sketch is turned
+into a part by an operation such as ``extrude``, not by arithmetic.
+
+***************************************
+Vectors, axes, planes and locations
+***************************************
+
+Four different things are used to say where something is, and they are
+easily confused.
+
+.. literalinclude:: /explanation/key_concepts.py
+    :language: build123d
+    :start-after: [places]
+    :end-before: [places]
+
+A **Vector** is three numbers. It serves as a point, as a direction, or as
+a displacement from one point to another, and wherever a point is wanted a
+plain tuple such as ``(1, 2, 3)`` will do.
+
+An **Axis** is a line with a direction: a point it passes through and the
+way it points. It is what something is revolved about, sorted along or
+filtered by. ``Axis.X``, ``Axis.Y`` and ``Axis.Z`` are the three through the
+origin.
+
+A **Plane** is a flat surface with a coordinate system of its own: an
+origin, an X direction and a normal, which is its Z direction. It is what a
+sketch is drawn on. ``Plane.XY``, ``Plane.XZ``, ``Plane.YZ`` and their
+relatives are the ones through the origin.
+
+A **Location** is a position together with a rotation. It is what moves a
+shape: it says where the shape's own origin goes and which way the shape is
+turned there. ``Pos`` makes a location with a position only, and ``Rot`` one
+with a rotation only.
+
+A plane and a location hold the same information, an origin and an
+orientation, and each can be made from the other. They differ in use: a
+plane is something to draw on, a location something to place with. An axis
+holds less, since it has no notion of which way is "up" around itself.
+
+.. literalinclude:: /explanation/key_concepts.py
+    :language: build123d
+    :start-after: [conversions]
+    :end-before: [conversions]
+
+Planes and axes can also be taken from the model, which is how a feature is
+put on an existing face or turned about an existing edge.
+:ref:`placing_sketches` and :ref:`moving_objects` cover using all four.
+
+**************************
+A shape has a location
+**************************
+
+Every shape carries a location of its own, which says where its geometry
+sits in space. Moving a shape changes that location and nothing else. The
+geometry is not recomputed.
+
+.. literalinclude:: /explanation/key_concepts.py
+    :language: build123d
+    :start-after: [location]
+    :end-before: [location]
+
+``moved`` returns a new shape that shares the geometry of the first and has
+a different location, which is why a hundred copies of one screw cost little
+more than one. ``Pos(5, 0, 0) * first`` does the same thing. The methods
+come in pairs: ``moved`` and ``located`` return a new shape, and ``move``
+and ``locate`` change the shape they are called on.
+
+When a shape is part of an assembly its location is relative to its parent,
+so moving the assembly carries its parts with it. :ref:`assembly` covers
+that.
 
 .. _empty_shapes:
 
+************
 Empty shapes
-------------
+************
 
 Every shape class has an empty value, made by its constructor with no
 arguments: ``Solid()``, ``Face()``, ``Part()``, ``Sketch()``, ``Curve()`` and so
@@ -152,62 +291,3 @@ To test whether a result has anything in it, use its truth value or
 has no empty form, and an intersection of geometry that finds nothing, such as
 two parallel axes, returns ``None``. Either kind of "nothing" reads as false, so
 ``if not a & b:`` works for shapes and geometry alike.
-
-Location
-========
-
-A :class:`~geometry.Location` represents a combination of translation and rotation
-applied to a topological or geometric object. It encapsulates information
-about the spatial orientation and position of a shape within its reference
-coordinate system. This allows for efficient manipulation of shapes within
-complex assemblies or transformations. The location is typically used to
-position shapes accurately within a 3D scene, enabling operations like
-assembly, and boolean operations. It's an essential component in build123d
-for managing the spatial relationships of geometric entities, providing a
-foundation for precise 3D modeling and engineering applications.
-
-The topological classes (sub-classes of :class:`~topology.Shape`) and the geometric classes 
-:class:`~geometry.Axis` and :class:`~geometry.Plane` all have a ``location`` property.
-The :class:`~geometry.Location` class itself has ``position`` and ``orientation`` properties
-that have setters and getters as shown below:
-
-
-.. doctest::
-
-    >>> from build123d import *
-    >>> # Create an object and extract its location
-    >>> b = Box(1, 1, 1)
-    >>> box_location = b.location
-    >>> box_location
-    Location((0, 0, 0), (0, 0, 0))
-    >>> # Set position and orientation independently
-    >>> box_location.position = (1, 2, 3)
-    >>> box_location.orientation = (30, 40, 50)
-    >>> box_location.position
-    Vector(1, 2, 3)
-    >>> box_location.orientation
-    Vector(30, 40, 50)
-
-Combining the getter and setter enables relative changes as follows:
-
-.. doctest::
-
-    >>> # Relative change
-    >>> box_location.position += (3, 2, 1)
-    >>> box_location.position
-    Vector(4, 4, 4)
-
-There are also four methods that are used to change the location of objects:
-
-* :meth:`~topology.Shape.locate` - absolute change of this object
-* :meth:`~topology.Shape.located` - absolute change of copy of this object
-* :meth:`~topology.Shape.move` - relative change of this object
-* :meth:`~topology.Shape.moved` - relative change of copy of this object
-
-Locations can be combined with the ``*`` operator and have their direction flipped with
-the ``-`` operator.
-
-Selectors
-=========
-
-.. include:: /explanation/selectors.rst
