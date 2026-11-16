@@ -2,6 +2,8 @@
 for details see `circuit_board.py`
 """
 # [Imports]
+# [Code]
+
 from itertools import product
 from build123d import *
 from ocp_vscode import show
@@ -11,7 +13,6 @@ pcb_length = 70 * MM
 pcb_width = 30 * MM
 pcb_height = 3 * MM
 
-# [Code]
 x_coords = product(range(65 // 5), (-15, -10, 10, 15))
 y_coords = product((30, 35), range(30 // 5 - 1))
 

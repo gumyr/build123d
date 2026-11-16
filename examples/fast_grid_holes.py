@@ -49,16 +49,21 @@ start_time = timeit.default_timer()
 major_r = 10
 hole_locs = HexLocations(major_r, 25, 25)
 
-# Create wires for both the perimeter and all the holes
-face_perimeter = Rectangle(500, 600).wire()
-hex_hole = RegularPolygon(major_r - 1, 6, major_radius=True).wire()
-holes = hole_locs * hex_hole
+with BuildPart() as grid:
+    with BuildSketch() as grid_pattern:
+        # Create wires for both the perimeter and all the holes, keeping
+        # the shapes they come from out of the sketch
+        face_perimeter = Rectangle(500, 600, mode=Mode.PRIVATE).wire()
+        hex_hole = RegularPolygon(
+            major_r - 1, 6, major_radius=True, mode=Mode.PRIVATE
+        ).wire()
+        holes = [loc * hex_hole for loc in hole_locs]
 
-# Create a new Face from the perimeter and hole wires
-grid_pattern = Face(face_perimeter, holes)
+        # Create a new Face from the perimeter and hole wires
+        insert(Face(face_perimeter, holes))
 
-# Extrude to a 3D part
-grid = extrude(grid_pattern, 1)
+    # Extrude to a 3D part
+    extrude(amount=1)
 
 print(f"Time: {timeit.default_timer() - start_time:0.3f}s")
 show(grid)

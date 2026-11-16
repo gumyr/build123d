@@ -20,6 +20,8 @@ image_files:
 """
 
 # [Imports]
+# [Code]
+
 from math import sin, cos, pi
 from build123d import *
 from ocp_vscode import show_object, show, show_all
@@ -29,8 +31,6 @@ from ocp_vscode import show_object, show, show_all
 height = 50
 width = 2 * height
 wave_amplitude = 3
-
-# [Code]
 
 
 def surface(amplitude, u, v):

@@ -31,10 +31,10 @@ license:
 
 """
 
+# [Code]
 from build123d import *
 from ocp_vscode import *
 
-# [Code]
 # Coin Parameters
 diameter, thickness = 50 * MM, 10 * MM
 

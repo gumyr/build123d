@@ -20,6 +20,8 @@ image_files:
 """
 
 # [Imports]
+# [Code]
+
 from build123d import *
 from ocp_vscode import *
 
@@ -28,7 +30,6 @@ pcb_length = 70 * MM
 pcb_width = 30 * MM
 pcb_height = 3 * MM
 
-# [Code]
 with BuildPart() as pcb:
     with BuildSketch():
         Rectangle(pcb_length, pcb_width)
