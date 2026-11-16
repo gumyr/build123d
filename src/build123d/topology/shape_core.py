@@ -2494,18 +2494,20 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @overload
     def split(
-        self, tool: TrimmingTool, keep: Literal[Keep.TOP, Keep.BOTTOM]
+        self, tool: Plane | Face | Shell, keep: Literal[Keep.TOP, Keep.BOTTOM]
     ) -> Self | list[Self]:
         """split and keep inside or outside"""
 
     @overload
     def split(
-        self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Literal[Keep.ALL]
+        self,
+        tool: Plane | Face | Shell | Iterable[Plane | Face | Shell],
+        keep: Literal[Keep.ALL],
     ) -> list[Self]:
         """split and return the unordered pieces"""
 
     @overload
-    def split(self, tool: TrimmingTool, keep: Literal[Keep.BOTH]) -> tuple[
+    def split(self, tool: Plane | Face | Shell, keep: Literal[Keep.BOTH]) -> tuple[
         Self | list[Self],
         Self | list[Self],
     ]:
@@ -2513,23 +2515,27 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @overload
     def split(
-        self, tool: TrimmingTool, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
+        self, tool: Plane | Face | Shell, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
     ) -> NoReturn:
         """invalid split"""
 
     @overload
     def split(
         self,
-        tool: Iterable[TrimmingTool],
+        tool: Iterable[Plane | Face | Shell],
         keep: Literal[Keep.TOP, Keep.BOTTOM, Keep.BOTH, Keep.INSIDE, Keep.OUTSIDE],
     ) -> NoReturn:
         """several tools leave no side to keep"""
 
     @overload
-    def split(self, tool: TrimmingTool) -> Self | list[Self]:
+    def split(self, tool: Plane | Face | Shell) -> Self | list[Self]:
         """split and keep inside (default)"""
 
-    def split(self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Keep = Keep.TOP):
+    def split(
+        self,
+        tool: Plane | Face | Shell | Iterable[Plane | Face | Shell],
+        keep: Keep = Keep.TOP,
+    ):
         """split
 
         Split this shape by the provided plane, face or shell, or by several of

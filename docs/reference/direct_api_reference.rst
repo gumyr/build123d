@@ -43,14 +43,46 @@ CAD objects described in the following section are frequently of these types.
 
 .. autoclass:: GeomEncoder
 
-Two type aliases appear throughout the signatures of build123d. Wherever one
-is asked for, any of the forms it lists may be given.
+Three type aliases appear throughout the signatures of build123d. None is a
+class to be created: each is a name for a set of forms, and wherever one is
+asked for, any of its forms may be given.
 
-.. autodata:: VectorLike
-   :no-value:
+.. py:class:: VectorLike
 
-.. autodata:: RotationLike
-   :no-value:
+   A position or a direction in space. Any of:
+
+   - a :class:`Vector`;
+   - ``tuple[float, float]``, a 2D coordinate ``(x, y)``, with Z taken as 0;
+   - ``tuple[float, float, float]``, a 3D coordinate ``(x, y, z)``;
+   - ``Sequence[float]``, any other sequence of two or three numbers, such
+     as a list.
+
+.. py:class:: ColorLike
+
+   A colour. Any of:
+
+   - a :class:`Color`;
+   - ``str``, a colour name such as ``"red"``;
+   - ``tuple[str, float]``, a name and an alpha, as ``("red", 0.5)``;
+   - ``tuple[float, float, float]``, red, green and blue from 0 to 1, as
+     ``(1, 0, 0)``;
+   - ``tuple[float, float, float, float]``, the same with an alpha, as
+     ``(1, 0, 0, 0.5)``;
+   - ``int``, a hexadecimal RGB value, as ``0xFF0000``;
+   - ``tuple[int, int]``, a hexadecimal value and an alpha from 0 to 255,
+     as ``(0xFF0000, 0x80)``;
+   - an OCP ``Quantity_ColorRGBA``.
+
+   A shape's ``color`` can be set to any of these, and reads back as a
+   :class:`Color`.
+
+.. py:class:: RotationLike
+
+   A rotation. Either of:
+
+   - a :class:`Rotation`;
+   - ``tuple[float, float, float]``, the angles of rotation about the X, Y
+     and Z axes, in degrees.
 
 *******************
 Topological Objects
