@@ -42,7 +42,7 @@ whether the shape was made in builder or algebra mode.
 Assign a material
 ******************
 
-``bd_materials`` is organised by kind - ``metals``, ``wood``, ``plastics``
+``bd_materials`` is organized by kind - ``metals``, ``wood``, ``plastics``
 and others - with a function for each material. Assign the result to a
 shape's ``material``.
 

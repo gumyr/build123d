@@ -339,7 +339,7 @@ wanted.
 When the block ends
 ***********************
 
-When its block ends, a builder finalises its result and, if it is nested,
+When its block ends, a builder finalizes its result and, if it is nested,
 hands it to its parent. Anything about the result that is set on the
 *builder* has to be set before then. A builder's ``label``, ``color`` and
 ``material`` are applied to the result as the block closes:

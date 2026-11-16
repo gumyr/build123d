@@ -53,7 +53,7 @@ This tea cup is about forty lines of Python. :ref:`See how it is made
 Where to start
 *****************
 
-This documentation is organised on the `Diátaxis <https://diataxis.fr/>`_
+This documentation is organized on the `Diátaxis <https://diataxis.fr/>`_
 framework, which sorts documentation by what the reader needs at the time:
 tutorials for learning, how-to guides for getting a task done, reference
 for looking something up, and explanation for understanding.
@@ -62,7 +62,7 @@ for looking something up, and explanation for understanding.
   model, and the two modes a model can be written in.
 * **Learning it?** The :ref:`tutorials` each build a complete part, step by
   step.
-* **Working on a design?** The :ref:`how_to_guides` are organised by task,
+* **Working on a design?** The :ref:`how_to_guides` are organized by task,
   and the :ref:`cheat_sheet` lists everything on one page.
 * **Deciding whether to use it, or wondering why it works the way it
   does?** Start with :ref:`why_build123d`.

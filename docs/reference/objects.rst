@@ -28,7 +28,7 @@ The following sections describe the 1D, 2D and 3D objects:
 Align
 -----
 
-2D/Sketch and 3D/Part objects can be aligned relative to themselves, either centered, or justified
+2D/Sketch and 3D/Part objects can be aligned relative to themselves, either centred, or justified
 right or left of each Axis. The following diagram shows how this alignment works in 2D:
 
 .. image:: /reference/assets/objects/align.svg
@@ -109,7 +109,7 @@ active ``Locations`` place 1D objects when they are added to the active builder.
         .. image:: /reference/assets/objects/center_arc_example.svg
 
         +++
-        Arc defined by center, radius, & angles
+        Arc defined by centre, radius, & angles
 
 
     .. grid-item-card:: :class:`~objects_curve.ConstrainedArcs`
@@ -139,7 +139,7 @@ active ``Locations`` place 1D objects when they are added to the active builder.
         .. image:: /reference/assets/objects/elliptical_center_arc_example.svg
 
         +++
-        Elliptical arc defined by center,  radii & angles
+        Elliptical arc defined by centre,  radii & angles
 
     .. grid-item-card:: :class:`~objects_curve.EllipticalStartArc`
 
@@ -160,7 +160,7 @@ active ``Locations`` place 1D objects when they are added to the active builder.
         .. image:: /reference/assets/objects/hyperbolic_center_arc_example.svg
 
         +++
-        Hyperbolic arc defined by center, radii & angles
+        Hyperbolic arc defined by centre, radii & angles
 
     .. grid-item-card:: :class:`~objects_curve.FilletPolyline`
 
@@ -360,7 +360,7 @@ Reference
         .. image:: /reference/assets/objects/slot_curve_example.svg
 
         +++
-        SlotCurve defined by a center line and height
+        SlotCurve defined by a centre line and height
 
     .. grid-item-card:: :class:`~objects_sketch.SlotCenterPoint`
 
@@ -374,7 +374,7 @@ Reference
         .. image:: /reference/assets/objects/slot_center_to_center_example.svg
 
         +++
-        SlotCenterToCenter defined by center separation and height
+        SlotCenterToCenter defined by centre separation and height
 
     .. grid-item-card:: :class:`~objects_sketch.SlotOverall`
 

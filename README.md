@@ -25,7 +25,7 @@
 [Issues](https://github.com/gumyr/build123d/issues ) |
 [Contributing](#contributing)
 
-build123d is a Python-based, parametric [boundary representation (BREP)][BREP] modeling framework for 2D and 3D CAD. Built on the [Open Cascade] geometric kernel, it provides a clean, fully Pythonic interface for creating precise models suitable for 3D printing, CNC machining, laser cutting, and other manufacturing processes.
+build123d is a Python-based, parametric [boundary representation (BREP)][BREP] modelling framework for 2D and 3D CAD. Built on the [Open Cascade] geometric kernel, it provides a clean, fully Pythonic interface for creating precise models suitable for 3D printing, CNC machining, laser cutting, and other manufacturing processes.
 
 <div align="left">
     <img style="height:200px" alt="bracket" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/examples/toy_truck.png">
@@ -35,13 +35,13 @@ build123d is a Python-based, parametric [boundary representation (BREP)][BREP] m
 
 ## Features
 
-Designed for modern, maintainable CAD-as-code, build123d combines clear architecture with expressive, algebraic modeling. It offers:
+Designed for modern, maintainable CAD-as-code, build123d combines clear architecture with expressive, algebraic modelling. It offers:
 - Minimal or no internal state depending on mode,
 - Explicit 1D, 2D, and 3D geometry classes with well-defined operations,
 - Extensibility through subclassing and functional composition—no monkey patching,
 - Standards-compliant code (PEP 8, mypy, pylint) with rich pylance type hints,
 - Deep Python integration—selectors as lists, locations as iterables, and natural conversions (`Solid(shell)`, `tuple(Vector)`),
-- Operator-driven modeling (`obj += sub_obj`, `Plane.XZ * Pos(X=5) * Rectangle(1, 1)`) for algebraic, readable, and composable design logic,
+- Operator-driven modelling (`obj += sub_obj`, `Plane.XZ * Pos(X=5) * Rectangle(1, 1)`) for algebraic, readable, and composable design logic,
 - Export formats to popular CAD tools such as [FreeCAD] and SolidWorks.
 
 ## Usage

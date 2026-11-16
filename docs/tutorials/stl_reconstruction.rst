@@ -178,7 +178,7 @@ Now ask what the triangles were.
 
 :func:`~build123d.detect_primitives` gives back three things:
 
-* ``primitives`` are the true faces it recognised, shown above: five
+* ``primitives`` are the true faces it recognized, shown above: five
   planes, in blue, and two cylinders, in orange. Each stands for a great
   many triangles. A plane comes back as a rectangle as big as the bounding
   box of the flat region it was found in, not as the outline of that
@@ -259,7 +259,7 @@ a fillet.
 Step 7: Measure what was left over
 ***********************************************
 
-The detector did not recognise the bend or the slot, so nothing in the
+The detector did not recognize the bend or the slot, so nothing in the
 report describes them. The triangles are still there, though, and they can
 be measured. Pick out the leftover triangles in each of the two places,
 and ask how much room they take up.
@@ -346,7 +346,7 @@ When this works, and when it does not
 The bracket was a kind case, and even so the detector found two of its
 features and missed two. It helps most when:
 
-* the mesh is clean, and fine enough for curves to be recognisable;
+* the mesh is clean, and fine enough for curves to be recognizable;
 * the part is mechanical, made mostly of flat, cylindrical and spherical
   faces;
 * there is symmetry, or features that repeat.
@@ -371,7 +371,7 @@ What you learned
   that the mesh can guide.
 * ``Mesher`` reads an STL, ``split`` cuts it down by its symmetry, and
   saving the working piece as BREP makes it quick to reload.
-* :func:`~build123d.detect_primitives` returns the faces it recognised,
+* :func:`~build123d.detect_primitives` returns the faces it recognized,
   the triangles it did not, and a report written as code.
 * Read the report for planes that repeat and offsets that pair up; they
   give thicknesses and overall sizes. Cylinders give holes and fillets.

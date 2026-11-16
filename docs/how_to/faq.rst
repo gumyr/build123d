@@ -50,7 +50,7 @@ which, together with something like the OCP CAD Viewer, acts as the user interfa
 Writing build123d often involves live coding in a REPL or typing in editors with limited space due to
 the rest of the CAD GUI taking up screen space. Scripts are usually centred around build123d usage, with
 usage of other libraries being limited enough that naming conflicts are easily avoided. In this context,
-it’s entirely reasonable to prioritise developer ergonomics over “correctness” by making build123d’s primitives
+it’s entirely reasonable to prioritize developer ergonomics over “correctness” by making build123d’s primitives
 available in the global namespace.
 
 When a script does need explicit imports, there is a tool to write them.

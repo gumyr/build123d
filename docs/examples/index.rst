@@ -247,7 +247,7 @@ This model is a good stress test for the geometric kernel because most of
 its boundary surfaces are *freeform*, not planes, cylinders or spheres. It
 is assembled from:
 
-- a swept center section, using a curved solid end-face as the sweep profile
+- a swept centre section, using a curved solid end-face as the sweep profile
 - two freeform tip caps built as Gordon surfaces, from a network of curves
 - an optional text label projected onto the curved solid and thickened
 - alignment holes for splitting, printing and assembly

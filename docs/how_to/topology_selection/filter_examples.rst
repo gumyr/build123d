@@ -46,7 +46,7 @@ All Edges Circle
 
 In this complete bearing block, we want to add joints for the bearings. These should be
 located in the counterbore recess. One way to locate the joints is by finding faces with
-centers located where the joints need to be located. Filtering for faces with only
+centres located where the joints need to be located. Filtering for faces with only
 circular edges selects the counterbore faces that meet the joint criteria.
 
 .. dropdown:: Setup
@@ -137,7 +137,7 @@ and then filtering for the specific inner wire by radius.
 |
 
 Linear joints for the slots are appropriate for mating flexibility, but require more
-than a single location. The slot arc centers can be used for creating a linear joint
+than a single location. The slot arc centres can be used for creating a linear joint
 axis and range. To do that we can filter for faces with 6 inner wires, sort for and
 select the top face, and then filter for the circular edges of the inner wires.
 

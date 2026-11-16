@@ -244,13 +244,13 @@ types, add shapes to the layers, and write the file.
     :end-before: [svg]
 
 ``ExportSVG`` accepts the standard ``ColorLike`` interface for
-layer fill and line colors. When a layer color is omitted, a Face color is used
-for its SVG fill and an Edge or Wire color is used for its SVG stroke. An
-explicit layer color, including ``None``, overrides the shape color.
+layer fill and line colours. When a layer colour is omitted, a Face colour is used
+for its SVG fill and an Edge or Wire colour is used for its SVG stroke. An
+explicit layer colour, including ``None``, overrides the shape colour.
 
 The older ``ColorIndex``, ``ezdxf.colors.RGB``, and 0–255 RGB tuple inputs are
 deprecated for SVG export and will be removed at or before version 1.0.0. They
-are converted with a ``DeprecationWarning`` during the transition. Use color
+are converted with a ``DeprecationWarning`` during the transition. Use colour
 names, hexadecimal values, or normalized RGB(A) tuples instead.
 
 .. literalinclude:: /how_to/import_export.py
@@ -262,9 +262,9 @@ A shape given to either exporter has to lie flat in the XY plane, as a
 section by ``Plane.XY`` and the edges of a ``drawing_view`` do.
 
 ``ExportDXF`` accepts the standard ``ColorLike`` interface for
-document and layer colors. ColorLike alpha is written as DXF layer transparency.
-True-color black is always ``0x000000``; unlike ACI 7, DXF viewers do not switch
-it to white on dark backgrounds. DXF versions before R2004 have no true color,
+document and layer colours. ColorLike alpha is written as DXF layer transparency.
+True-colour black is always ``0x000000``; unlike ACI 7, DXF viewers do not switch
+it to white on dark backgrounds. DXF versions before R2004 have no true colour,
 so for those the nearest AutoCAD Color Index is written instead. The older
 ``ColorIndex`` values remain supported
 during the transition but emit a ``DeprecationWarning`` and will be removed at or

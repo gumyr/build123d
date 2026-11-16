@@ -40,7 +40,7 @@ geometry. Each solves one specific pattern of constraint while keeping the
 behaviour of the model explicit, deterministic and readable in code.
 
 The result is a practical hybrid: precise programmatic modelling by
-default, with specialised constrained objects where they provide clear
+default, with specialized constrained objects where they provide clear
 leverage. For most production parts this yields robust, maintainable
 sketches without the overhead and fragility of a general-purpose sketch
 solver.

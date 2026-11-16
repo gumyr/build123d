@@ -33,7 +33,7 @@ Step 1: Choose the materials
 
 Materials come from ``bd_materials``, a library of real materials that is
 installed with build123d. You met it in :ref:`tutorial_parametric_part`,
-where a beam was made of aluminium. It is organised by kind: ``metals``,
+where a beam was made of aluminium. It is organized by kind: ``metals``,
 ``wood``, ``plastics`` and more.
 
 .. literalinclude:: /tutorials/box_materials.py

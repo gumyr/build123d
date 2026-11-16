@@ -64,7 +64,7 @@ with :math:`B^3 \subset C^3, B^2 \subset C^2` and :math:`B^1 \subset C^1`
     :math:`\; a \; \& \; b :=` ``a.intersect(b)``
 
     * The following relationship holds: :math:`a \; \& \; b = (a + b) - (a - b) - (b - a)`
-    * For :math:`n=3` the result is regularised: two solids that only touch,
+    * For :math:`n=3` the result is regularized: two solids that only touch,
       on a face, an edge or a corner, have :math:`c^3_0` in common.
     * For :math:`n=1,2` two shapes that touch without overlapping return what
       they share one dimension down: two faces that share an edge return that
@@ -99,7 +99,7 @@ For :math:`n=1,2,3` and all :math:`a, b, c \in C^n`:
 * :math:`c^n_0` is the identity of :math:`+` and annihilates :math:`\&`: :math:`a + c^n_0 = a` and :math:`a \; \& \; c^n_0 = c^n_0`
 * :math:`a - b` is the complement of :math:`b` relative to :math:`a`: :math:`(a - b) \; \& \; b` has no part of dimension :math:`n`, and :math:`(a - b) + (a \; \& \; b) = a`
 
-:math:`( C^n, \; +, \; \&, \; -, \; c^n_0)` is therefore a generalised Boolean
+:math:`( C^n, \; +, \; \&, \; -, \; c^n_0)` is therefore a generalized Boolean
 algebra: a distributive lattice with a least element in which every element
 has a complement relative to any other. It has no greatest element, since
 there is no shape that is "everything", and so no absolute complement.

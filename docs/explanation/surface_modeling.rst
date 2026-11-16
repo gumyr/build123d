@@ -1,12 +1,12 @@
 .. _surface_modeling:
 
-################
-Surface modeling
-################
+#################
+Surface modelling
+#################
 
 Most parts are made from volumes. A sketch is extruded or revolved, the
 result fills a region of space, and its faces are whatever the operation
-left behind. *Surface modeling* goes the other way: the faces are made
+left behind. *Surface modelling* goes the other way: the faces are made
 first, each one deliberately, and the solid is what they enclose.
 
 ***********************
@@ -24,7 +24,7 @@ It stops being enough when the shape of a face is the point. The skin of
 an aircraft, the hull of a boat, a hand grip, a smooth transition between
 two unlike shapes: none of these is a sketch pushed along a line or turned
 about an axis. They are surfaces that curve in two directions at once, and
-they have to be described as surfaces. Surface modeling gives direct
+they have to be described as surfaces. Surface modelling gives direct
 control over each face, and over how neighbouring faces meet.
 
 *******************************
