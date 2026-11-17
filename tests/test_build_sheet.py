@@ -107,32 +107,32 @@ class TestBuildSheetBase(unittest.TestCase):
 
     def test_sheet_invariant_errors(self):
         """The sheet invariant lives on Shell, for Builder and Algebra mode alike."""
-        self.assertFalse(Shell.make_sheet([]))
+        self.assertFalse(Shell._make_sheet([]))
         sphere = Solid.make_sphere(1).faces()[0]
         with self.assertRaisesRegex(ValueError, "planar and cylindrical"):
-            Shell.make_sheet([sphere])
+            Shell._make_sheet([sphere])
 
         cylinder = Solid.make_cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0]
         with patch.object(Face, "radius", new_callable=PropertyMock, return_value=0):
             with self.assertRaisesRegex(ValueError, "positive radius"):
-                Shell.make_sheet([cylinder])
+                Shell._make_sheet([cylinder])
 
         face = Face.make_rect(10, 10)
         with patch.object(
             Shell, "is_valid", new_callable=PropertyMock, return_value=False
         ):
             with self.assertRaisesRegex(ValueError, "invalid shell"):
-                Shell.make_sheet([face])
+                Shell._make_sheet([face])
 
         with patch(
             "build123d.topology.two_d.topo_explore_connected_faces",
             return_value=[face, face, face],
         ):
             with self.assertRaisesRegex(ValueError, "non-manifold"):
-                Shell.make_sheet([face])
+                Shell._make_sheet([face])
 
         with self.assertRaisesRegex(ValueError, "one connected shell"):
-            Shell.make_sheet([face, Pos(50, 0) * Face.make_rect(10, 10)])
+            Shell._make_sheet([face, Pos(50, 0) * Face.make_rect(10, 10)])
 
     def test_make_sheet_records_the_sewing(self):
         """A sheet made in Algebra mode knows what became of its faces."""
@@ -140,7 +140,7 @@ class TestBuildSheetBase(unittest.TestCase):
         wall = Face.make_rect(
             20, 10, Plane(origin=(10, 0, 5), x_dir=(0, 1, 0), z_dir=(1, 0, 0))
         )
-        sheet = Shell.make_sheet([base, wall])
+        sheet = Shell._make_sheet([base, wall])
         self.assertEqual(len(sheet.faces()), 2)
         sheet._history.with_inputs([base.wrapped], [wall.wrapped])
         self.assertEqual(len(sheet.faces(Select.LAST)), 1)
@@ -155,14 +155,14 @@ class TestBuildSheetBase(unittest.TestCase):
                 Rectangle(40, 20)
             flange(bs.edges().sort_by(Axis.X)[-1], length=10)
         sheet = bs.sheet
-        pierced = sheet.cut_sheet(Cylinder(1, 40, rotation=(0, 90, 0)))
+        pierced = sheet._cut_sheet(Cylinder(1, 40, rotation=(0, 90, 0)))
         self.assertTrue(pierced.is_valid)
         self.assertLess(pierced.area, sheet.area)
         self.assertEqual(len(pierced.bends()), 1)
-        notched = sheet.cut_sheet(Pos(0, 5) * Face.make_rect(4, 4))
+        notched = sheet._cut_sheet(Pos(0, 5) * Face.make_rect(4, 4))
         self.assertAlmostEqual(notched.area, sheet.area - 16, 5)
         with self.assertRaisesRegex(ValueError, "coplanar"):
-            sheet.cut_sheet(Pos(0, 0, 3) * Face.make_rect(4, 4))
+            sheet._cut_sheet(Pos(0, 0, 3) * Face.make_rect(4, 4))
 
     def test_context_modes_and_empty_inputs(self):
         builder = BuildSheet(thickness=1)
@@ -193,9 +193,9 @@ class TestBuildSheetBase(unittest.TestCase):
         faces = [Face.make_rect(10, 10), Pos(10, 0) * Face.make_rect(10, 10)]
         with patch.object(Face, "fuse", return_value=Compound(faces)):
             self.assertEqual(
-                len(Shell.make_sheet(faces, merge_coplanar=True).faces()), 2
+                len(Shell._make_sheet(faces, merge_coplanar=True).faces()), 2
             )
-        self.assertEqual(len(Shell.make_sheet(faces, merge_coplanar=True).faces()), 1)
+        self.assertEqual(len(Shell._make_sheet(faces, merge_coplanar=True).faces()), 1)
 
     def test_base_from_sketch(self):
         with BuildSheet(thickness=1) as bs:
@@ -1667,7 +1667,7 @@ class TestJog(unittest.TestCase):
                 self.assertTrue(materialize(bs).is_valid)
 
     def test_algebra_mode(self):
-        halves = Shell.make_sheet(
+        halves = Shell._make_sheet(
             [Pos(-25, 0) * Face.make_rect(50, 60), Pos(25, 0) * Face.make_rect(50, 60)]
         )
         line = halves.flats().sort_by(Axis.X)[0].fold_lines()[0]

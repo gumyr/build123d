@@ -3158,7 +3158,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return rims
 
     @classmethod
-    def make_sheet(
+    def _make_sheet(
         cls, faces: Iterable[Face], merge_coplanar: bool | Iterable[Face] = False
     ) -> Shell:
         """Sew faces into a sheet metal reference shell.
@@ -3209,7 +3209,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         ]
         return cls._sewn_sheet(face_list, records)
 
-    def cut_sheet(self, *cutters: Shape) -> Shell:
+    def _cut_sheet(self, *cutters: Shape) -> Shell:
         """Trim this sheet with cutters, keeping its flats and bends.
 
         A ``Solid`` is a normal cut, the cut across a bend of sheet metal
