@@ -140,7 +140,7 @@ svg.add_shape(
 svg.add_shape(example_12.sketch)
 svg.write("assets/objects/trapezoid_example.svg")
 
-d = Draft(line_width=0.1)
+d = Drafting(line_width=0.1)
 # [Ex. 15]
 with BuildSketch() as isosceles_triangle:
     t = Triangle(a=30, b=40, c=40)
@@ -228,7 +228,7 @@ svg.add_shape(align.sketch)
 svg.write("assets/objects/align.svg")
 
 # [DimensionLine]
-std = Draft()
+std = Drafting()
 with BuildSketch() as d_line:
     Rectangle(100, 100)
     c = Circle(45, mode=Mode.SUBTRACT)

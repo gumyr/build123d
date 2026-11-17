@@ -162,7 +162,7 @@ assert abs(right_box.size.X - height) < 1e-5 and abs(top_box.size.Y - height) < 
 # Step 6: dimensions
 # ---------------------------------------------------------------------------
 # [dimensions]
-draft = Draft(
+draft = Drafting(
     font_size=3,
     decimal_precision=0,
     display_units=False,

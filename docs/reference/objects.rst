@@ -421,6 +421,7 @@ Reference
 .. autoclass:: drafting.ArrowHead
 .. autoclass:: Circle
 .. autoclass:: drafting.DimensionLine
+.. autoclass:: drafting.Drafting
 .. autoclass:: drafting.Draft
 .. autoclass:: Ellipse
 .. autoclass:: drafting.ExtensionLine

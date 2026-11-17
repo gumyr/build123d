@@ -194,7 +194,7 @@ between them.
     :align: center
     :width: 70%
 
-:class:`~drafting.Draft` holds the style that all the dimensions share -
+:class:`~drafting.Drafting` holds the style that all the dimensions share -
 the size of the text and the arrows, and how numbers are written - so that
 it is set once. ``decimal_precision=0`` and ``display_units=False`` give
 plain whole numbers; the title block already says the units are
@@ -280,7 +280,7 @@ What you learned
 * The views of a drawing are placed by convention and lined up with one
   another, which giving them a shared X or Y position does.
 * :class:`~drafting.ExtensionLine` measures what it is given, with its
-  style held in a :class:`~drafting.Draft`.
+  style held in a :class:`~drafting.Drafting`.
 * :class:`~exporters.ExportSVG` writes the sheet to a file, with a layer
   for each style of line.
 * A drawing made in code follows the model, dimensions included.
