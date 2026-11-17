@@ -160,17 +160,6 @@ svg.add_shape(dot.moved(Location(Vector((1.5, 2)))))
 svg.add_shape(dot.moved(Location(Vector((3, 3)))))
 svg.write("assets/objects/three_point_arc_example.svg")
 
-with BuildLine() as intersecting_line:
-    other = Line((2, 0), (2, 2), mode=Mode.PRIVATE)
-    IntersectingLine((1, 0), (1, 1), other)
-s = 100 / max(*intersecting_line.line.bounding_box().size)
-svg = ExportSVG(scale=s)
-svg.add_layer("dashed", line_type=LineType.ISO_DASH_SPACE)
-svg.add_shape(other, "dashed")
-svg.add_shape(intersecting_line.line)
-svg.add_shape(dot.moved(Location(Vector((1, 0)))))
-svg.write("assets/objects/intersecting_line_example.svg")
-
 with BuildLine() as double_tangent:
     p1 = (6, 0)
     d1 = (0, 1)

@@ -176,13 +176,6 @@ active ``Locations`` place 1D objects when they are added to the active builder.
         +++
         Helix defined pitch, radius and height
 
-    .. grid-item-card:: :class:`~objects_curve.IntersectingLine`
-
-        .. image:: /reference/assets/objects/intersecting_line_example.svg
-
-        +++
-        Intersecting line defined by start, direction & other line
-
     .. grid-item-card:: :class:`~objects_curve.JernArc`
 
         .. image:: /reference/assets/objects/jern_arc_example.svg
@@ -202,7 +195,7 @@ active ``Locations`` place 1D objects when they are added to the active builder.
         .. image:: /reference/assets/objects/polar_line_example.svg
 
         +++
-        Line defined by start, angle and length
+        Line defined by start, angle and length, or a limit to stop at
 
     .. grid-item-card:: :class:`~objects_curve.Polyline`
 
