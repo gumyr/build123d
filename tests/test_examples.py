@@ -80,10 +80,9 @@ class TestExamples(unittest.TestCase):
 
 def _is_paired(path: Path) -> bool:
     """True for a script with both a builder and an algebra version"""
-    stem = path.name[: -len(".py")]
-    if stem.endswith("_algebra"):
-        return (path.parent / f"{stem[: -len('_algebra')]}.py").exists()
-    return (path.parent / f"{stem}_algebra.py").exists()
+    if path.stem.endswith("_algebra"):
+        return path.with_stem(path.stem.removesuffix("_algebra")).exists()
+    return path.with_stem(f"{path.stem}_algebra").exists()
 
 
 for example in sorted(list(_examples_dir.iterdir()) + list(_ttt_dir.iterdir())):
