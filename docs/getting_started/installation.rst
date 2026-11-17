@@ -52,6 +52,62 @@ Visual Studio Code, are listed in :ref:`external`.
 Other ways to install
 ***********************
 
+With uv
+=======
+
+Most trouble with installing build123d comes from the Python environment
+rather than from build123d: the wrong Python, or a package installed into
+one environment and a script run with another.
+`uv <https://docs.astral.sh/uv/>`_ avoids both, because it downloads the
+Python it is asked for and keeps the environment in the folder the work is
+done in. It is installed with the single command given on its own site, and
+the commands below are then the same on Linux, macOS and Windows.
+
+First create a virtual environment in a work folder, and install build123d
+and the viewer into it:
+
+.. code-block:: bash
+
+    cd work_folder                       # the folder your scripts will be in
+    uv venv --python 3.14                # create a fresh virtual environment
+    uv pip install build123d ocp-viewer  # install build123d and the viewer
+
+Next start the viewer from the same folder, so that ``uv`` finds the
+environment just created, and leave it running:
+
+.. code-block:: bash
+
+    cd work_folder
+    uv run ocp-viewer
+
+Then, in a second terminal, run a script from that folder in the same way:
+
+.. code-block:: bash
+
+    cd work_folder
+    uv run python hello_world.py
+
+Because ``uv run`` uses the environment in the folder it is run from, there
+is nothing to activate, and the script and the viewer cannot end up with
+different Pythons.
+
+With poetry
+===========
+
+In a project managed by `poetry <https://python-poetry.org/>`_, add the
+release as a dependency:
+
+.. code-block:: bash
+
+    poetry add build123d
+
+For the development version, name the branch, since build123d's default
+branch is ``dev``:
+
+.. code-block:: bash
+
+    poetry add git+https://github.com/gumyr/build123d.git@dev
+
 The latest development version
 ==============================
 
@@ -60,11 +116,6 @@ To get changes that have not yet been released, install from GitHub:
 .. code-block:: bash
 
     python -m pip install git+https://github.com/gumyr/build123d
-
-With `poetry <https://python-poetry.org/>`_, ``poetry add build123d``
-installs the release. For the development version, name the branch, since
-build123d's default branch is ``dev``:
-``poetry add git+https://github.com/gumyr/build123d.git@dev``.
 
 For working on build123d itself
 ===============================
