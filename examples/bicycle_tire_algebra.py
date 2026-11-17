@@ -47,7 +47,7 @@ tread_pattern += mirror(tread_pattern, Plane.XZ)
 wrapped_pattern = road_surface.wrap_faces(tread_pattern.faces(), tread_path)
 
 # Thicken the wrapped faces into blocks
-tread_unit = Part() + [thicken(face, amount=block_height) for face in wrapped_pattern]
+tread_unit = thicken(wrapped_pattern, amount=block_height)
 
 # Copy the unit all the way round the tire
 tread = [Rot(X=angle) * tread_unit for angle in range(0, 360, tread_step)]

@@ -69,10 +69,11 @@ Checking the result
 
 A shell and a solid can each be asked whether they came out as intended:
 
-* ``shell.is_manifold`` is true when the shell has no openings.
-* ``solid.is_valid`` is true when the solid is well formed. Check it after
-  making a solid from a shell: an open shell is not refused, and gives a
-  solid that is not valid.
+* ``shell.is_manifold`` is true when the shell has no openings. A solid
+  can only be made from such a shell: ``Solid(shell)`` raises a
+  ``ValueError`` if the shell is open, because an open shell encloses
+  nothing.
+* ``solid.is_valid`` is true when the solid is well formed.
 * ``solid.volume`` should be the positive number expected.
 
 **************************

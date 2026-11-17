@@ -45,6 +45,7 @@ for extent_object, parameter in (
     (PolarLine, "length"),
     (CenterArc, "arc_size"),
     (EllipticalCenterArc, "arc_size"),
+    (EllipticalStartArc, "arc_size"),
     (JernArc, "arc_size"),
     (ParabolicCenterArc, "arc_size"),
     (HyperbolicCenterArc, "arc_size"),

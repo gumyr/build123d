@@ -245,9 +245,9 @@ ones that are waiting in the part.
 The last statement copies the unit round the tire.
 ``Rot(X=angle) * tread_unit.part`` is a copy of the whole unit, all six
 blocks, turned about the axle, and there is one every ``tread_step``
-degrees: 180 units, 1080 blocks. In algebra mode the six blocks are
-gathered into one part with ``Part() + [...]``, and that part is copied
-in the same way.
+degrees: 180 units, 1080 blocks. In algebra mode ``thicken`` is given the
+wrapped faces and returns the six blocks as one part, which is copied in
+the same way.
 
 The units are kept as a list beside the tire, not added to it: fusing a
 thousand solids into one is slow, and nothing here needs it.
@@ -412,8 +412,8 @@ gives them some, as it did for the tread, so that each letter stands
     :width: 70%
 
 In builder mode ``thicken`` again takes the faces waiting in the part,
-which are now the projected letters. In algebra mode each face of
-``letters`` is thickened and the pieces are gathered into one part.
+which are now the projected letters. In algebra mode it is given
+``letters`` and returns the raised lettering as one part.
 
 .. tip::
 

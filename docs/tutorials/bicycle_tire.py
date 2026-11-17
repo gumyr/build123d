@@ -430,7 +430,7 @@ tread_pattern += mirror(tread_pattern, Plane.XZ)
 wrapped_pattern = road_surface.wrap_faces(tread_pattern.faces(), tread_path)
 
 # Thicken the wrapped faces into blocks
-tread_unit = Part() + [thicken(face, amount=block_height) for face in wrapped_pattern]
+tread_unit = thicken(wrapped_pattern, amount=block_height)
 
 # Copy the unit all the way round the tire
 tread = [Rot(X=angle) * tread_unit for angle in range(0, 360, tread_step)]
@@ -567,7 +567,7 @@ tread_pattern += mirror(tread_pattern, Plane.XZ)
 wrapped_pattern = road_surface.wrap_faces(tread_pattern.faces(), tread_path)
 
 # Thicken the wrapped faces into blocks
-tread_unit = Part() + [thicken(face, amount=block_height) for face in wrapped_pattern]
+tread_unit = thicken(wrapped_pattern, amount=block_height)
 
 # Copy the unit all the way round the tire
 tread = [Rot(X=angle) * tread_unit for angle in range(0, 360, tread_step)]
@@ -712,7 +712,7 @@ tread_pattern += mirror(tread_pattern, Plane.XZ)
 wrapped_pattern = road_surface.wrap_faces(tread_pattern.faces(), tread_path)
 
 # Thicken the wrapped faces into blocks
-tread_unit = Part() + [thicken(face, amount=block_height) for face in wrapped_pattern]
+tread_unit = thicken(wrapped_pattern, amount=block_height)
 
 # Copy the unit all the way round the tire
 tread = [Rot(X=angle) * tread_unit for angle in range(0, 360, tread_step)]
@@ -865,7 +865,7 @@ tread_pattern += mirror(tread_pattern, Plane.XZ)
 wrapped_pattern = road_surface.wrap_faces(tread_pattern.faces(), tread_path)
 
 # Thicken the wrapped faces into blocks
-tread_unit = Part() + [thicken(face, amount=block_height) for face in wrapped_pattern]
+tread_unit = thicken(wrapped_pattern, amount=block_height)
 
 # Copy the unit all the way round the tire
 tread = [Rot(X=angle) * tread_unit for angle in range(0, 360, tread_step)]
@@ -887,7 +887,7 @@ label = Plane.ZY.offset(label_offset) * Text(
 letters = project_to_shape(label, smooth_tire, direction=(1, 0, 0), hit=Hit.NEAREST)
 
 # Thicken the projected letters so they stand out from the sidewall
-embossed_label = Part() + [thicken(face, amount=relief) for face in letters.faces()]
+embossed_label = thicken(letters, amount=relief)
 # [emboss_algebra]
 
 assert same(builder_result, embossed_label)
@@ -1034,7 +1034,7 @@ tread_pattern += mirror(tread_pattern, Plane.XZ)
 wrapped_pattern = road_surface.wrap_faces(tread_pattern.faces(), tread_path)
 
 # Thicken the wrapped faces into blocks
-tread_unit = Part() + [thicken(face, amount=block_height) for face in wrapped_pattern]
+tread_unit = thicken(wrapped_pattern, amount=block_height)
 
 # Copy the unit all the way round the tire
 tread = [Rot(X=angle) * tread_unit for angle in range(0, 360, tread_step)]
@@ -1056,7 +1056,7 @@ label = Plane.ZY.offset(label_offset) * Text(
 letters = project_to_shape(label, smooth_tire, direction=(1, 0, 0), hit=Hit.NEAREST)
 
 # Thicken the projected letters so they stand out from the sidewall
-embossed_label = Part() + [thicken(face, amount=relief) for face in letters.faces()]
+embossed_label = thicken(letters, amount=relief)
 
 # The whole tire: the parts are grouped, not fused
 tire = Compound(children=tread + [smooth_tire, embossed_label])

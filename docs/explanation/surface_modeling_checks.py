@@ -97,8 +97,13 @@ assert joined.is_manifold and Solid(joined).is_valid
 
 open_box = Shell(cube_faces()[:5])
 assert not open_box.is_manifold
-# an open shell is not refused, and the solid made from it is not valid
-assert not Solid(open_box).is_valid
+# an open shell is refused: it encloses nothing, so there is no solid to make
+try:
+    Solid(open_box)
+except ValueError:
+    pass
+else:
+    raise AssertionError("an open shell was made into a solid")
 
 # ---------------------------------------------------------------------------
 # Ways to make a surface: each method the page lists gives a face or shell
