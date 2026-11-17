@@ -577,6 +577,15 @@ class BuildLineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             IntersectingLine((0, 10), (1, 1), l3)
 
+    def test_intersecting_line_is_deprecated(self):
+        """IntersectingLine still works but warns; PolarLine makes the same line."""
+        other = Line((0, 0), (10, 10))
+        with self.assertWarnsRegex(DeprecationWarning, "use PolarLine"):
+            old = IntersectingLine((0, 10), (1, -1), other)
+        new = PolarLine((0, 10), other, direction=(1, -1))
+        self.assertAlmostEqual(old @ 0, new @ 0, 5)
+        self.assertAlmostEqual(old @ 1, new @ 1, 5)
+
     def test_jern_arc(self):
         with BuildLine() as jern:
             j1 = JernArc((1, 0), (0, 1), 1, 90)

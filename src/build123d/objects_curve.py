@@ -35,6 +35,7 @@ from typing import overload
 
 import numpy as np
 from scipy.optimize import minimize
+from typing_extensions import deprecated
 
 from build123d.build_common import BaseObject, flatten_sequence
 from build123d.build_enums import (
@@ -1867,8 +1868,17 @@ class Line(BaseEdgeObject):
         super().__init__(new_edge, mode=mode)
 
 
+@deprecated(
+    "IntersectingLine is deprecated; use "
+    "PolarLine(start, other, direction=direction) instead."
+)
 class IntersectingLine(BaseEdgeObject):
     """Intersecting Line Object: Line
+
+    .. deprecated::
+        Use :class:`~objects_curve.PolarLine` instead, with the object to
+        intersect as its ``length``:
+        ``PolarLine(start, other, direction=direction)``.
 
     Create a straight line defined by a point/direction pair and another line to intersect.
 
