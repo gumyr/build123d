@@ -35,6 +35,7 @@ from build123d.objects_curve import JernArc, Polyline, Spline
 from build123d.objects_sketch import Circle, Rectangle
 from build123d.operations_generic import sweep
 from build123d.topology import Compound, Edge, Face, Shell, SkipClean, Solid, Wire
+from build123d.topology.history import ShapeHistory
 
 
 class TestShells(unittest.TestCase):
@@ -247,6 +248,27 @@ class TestShellAdd(unittest.TestCase):
         result = shell + self.wall
         self.assertEqual(result.label, "sheet")
         self.assertIsNotNone(result.color)
+
+    def test_the_sewing_is_recorded(self):
+        """The result carries the record of the sewing, as a fuse does, so a
+        face the shell already had is not taken for a new one"""
+        shell = Shell([self.base])
+        for skip_clean in (False, True):
+            with self.subTest(skip_clean=skip_clean):
+                if skip_clean:
+                    with SkipClean():
+                        result = shell + self.wall
+                else:
+                    result = shell + self.wall
+                record = ShapeHistory.of(result)
+                self.assertIsNotNone(record)
+                self.assertEqual(len(result.faces()), 2)
+                # nothing is new: both faces were inputs
+                self.assertFalse(any(record.is_new(f.wrapped) for f in result.faces()))
+                # and only the face that was brought in is last
+                last = [f for f in result.faces() if record.is_last(f.wrapped)]
+                self.assertEqual(len(last), 1)
+                self.assertAlmostEqual(last[0].area, self.wall.area, 5)
 
     def test_mismatched_dimensions_raise(self):
         with self.assertRaises(ValueError):
