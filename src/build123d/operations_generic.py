@@ -441,7 +441,7 @@ def chamfer(
         if isinstance(context, BuildSheet):
             context._add_to_context(*new_faces, mode=Mode.REPLACE)
             return context.sheet_local
-        return Shell.make_sheet(new_faces)
+        return Shell._make_sheet(new_faces)
 
     if target._dim == 3:
         source = target
@@ -583,7 +583,7 @@ def fillet(
         if isinstance(context, BuildSheet):
             context._add_to_context(*new_faces, mode=Mode.REPLACE)
             return context.sheet_local
-        return Shell.make_sheet(new_faces)
+        return Shell._make_sheet(new_faces)
 
     if target._dim == 3:
         source = target
@@ -705,7 +705,7 @@ def mirror(
             -copy_module.deepcopy(face).mirror(about) for face in source_faces
         ]
         if mode == Mode.PRIVATE:
-            return Shell.make_sheet(mirrored_faces, merge_coplanar=True)
+            return Shell._make_sheet(mirrored_faces, merge_coplanar=True)
         context._add_to_context(*mirrored_faces, mode=mode)
         return context.sheet_local
 
@@ -714,7 +714,8 @@ def mirror(
     if context is not None:
         context._add_to_context(*mirrored, mode=mode)
 
-    mirrored_compound: Compound = Compound(mirrored)
+    # one object that is already a compound, a Box say, needs no second wrapper
+    mirrored_compound = cast(Compound, Compound(mirrored).unwrap(fully=False))
     if all([obj._dim == 3 for obj in object_list]):
         mirrored_compound = Part(mirrored_compound.wrapped)
     elif all([obj._dim == 2 for obj in object_list]):
@@ -1363,7 +1364,7 @@ def split(
                     split_faces.extend(piece.faces())
 
         untouched_faces = [face for face in current_faces if face not in selected_faces]
-        result = Shell.make_sheet(untouched_faces + split_faces)
+        result = Shell._make_sheet(untouched_faces + split_faces)
         if not result:
             raise ValueError("split removed the entire sheet")
         if mode == Mode.REPLACE:

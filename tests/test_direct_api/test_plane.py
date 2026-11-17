@@ -205,7 +205,7 @@ class TestPlane(unittest.TestCase):
 
         # can be instantiated from planar faces of surface types other than Geom_Plane
         # this loft creates the trapezoid faces of type Geom_BSplineSurface
-        lofted_solid = Solid.make_loft(
+        lofted_solid = Solid.loft(
             [
                 Rectangle(3, 1).wire(),
                 Pos(0, 0, 1) * Rectangle(1, 1).wire(),

@@ -934,12 +934,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
         """Build a solid from an OCCT TopoDS_Shape/TopoDS_Solid
 
         Args:
-            obj (TopoDS_Shape | Shell, optional): OCCT Solid or Shell.
+            obj (TopoDS_Shape | Shell, optional): OCCT Solid or Shell. A Shell
+                must be closed, as a solid is the region it encloses.
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             material (str, optional): tag for external tools. Defaults to ''.
             joints (dict[str, Joint], optional): names joints. Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
+
+        Raises:
+            ValueError: the Shell is not closed
         """
 
         if isinstance(obj, Shell):
@@ -1184,6 +1188,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
     @classmethod
     def _make_solid(cls, shell: Shell) -> TopoDS_Solid:
         """Create a Solid object from the surface shell"""
+        if shell and not shell.is_manifold:
+            raise ValueError(
+                "the shell is not closed, so it does not enclose a solid: "
+                "check shell.is_manifold"
+            )
         return ShapeFix_Solid().SolidFromShell(shell.wrapped)
 
     @classmethod
@@ -1418,7 +1427,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                     taper_wires.append(taper_wire)
 
                 solids = [
-                    Solid.make_loft([p, t]) for p, t in zip(profile_wires, taper_wires)
+                    Solid.loft([p, t]) for p, t in zip(profile_wires, taper_wires)
                 ]
             except (RuntimeError, Standard_Failure) as err:
                 raise RuntimeError(
@@ -1744,8 +1753,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
         )
 
     @classmethod
-    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Solid:
-        """make loft
+    def loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Solid:
+        """loft
 
         Makes a loft from a list of wires and vertices. Vertices can appear only at the
         beginning or end of the list, but cannot appear consecutively within the list
@@ -1762,6 +1771,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
             Solid: Lofted object
         """
         return cls(TopoDS.Solid(_make_loft(objs, True, ruled)))
+
+    @classmethod
+    @deprecated("Solid.make_loft is deprecated; use Solid.loft instead.")
+    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Solid:
+        """make loft
+
+        .. deprecated::
+            Use :meth:`loft` instead.
+        """
+        return cls.loft(objs, ruled)
 
     @classmethod
     def make_sphere(

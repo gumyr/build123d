@@ -575,6 +575,18 @@ class LocationsTests(unittest.TestCase):
 
 
 class MirrorTests(unittest.TestCase):
+    def test_mirror_of_one_part_gives_one_level_of_compound(self):
+        """A mirrored Box is a Part holding a solid, not a Part holding the
+        Box's compound, and keeps the Box's attributes"""
+        box = Pos(3, 0, 0) * Box(1, 1, 1)
+        box.label = "box"
+        mirrored = mirror(box, Plane.YZ)
+        self.assertIsInstance(mirrored, Part)
+        self.assertEqual(len(mirrored.compounds()), 1)
+        self.assertEqual(len(mirrored.get_type(Solid)), 1)
+        self.assertEqual(mirrored.label, "box")
+        self.assertAlmostEqual(mirrored.center().X, -3, 5)
+
     def test_mirror_line(self):
         edge = Edge.make_line((1, 0, 0), (2, 0, 0))
         wire = Wire.make_circle(1, Plane((5, 0, 0)))

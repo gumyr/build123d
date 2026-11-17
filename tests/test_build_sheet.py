@@ -107,32 +107,32 @@ class TestBuildSheetBase(unittest.TestCase):
 
     def test_sheet_invariant_errors(self):
         """The sheet invariant lives on Shell, for Builder and Algebra mode alike."""
-        self.assertFalse(Shell.make_sheet([]))
+        self.assertFalse(Shell._make_sheet([]))
         sphere = Solid.make_sphere(1).faces()[0]
         with self.assertRaisesRegex(ValueError, "planar and cylindrical"):
-            Shell.make_sheet([sphere])
+            Shell._make_sheet([sphere])
 
         cylinder = Solid.make_cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0]
         with patch.object(Face, "radius", new_callable=PropertyMock, return_value=0):
             with self.assertRaisesRegex(ValueError, "positive radius"):
-                Shell.make_sheet([cylinder])
+                Shell._make_sheet([cylinder])
 
         face = Face.make_rect(10, 10)
         with patch.object(
             Shell, "is_valid", new_callable=PropertyMock, return_value=False
         ):
             with self.assertRaisesRegex(ValueError, "invalid shell"):
-                Shell.make_sheet([face])
+                Shell._make_sheet([face])
 
         with patch(
             "build123d.topology.two_d.topo_explore_connected_faces",
             return_value=[face, face, face],
         ):
             with self.assertRaisesRegex(ValueError, "non-manifold"):
-                Shell.make_sheet([face])
+                Shell._make_sheet([face])
 
         with self.assertRaisesRegex(ValueError, "one connected shell"):
-            Shell.make_sheet([face, Pos(50, 0) * Face.make_rect(10, 10)])
+            Shell._make_sheet([face, Pos(50, 0) * Face.make_rect(10, 10)])
 
     def test_make_sheet_records_the_sewing(self):
         """A sheet made in Algebra mode knows what became of its faces."""
@@ -140,7 +140,7 @@ class TestBuildSheetBase(unittest.TestCase):
         wall = Face.make_rect(
             20, 10, Plane(origin=(10, 0, 5), x_dir=(0, 1, 0), z_dir=(1, 0, 0))
         )
-        sheet = Shell.make_sheet([base, wall])
+        sheet = Shell._make_sheet([base, wall])
         self.assertEqual(len(sheet.faces()), 2)
         sheet._history.with_inputs([base.wrapped], [wall.wrapped])
         self.assertEqual(len(sheet.faces(Select.LAST)), 1)
@@ -155,14 +155,14 @@ class TestBuildSheetBase(unittest.TestCase):
                 Rectangle(40, 20)
             flange(bs.edges().sort_by(Axis.X)[-1], length=10)
         sheet = bs.sheet
-        pierced = sheet.cut_sheet(Cylinder(1, 40, rotation=(0, 90, 0)))
+        pierced = sheet._cut_sheet(Cylinder(1, 40, rotation=(0, 90, 0)))
         self.assertTrue(pierced.is_valid)
         self.assertLess(pierced.area, sheet.area)
         self.assertEqual(len(pierced.bends()), 1)
-        notched = sheet.cut_sheet(Pos(0, 5) * Face.make_rect(4, 4))
+        notched = sheet._cut_sheet(Pos(0, 5) * Face.make_rect(4, 4))
         self.assertAlmostEqual(notched.area, sheet.area - 16, 5)
         with self.assertRaisesRegex(ValueError, "coplanar"):
-            sheet.cut_sheet(Pos(0, 0, 3) * Face.make_rect(4, 4))
+            sheet._cut_sheet(Pos(0, 0, 3) * Face.make_rect(4, 4))
 
     def test_context_modes_and_empty_inputs(self):
         builder = BuildSheet(thickness=1)
@@ -193,9 +193,9 @@ class TestBuildSheetBase(unittest.TestCase):
         faces = [Face.make_rect(10, 10), Pos(10, 0) * Face.make_rect(10, 10)]
         with patch.object(Face, "fuse", return_value=Compound(faces)):
             self.assertEqual(
-                len(Shell.make_sheet(faces, merge_coplanar=True).faces()), 2
+                len(Shell._make_sheet(faces, merge_coplanar=True).faces()), 2
             )
-        self.assertEqual(len(Shell.make_sheet(faces, merge_coplanar=True).faces()), 1)
+        self.assertEqual(len(Shell._make_sheet(faces, merge_coplanar=True).faces()), 1)
 
     def test_base_from_sketch(self):
         with BuildSheet(thickness=1) as bs:
@@ -1667,7 +1667,7 @@ class TestJog(unittest.TestCase):
                 self.assertTrue(materialize(bs).is_valid)
 
     def test_algebra_mode(self):
-        halves = Shell.make_sheet(
+        halves = Shell._make_sheet(
             [Pos(-25, 0) * Face.make_rect(50, 60), Pos(25, 0) * Face.make_rect(50, 60)]
         )
         line = halves.flats().sort_by(Axis.X)[0].fold_lines()[0]
@@ -1979,11 +1979,16 @@ class TestUnfoldFaceMap(unittest.TestCase):
             loose_lines[0].center() + shift, cornered_lines[0].center(), 5
         )
 
-    def test_the_geometric_unfold_reports_the_source_radius(self):
-        """Without parameters a bend develops at the radius of its reference
-        face, and that is the radius the record reports for both"""
-        sheet, _ = TestUnfoldOperation.flanged()
-        _, faces = sheet.unfold()
+    def test_a_zero_k_factor_unfold_reports_the_source_radius(self):
+        """With a K-factor of zero a bend develops at its inside radius, here
+        the radius of its reference face, and the record reports that for both"""
+        sheet, parameters = TestUnfoldOperation.flanged()
+        geometric = SheetMetalParameters(
+            thickness=parameters.thickness,
+            k_factor=0,
+            sheet_surface=SheetSurface.INSIDE,
+        )
+        _, faces = sheet.unfold(geometric)
         (record,) = [r for r in faces.values() if r.is_bend]
         self.assertAlmostEqual(record.inside_radius, 2, 5)
         self.assertAlmostEqual(record.neutral_radius, 2, 5)
@@ -2369,7 +2374,9 @@ class TestSheetSelectors(unittest.TestCase):
             self.assertEqual(len(bs.flats(Select.LAST)), 0)
             self.assertEqual(len(bs.edges(Select.LAST)), 2)
             self.assertEqual(len(bs.edges(Select.NEW)), 2)
-            self.assertTrue(all(e.geom_type == GeomType.LINE for e in bs.edges(Select.LAST)))
+            self.assertTrue(
+                all(e.geom_type == GeomType.LINE for e in bs.edges(Select.LAST))
+            )
 
     def test_a_bend_moves_the_far_side_and_leaves_the_near_side(self):
         with BuildSheet(thickness=1, bend_radius=2) as bs:
@@ -2562,7 +2569,7 @@ class TestUnfold(unittest.TestCase):
             flat.bounding_box().size.X, 30 + 25 + radians(90) * 2.6, 4
         )
 
-    def test_geometric_and_neutral_axis_development(self):
+    def test_neutral_axis_development(self):
         """All reference surfaces produce the same neutral development, and so
         do both bend directions: the neutral fibre is k*t from the inside of the
         bend whichever face that is."""
@@ -2584,22 +2591,29 @@ class TestUnfold(unittest.TestCase):
                         sheet_parameters=parameters,
                     )
 
-                    geometric = sheet.unfold().flat
                     neutral = sheet.unfold(parameters).flat
 
-                    self.assertTrue(geometric.is_valid)
                     self.assertTrue(neutral.is_valid)
-                    self.assertAlmostEqual(geometric.area, sheet.area, 5)
                     self.assertAlmostEqual(neutral.area, expected_area, 5)
                     self.assertAlmostEqual(neutral.bounding_box().size.Z, 0, 5)
 
     def test_validation(self):
+        parameters = SheetMetalParameters(thickness=1)
         with self.assertRaisesRegex(ValueError, "non-empty Shell"):
-            Shell().unfold()
+            Shell().unfold(parameters)
         with self.assertRaisesRegex(TypeError, "SheetMetalParameters"):
             Shell(Rectangle(10, 10).face()).unfold("parameters")
         with self.assertRaisesRegex(ValueError, "planes and cylinders"):
-            Solid.make_sphere(10).shell().unfold()
+            Solid.make_sphere(10).shell().unfold(parameters)
+
+    def test_the_parameters_are_required(self):
+        """A pattern developed without parameters would not fold back to the
+        part, so the method refuses to make one"""
+        sheet = Shell(Rectangle(10, 10).face())
+        with self.assertRaises(TypeError):
+            sheet.unfold()  # pylint: disable=no-value-for-parameter
+        with self.assertRaisesRegex(TypeError, "SheetMetalParameters"):
+            sheet.unfold(None)
 
 
 class TestMiter(unittest.TestCase):
@@ -3655,6 +3669,9 @@ class TestBendRelief(unittest.TestCase):
     def test_relief_survives_developing(self):
         """A relief cut in the flat pattern removes the same area folded."""
         sheet = self.tab_sheet().sheet_local
+        # a K-factor of zero develops each bend at the radius of the shell
+        # itself, so areas on the pattern and on the shell can be compared
+        geometric = SheetMetalParameters(thickness=1, bend_radius=2, k_factor=0)
         for relief_type, kwargs in (
             (ReliefType.ROUND, {"radius": 1.5}),
             (ReliefType.SQUARE, {"depth": 3.0, "width": 1.5}),
@@ -3669,7 +3686,8 @@ class TestBendRelief(unittest.TestCase):
                 )
                 self.assertAlmostEqual(
                     sheet.area - result.area,
-                    sheet.unfold().flat.area - result.unfold().flat.area,
+                    sheet.unfold(geometric).flat.area
+                    - result.unfold(geometric).flat.area,
                     6,
                 )
 

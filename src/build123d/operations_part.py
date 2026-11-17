@@ -362,9 +362,9 @@ def loft(
                 hole_sections[j].append(face.inner_wires()[k])
 
     # Perform lofts
-    new_solid = Solid.make_loft(loft_sections, ruled)
+    new_solid = Solid.loft(loft_sections, ruled)
     if hole_sections:
-        hole_solids = [Solid.make_loft(holes, ruled) for holes in hole_sections]
+        hole_solids = [Solid.loft(holes, ruled) for holes in hole_sections]
         new_solid = cast(Solid, new_solid.cut(*hole_solids))
 
     # Try to recover an invalid loft
@@ -998,4 +998,5 @@ def thicken(
         if clean and not sheet_thickening:
             new_solids = [solid.clean() for solid in new_solids]
 
-    return Part(Compound(new_solids).wrapped)
+    # several solids arrive fused into one compound: don't wrap it in another
+    return Part(Compound(new_solids).unwrap(fully=False).wrapped)

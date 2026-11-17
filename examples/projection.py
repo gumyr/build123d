@@ -39,7 +39,7 @@ square = Face.make_rect(20, 20, Plane.ZX.offset(-80))
 square_projected = square.project_to_shape(sphere, projection_direction)
 square_solids = Compound([Solid.thicken(f, 2) for f in square_projected])
 projection_beams = [
-    Solid.make_loft(
+    Solid.loft(
         [
             square.outer_wire(),
             square.outer_wire().translate(Vector(0, 160, 0)),

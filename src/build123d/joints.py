@@ -858,13 +858,20 @@ class BallJoint(Joint):
             raise TypeError(f"angles is of an unknown type {type(angles)}")
 
         rotation = angle_rotation * self.angle_reference.location
-        for i, rotations in zip(
-            [0, 1, 2],
-            [rotation.orientation.X, rotation.orientation.Y, rotation.orientation.Z],
-        ):
-            if not self.angular_range[i][0] <= rotations <= self.angular_range[i][1]:
-                raise ValueError(
-                    f"angles ({angles}) must in range of {self.angular_range}"
-                )
+
+        def in_range(values: Iterable[float]) -> bool:
+            """Is each angle within its range, allowing for rounding"""
+            return all(
+                low - 1e-6 <= value <= high + 1e-6
+                for value, (low, high) in zip(values, self.angular_range)
+            )
+
+        # Angles given as numbers are compared as given. Read back from a
+        # rotation they are the same orientation but not the same numbers - Z
+        # returns within +/-180 and Y within +/-90 - so that comparison is
+        # kept only for a Rotation, and for what it has accepted until now.
+        as_given = isinstance(angles, tuple) and in_range(angles)
+        if not as_given and not in_range(rotation.orientation):
+            raise ValueError(f"angles ({angles}) must in range of {self.angular_range}")
 
         return self.relative_location * rotation * other.relative_location.inverse()

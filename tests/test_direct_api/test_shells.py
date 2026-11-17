@@ -111,12 +111,18 @@ class TestShells(unittest.TestCase):
         self.assertEqual(len(sweep_w_w.faces()), 3)  # 3 with clean, 4 without
         self.assertEqual(len(sweep_c2_c2.faces()), 3)  # 3 with clean, 4 without
 
-    def test_make_loft(self):
+    def test_make_loft_is_deprecated(self):
+        """Shell.make_loft still works, as Shell.loft, but warns."""
+        sections = [Wire.make_circle(3, Plane((0, 0, 2))), Wire.make_circle(3)]
+        with self.assertWarnsRegex(DeprecationWarning, "use Shell.loft"):
+            old = Shell.make_loft(sections)
+        self.assertIsInstance(old, Shell)
+        self.assertAlmostEqual(old.area, Shell.loft(sections).area, 5)
+
+    def test_loft(self):
         r = 3
         h = 2
-        loft = Shell.make_loft(
-            [Wire.make_circle(r, Plane((0, 0, h))), Wire.make_circle(r)]
-        )
+        loft = Shell.loft([Wire.make_circle(r, Plane((0, 0, h))), Wire.make_circle(r)])
         self.assertEqual(loft.volume, 0, "A shell has no volume")
         cylinder_area = 2 * math.pi * r * h
         self.assertAlmostEqual(loft.area, cylinder_area)

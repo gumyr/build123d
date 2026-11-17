@@ -202,7 +202,7 @@ def _target_shell(context: BuildSheet | None, edges: list[Edge]) -> Shell:
     if isinstance(parent, Face):
         return Shell(parent)
     if isinstance(parent, Sketch):
-        return Shell.make_sheet(parent.faces())
+        return Shell._make_sheet(parent.faces())
     raise ValueError("edges must belong to a sheet Face, Sketch, or Shell")
 
 
@@ -564,7 +564,7 @@ def _apply_faces(
     if context is not None:
         context._add_to_context(*faces, mode=Mode.REPLACE)
         return context.sheet_local
-    joined = Shell.make_sheet(faces)
+    joined = Shell._make_sheet(faces)
     if joined._history is not None:
         joined._history.with_inputs([target.wrapped], (a.wrapped for a in additions))
     return joined
@@ -1221,7 +1221,7 @@ def miter(
             )
         )
 
-    return _publish(context, Shell.make_sheet(new_faces))
+    return _publish(context, Shell._make_sheet(new_faces))
 
 
 def _remodel_flange(face: Face, moved: dict[Vertex, Vector]) -> Face:
@@ -1691,10 +1691,8 @@ def unfold(
     press brake needs that the outline alone does not say.
 
     Each bend is developed at its neutral radius, derived from the thickness,
-    K-factor and reference surface. :meth:`~topology.Shell.unfold` defaults to
-    the geometric radius of each bend when given no parameters, which produces
-    a pattern that will not fold back to the requested part; this operation
-    requires the parameters instead, taking them from an enclosing
+    K-factor and reference surface. The parameters are required, as they are
+    by :meth:`~topology.Shell.unfold`, and are taken from an enclosing
     ``BuildSheet`` when there is one.
 
     The pattern is always built on ``Plane.XY``; ``align`` places it within
@@ -2491,7 +2489,7 @@ def _replace_relief_faces(shell: Shell, replacements: dict[Face, Face]) -> Shell
         if match is not None:
             match._made_by(ShapeHistory().add_modified(face.wrapped, match.wrapped))
         faces.append(match if match is not None else face)
-    result = Shell.make_sheet(faces)
+    result = Shell._make_sheet(faces)
     # one relief follows another on the same shell, so each record carries on
     # from the one before it
     record = ShapeHistory().merge(shell._history).merge(result._history)
@@ -3155,7 +3153,7 @@ def _reassemble(
             continue
         swings = any(other.is_same(moved) for moved in site.moving)
         rebuilt.append(carried(other) if swings else other)
-    return Shell.make_sheet(rebuilt)
+    return Shell._make_sheet(rebuilt)
 
 
 def _fold_pieces(

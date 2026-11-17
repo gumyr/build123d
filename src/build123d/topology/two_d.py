@@ -3158,7 +3158,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return rims
 
     @classmethod
-    def make_sheet(
+    def _make_sheet(
         cls, faces: Iterable[Face], merge_coplanar: bool | Iterable[Face] = False
     ) -> Shell:
         """Sew faces into a sheet metal reference shell.
@@ -3209,7 +3209,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         ]
         return cls._sewn_sheet(face_list, records)
 
-    def cut_sheet(self, *cutters: Shape) -> Shell:
+    def _cut_sheet(self, *cutters: Shape) -> Shell:
         """Trim this sheet with cutters, keeping its flats and bends.
 
         A ``Solid`` is a normal cut, the cut across a bend of sheet metal
@@ -3343,8 +3343,8 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return Shell(TopoDS.Shell(_extrude_topods_shape(obj.wrapped, direction)))
 
     @classmethod
-    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Shell:
-        """make loft
+    def loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Shell:
+        """loft
 
         Makes a loft from a list of wires and vertices. Vertices can appear only at the
         beginning or end of the list, but cannot appear consecutively within the list nor
@@ -3361,6 +3361,16 @@ class Shell(Mixin2D[TopoDS_Shell]):
             Shell: Lofted object
         """
         return cls(TopoDS.Shell(_make_loft(objs, False, ruled)))
+
+    @classmethod
+    @deprecated("Shell.make_loft is deprecated; use Shell.loft instead.")
+    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Shell:
+        """make loft
+
+        .. deprecated::
+            Use :meth:`loft` instead.
+        """
+        return cls.loft(objs, ruled)
 
     @classmethod
     def revolve(
@@ -3436,9 +3446,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         """
         return tcast(Shell, super().__add__(other))
 
-    def unfold(
-        self, sheet_parameters: SheetMetalParameters | None = None
-    ) -> UnfoldOutput:
+    def unfold(self, sheet_parameters: SheetMetalParameters) -> UnfoldOutput:
         """Develop this planar/cylindrical shell onto ``Plane.XY``.
 
         Adjacent faces are placed by matching the developed representations of
@@ -3446,10 +3454,10 @@ class Shell(Mixin2D[TopoDS_Shell]):
         cylindrical faces have their angular UV direction scaled by the
         appropriate development radius.
 
-        When ``sheet_parameters`` is omitted, the geometric radius of every
-        cylindrical face is used. Supplying sheet parameters compensates each
-        bend to its neutral radius using the face orientation to distinguish
-        positive and negative bends.
+        The sheet parameters compensate each bend to its neutral radius, using
+        the face orientation to distinguish positive and negative bends. They
+        are required: a pattern developed without them, at the radius of the
+        shell's own surface, looks right and does not fold back to the part.
 
         The result unpacks as ``flat, face_map = shell.unfold(parameters)``:
         the flat pattern, and a :class:`~sheet_utils.FaceMap` that answers
@@ -3459,10 +3467,12 @@ class Shell(Mixin2D[TopoDS_Shell]):
         direction.
 
         Args:
-            sheet_parameters: Optional material and reference-surface parameters
+            sheet_parameters: material and reference-surface parameters
                 used to produce a neutral-axis flat pattern.
 
         Raises:
+            TypeError: If ``sheet_parameters`` is not a
+                :class:`~sheet_utils.SheetMetalParameters`.
             ValueError: If the shell is empty, disconnected, non-manifold,
                 contains unsupported surface types, or cannot be developed
                 consistently without a cut.
@@ -3471,6 +3481,8 @@ class Shell(Mixin2D[TopoDS_Shell]):
             UnfoldOutput: the developed shell on ``Plane.XY`` and the record
             of its faces
         """
+        if not isinstance(sheet_parameters, SheetMetalParameters):
+            raise TypeError("sheet_parameters must be a SheetMetalParameters")
         if not self:
             raise ValueError("unfold requires a non-empty Shell")
         flat, developments = _unfold_shell(self.wrapped, sheet_parameters)
