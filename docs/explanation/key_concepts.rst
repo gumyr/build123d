@@ -113,13 +113,13 @@ Picking out particular faces, edges and vertices is the subject of
 Topology and geometry
 *************************
 
-The topology of a shape says what is joined to what. It does not say what
-shape anything is. That is the *geometry*: the curve an edge lies on and the
-surface a face lies on.
+The topology of a shape says what is joined to what, but not what shape
+anything is. That is its *geometry*: the curve an edge lies on and the surface
+a face lies on.
 
-An edge is a piece of a curve, cut off at two points. A face is a piece of a
-surface, cut off along its wires. The curve may be a line, a circle or a
-spline, and the surface a plane, a cylinder, a sphere or something freer,
+An edge is a piece of a curve, cut off at two points, just as a face is a
+piece of a surface, cut off along its wires. The curve may be a line, a circle
+or a spline, and the surface a plane, a cylinder, a sphere or something freer,
 and each element knows which:
 
 .. literalinclude:: /explanation/key_concepts.py
@@ -186,8 +186,8 @@ into a part by an operation such as ``extrude``, not by arithmetic.
 Vectors, axes, planes and locations
 ***************************************
 
-Four different things are used to say where something is, and they are
-easily confused.
+Four different things are used to say where something is, and they are easily
+confused, so each is taken in turn below.
 
 .. literalinclude:: /explanation/key_concepts.py
     :language: build123d
@@ -232,7 +232,7 @@ A shape has a location
 **************************
 
 Every shape carries a location of its own, which says where its geometry
-sits in space. Moving a shape changes that location and nothing else. The
+sits in space. Moving a shape changes that location and nothing else: the
 geometry is not recomputed.
 
 .. literalinclude:: /explanation/key_concepts.py

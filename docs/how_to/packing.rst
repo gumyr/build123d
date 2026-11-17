@@ -4,8 +4,8 @@
 Arranging parts for printing
 ############################
 
-Parts are usually designed one at a time, each at or near the origin.
-Shown or exported together they lie on top of each other.
+Parts are usually designed one at a time, each at or near the origin, so
+shown or exported together they lie on top of each other.
 :func:`~pack.pack` spreads a set of shapes out on a plane so that none
 overlaps another, which is what a print bed or a parts overview wants.
 

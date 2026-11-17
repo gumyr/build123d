@@ -38,8 +38,8 @@ Along the way you will:
 It takes about twenty minutes, and it is the same in builder and algebra
 mode apart from one line. So that you can check your answer, the mesh is
 one whose design you already have: the bracket of :ref:`design_tutorial`.
-Read its first three steps again before starting. Looking for symmetry and
-choosing an origin matter even more here than they did there.
+Read its first three steps again before starting, because looking for
+symmetry and choosing an origin matter even more here than they did there.
 
 ***************************
 Step 1: Make the STL
@@ -196,14 +196,14 @@ What was found well, and what was not, decides what to do next.
 
 Here the leftovers, in red, are in three places: the bend, the end of the
 slot, and the two flat faces where step 3 cut the mesh. The cut faces are
-not part of the bracket and can be ignored. The bend and the slot are
+not part of the bracket and can be ignored, but the bend and the slot are
 real, and are dealt with in step 7.
 
 *******************************
 Step 6: Read the report
 *******************************
 
-Print the code.
+The third of those results, the report, is read by printing it.
 
 .. literalinclude:: /tutorials/stl_reconstruction.py
     :language: build123d
@@ -220,11 +220,11 @@ Print the code.
     r5 = Plane.ZX * Rectangle(12.5, 20, align=Align.MIN)
     r6 = Plane.ZX.offset(3) * Rectangle(12.5, 20, align=Align.MIN)
 
-Each line would make one of the primitives, and the lines can be run. That
-is not what they are for. *Do not build the part out of this code.* Read
-it, as a list of clues. It is written in algebra mode, with every shape
-placed as a plane, an offset and a position, so that shapes which belong
-together show up as lines that start the same way.
+Each line would make one of the primitives, and the lines can be run, but
+that is not what they are for. *Do not build the part out of this code.*
+Read it instead, as a list of clues. It is written in algebra mode, with
+every shape placed as a plane, an offset and a position, so that shapes
+which belong together show up as lines that start the same way.
 
 Look first at the planes and their offsets:
 
@@ -287,7 +287,7 @@ slot is in the base, a little way out from the middle.
   wide, the same width as the hole.
 
 Measuring the mesh like this is always possible when the detector has
-nothing to say. The detector only makes it quicker.
+nothing to say; the detector only makes the job quicker.
 
 *****************************
 Step 8: The dimensions
@@ -303,11 +303,11 @@ Write down what has been found.
 With the numbers known, the part has to be designed, and that is the
 subject of :ref:`design_tutorial`: a strip of one thickness with a rounded
 bend is a line that has been offset; a part with two planes of symmetry is
-a quarter, mirrored twice. None of that is in the mesh. It is the step the
-detector cannot take, and the reason this is a redesign and not a
+a quarter, mirrored twice. None of that is in the mesh, which makes it the
+step the detector cannot take, and the reason this is a redesign and not a
 conversion.
 
-Now open the bracket file again and compare. These are the eight numbers
+Now open the bracket file again and compare: these are the eight numbers
 it began with.
 
 *****************************************************
@@ -367,8 +367,8 @@ and build the part from what you measure.
 What you learned
 ********************
 
-* An STL holds triangles, not a design. Rebuilding from one is a redesign
-  that the mesh can guide.
+* An STL holds triangles, not a design, so rebuilding from one is a
+  redesign that the mesh can guide.
 * ``Mesher`` reads an STL, ``split`` cuts it down by its symmetry, and
   saving the working piece as BREP makes it quick to reload.
 * :func:`~build123d.detect_primitives` returns the faces it recognized,

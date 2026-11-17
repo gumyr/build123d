@@ -141,8 +141,8 @@ Solids combine as sketch objects do. In builder mode every object has a
 part and the object have in common, shown here by the sphere that rounds
 off the corners. In algebra mode the three are ``+``, ``-`` and ``&``.
 
-In builder mode the result is ``block.part``. In algebra mode ``block``
-is the part.
+The result is ``block.part`` in builder mode, while in algebra mode
+``block`` is itself the part.
 
 ***************************
 Add a feature to a face
@@ -427,8 +427,8 @@ on the builder and the measurements on ``block.part``.
 Work in other units
 ***********************
 
-Lengths in build123d are plain numbers and carry no unit. Exports to
-formats such as STEP and STL treat them as millimetres. To write a
+Lengths in build123d are plain numbers and carry no unit, although exports
+to formats such as STEP and STL treat them as millimetres. To write a
 dimension in another unit, multiply by its constant:
 
 .. literalinclude:: /how_to/build_part.py
@@ -447,7 +447,7 @@ These are defined:
     FT = 12 * IN
     THOU = IN / 1000
 
-Writing ``* MM`` after a dimension changes nothing and says what the
+Writing ``* MM`` after a dimension changes nothing, but it says what the
 number means. Some export formats, DXF among them, can be told which
 unit to declare; see :ref:`import_export`.
 

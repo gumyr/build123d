@@ -9,10 +9,10 @@ Why build123d
 
     -- James Dyson
 
-Design is iteration. Requirements change, and some things are only learned
-by making the part. A CAD system is therefore judged less by how quickly it
-produces the first version of a design than by how well it copes with the
-second, the tenth and the fiftieth.
+Design is iteration, because requirements change and some things are only
+learned by making the part. A CAD system is therefore judged less by how
+quickly it produces the first version of a design than by how well it copes
+with the second, the tenth and the fiftieth.
 
 Software developers have the same problem, at a larger scale, and have spent
 decades on tools for it: ways to hide complexity behind a simple interface,
@@ -96,12 +96,12 @@ press-fit hole for the bearing, and a clearance hole for a screw at each
 bolt centre.
 
 Its dimensions are a handful of names at the top: the bolt spacing, the
-overall length, the diameter and height of the body. Everything else is
-worked out from them. The lugs are placed from the bolt spacing, so
-changing one number moves both lugs, their holes and the outline that
-wraps them. The change request that always arrives is then a new number,
-not a new drawing, and a whole family of housings in different sizes is
-the same program run with different values.
+overall length, the diameter and height of the body. Everything else is worked
+out from them: the lugs, for instance, are placed from the bolt spacing, so
+changing one number moves both lugs, their holes and the outline that wraps
+them. The change request that always arrives is then a new number, not a new
+drawing, and a whole family of housings in different sizes is the same program
+run with different values.
 
 ******************************
 Parts carry their own data
@@ -137,12 +137,12 @@ carried through. It has screws, nuts and washers to the common standards,
 ball and roller bearings, bushings, pipes and flanges, gears, sprockets,
 threads, O-rings, retaining rings and shaft keys.
 
-A part in it is not a file to download. It is made on demand from its
-designation, the size of a screw or the catalogue number of a bearing, and
-its dimensions come from tables of the published standard. The part that
-results is real geometry, exact to those figures, and it keeps the figures
-with it: its diameters, its lengths, and the sizes of hole that the standard
-gives for it.
+A part in it is not a file to download but is made on demand from its
+designation, the size of a screw or the catalogue number of a bearing, and its
+dimensions come from tables of the published standard. The part that results
+is real geometry, exact to those figures, and it keeps the figures with it:
+its diameters, its lengths, and the sizes of hole that the standard gives for
+it.
 
 That last point is what changes how a design is written. The holes are part
 of the library too, and each takes the part it is for. A clearance hole is
@@ -171,10 +171,10 @@ nothing else.
 
 A version control system such as Git records every such change with its
 author, its date and its reason, and can return to any earlier state.
-Several people can work on one design at once and have their work merged.
-A proposed change can be reviewed and discussed before it is accepted. All
-of this is ordinary practice for software, and it comes with build123d
-for free because a model is a text file.
+Several people can work on one design at once and have their work merged, and
+a proposed change can be reviewed and discussed before it is accepted. All of
+this is ordinary practice for software, and it comes with build123d for free
+because a model is a text file.
 
 **************************
 A design can be tested
@@ -200,12 +200,12 @@ The geometry is exact
 *************************
 
 build123d is built on the Open Cascade kernel, the same kind of *boundary
-representation* (BREP) modeller that commercial CAD systems use. The seat
-in the housing is a true cylinder, not a ring of flat facets. That is why
-a press fit can be specified to a few hundredths of a millimetre, why a
-part can be asked for its faces and edges, and why models go to other CAD
-systems as STEP files without loss. Triangles appear only on export to a
-mesh format for printing or display.
+representation* (BREP) modeller that commercial CAD systems use, so the seat
+in the housing is a true cylinder, not a ring of flat facets. That is why a
+press fit can be specified to a few hundredths of a millimetre, why a part can
+be asked for its faces and edges, and why models go to other CAD systems as
+STEP files without loss. Triangles appear only on export to a mesh format for
+printing or display.
 
 ****************
 It is Python

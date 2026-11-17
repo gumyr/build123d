@@ -51,7 +51,7 @@ Along Wire
 =============
 
 Vertices selected from an edge or wire might have a useful ordering when created from
-a single object, but when created from multiple objects, the ordering not useful. For
+a single object, but when created from multiple objects, the ordering is not useful. For
 example, when applying incrementing fillet radii to a list of vertices from the face,
 the order is random.
 
@@ -132,7 +132,7 @@ Here we are sorting the boxes by distance from the origin, using an empty ``Vert
 |
 
 The example can be extended by first sorting the boxes by volume using the ``Solid``
-property ``volume``, and getting the last (largest) box. Then, the boxes sorted by
+property ``volume``, and getting the last (largest) box. Then, the boxes are sorted by
 their distance from the largest box.
 
 .. literalinclude:: /how_to/topology_selection/sort_distance_from.py

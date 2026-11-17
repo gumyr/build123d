@@ -144,7 +144,7 @@ and the inner leaf the last.
 
 The two leaves were made the same way round, but in a hinge they face each
 other, so the axis of one has to run the opposite way to the axis of the
-other. That is the ``reverse()``.
+other, which is what the ``reverse()`` is for.
 
 **The pin.** The pin is pushed in from one end of the hinge, and the outer
 leaf, whose tubes are at both ends, is the one that holds it. Its ``pin``
@@ -284,9 +284,10 @@ given sits at the origin, with its Z along the shank. (The picture shows
 the pin lying on its side.) The radius of the
 head is read from the leaf, to match its tubes.
 
-The last part is a screw, and it is not made here at all. A joint does not
-have to be made in a builder. Any solid can be given one, including a part
-that was drawn somewhere else and imported. Download the screw
+The last part is a screw, and it is not made here at all, which shows that
+a joint does not have to be made in a builder: any solid can be given one,
+including a part that was drawn somewhere else and imported. Download the
+screw
 :download:`M6-1x12-countersunk-screw.step </tutorials/M6-1x12-countersunk-screw.step>`
 into the folder of your file.
 
@@ -307,9 +308,9 @@ middle of the top of the screw's head, with Z pointing up out of it.
 Step 7: Connect the joints
 ************************************
 
-Every part now carries its joints, and the parts are all in the wrong
-places. Four lines put them right. This step, and the rest of the
-tutorial, is the same in both modes.
+Every part now carries its joints, but the parts are all still in the
+wrong places, and it takes four lines to put them right. This step, and the
+rest of the tutorial, is the same in both modes.
 
 .. literalinclude:: /tutorials/hinged_box.py
     :language: build123d
@@ -321,9 +322,9 @@ tutorial, is the same in both modes.
     :width: 55%
 
 ``attach`` reads as *this joint, stay where you are; that joint, come
-here*. The part that owns the first joint does not move. The part that
-owns the joint in the brackets moves so that the two joints meet. Here the
-box stays and the leaf comes to it.
+here*. The part that owns the first joint does not move, while the part
+that owns the joint in the brackets moves so that the two joints meet. Here
+the box stays and the leaf comes to it.
 
 .. literalinclude:: /tutorials/hinged_box.py
     :language: build123d
@@ -364,8 +365,8 @@ how far that is.
 The pin goes to the ``pin`` joint of the outer leaf, which puts it through
 the tubes of both leaves with its head against the end of the hinge.
 
-The order matters. Each ``attach`` moves one part to a part that is already
-in its final place, so work outwards from the part that stays still: the
+The order matters, because each ``attach`` moves one part to a part that is
+already in its final place. Work outwards from the part that stays still: the
 box, then the leaf on it, then the other leaf, then the lid. The pin
 hangs from the first leaf, so it could have gone in any time after that.
 
@@ -400,7 +401,7 @@ viewer.
 Step 9: The screws
 ***********************
 
-There is one screw and there are six holes. Each hole needs a copy.
+There is one screw and there are six holes, so each hole needs a copy.
 
 .. literalinclude:: /tutorials/hinged_box.py
     :language: build123d
@@ -445,7 +446,7 @@ meant to bite into the sides of its hole and would be reported.
 Step 10: Open the lid
 ***************************
 
-The box is closed because of one number, the ``angle`` in step 7. A
+The box is closed because of one number, the ``angle`` in step 7, so a
 different angle opens it.
 
 .. literalinclude:: /tutorials/hinged_box.py

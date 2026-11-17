@@ -7,10 +7,10 @@ Challenges
 .. image:: /challenges/assets/ttt.png
   :align: center
 
-A way to test what you have learned. Each challenge gives a drawing of a
-part. Model the part, and check your result against the mass given: every
-drawing states its material and density, and the mass that the finished
-part should come to.
+The challenges are a way to test what you have learned. Each gives a drawing
+of a part for you to model, and a way to check your result, because every
+drawing states its material and density, and the mass that the finished part
+should come to.
 
 These drawings were skillfully crafted and generously provided to build123d by Too Tall Toby,
 a renowned figure in the realm of 3D CAD. Too Tall Toby is the host of the World Championship

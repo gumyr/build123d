@@ -26,9 +26,9 @@ is described in :ref:`tutorial_sketch_then_extrude`.
 Step 1: Examine the part in all three orientations
 **********************************************************
 
-Start by picturing the part from the front, the top and the side. Look for
-symmetry in each view. A plane of symmetry halves the work: only one side
-has to be designed, and the other is a mirror image of it.
+Start by picturing the part from the front, the top and the side, and look
+for symmetry in each view, because a plane of symmetry halves the work: only
+one side has to be designed, and the other is a mirror image of it.
 
 The bracket has two planes of symmetry, so only a quarter of it needs to be
 designed.
@@ -42,8 +42,8 @@ Step 2: Identify rotational symmetries
 
 Look for anything that could be made by turning a flat shape round an axis:
 cylinders, cones, spheres, or any feature that could have come off a lathe.
-Note where the axis is. These features are made with ``revolve``, described
-in :ref:`tutorial_beyond_extrude`.
+Note where the axis is, because these features are made with ``revolve``,
+described in :ref:`tutorial_beyond_extrude`, which turns a profile about it.
 
 The bracket has none.
 
@@ -71,10 +71,10 @@ Step 4: Name the dimensions
 
 Before drawing anything, give every dimension a name. A part written in
 terms of names can be resized by changing one number, and can be turned
-into a family of parts later. A number typed into the middle of the code
-cannot.
+into a family of parts later, which a part with numbers typed into the
+middle of its code cannot.
 
-The bracket has eight dimensions, in millimetres. They start its file:
+The bracket has eight dimensions, in millimetres, and they start its file:
 
 .. literalinclude:: /tutorials/tutorial_design.py
     :language: build123d
@@ -235,9 +235,9 @@ short edges at the ends of its arms.
             :start-after: [fillet_algebra]
             :end-before: [fillet_algebra]
 
-Read the selector from left to right. ``bracket.edges()`` is every edge of
-the bracket. ``filter_by(Axis.X)`` keeps the ones that run in the X
-direction. ``group_by(Axis.Y)`` gathers those into groups by how far along
+Read the selector from left to right: ``bracket.edges()`` is every edge of
+the bracket, ``filter_by(Axis.X)`` keeps the ones that run in the X
+direction, ``group_by(Axis.Y)`` gathers those into groups by how far along
 Y they are, and ``[-1]`` takes the last group, the edges furthest back.
 
 The selection is given a name, ``corners``, before it is used. That is the

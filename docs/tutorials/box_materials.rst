@@ -5,8 +5,8 @@
 Materials for the hinged box
 #############################
 
-The box of :ref:`joint_tutorial` has a shape and nothing else. It is not
-made of anything, so it has no weight, and in a viewer every part is the
+The box of :ref:`joint_tutorial` has a shape and nothing else: because it
+is not made of anything it has no weight, and in a viewer every part is the
 same plain colour. In this tutorial you will say what each part is made
 of - a walnut box with a brass hinge - and get this:
 
@@ -41,14 +41,14 @@ where a beam was made of aluminium. It is organized by kind: ``metals``,
     :start-after: [materials]
     :end-before: [materials]
 
-Every shape has a ``material``, and giving it one is an assignment. The box
-and the lid are each given walnut.
+Every shape has a ``material``, and giving it one is an assignment, which
+is how the box and the lid are each given walnut.
 
 The last line gives a material to ``hinged_box``, the assembly, and that
-is worth a second look. A part with no material of its own takes the
-material of the assembly it is in. The two leaves, the pin and the six screws
-have none, so all nine are now brass, and nothing had to be written nine
-times. The box and the lid keep their walnut, because a part's own
+is worth a second look, because a part with no material of its own takes
+the material of the assembly it is in. The two leaves, the pin and the six
+screws have none, so all nine are now brass, and nothing had to be written
+nine times. The box and the lid keep their walnut, because a part's own
 material comes first.
 
 *************************
@@ -56,8 +56,9 @@ Step 2: Add a finish
 *************************
 
 A real part is made and then finished: sanded, brushed, polished, plated
-or painted. A finish does not change what the part is made of, but it
-changes how it looks. Give the two leaves a brushed surface.
+or painted. A finish does not change what the part is made of, only how it
+looks, so it is added to a material rather than replacing it. Give the two
+leaves a brushed surface.
 
 .. literalinclude:: /tutorials/box_materials.py
     :language: build123d
@@ -66,15 +67,15 @@ changes how it looks. Give the two leaves a brushed surface.
 
 ``finish=`` goes to the function that makes the material, and the result
 is a material like any other, here kept in a variable and used twice. The
-leaves now have a material of their own, brushed brass. The pin and the
-screws still take plain brass from the assembly.
+leaves now have a material of their own, brushed brass, while the pin and
+the screws still take plain brass from the assembly.
 
 ****************************************
 Step 3: Ask a material what it is
 ****************************************
 
-A material is more than a name. It knows the physical properties of the
-real thing. Print the material of the box.
+A material is more than a name: it knows the physical properties of the
+real thing. To see them, print the material of the box.
 
 .. literalinclude:: /tutorials/box_materials.py
     :language: build123d
@@ -123,8 +124,8 @@ finished material, beside ``material``.
 Step 4: Weigh the box
 *******************************
 
-A shape has a volume, and a material has a density, so a part with a
-material has a mass.
+A shape has a volume and a material has a density, so a part with a
+material has a mass, and build123d will work it out.
 
 .. literalinclude:: /tutorials/box_materials.py
     :language: build123d
@@ -153,39 +154,42 @@ the assembly, reaching them. The mass of an assembly is the sum of its
 parts, each weighed with its own material, and ``mass(Unit.KG)`` gives the
 answer in another unit.
 
-This is a parts list with weights, and it came from the model. Change
-``wood.walnut()`` to ``wood.pine()`` in step 1, or ``wall_thickness`` at
-the top of the file, and it is right again.
+This is a parts list with weights, and because it came from the model it
+keeps up with the model: change ``wood.walnut()`` to ``wood.pine()`` in
+step 1, or ``wall_thickness`` at the top of the file, and it is right
+again.
 
 *********************
 Step 5: Look at it
 *********************
 
-Show the assembly in your viewer.
+The materials also decide how the box is drawn, so show the assembly in
+your viewer.
 
 .. code-block:: build123d
 
     show(hinged_box)
 
 Each part is already drawn in the colour of its material: brown for the
-walnut and yellow for the brass. OCP CAD Viewer can do a good deal more.
-Open its **Studio** tab and it renders the materials as they would look,
+walnut and yellow for the brass. OCP CAD Viewer can do a good deal more:
+open its **Studio** tab and it renders the materials as they would look,
 with the grain of the wood and the brushed surface of the leaves.
 
 .. image:: /tutorials/assets/box_materials/materials_hinge.png
     :align: center
     :width: 70%
 
-The grain and the brushing are part of the materials. Nothing was added to
-the model to draw them.
+The grain and the brushing are part of the materials, so nothing had to be
+added to the model to draw them.
 
 ***************************
 Step 6: Take it elsewhere
 ***************************
 
-The same appearance can be written to a file. glTF is a format made for
-exchanging models with their materials, and most 3D viewers, game engines
-and renderers read it.
+The same appearance can be written to a file for use outside the viewer.
+The format for that is glTF, which was made for exchanging models together
+with their materials and is read by most 3D viewers, game engines and
+renderers.
 
 .. literalinclude:: /tutorials/box_materials.py
     :language: build123d

@@ -46,8 +46,9 @@ stands at that point.
 Step 2: A list of places
 ****************************
 
-The panel is a rounded rectangle with a mounting hole in each corner.
-:class:`~build_common.Locations` holds a list of places, and whatever is
+The panel is a rounded rectangle with a mounting hole in each corner. To
+make the four holes without drawing a circle four times, use
+:class:`~build_common.Locations`, which holds a list of places: whatever is
 created at a ``Locations`` is created once at each place in it - here, four
 circles subtracted from the outline.
 
@@ -78,19 +79,19 @@ circles subtracted from the outline.
 of its places. In algebra mode the ``*`` operator places a shape at each of
 them.
 
-This works, and it has the weakness that the typed corners had in
-:ref:`tutorial_drawing_outlines`. The numbers 77 and 42 are half the size of
-the panel less a margin, worked out by hand and typed four times. Resize the
-panel and the holes stay where they were.
+This works, but it has the weakness that the typed corners had in
+:ref:`tutorial_drawing_outlines`: the numbers 77 and 42 are half the size of
+the panel less a margin, worked out by hand and typed four times, so if the
+panel is resized the holes stay where they were.
 
 ****************************
 Step 3: A grid of places
 ****************************
 
-Four holes at the corners of a rectangle are a two by two grid.
-:class:`~build_common.GridLocations` describes a grid by the spacing between
-its places in X and in Y and the number of places each way, and centres it
-on the origin.
+Four holes at the corners of a rectangle are a two by two grid, and a grid
+can be described instead of listed. :class:`~build_common.GridLocations`
+does so by the spacing between its places in X and in Y and the number of
+places each way, and centres the grid on the origin.
 
 .. tab-set::
 
@@ -110,8 +111,8 @@ on the origin.
             :start-after: [grid_algebra]
             :end-before: [grid_algebra]
 
-These are exactly the four holes of step 2, and the picture is unchanged.
-But the spacing is now computed from ``panel_width``, ``panel_height`` and
+These are exactly the four holes of step 2, and the picture is unchanged,
+but the spacing is now computed from ``panel_width``, ``panel_height`` and
 ``inset``, so the holes follow the panel. You have said what the pattern
 *is*, and left the points to build123d.
 
@@ -119,10 +120,10 @@ But the spacing is now computed from ``panel_width``, ``panel_height`` and
 Step 4: Places round a circle
 *********************************
 
-A fan needs vents in front of it.
-:class:`~build_common.PolarLocations` spaces a number of places evenly round
-a circle of a given radius. For now there is one fan, at the centre of the
-panel, with a slot at each place.
+A fan needs vents in front of it, arranged in a ring, and
+:class:`~build_common.PolarLocations` is the pattern for that: it spaces a
+number of places evenly round a circle of a given radius. For now there is
+one fan, at the centre of the panel, with a slot at each place.
 
 .. tab-set::
 
@@ -163,7 +164,7 @@ Step 5: A place has a direction
 
 The air leaving a fan is spinning, and vents that lean with the spin let it
 through more easily. In :ref:`tutorial_sketch_then_extrude` a slot was
-turned with ``rotation=90``. The same parameter leans these, by
+turned with ``rotation=90``, and the same parameter leans these, by
 ``vent_lean`` degrees:
 
 .. tab-set::
@@ -191,7 +192,7 @@ turned with ``rotation=90``. The same parameter leans these, by
 Every slot has turned by the same 30 degrees, but each from a different
 starting direction: its own spoke. A shape's ``rotation`` is measured from
 the direction of the place it is created at, not from the X axis of the
-sketch. This is the rule that makes patterns useful. Describe a feature
+sketch. This is the rule that makes patterns useful: describe a feature
 once, as it should look at one place, and it comes out right at all of
 them.
 
@@ -200,9 +201,9 @@ Step 6: Places within places
 ********************************
 
 The panel holds two fans, side by side, and each needs the same vents and
-its own four screw holes. Nothing about a fan has to be described twice.
-Its vents and its screw holes are patterns *around the fan's centre*, and
-the two centres are themselves a list of places.
+its own four screw holes. Nothing about a fan has to be described twice,
+because its vents and its screw holes are patterns *around the fan's
+centre*, and the two centres are themselves a list of places.
 
 .. tab-set::
 
@@ -273,7 +274,7 @@ Step 8: The sketch has a place too
 **************************************
 
 Every place so far has been measured in the flat of the sketch, from its
-centre. The sketch itself is somewhere as well. Until now that has been
+centre, but the sketch itself is somewhere as well. Until now that has been
 ``Plane.XY``, the plane of the floor, which is where a sketch goes when you
 do not say. A fan panel stands upright, so put the sketch on ``Plane.XZ``,
 the plane of the front wall.

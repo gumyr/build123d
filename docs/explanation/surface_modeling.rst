@@ -4,10 +4,10 @@
 Surface modelling
 #################
 
-Most parts are made from volumes. A sketch is extruded or revolved, the
-result fills a region of space, and its faces are whatever the operation
-left behind. *Surface modelling* goes the other way: the faces are made
-first, each one deliberately, and the solid is what they enclose.
+Most parts are made from volumes: a sketch is extruded or revolved, the result
+fills a region of space, and its faces are whatever the operation left behind.
+*Surface modelling* goes the other way: the faces are made first, each one
+deliberately, and the solid is what they enclose.
 
 ***********************
 Why build from faces
@@ -45,16 +45,16 @@ usual ways.
 The step that causes trouble is the joining of edges. ``Shell`` *sews* the
 faces it is given: wherever the edges of two faces lie on top of one
 another, they are merged into one shared edge. The edges need not be the
-same object, or have been made together. They need to coincide, to within a
-tolerance of one millionth of a unit.
+same object, or have been made together, but they do need to coincide, to
+within a tolerance of one millionth of a unit.
 
 Faces whose edges are further apart than that are not joined, and if the
 faces do not all join up ``Shell`` raises a ``ValueError`` instead of
-returning something with a gap in it. A gap of that kind is rarely a
-mistake in the numbers. It usually comes from an edge that is an
-*approximation* of its neighbour: a surfacing method that fits a spline to
-its boundary returns a face whose edge is very close to the curve it was
-given, and not exactly on it. There are two remedies:
+returning something with a gap in it. A gap of that kind is rarely a mistake
+in the numbers, and usually comes from an edge that is an *approximation* of
+its neighbour: a surfacing method that fits a spline to its boundary returns a
+face whose edge is very close to the curve it was given, and not exactly on
+it. There are two remedies:
 
 * Take the edge from the face. Build the neighbouring face from
   ``face.edges()`` and not from the original curve, and the two coincide

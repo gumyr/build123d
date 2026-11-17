@@ -4,15 +4,15 @@
 Drawing with constraints
 ########################
 
-An outline drawn from typed-in coordinates is right once. Change one
+An outline drawn from typed-in coordinates is right only once: change one
 dimension and the pieces no longer meet. An outline drawn with
-*constraints* holds together: each line or arc takes its ends, its
+*constraints* holds together, because each line or arc takes its ends, its
 direction or its length from the objects it belongs with, so when they
 change it follows.
 
-build123d has no sketch solver. A constraint here is a line of code that
-asks an object already drawn for a point, a direction or a length, and
-the outline is built in order, each piece from the ones before it. Why it
+build123d has no sketch solver, so a constraint here is a line of code
+that asks an object already drawn for a point, a direction or a length,
+and the outline is built in order, each piece from the ones before it. Why it
 works this way is discussed in :ref:`constraints_explained`, and
 :ref:`tutorial_dimensioned_drawing` uses several of these techniques
 together on one drawing.
@@ -140,11 +140,11 @@ Sized from another object
             :start-after: [measure_algebra]
             :end-before: [measure_algebra]
 
-The middle point of the arc is no longer typed in. ``l1 @ 0.5`` is the
-middle of the line, and ``(0, l1.length / 2)`` is added to it, a vector
-half the length of the line. ``length`` is a property of every edge and
-wire. The arc now follows the line through any change of position, length
-or slope.
+The middle point of the arc is no longer typed in. Instead ``l1 @ 0.5``
+gives the middle of the line, and ``(0, l1.length / 2)`` is added to it, a
+vector half the length of the line, ``length`` being a property of every
+edge and wire. The arc therefore follows the line through any change of
+position, length or slope.
 
 Other properties serve the same way: an arc has a ``radius`` and an
 ``arc_center``, and every shape has a ``center()`` and a bounding box.
@@ -211,11 +211,12 @@ Leave at a right angle
             :start-after: [perpendicular_algebra]
             :end-before: [perpendicular_algebra]
 
-A tangent is a vector, and can be turned. Rotated a quarter turn about
-``Axis.Z`` it points square to the curve, and
-:class:`~objects_curve.PolarLine` draws a line from a start point in a
-direction. ``l2`` stays perpendicular to the end of the arc whatever the
-arc is changed to. Use ``90`` to leave on the other side.
+A tangent is a vector, and so it can be turned. Rotated a quarter turn
+about ``Axis.Z`` it points square to the curve, which is the direction given
+to :class:`~objects_curve.PolarLine`, an object that draws a line from a
+start point in a direction. ``l2`` therefore stays perpendicular to the end
+of the arc whatever the arc is changed to. Use ``90`` to leave on the other
+side.
 
 The third operator, ``^``, is short for
 :meth:`~topology.Mixin1D.location_at`. ``l1 ^ 1`` is a whole location at
@@ -512,7 +513,7 @@ challenge.
 When the relationships really are algebra and cannot be put as geometry,
 build123d code is Python: solve for the values with any solver, such as
 ``scipy.optimize`` or the symbolic solver ``sympy``, and feed the results
-into ordinary objects. ``sympy`` is not installed with build123d.
+into ordinary objects.
 
 ************
 See also

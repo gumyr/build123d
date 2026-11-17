@@ -4,9 +4,9 @@
 Examples
 ########
 
-Finished models with their code. Every example is written twice, in builder
-mode and in algebra mode, and the two versions make the same model: open
-"Code" under an example and choose a tab. :ref:`builder_and_algebra`
+These are finished models with their code. Every example is written twice, in
+builder mode and in algebra mode, and the two versions make the same model:
+open "Code" under an example and choose a tab. :ref:`builder_and_algebra`
 describes the two modes.
 
 The scripts are in the `examples folder
@@ -72,7 +72,7 @@ algebra mode. The folder holds further scripts that are not shown here.
             :link-type: ref
 
     .. grid-item-card:: Key Cap
-            :img-top: /assets/examples/key_cap.png
+            :img-top: /examples/assets/key_cap.png
             :link: key_cap
             :link-type: ref
 
@@ -122,7 +122,7 @@ algebra mode. The folder holds further scripts that are not shown here.
             :link-type: ref
 
     .. grid-item-card:: Toy Truck
-            :img-top: /assets/examples/toy_truck.png
+            :img-top: /examples/assets/toy_truck.png
             :link: toy_truck
             :link-type: ref
 
@@ -264,7 +264,7 @@ Key techniques:
   than one face of the solid, which a wrap of a single face cannot do
 
 The curves and surfaces of the tip are made one at a time from one another,
-so that part of the script is the same in both modes. They differ in how
+so that part of the script is the same in both modes, which differ only in how
 the pieces are put together.
 
 .. dropdown:: Code
@@ -528,11 +528,11 @@ Handle
     :align: center
 
 A drawer handle made with a multisection sweep. The path is a
-:class:`~objects_curve.Spline`. Cross sections are placed along it with the
-``^`` operator, which gives a location on the path facing along it: circles
-at the two ends and rounded rectangles between. ``sweep(multisection=True)``
-then blends from each section to the next as it follows the path.
-:ref:`tutorial_beyond_extrude` introduces ``sweep``.
+:class:`~objects_curve.Spline`, and cross sections are placed along it with
+the ``^`` operator, which gives a location on the path facing along it:
+circles at the two ends and rounded rectangles between.
+``sweep(multisection=True)`` then blends from each section to the next as it
+follows the path. :ref:`tutorial_beyond_extrude` introduces ``sweep``.
 
 .. dropdown:: Code
 
@@ -591,7 +591,7 @@ make the other.
 
 Key Cap
 -------
-.. image:: /assets/examples/key_cap.png
+.. image:: /examples/assets/key_cap.png
     :align: center
 
 A Cherry MX key cap. The body is an extrusion with a ``taper``, hollowed
@@ -913,7 +913,7 @@ script.
 
 Toy Truck
 ---------
-.. image:: /assets/examples/toy_truck.png
+.. image:: /examples/assets/toy_truck.png
     :align: center
 
 .. image:: /examples/assets/toy_truck_picture.jpg

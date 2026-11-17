@@ -10,7 +10,7 @@ shape whose cross-section matters all the way along. A wing has to be an
 exact airfoil at the root, a different, thinner airfoil at the tip, and a
 smooth blend between, inside an outline that is curved as well.
 
-A *Gordon surface* is made for this. It is given a grid of curves - some
+A *Gordon surface* is made for this: it is given a grid of curves - some
 running one way, the rest crossing them - and makes the surface that
 passes through all of them. In this tutorial you will use one to make the
 elliptical wing of a Supermarine Spitfire:
@@ -76,9 +76,9 @@ shallow one for the leading edge and a deeper one for the trailing edge.
 
 An ``EllipticalCenterArc`` is part of an ellipse, given by its centre, its
 two radii, the angle it starts at and how far round it goes. Both arcs are
-centred on the origin and are half the span long in X. The leading edge
-reaches ``wing_leading`` forwards, towards -Y, and the trailing edge
-``wing_trailing`` backwards. They meet at the tip.
+centred on the origin and are half the span long in X, so they meet at the
+tip, while the leading edge reaches ``wing_leading`` forwards, towards -Y,
+and the trailing edge ``wing_trailing`` backwards.
 
 These two curves run the length of the wing. In a Gordon surface the
 curves that run one way are called the *guides*, and these are they.
@@ -105,17 +105,17 @@ root and then at ``wing_tip_section``. ``intersect`` gives the points where
 a curve meets it, and the chord is the distance in Y between the point on
 the leading edge and the point on the trailing edge.
 
-Nothing about the ellipses had to be worked out by hand. The shapes were
-asked.
+Nothing about the ellipses had to be worked out by hand, because the
+shapes themselves were asked.
 
 ***************************
 Step 4: The airfoils
 ***************************
 
-``Airfoil`` draws a standard NACA airfoil from its four-digit code. It is
-one unit long, with its nose at the origin. Each one is moved so that the
-right point along it is on the centre line, scaled up to its chord, and
-stood on its edge.
+``Airfoil`` draws a standard NACA airfoil from its four-digit code, one
+unit long and with its nose at the origin. To fit the wing, each one is
+therefore moved so that the right point along it is on the centre line,
+scaled up to its chord, and stood on its edge.
 
 .. literalinclude:: /tutorials/surface_spitfire_wing.py
     :language: build123d
@@ -144,8 +144,8 @@ touching both. These are the *profiles* of the Gordon surface.
 Step 5: The Gordon surface
 ***********************************
 
-There are guides running along the wing and profiles crossing them.
-Together they are the grid the surface will be stretched over:
+There are now guides running along the wing and profiles crossing them,
+and together they are the grid the surface will be stretched over:
 
 .. image:: /tutorials/assets/surface_spitfire_wing/wing_grid.svg
     :align: center
@@ -171,7 +171,7 @@ One call makes the surface through them all.
 ``profiles`` is the list of the three in red, and ``guides`` the two in
 blue.
 
-The grid has to be a true one. *Every profile must cross every guide, and
+The grid has to be a true one: *every profile must cross every guide, and
 cross it exactly once.* That is why step 3 measured the chords from the
 guides instead of calculating them: an airfoil that stopped a little short
 of a guide, or ran a little past it, would not be on the grid, and the
@@ -184,8 +184,8 @@ outwards.
 Step 6: Close the root and make a solid
 *************************************************
 
-The surface is open at the root, where the wing would join the aircraft.
-A flat face closes it.
+The surface is open at the root, where the wing would join the aircraft,
+and a flat face closes it.
 
 .. literalinclude:: /tutorials/surface_spitfire_wing.py
     :language: build123d
@@ -207,10 +207,10 @@ loop with a flat face, shown in red.
 
 Taking the edge from the surface, instead of using ``airfoil_root`` again,
 is the rule of the heart token at work: the edges of the two faces must
-coincide, and the surest way is to take the edge from the face that
-already has it. The surface follows the airfoil closely but not exactly,
-so the airfoil itself would leave a small gap. The two faces then make a ``Shell``, and the shell a
-``Solid``, as before.
+coincide, and the surest way is to take the edge from the face that already
+has it. The surface follows the airfoil closely but not exactly, so the
+airfoil itself would leave a small gap. The two faces then make a ``Shell``,
+and the shell a ``Solid``, as before.
 
 Check it: the solid is valid, and one wing has a volume of about two cubic
 metres.

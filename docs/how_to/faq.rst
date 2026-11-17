@@ -30,7 +30,7 @@ Is build123d GPU accelerated?
 =============================
 
 No. The geometry is computed by the OpenCascade kernel, which runs on the
-CPU. A viewer uses the GPU to draw the result, and that is all.
+CPU; a viewer uses the GPU only to draw the result.
 
 .. _are_glob_imports_bad_practice:
 
@@ -72,11 +72,11 @@ Sketches and planes
 Where is my sketch actually drawn?
 ==================================
 
-Flat, in its own X and Y, whatever plane it was given. The plane is applied
-afterwards, to the finished sketch. So inside a sketch, positions and
-selections are in the sketch's own coordinates, where Z is always zero.
-Builders do not inherit a placement from the builder they are nested in:
-each draws at its own origin and is placed when it finishes.
+Flat, in its own X and Y, whatever plane it was given, because the plane is
+applied afterwards, to the finished sketch. Inside a sketch, positions and
+selections are therefore in the sketch's own coordinates, where Z is always
+zero. Nor do builders inherit a placement from the builder they are nested
+in: each draws at its own origin and is placed when it finishes.
 :ref:`sketching_on_other_planes` covers this.
 
 Why is the origin of a sketch on a face at the centre of the face?
@@ -120,8 +120,9 @@ Why is my mirrored part in the wrong place?
 ===========================================
 
 ``mirror`` reflects in a plane, and unless told otherwise that plane is
-``Plane.XZ``, through the origin. A part away from the origin lands on the
-other side of it. Name the plane you mean, which can be a face of the part:
+``Plane.XZ``, through the origin, so a part away from the origin lands on
+the other side of it. Name the plane you mean, which can be a face of the
+part:
 
 .. literalinclude:: /how_to/faq.py
     :language: build123d
@@ -135,16 +136,17 @@ Lines and outlines
 Why is there no “current point” when drawing lines?
 ===================================================
 
-build123d keeps no hidden cursor. Each object says where it starts, and to
-carry on from the last one you ask that one where it ended:
+Because build123d keeps no hidden cursor. Each object says where it starts,
+so to carry on from the last one you ask that one where it ended:
 
 .. literalinclude:: /how_to/faq.py
     :language: build123d
     :start-after: [current_point]
     :end-before: [current_point]
 
-Nothing is typed twice, and the pieces cannot drift apart when a dimension
-changes. :ref:`drawing_with_constraints` covers ``@`` and its relatives.
+Written this way, nothing is typed twice and the pieces cannot drift apart
+when a dimension changes. :ref:`drawing_with_constraints` covers ``@`` and
+its relatives.
 
 Why will my outline not make a face?
 ====================================
@@ -274,5 +276,6 @@ triangles and nothing else. :ref:`import_export` compares all the formats.
 Why does ``import_dxf`` give me lines and not faces?
 ====================================================
 
-A DXF file holds lines and arcs, and that is what comes back, as separate
-edges. Pass the ones that form a closed outline to ``make_face``.
+A DXF file holds lines and arcs, so that is what comes back, as separate
+edges. To get a face, pass the ones that form a closed outline to
+``make_face``.

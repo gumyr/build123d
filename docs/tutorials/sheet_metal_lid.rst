@@ -6,8 +6,8 @@ A lid for the enclosure
 
 :ref:`sheet_metal_tutorial` made the base of an enclosure with walls
 folded up from a blank. This tutorial makes the lid that goes on it, and a
-lid is a different kind of sheet metal part. It is nearly flat, and all of
-its features are small folds that make it fit: lips that step up to rest
+lid is a different kind of sheet metal part: it is nearly flat, and all of
+its features are small folds that make it fit, lips that step up to rest
 on the rims of the base, and tabs that reach down inside to hold it in
 place.
 
@@ -120,13 +120,13 @@ material to it, as ``flange`` does. ``offset`` is the height of the step
 and ``length`` is how far the sheet runs on beyond it, which here is the
 lip.
 
-``lid.rims().filter_by(Axis.X)`` are the two long edges of the plate. Both
-are stepped in one call.
+``lid.rims().filter_by(Axis.X)`` are the two long edges of the plate, and
+both are stepped in one call.
 
-A jog has a least height. Each of its two bends takes up room, so the step
-cannot be smaller than the two bend radii together. That is why this sheet
-has a small ``lid_bend_radius``: with the 2 mm of the base, a step of 4 mm
-could not be made.
+A jog has a least height, because each of its two bends takes up room: the
+step cannot be smaller than the two bend radii together. That is why this
+sheet has a small ``lid_bend_radius``: with the 2 mm of the base, a step of
+4 mm could not be made.
 
 **********************
 Step 4: Tabs
@@ -167,14 +167,14 @@ side of the sheet its faces look out from, which for the plate is upwards,
 and a negative angle folds the other way.
 
 ``gaps=tab_gap`` now leaves a long stretch of each end unbent, so that the
-tab is much narrower than the edge it is folded from. In the base, the
-gaps were small and were there to clear the corners. Here they make the
+tab is much narrower than the edge it is folded from. In the base the gaps
+were small and were there to clear the corners, whereas here they make the
 feature.
 
-The edges are found by selection. After step 3 the sheet has several rims
-that run along Y - the ends of the plate, and the ends of the two lips,
-higher up. ``group_by(Axis.Z)[0]`` takes the lowest group, which is the
-ends of the plate.
+The edges are found by selection, which needs some care because after step
+3 the sheet has several rims that run along Y - the ends of the plate, and
+the ends of the two lips, higher up. ``group_by(Axis.Z)[0]`` takes the lowest
+group, which is the ends of the plate.
 
 ***************************************
 Step 5: Relieve the bends
@@ -182,7 +182,7 @@ Step 5: Relieve the bends
 
 Look at where each tab meets the plate. The bend stops partway along the
 edge, and beside it the edge carries straight on, flat. Metal cannot fold
-on one side of a point and stay flat on the other. Formed like this, it
+on one side of a point and stay flat on the other, so formed like this it
 would tear at each end of the bend, and the tear would run into the plate.
 
 .. tab-set::
@@ -209,7 +209,7 @@ would tear at each end of the bend, and the tear would run into the plate.
 
 :ref:`bend_relief <sheet_metal_bend_relief>` cuts a small notch into the
 sheet at each end of a bend, so that the bend ends on a free edge and has
-nothing to tear. It is given the bends themselves. A sheet's ``bends()``
+nothing to tear. It is given the bends themselves: a sheet's ``bends()``
 are its curved faces, and ``filter_by(Axis.Y)`` keeps the ones whose axis
 runs along Y, which are the two tab bends and not the four bends of the
 lips. ``ReliefType.OBROUND`` is a notch with a rounded end.
@@ -222,8 +222,8 @@ one bend that stops inside the sheet.
 Step 6: Trim the corners of the tabs
 ******************************************************
 
-A tab with square corners catches on the wall as the lid goes on. Cut the
-lower corners off at an angle.
+A tab with square corners catches on the wall as the lid goes on, so cut
+the lower corners off at an angle.
 
 .. tab-set::
 
@@ -265,8 +265,8 @@ One more refinement: tip the bottom of each tab inwards a little, so that
 it guides the lid into the box.
 
 Everything folded so far was *new* material, added beyond an edge. This is
-different. The tab is already there, and it is to be folded across its
-middle. That is what :ref:`bend <sheet_metal_bend>` is for.
+different, because the tab is already there and is to be folded across its
+middle, which is what :ref:`bend <sheet_metal_bend>` is for.
 
 .. tab-set::
 
@@ -314,7 +314,8 @@ selection is inside the loop.
 Step 8: Thicken
 *************************
 
-The lid is finished as a surface. Give it its thickness.
+The lid is finished as a surface, so all that remains in making it is to
+give it its thickness.
 
 .. tab-set::
 
@@ -371,7 +372,7 @@ the base is. Lift it into place and see whether it fits.
     :align: center
     :width: 60%
 
-The lift is worked out from the parts. The lips have to rest on the
+The lift is worked out from the parts: the lips have to rest on the
 highest point of the base, which is the top of its hems,
 ``base.bounding_box().max.Z``. In the lid's own coordinates the underside
 of a lip is ``step_height - lid_thickness`` above the plate: the step up,
@@ -394,7 +395,7 @@ the middle, hangs down inside the short wall with its tip turned in.
 Step 10: The flat pattern
 *************************************
 
-Last, the piece to cut.
+Last comes the piece to cut, the lid's flat pattern.
 
 .. tab-set::
 

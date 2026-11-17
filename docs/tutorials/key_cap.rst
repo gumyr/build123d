@@ -4,12 +4,12 @@
 A key cap
 #########
 
-A moulded plastic part has a look of its own. Its sides lean, so that it
-will come out of the mould. It is a thin shell, because thick plastic
-sinks as it cools. And inside the shell are ribs and posts that run from
-wherever they are needed up to the underside of the outer skin, whatever
-shape that skin happens to be. In this tutorial you will build such a
-part, a key cap for a Cherry MX keyboard switch:
+A moulded plastic part has a look of its own, and each feature of it has a
+reason. Its sides lean, so that it will come out of the mould; it is a thin
+shell, because thick plastic sinks as it cools; and inside the shell are
+ribs and posts that run from wherever they are needed up to the underside of
+the outer skin, whatever shape that skin happens to be. In this tutorial you
+will build such a part, a key cap for a Cherry MX keyboard switch:
 
 .. image:: /tutorials/assets/key_cap/keycap_finished.png
     :align: center
@@ -126,8 +126,8 @@ already has.
 Step 4: Dish the top
 ***************************
 
-A fingertip sits in a shallow dish. The dish is part of a large sphere,
-taken out of the top of the block.
+A fingertip sits in a shallow dish, which is made by taking part of a
+large sphere out of the top of the block.
 
 .. tab-set::
 
@@ -158,11 +158,12 @@ ready-made solid from another is the subject of
 :ref:`tutorial_combining_solids`, and this is a case where it is the right
 tool.
 
-``rotation=(90, 0, 0)`` tips the sphere on its side. A sphere has two
-poles, like a globe, and as made they are at its top and bottom, which
-would put one in the middle of the dish. A pole is a point where the
-surface is awkward to work with, and the hollowing of the next step fails
-on it. Tipped over, the poles are out to the sides, clear of the key cap.
+``rotation=(90, 0, 0)`` tips the sphere on its side, and the reason is its
+poles. A sphere has two, like a globe, and as made they are at its top and
+bottom, which would put one in the middle of the dish. Because a pole is a
+point where the surface is awkward to work with, the hollowing of the next
+step fails on it; tipped over, the poles are out to the sides, clear of the
+key cap.
 
 ***********************
 Step 5: Hollow it
@@ -201,6 +202,9 @@ up the sides.
 *********************************
 Step 6: Round the outside
 *********************************
+
+With the shell made, its outside edges can be rounded. The work in this
+step is all in choosing them.
 
 .. tab-set::
 
@@ -257,8 +261,8 @@ The switch pushes on a socket in the middle of the key cap, and the socket
 is held by two ribs that cross the inside. The ribs start at
 ``rib_height`` and go up until they meet the underside of the dished top.
 Two things about them are not known: how long they should be at that
-height, since the sides lean, and how tall, since the top is curved. The
-part can answer both.
+height, since the sides lean, and how tall, since the top is curved. Rather
+than work either out, the part itself can be asked.
 
 .. tab-set::
 
@@ -298,18 +302,18 @@ meets is the one being built. In algebra mode it is named with ``target``,
 and the result is added to the cap.
 
 The ribs are a little too long higher up, where the sides have leaned
-further in, and their ends run into the wall. That is what joins them to
+further in, so their ends run into the wall, and that is what joins them to
 it.
 
 Change ``dish_low`` or ``dish_radius`` and the ribs still end on the
-underside; change ``wall`` or ``draft_angle`` and they still fit across.
-Neither number was ever worked out.
+underside; change ``wall`` or ``draft_angle`` and they still fit across,
+because neither number was ever worked out.
 
 *************************
 Step 8: The socket
 *************************
 
-The stem of the switch is a cross, and the key cap pushes onto it. The
+The stem of the switch is a cross, and the key cap pushes onto it, so the
 socket is a round post with a cross-shaped hole, hanging down from the
 ribs.
 
@@ -336,7 +340,7 @@ ribs.
     :width: 50%
 
 The sketch is on the same plane as the ribs, and a negative ``amount``
-extrudes it downward from there. It stops half a millimetre short of the
+extrudes it downward from there, to stop half a millimetre short of the
 bottom of the key cap.
 
 Try a ``draft_angle`` of 8, a ``wall`` of 1.5 or a ``dish_low`` of 8, and

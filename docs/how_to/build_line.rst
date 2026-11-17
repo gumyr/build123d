@@ -5,9 +5,9 @@ Drawing lines and curves
 #########################
 
 Lines and curves are the one-dimensional objects of build123d: they have
-length and no area. They are drawn for two reasons above all. Joined into
+length and no area. They are drawn for two reasons above all: joined into
 a closed outline they become the edge of a face, for shapes that no
-rectangle or circle will make. Left open they are a path, for a sweep to
+rectangle or circle will make, and left open they are a path for a sweep to
 follow. This guide shows how to draw them for either job.
 
 In builder mode lines are drawn inside a ``BuildLine``, which collects
@@ -129,7 +129,8 @@ with a picture of each, is in the :doc:`Objects reference </reference/objects>`.
 Draw half and mirror it
 ***************************
 
-A symmetric outline need only be drawn once.
+Only half of a symmetric outline need be drawn, because the other half is
+its reflection.
 
 .. image:: /how_to/assets/build_line/lines_mirror.svg
     :align: center
@@ -171,8 +172,8 @@ does at ``X = 0``, and the two halves meet to make a closed outline.
 Close an outline into a face
 ********************************
 
-A closed outline is still only lines. :func:`~operations_sketch.make_face`
-fills it.
+A closed outline is still only lines, and becomes a face when
+:func:`~operations_sketch.make_face` fills it.
 
 .. tab-set::
 
@@ -198,9 +199,10 @@ the lines waiting there into a face. In algebra mode ``make_face`` is
 given the outline and returns the face as a sketch. Either way the result
 is a sketch like any other, ready to ``extrude``.
 
-The outline must be closed. :func:`~operations_sketch.make_hull` does not
-need one: it makes the face that a band stretched round the lines would
-enclose, whether or not they touch.
+For ``make_face`` the outline must be closed.
+:func:`~operations_sketch.make_hull` has no such need, because it makes the
+face that a band stretched round the lines would enclose, whether or not
+they touch.
 
 .. image:: /how_to/assets/build_line/lines_hull.svg
     :align: center

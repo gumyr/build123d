@@ -130,8 +130,8 @@ unless it is given a smaller ``revolution_arc`` in degrees.
 Step 4: Hollow it out
 *************************
 
-So far the adapter is solid. It needs to be a shell ``wall`` thick, open at
-the bottom and at the top.
+So far the adapter is solid, whereas what is wanted is a shell ``wall``
+thick, open at the bottom and at the top.
 
 You met :func:`~operations_generic.offset` in the first tutorial, shrinking
 an outline to make a rim. Given a solid and a negative amount it moves
@@ -175,8 +175,8 @@ The adapter needs a short straight skirt at the bottom, to slide over the
 nozzle. Its cross-section is exactly the rim the hollowing left behind - an
 oval ring ``wall`` wide - and that rim is a face of the part.
 
-A face can be extruded as well as a sketch. Select the lowest face, and
-give it to ``extrude``:
+Since a face can be extruded as well as a sketch, there is nothing to draw
+for this step: select the lowest face, and give it to ``extrude``:
 
 .. tab-set::
 
@@ -200,11 +200,10 @@ give it to ``extrude``:
     :align: center
     :width: 55%
 
-Nothing was drawn for this step. The rim, in red, is pushed straight out of
-the part, away from the solid, so the skirt grows downwards and matches the
-wall above it exactly. In builder mode this is ``extrude`` being given what
-to extrude, as mentioned in the first tutorial, instead of taking the last
-sketch.
+The rim, in red, is pushed straight out of the part, away from the solid, so
+the skirt grows downwards and matches the wall above it exactly. In builder
+mode this is ``extrude`` being given what to extrude, as mentioned in the
+first tutorial, instead of taking the last sketch.
 
 **************************************
 Step 6: Mirror, draw one side only
@@ -301,8 +300,8 @@ the top of the file, and look at the cut half again.
 What you learned
 ********************
 
-* Every operation here starts from a sketch or a face, as ``extrude`` does.
-  What differs is how the solid is made from it.
+* Every operation here starts from a sketch or a face, as ``extrude`` does;
+  what differs is how the solid is made from it.
 * :func:`~operations_part.loft` blends two or more sketches on different
   planes into one solid, and ``Plane.XY.offset()`` puts a plane at a
   height.

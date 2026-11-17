@@ -18,8 +18,8 @@ underneath both: a shape is a value.
 Objects are values
 **********************
 
-A number is a value. ``3 + 4`` does not change the 3 or the 4; it makes a
-7. Shapes in algebra mode behave the same way:
+A number is a value: ``3 + 4`` does not change the 3 or the 4, it makes a 7.
+Shapes in algebra mode behave the same way:
 
 .. literalinclude:: /explanation/algebra_mode.py
     :language: build123d
@@ -40,8 +40,8 @@ that reads naturally:
     :start-after: [rebind]
     :end-before: [rebind]
 
-This does not modify the plate. It makes a new part and gives it the old
-name.
+Even so, this does not modify the plate: it makes a new part and gives it the
+old name.
 
 This is the opposite of builder mode, where a builder holds a model that
 each line changes. :ref:`how_builder_mode_works` describes that.
@@ -88,12 +88,12 @@ makes sense to:
 Subtracting never raises the dimension of what it is taken from, and an
 intersection has the lower dimension of the two. A lower dimension cannot
 be taken from a higher one: a solid less a sketch would be the same solid.
-Nor can different dimensions be added. A sketch is turned into a part by an
-operation such as ``extrude``, not by arithmetic.
+Nor can different dimensions be added, since a sketch is turned into a part by
+an operation such as ``extrude``, not by arithmetic.
 
-When the pieces being added do not touch, there is nothing to join them
-into one. They come back grouped in a plain ``Compound``, which holds both
-and can be selected from and measured like any shape.
+When the pieces being added do not touch, there is nothing to join them into
+one, so they come back grouped in a plain ``Compound``, which holds both and
+can be selected from and measured like any shape.
 
 The operators also accept a list, and apply it in one step:
 
@@ -128,7 +128,7 @@ a single operation:
     :start-after: [fast]
     :end-before: [fast]
 
-The result is identical. On a grid of a few hundred holes the second form
+The result is identical, but on a grid of a few hundred holes the second form
 is around ten times faster, and the gap widens as the number grows.
 
 When the same shape goes at every place, the places can be multiplied by
@@ -180,9 +180,9 @@ contributes its faces, so sketch objects can be added directly:
 Placement arithmetic
 ************************
 
-A shape is made at the origin. It is put in place with a fourth operator,
-``*``, which takes a location or a plane on its left and a shape on its
-right, and gives back the shape moved:
+A shape is made at the origin, and is put in place with a fourth operator,
+``*``, which takes a location or a plane on its left and a shape on its right,
+and gives back the shape moved:
 
 .. literalinclude:: /explanation/algebra_mode.py
     :language: build123d
@@ -220,9 +220,9 @@ too:
     :start-after: [place_many]
     :end-before: [place_many]
 
-A location list is a Python list of locations. It can be indexed, sliced
-and joined with ``+``, and the result is still a location list, as is a
-plane or a location times one.
+A location list is a Python list of locations, so it can be indexed, sliced
+and joined with ``+``, and the result is still a location list, as is a plane
+or a location times one.
 
 The two kinds of arithmetic combine in one expression. ``*`` binds more
 tightly than ``+``, ``-`` and ``&``, as in ordinary arithmetic, so each

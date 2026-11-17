@@ -48,9 +48,10 @@ There are four builders, one for each kind of thing that can be built:
       - sheet metal
       - ``.sheet``, a ``Shell``
 
-``example`` above is the builder. The part it built is ``example.part``.
-It is the part, not the builder, that is exported, measured or put in an
-assembly. :ref:`key_concepts` describes ``Part``, ``Sketch`` and ``Curve``.
+``example`` above is the builder, and the part it built is ``example.part``.
+The distinction matters because it is the part, not the builder, that is
+exported, measured or put in an assembly. :ref:`key_concepts` describes
+``Part``, ``Sketch`` and ``Curve``.
 
 ******************************
 Objects find their builder
@@ -65,9 +66,9 @@ acts on that one:
     :start-after: [scope]
     :end-before: [scope]
 
-This is what keeps builder code short. It also has a consequence that
-catches everyone once: **an object is added to its builder at the moment it
-is created**, not when the line finishes and not when the block ends.
+This is what keeps builder code short, but it has a consequence that catches
+everyone once: **an object is added to its builder at the moment it is
+created**, not when the line finishes and not when the block ends.
 
 .. _builder_objects_combine_at_once:
 
@@ -130,10 +131,10 @@ inside a builder:
     :start-after: [algebra_wrong]
     :end-before: [algebra_wrong]
 
-This looks like a ring. The variable ``ring`` is a ring. But each ``Circle``
-added itself to the sketch as it was created, so the sketch holds both
-circles joined together: a solid disc. The subtraction was done on the side,
-and its result was never given to the builder.
+This looks like a ring, and the variable ``ring`` is indeed a ring. But each
+``Circle`` added itself to the sketch as it was created, so the sketch holds
+both circles joined together: a solid disc. The subtraction was done on the
+side, and its result was never given to the builder.
 
 Objects are combined with their builder as soon as they are created,
 unless they are made with ``mode=Mode.PRIVATE``. A private object is made
@@ -182,9 +183,10 @@ is combined with the running total:
 On the column of figures, ``ADD`` and ``SUBTRACT`` are the plus and minus
 signs.
 
-The default is not always ``ADD``. A ``Hole`` exists to remove material and
-defaults to ``SUBTRACT``. Operations that reshape what is there, such as
-``fillet`` and ``offset``, replace it.
+The default is not always ``ADD``, because it follows what the object is for:
+a ``Hole`` exists to remove material and so defaults to ``SUBTRACT``, while
+operations that reshape what is there, such as ``fillet`` and ``offset``,
+replace it.
 
 Builders have modes too
 =======================
@@ -199,11 +201,11 @@ of it is then added, subtracted or intersected in one step.
     :start-after: [builder_mode_sketch]
     :end-before: [builder_mode_sketch]
 
-The window is a rectangle joined to a circle. It is built as one shape, and
-that shape is then cut from the plate. Written as two separate objects with
-``Mode.SUBTRACT`` the result here would be the same, but a nested builder
-can hold any amount of construction, fillets, mirrors and all, and still
-combine as a single thing.
+The window, a rectangle joined to a circle, is built as one shape, and that
+shape is then cut from the plate. Written as two separate objects with
+``Mode.SUBTRACT`` the result here would be the same, but a nested builder can
+hold any amount of construction, fillets, mirrors and all, and still combine
+as a single thing.
 
 It works the same way for parts:
 
@@ -229,13 +231,13 @@ Built locally, placed on exit
 *********************************
 
 A builder can be given one or more *placements*, planes, faces or
-locations, as its first arguments. They say where the finished result is
-to go.
+locations, as its first arguments. They say where the finished result is to
+go, not where things are drawn.
 
-They do not change where things are drawn. Every builder constructs in its
-own coordinates, as if on ``Plane.XY`` at the origin, and the placement is
-applied once, to the completed result, when the block ends. Inside the
-block, positions and selections are in the builder's own coordinates.
+Every builder constructs in its own coordinates, as if on ``Plane.XY`` at the
+origin, and the placement is applied once, to the completed result, when the
+block ends. Inside the block, positions and selections are therefore in the
+builder's own coordinates.
 
 .. literalinclude:: /explanation/builder_mode.py
     :language: build123d
@@ -257,8 +259,8 @@ rectangle is drawn once and lands on each of the six faces of a box:
 .. image:: /explanation/assets/key_concepts_builder/boxes_on_faces.svg
     :align: center
 
-A builder does not inherit a placement from the builder it is nested in.
-The sketch above is drawn flat, whatever the part round it is doing.
+A builder does not inherit a placement from the builder it is nested in, which
+is why the sketch above is drawn flat, whatever the part round it is doing.
 ``BuildLine`` takes a single placement; the others take any number.
 
 .. _location_context_link:
@@ -276,9 +278,9 @@ every active place:
     :start-after: [locations_inside]
     :end-before: [locations_inside]
 
-Two boxes, two cylinders, and a grid of four spheres at each of the two
-places. Contexts nest, and an inner one is measured from each place of the
-outer one.
+The result is two boxes, two cylinders, and a grid of four spheres at each of
+the two places, because contexts nest and an inner one is measured from each
+place of the outer one.
 
 Put *round* a builder, the same contexts act on the builder's finished
 result, exactly as a placement does:
@@ -288,20 +290,19 @@ result, exactly as a placement does:
     :start-after: [locations_around]
     :end-before: [locations_around]
 
-The circle is drawn once: ``holes.sketch_local`` has one face. It is placed
-twice: ``holes.sketch`` has two, and ``extrude`` makes two posts. The same
-goes for a whole part:
+The circle is drawn once, so ``holes.sketch_local`` has one face, but it is
+placed twice, so ``holes.sketch`` has two and ``extrude`` makes two posts. The
+same goes for a whole part:
 
 .. literalinclude:: /explanation/builder_mode.py
     :language: build123d
     :start-after: [locations_part]
     :end-before: [locations_part]
 
-A builder made inside a function is the exception. It is not part of the
-build that called the function, so it is not added to that build when it
-ends, and the caller's active locations are not applied to it. It is
-returned like any object, and the caller places it, usually with
-``insert``:
+A builder made inside a function is the exception, because it is not part of
+the build that called the function: it is not added to that build when it
+ends, and the caller's active locations are not applied to it. Instead it is
+returned like any object, and the caller places it, usually with ``insert``:
 
 .. literalinclude:: /explanation/builder_mode.py
     :language: build123d
@@ -316,19 +317,19 @@ Pending objects
 *******************
 
 When a builder inside another builder finishes, its result has to go
-somewhere. A sketch finished inside a ``BuildPart`` is not a solid and
-cannot be added to the part. It is handed to the part to hold, as a
-*pending* face, until an operation comes along that wants one:
+somewhere. A sketch finished inside a ``BuildPart`` is not a solid and cannot
+be added to the part, so it is handed to the part to hold, as a *pending*
+face, until an operation comes along that wants one:
 
 .. literalinclude:: /explanation/builder_mode.py
     :language: build123d
     :start-after: [pending]
     :end-before: [pending]
 
-``extrude`` was given no sketch. It took the pending one, and used it up.
-``loft`` and ``revolve`` take pending faces in the same way, ``sweep``
-takes a pending face and a pending line, and ``make_face`` in a sketch
-takes the pending lines of a ``BuildLine``.
+``extrude`` was given no sketch, so it took the pending one and used it up.
+``loft`` and ``revolve`` take pending faces in the same way, ``sweep`` takes a
+pending face and a pending line, and ``make_face`` in a sketch takes the
+pending lines of a ``BuildLine``.
 
 This is why a builder-mode model reads as a sequence of sketch, operation,
 sketch, operation, with nothing passed between them. :ref:`building_parts`
@@ -349,8 +350,8 @@ hands it to its parent. Anything about the result that is set on the
     :start-after: [exit]
     :end-before: [exit]
 
-Changing the builder afterwards does nothing to a part that is already
-made. Change the part:
+Changing the builder afterwards does nothing to a part that is already made,
+so from then on change the part itself:
 
 .. literalinclude:: /explanation/builder_mode.py
     :language: build123d

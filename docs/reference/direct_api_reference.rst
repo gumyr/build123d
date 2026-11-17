@@ -15,7 +15,7 @@ this API possible.
 *****************
 Geometric Objects
 *****************
-The geometric classes defined by build123d are defined below. This parameters to the
+The geometric classes defined by build123d are defined below. The parameters to the
 CAD objects described in the following section are frequently of these types.
 
 .. inheritance-diagram:: geometry
@@ -92,8 +92,8 @@ The topological object classes defined by build123d are defined below.
 Note that the :class:`~topology.Mixin1D` and :class:`~topology.Mixin3D` classes add
 supplementary functionality specific to 1D
 (:class:`~topology.Edge` and :class:`~topology.Wire`) and 3D (:class:`~topology.Compound` and
-`~topology.Solid`) objects respectively.
-Note that a :class:`~topology.Compound` may be contain only 1D, 2D (:class:`~topology.Face`)  or 3D objects.
+:class:`~topology.Solid`) objects respectively.
+Note that a :class:`~topology.Compound` may contain only 1D, 2D (:class:`~topology.Face`)  or 3D objects.
 
 .. inheritance-diagram:: topology.shape_core topology.zero_d topology.one_d topology.two_d topology.three_d topology.composite topology.utils
    :parts: 1

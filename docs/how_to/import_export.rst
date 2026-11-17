@@ -168,8 +168,8 @@ Send a part to a slicer
 triangle to the next. Smaller values give a smoother part and a larger
 file: the second file here is several times the size of the first.
 
-3MF is the better format where the slicer accepts it. It holds one mesh
-for each shape, with its label and colour, and states its units.
+3MF is the better format where the slicer accepts it, because it holds one
+mesh for each shape, with its label and colour, and states its units.
 :class:`~mesher.Mesher` writes it, and can attach a part number and other
 metadata:
 

@@ -4,9 +4,11 @@
 Tutorials
 #########
 
-There are several tutorials to help guide uses through the concepts of build123d
-in a step by step way. Working through these tutorials in order is recommended
-as later tutorials build on the concepts introduced in earlier ones.
+Each tutorial works through one model or one subject, step by step. The
+first seven, from :ref:`tutorial_sketch_then_extrude` to
+:ref:`tutorial_parametric_part`, are a series and are best worked through in
+order, because each builds on what the one before introduced. The rest each
+take up one subject and can be read in any order once the series is done.
 
 .. toctree::
     :maxdepth: 2

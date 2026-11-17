@@ -6,10 +6,10 @@ Selecting and finishing
 
 A sketch decides the shape of a part. What is left - rounding an edge,
 breaking a sharp corner, putting a hole in a face - is done to the solid,
-and to do it you have to say *which* edge or *which* face. In a traditional
-CAD program you click on it. In build123d you describe it: "the vertical
-edges", "the highest face", "the edges that were just made". In this
-tutorial you will finish this bearing pedestal that way:
+and to do it you have to say *which* edge or *which* face. Where a
+traditional CAD program has you click on it, build123d has you describe it:
+"the vertical edges", "the highest face", "the edges that were just made".
+In this tutorial you will finish this bearing pedestal that way:
 
 .. image:: /tutorials/assets/selecting_and_finishing/pedestal_lead_in.svg
     :align: center
@@ -79,11 +79,12 @@ The four upright corners of the block are to be rounded.
 :func:`~operations_generic.fillet` rounds edges, and it needs to be told
 which ones.
 
-A part will list what it is made of. ``pedestal.edges()`` gives every edge
-of the block, all twelve, and ``pedestal.faces()`` and
-``pedestal.vertices()`` do the same for its six faces and eight corners.
-Each returns a list, and the list can narrow itself down.
-``filter_by(Axis.Z)`` keeps only the edges that run in the Z direction:
+Finding them starts with the part itself, which will list what it is made
+of. ``pedestal.edges()`` gives every edge of the block, all twelve, and
+``pedestal.faces()`` and ``pedestal.vertices()`` do the same for its six
+faces and eight corners. Each returns a list, and the list can narrow
+itself down: ``filter_by(Axis.Z)`` keeps only the edges that run in the Z
+direction.
 
 .. image:: /tutorials/assets/selecting_and_finishing/pedestal_corners_selected.svg
     :align: center
@@ -113,9 +114,10 @@ Those four are what ``fillet`` is given.
     :align: center
     :width: 55%
 
-It is the same ``fillet``, given the same edges, in both modes. In builder
-mode it changes the part being built. In algebra mode it returns the
-rounded part, which is assigned back to ``pedestal``.
+It is the same ``fillet``, given the same edges, in both modes, and only
+what becomes of the result differs: in builder mode it changes the part
+being built, while in algebra mode it returns the rounded part, which is
+assigned back to ``pedestal``.
 
 Notice what was *not* written: no coordinates, and no edge numbers. "The
 edges that run along Z" stays true if the block is made longer, wider or
@@ -124,14 +126,14 @@ taller, so the selection keeps working when the dimensions change.
 This matters more than it may seem. Many CAD programs remember "the edge
 you clicked" by an internal name or number, and when an earlier step of
 the design changes, those names can end up pointing at a different edge or
-at nothing. It is known as the *topological naming problem*. A selection
+at nothing, which is known as the *topological naming problem*. A selection
 written as a description has no such name to go stale.
 
 For the same reason, do not pick an edge by its position in the list a part
 gives you. ``pedestal.edges()[3]`` is some edge today, but the order of
 that list is not promised and can change when the part does. Always narrow
-the list down by a description first. An index is safe after a ``sort_by``
-or a ``group_by``, because then the order means something.
+the list down by a description first; an index becomes safe only after a
+``sort_by`` or a ``group_by``, because then the order means something.
 
 .. tip::
 
@@ -171,7 +173,7 @@ Next, the top edge of the block gets a small bevel so that it is not sharp.
 which edges.
 
 Direction will not pick them out: the top edge runs all the way round. What
-they have in common is their height. ``group_by(Axis.Z)`` sorts the edges
+they have in common is their height, and ``group_by(Axis.Z)`` sorts the edges
 into groups by how far up Z they are, lowest first. The block now has three
 groups - the bottom edges, the upright ones, and the top edges - and
 ``[-1]`` takes the last, which is the highest.
@@ -253,7 +255,7 @@ makes a plane from it and the circle is placed there with ``*``, as before.
 Either way ``extrude`` pushes the circle up out of the face, and the boss
 joins the block.
 
-The height of the block was never mentioned. If ``base_height`` changes,
+The height of the block was never mentioned, so if ``base_height`` changes,
 the top face moves and the boss moves with it.
 
 ******************************
@@ -261,7 +263,7 @@ Step 6: What was just made
 ******************************
 
 A sharp inside corner where the boss meets the block is a weak point, so it
-gets a fillet. This edge is harder to describe by where it is. It is easy
+gets a fillet. This edge is harder to describe by where it is, but easy
 to describe by *when*: it is one of the edges the last step created.
 
 .. image:: /tutorials/assets/selecting_and_finishing/pedestal_blend_selected.svg
@@ -353,12 +355,12 @@ subtracted, so it is given a ``depth``.
 Step 8: By what it is
 *************************
 
-One detail is left. A bearing is easier to press in if the mouth of the
-bore has a small chamfer to guide it. The edge to chamfer is the circle at
-the top of the bore.
+One detail is left: a bearing is easier to press in if the mouth of the
+bore has a small chamfer to guide it, so the edge to chamfer is the circle
+at the top of the bore.
 
-Where it is does not single it out this time. Two edges are at that height:
-the mouth of the bore, and the outer rim of the boss around it. What
+Where it is does not single it out this time, because two edges are at that
+height: the mouth of the bore, and the outer rim of the boss around it. What
 separates them is their size, and edges can be selected by what they are
 as well as by where they are.
 
@@ -406,8 +408,8 @@ and would find the wrong one if the design changed so that something
 smaller appeared at that height. Where a dimension you have named
 identifies the edge, select by it.
 
-The order of the moves matters. Only a circle has a radius, so asking a
-straight edge for one fails, and ``filter_by_value(Edge.radius, ...)``
+The order of the moves matters, because only a circle has a radius: asking
+a straight edge for one fails, and ``filter_by_value(Edge.radius, ...)``
 stops with *Shape could not be reduced to a circle* if one is in the list.
 Filtering for circles first makes the list safe to ask. The height comes
 into it as well: the bore has a circle of the same radius at its other
@@ -440,11 +442,11 @@ What you learned
   index or a slice is safe once the list has been sorted or grouped.
 * :func:`~operations_generic.fillet` rounds the edges it is given and
   :func:`~operations_generic.chamfer` bevels them.
-* A **face is a place**. A sketch can be drawn on it, and features such as
+* A **face is a place**: a sketch can be drawn on it, and features such as
   :class:`~objects_part.Hole` can be created at it. :ref:`placing_sketches`
   shows how to turn the sketch on the face or measure it from a corner.
 * The edges an operation has just made can be selected with
   ``Select.LAST``.
 * A selection describes what you mean, so it goes on meaning it when the
-  dimensions change. That is how build123d avoids the topological naming
+  dimensions change, which is how build123d avoids the topological naming
   problem.

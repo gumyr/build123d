@@ -41,7 +41,7 @@ For example:
     with BuildSketch():
         Circle(1, align=(Align.MIN, Align.MIN))
 
-creates a circle who's minimal X and Y values are on the X and Y axis and is located in the top right corner.
+creates a circle whose minimal X and Y values are on the X and Y axis and is located in the top right corner.
 The ``Align`` enum has values: ``MIN``, ``CENTER`` and ``MAX``.
 
 In 3D the ``align`` parameter also contains a Z align value but otherwise works in the same way.

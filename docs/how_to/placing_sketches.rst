@@ -134,8 +134,9 @@ On a face of the part
             :start-after: [face_algebra]
             :end-before: [face_algebra]
 
-Select the face and sketch on it. In builder mode ``BuildSketch`` takes
-the face as it is. In algebra mode ``Plane(face)`` makes a plane from it.
+Select the face and sketch on it: in builder mode ``BuildSketch`` takes
+the face as it is, while in algebra mode ``Plane(face)`` makes a plane from
+it.
 
 The origin of that plane is the centre of the face, and it faces the way
 the face does, outward from the part. A positive ``extrude`` therefore
@@ -177,16 +178,16 @@ that leans out of the face is laid flat onto it, so a world direction
 such as ``(0, 1, 0)`` will usually do; only one that points straight out
 of the face cannot be used.
 
-Give ``x_dir`` whenever the sketch is not the same all the way round. A
-circle does not care which way X is; a slot, a rectangle or text does.
+Give ``x_dir`` whenever the sketch is not the same all the way round: a
+circle does not care which way X is, but a slot, a rectangle or text does.
 
 *******************************
 With its origin at a corner
 *******************************
 
 The centre of a face is not always the convenient place to measure from.
-``shift_origin`` moves the origin of a plane to another point on it and
-leaves its directions alone.
+When it is not, ``shift_origin`` moves the origin of a plane to another
+point on it and leaves its directions alone.
 
 .. image:: /how_to/assets/placing_sketches/origin.svg
     :align: center
@@ -377,9 +378,9 @@ In several places at once
             :end-before: [several_algebra]
 
 ``BuildSketch`` accepts any number of planes, faces and locations, and
-the finished sketch is placed on every one of them. What is drawn inside
-is drawn once. Here it lands on the two faces that face along Y, and one
-``extrude`` raises a boss on each.
+the finished sketch is placed on every one of them, although what is drawn
+inside is drawn only once. Here it lands on the two faces that face along
+Y, and one ``extrude`` raises a boss on each.
 
 In algebra mode the same thing is a list: one placed sketch for each
 plane, and one extrusion for each sketch.

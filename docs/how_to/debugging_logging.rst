@@ -88,9 +88,9 @@ on these two.
 See what a selection picked
 *******************************
 
-Most operations that do the wrong thing were given the wrong features.
-A selection is a list, and it can be shown like anything else. Show it
-beside the part before it is used:
+Most operations that do the wrong thing were given the wrong features, so
+the selection is the first thing to look at. It is a list, and can be shown
+like anything else, beside the part and before it is used:
 
 .. code-block:: build123d
 

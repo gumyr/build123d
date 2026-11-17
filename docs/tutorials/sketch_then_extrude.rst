@@ -85,6 +85,7 @@ origin and lies flat on the XY plane.
 Step 3: Give it depth
 **********************
 
+A sketch has no thickness, so the next step is to give it some.
 :func:`~operations_part.extrude` pushes a sketch straight up into a solid,
 here by ``thickness``.
 
@@ -129,8 +130,8 @@ where you would click and drag - but it is not different in concept.
 Step 4: Shape the sketch, not the solid
 ******************************************
 
-The plate needs a hexagonal hole through its centre to hold a nut. Do not
-reach for a way to cut the solid. Take the hexagon out of the sketch instead,
+The plate needs a hexagonal hole through its centre to hold a nut. Rather
+than reaching for a way to cut the solid, take the hexagon out of the sketch,
 so that the shape being extruded already has the hole in it.
 
 .. tab-set::
@@ -175,8 +176,8 @@ Two slots let the plate slide on its fixings before they are tightened.
 :class:`~objects_sketch.SlotOverall` draws one from its overall length and
 its width; ``rotation=90`` turns it to run across the plate.
 
-Until now every shape has landed at the origin. The slots go either side of
-it, ``slot_spacing`` apart.
+Until now every shape has landed at the origin, but the slots go either side
+of it, ``slot_spacing`` apart, so each has to be put in its place.
 
 .. tab-set::
 
@@ -216,9 +217,9 @@ A raised rim stiffens the plate. It is a second sketch, extruded higher than
 the first: the outline of the plate with a smaller copy of itself removed,
 leaving a band ``rim_width`` wide.
 
-The smaller copy is not drawn. :func:`~operations_generic.offset` makes it
-from the outline, moving every edge inwards by the same distance, corners
-included.
+The smaller copy does not have to be drawn, because
+:func:`~operations_generic.offset` makes it from the outline, moving every
+edge inwards by the same distance, corners included.
 
 .. tab-set::
 
@@ -265,7 +266,7 @@ What you learned
 * :func:`~operations_part.extrude` turns a sketch into a solid.
 * Shapes are **added to or subtracted from** a sketch, with ``mode=`` in
   builder mode and ``+`` and ``-`` in algebra mode.
-* Design decisions belong in the sketch. The solid is what the sketch
-  produces.
+* Design decisions belong in the sketch, because the solid is only what the
+  sketch produces.
 * :func:`~operations_generic.offset` derives a new shape from an existing
   one, so the two stay in step.

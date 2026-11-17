@@ -4,8 +4,8 @@
 Materials
 #########
 
-A shape can be told what it is made of. With a material it has a mass, a
-colour, and an appearance that viewers and exported files can use.
+A shape can be told what it is made of, and with a material it has a mass,
+a colour, and an appearance that viewers and exported files can use.
 Materials come from `bd_materials <https://github.com/bernhard-42/bd_materials>`_,
 which is installed with build123d. For a guided introduction see
 :ref:`material_tutorial`.
@@ -71,8 +71,8 @@ A material can also be assigned by name:
 Add a finish
 *************
 
-A finish is what is done to the surface after the part is made. Pass it
-as ``finish`` when making the material.
+A finish is what is done to the surface after the part is made, and it is
+passed as ``finish`` when making the material.
 
 .. literalinclude:: /how_to/materials.py
     :language: build123d
@@ -130,7 +130,7 @@ Which properties there are depends on the kind of material: a wood has a
 Ranges
 ======
 
-``density`` is a single typical value. Every other property is a
+``density`` is a single typical value, but every other property is a
 ``Range``, because real material varies.
 
 .. literalinclude:: /how_to/materials.py
@@ -153,8 +153,8 @@ works against you, as :ref:`tutorial_parametric_part` does with ``.min``.
 Units
 =====
 
-The properties are plain numbers. Their units are fixed, and are listed in
-``PROPERTY_UNITS``.
+The properties are plain numbers, so their units are fixed, and are listed
+in ``PROPERTY_UNITS``.
 
 .. literalinclude:: /how_to/materials.py
     :language: build123d
@@ -236,7 +236,7 @@ If the model is in inches, say so:
 
     2926.3
 
-The shape has not changed. The same numbers are now read as a plate 100
+The shape has not changed: the same numbers are now read as a plate 100
 inches long, which is 25.4³ - about 16,000 - times the volume of one 100
 mm long, and the answer is in pounds.
 

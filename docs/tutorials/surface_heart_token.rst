@@ -8,12 +8,12 @@ Every solid in the tutorials so far was made *from* something: a sketch
 that was extruded, revolved or lofted. The faces of the solid were a
 by-product, and their shapes were whatever the operation produced.
 
-Some shapes cannot be reached that way. A surface that swells gently in
-two directions at once - a car body, a boat hull, a pebble - is not an
+Some shapes cannot be reached that way, because a surface that swells gently
+in two directions at once - a car body, a boat hull, a pebble - is not an
 extrusion or a revolution of anything. For shapes like these the work is
-done the other way round: make the faces yourself, one by one, and then
-join them into a solid. This is *surface modelling*, and in this tutorial
-you will use it to make a game token with a domed heart:
+done the other way round: make the faces yourself, one by one, and then join
+them into a solid. This is *surface modelling*, and in this tutorial you
+will use it to make a game token with a domed heart:
 
 .. raw:: html
 
@@ -78,18 +78,18 @@ Its outline is three lines, flat on ``Plane.XY``.
   going, until it reaches the centre line of the heart. Giving ``PolarLine``
   a shape as its ``length`` makes it run until it meets that shape.
 
-These are lines on their own, not lines in a ``BuildLine``. Nothing is
-being collected into a sketch; each line is kept in a variable, and the
+These are lines on their own, not lines in a ``BuildLine``, because nothing
+is being collected into a sketch: each line is kept in a variable, and the
 variables are what the next steps use.
 
 ***************************************
 Step 3: The ridge down the middle
 ***************************************
 
-A flat outline would give a flat face. To make the surface rise, one of
-its edges has to leave the plane. The fourth edge runs down the centre
-line of the heart, from the dip back to the point, and arches up as it
-goes.
+A flat outline would give a flat face, so to make the surface rise one of
+its edges has to leave the plane. That is the job of the fourth edge, which
+runs down the centre line of the heart, from the dip back to the point, and
+arches up as it goes.
 
 .. literalinclude:: /tutorials/surface_heart_token.py
     :language: build123d
@@ -112,9 +112,10 @@ loop: the boundary of the face to be made.
 Step 4: A surface
 ***********************
 
-``Face.make_surface`` fills a closed boundary with a smooth surface. Given
-only the boundary it makes a surface that spans it. Given points as well,
-it makes the surface pass through them.
+With the boundary closed, it can be filled in. ``Face.make_surface`` fills
+a closed boundary with a smooth surface: given only the boundary it makes a
+surface that spans it, and given points as well it makes the surface pass
+through them.
 
 .. literalinclude:: /tutorials/surface_heart_token.py
     :language: build123d
@@ -142,8 +143,8 @@ Two more things happen on that line:
 Step 5: Mirror it
 *************************
 
-One quarter of the heart's skin is made. The other three are reflections
-of it.
+One quarter of the heart's skin is made, and the other three are
+reflections of it.
 
 .. literalinclude:: /tutorials/surface_heart_token.py
     :language: build123d
@@ -159,7 +160,7 @@ Mirroring in ``Plane.YZ`` gives the left half of the top, and mirroring in
 face, ``face.mirror(plane)``, which is the same reflection as the
 ``mirror`` of :ref:`tutorial_beyond_extrude`.
 
-The top and bottom do not touch. There is a gap of ``edge_height`` between
+The top and bottom do not touch: there is a gap of ``edge_height`` between
 them all the way round.
 
 *************************
@@ -178,7 +179,7 @@ up.
     :align: center
     :width: 60%
 
-Extruding a sketch gives a solid. Extruding a *line* gives a face, and
+Extruding a sketch gives a solid, but extruding a *line* gives a face, and
 ``Shell.extrude`` does that to each edge of a wire, giving a strip of
 faces. ``rim`` is the three flat edges of step 2 - not the ridge, which is
 inside the heart - and the strip is started half the thickness below the
@@ -191,7 +192,7 @@ Notice that ``rim`` is built from the very same ``side``, ``lobe`` and
 Step 7: From faces to a solid
 *******************************************
 
-Six faces now enclose a space. Two more lines make that space a solid.
+Six faces now enclose a space, and two more lines make that space a solid.
 
 .. literalinclude:: /tutorials/surface_heart_token.py
     :language: build123d

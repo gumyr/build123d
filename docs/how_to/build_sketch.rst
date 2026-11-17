@@ -10,7 +10,7 @@ It is the usual starting point for a part, the profile that
 other part operations turn into a solid. This guide shows how to make the
 sketch you want.
 
-Sketch objects are filled shapes, not outlines. That is what lets them be
+Sketch objects are filled shapes, not outlines, which is what lets them be
 combined: one added to another, cut out of it, or used to trim it.
 
 In builder mode a sketch is made inside a ``BuildSketch``, which combines
@@ -83,8 +83,8 @@ what is there. In builder mode every object has a ``mode``:
 
 In algebra mode the three are the operators ``+``, ``-`` and ``&``.
 
-In builder mode the result is ``plate.sketch``. In algebra mode ``plate``
-is the sketch.
+The result is ``plate.sketch`` in builder mode, while in algebra mode
+``plate`` is itself the sketch.
 
 *********************
 Choose the object
@@ -356,7 +356,7 @@ Some shapes are wanted only for what can be measured from them.
             :start-after: [construction_algebra]
             :end-before: [construction_algebra]
 
-The hexagon is never part of the flange. It is there for its six
+The hexagon is never part of the flange: it is there only for its six
 corners, which are where the holes go.
 
 In builder mode ``mode=Mode.PRIVATE`` makes an object without adding it
@@ -422,8 +422,8 @@ sketch are applied to the finished sketch in the same way:
     :start-after: [local]
     :end-before: [local]
 
-``sketch_local`` is the sketch as it was drawn. ``sketch`` is the sketch
-where it was put, which is what an enclosing ``BuildPart`` receives.
+``sketch_local`` is the sketch as it was drawn, while ``sketch`` is the
+sketch where it was put, which is what an enclosing ``BuildPart`` receives.
 
 ***********************
 Get the pieces back

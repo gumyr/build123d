@@ -41,11 +41,11 @@ A curve shows all three apart:
     :align: center
     :width: 50%
 
-The bounding box is dashed. Only the triangle, the point halfway along, is
-on the arc.
+The bounding box is dashed, and of the three marks only the triangle, the
+point halfway along, is on the arc.
 
-A flat face has two. Its ``GEOMETRY`` centre is defined to be its centre of
-mass:
+A flat face has only two, because its ``GEOMETRY`` centre is defined to be its
+centre of mass:
 
 .. literalinclude:: /explanation/center.py
     :language: build123d
@@ -124,8 +124,8 @@ only on curved ones.
 ********************************
 
 For a face that is not flat, ``GEOMETRY`` is the middle of the surface, the
-point at ``face.position_at(0.5, 0.5)``. It is on the face. The centre of
-mass of a curved face is generally not: it is somewhere in the hollow.
+point at ``face.position_at(0.5, 0.5)``, and so it is on the face. The centre
+of mass of a curved face generally is not: it is somewhere in the hollow.
 
 .. literalinclude:: /explanation/center.py
     :language: build123d
@@ -168,9 +168,9 @@ Planes and places taken from a face
         :start-after: [plane]
         :end-before: [plane]
 
-    ``face.center_location`` is a different point. It is always the middle
-    of the surface, ``position_at(0.5, 0.5)``, with the surface normal there
-    as its z. On a flat face that is not symmetrical it need not be the
+    ``face.center_location`` is a different point, because it is always the
+    middle of the surface, ``position_at(0.5, 0.5)``, with the surface normal
+    there as its z. On a flat face that is not symmetrical it need not be the
     centre of mass, or on the face: for the angle above it is ``(5, 5, 0)``.
 
 ***************************
@@ -178,16 +178,16 @@ What a centre is not
 ***************************
 
 **It is not the shape's position.** ``shape.position`` is where the shape's
-location is, the origin it was made about. A centre is where the material
-is.
+location is, the origin it was made about, whereas a centre is where the
+material is.
 
 .. literalinclude:: /explanation/center.py
     :language: build123d
     :start-after: [position]
     :end-before: [position]
 
-**It is not the centre of an arc's circle.** The three centres of an arc
-are all near the arc. The point it is drawn about is
+**It is not the centre of an arc's circle.** The three centres of an arc are
+all near the arc, whereas the point it is drawn about is
 :attr:`~topology.Edge.arc_center`.
 
 .. literalinclude:: /explanation/center.py

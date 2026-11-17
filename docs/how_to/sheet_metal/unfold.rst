@@ -54,8 +54,8 @@ Exporting the blank
 
 ``unfold`` returns two things: the pattern, a planar ``Shell`` whose outline
 and holes export like any other 2D geometry, and a record of what each of
-its faces developed from. A DXF with the outline for the cutter and a bend
-line per bend for the brake operator:
+its faces developed from. Together they give a DXF with the outline for the
+cutter and a bend line per bend for the brake operator:
 
 .. code-block:: build123d
 

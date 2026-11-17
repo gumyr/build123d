@@ -55,11 +55,11 @@ Name the parts and group them
     :end-before: [group]
 
 A ``label`` is any string, and labels do not have to be unique. The
-assembly is a ``Compound`` given its own label and its ``children``. Each
-child's ``parent`` is set for it, and the tree is in place.
+assembly is a ``Compound`` given its own label and its ``children``;
+making it sets each child's ``parent``, and with that the tree is in place.
 
-A shape has one parent. Putting a part into a second assembly takes it out
-of the first, so use a copy when the same part belongs in two places.
+A shape has only one parent, so putting a part into a second assembly takes
+it out of the first. Use a copy when the same part belongs in two places.
 
 ****************
 See the tree
@@ -77,7 +77,7 @@ See the tree
     └── lid   Box      at 0x11c04dd30, Location((0, 0, 15), (0, 0, 0))
 
 :meth:`~topology.Shape.show_topology` gives each node's label, type and
-location. The location is the node's own, relative to its parent.
+location, where the location is the node's own, relative to its parent.
 
 .. _shallow_copy:
 
@@ -85,8 +85,8 @@ location. The location is the node's own, relative to its parent.
 Use one part many times
 ***************************
 
-An assembly often holds many copies of one part: screws, posts, feet. Make
-them with ``copy.copy``.
+When an assembly holds many copies of one part, such as screws, posts or
+feet, make them with ``copy.copy``.
 
 .. literalinclude:: /how_to/assemblies.py
     :language: build123d

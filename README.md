@@ -28,8 +28,8 @@
 build123d is a Python-based, parametric [boundary representation (BREP)][BREP] modelling framework for 2D and 3D CAD. Built on the [Open Cascade] geometric kernel, it provides a clean, fully Pythonic interface for creating precise models suitable for 3D printing, CNC machining, laser cutting, and other manufacturing processes.
 
 <div align="left">
-    <img style="height:200px" alt="bracket" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/examples/toy_truck.png">
-    <img style="height:200px" alt="key cap" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/examples/key_cap.png">
+    <img style="height:200px" alt="bracket" src="https://github.com/gumyr/build123d/raw/dev/docs/examples/assets/toy_truck.png">
+    <img style="height:200px" alt="key cap" src="https://github.com/gumyr/build123d/raw/dev/docs/examples/assets/key_cap.png">
     <img style="height:200px" alt="hangar" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/ttt/ttt-23-02-02-sm_hanger_object.png">
 </div>
 

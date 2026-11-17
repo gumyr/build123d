@@ -74,8 +74,9 @@ there. Only the axes that matter need be given: ``Pos(X=20)`` or
 ``Pos(Z=5)``. In builder mode the places are named first, and every
 object made inside the ``with`` block is made at each of them.
 
-The object is not changed and nothing is copied point by point. Every
-shape carries a location, and moving the shape changes that.
+The object itself is not changed, and nothing is copied point by point,
+because every shape carries a location and moving the shape changes only
+that.
 
 ***************************
 Turn it where it stands
@@ -102,8 +103,8 @@ Turn it where it stands
             :start-after: [turn_algebra]
             :end-before: [turn_algebra]
 
-Angles are in degrees. ``Rot(Z=30)`` turns an object 30 degrees about the
-Z axis, anticlockwise seen from above.
+Angles are in degrees, so ``Rot(Z=30)`` turns an object 30 degrees about
+the Z axis, anticlockwise seen from above.
 
 An object's ``rotation`` turns it about its own origin before it is put
 in place, so the bar turns where it stands. The algebra line says the
@@ -114,8 +115,9 @@ move it.
 Turn then move, or move then turn
 *************************************
 
-The order matters. A rotation is always about the origin, so an object
-that has already been moved away from the origin is swung round it:
+The order matters, because a rotation is always about the origin, and so
+an object that has already been moved away from the origin is swung round
+it:
 
 .. image:: /how_to/assets/moving_objects/order.svg
     :align: center
@@ -143,15 +145,15 @@ still at the origin, and then moved: it turns where it stands. In the
 second it is moved 40 along X and then turned, and the turn carries it
 round the Z axis to a new place.
 
-Both are useful. Turn first to set which way an object faces; move first
-to swing it round the origin on an arm.
+Both are useful: turn first to set which way an object faces, and move
+first to swing it round the origin on an arm.
 
 ****************************************
 Turn it about an axis somewhere else
 ****************************************
 
-A hinge, a pivot or an axle is rarely at the origin. ``rotate`` turns a
-shape about any axis.
+A hinge, a pivot or an axle is rarely at the origin, so a turn about one
+needs ``rotate``, which turns a shape about any axis.
 
 .. image:: /how_to/assets/moving_objects/hinge.svg
     :align: center
@@ -228,8 +230,9 @@ order that is: it is longer, and it says what it does.
 At a rotated location
 *************************
 
-A :class:`~geometry.Location` is a position and a rotation in one. It can
-be kept in a variable, put in a list and used wherever a place is wanted.
+A :class:`~geometry.Location` is a position and a rotation in one, so it
+can be kept in a variable, put in a list and used wherever a place is
+wanted.
 
 .. image:: /how_to/assets/moving_objects/location.svg
     :align: center
@@ -262,8 +265,8 @@ which then places everything it makes there:
 At the vertices of the part
 *******************************
 
-A place does not have to be worked out from dimensions. A vertex of the
-part is a point, and can be used as one.
+A place does not have to be worked out from dimensions: a vertex of the
+part is already a point, and can be used as one.
 
 .. image:: /how_to/assets/moving_objects/vertices.svg
     :align: center
@@ -288,13 +291,13 @@ part is a point, and can be used as one.
 
 ``top.vertices()`` is the four corners of the top face. ``Locations``
 takes vertices as it takes points, and ``Pos(vertex)`` is the position
-of one. Move the corners, by changing the size of the plate, and the
-posts go with them. :ref:`selectors` covers picking out the vertices
-wanted.
+of one. Because the places come from the part, changing the size of the
+plate moves the corners and the posts go with them. :ref:`selectors`
+covers picking out the vertices wanted.
 
-This is for objects placed in the part. Inside a sketch that is drawn
-on a plane, places are measured in the sketch, not in space;
-:ref:`placing_sketches` shows how to use a vertex there.
+This is for objects placed in the part. Inside a sketch that is drawn on a
+plane it needs more care, because places there are measured in the sketch
+and not in space; :ref:`placing_sketches` shows how to use a vertex there.
 
 ************************
 Copies round an axis
@@ -423,8 +426,8 @@ its own centre:
 Changing an object directly
 *******************************
 
-A shape's location can also be read and set after it is made. These are
-most use in a script that adjusts an existing model.
+A shape's location can also be read and set after it is made, which is
+of most use in a script that adjusts an existing model.
 
 .. list-table::
     :header-rows: 1

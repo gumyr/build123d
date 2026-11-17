@@ -23,8 +23,8 @@ One surface: ``wrap_faces``
 :meth:`~topology.Face.wrap_faces` writes the letters into the face's own
 parameter space through a :class:`~topology.UVFrame`. On a developable
 surface, a cylinder or a cone, that is exact: the letters keep their lengths
-as if the sheet had been rolled onto the part. Seams are handled. The path
-must lie on the one face.
+as if the sheet had been rolled onto the part. Seams are handled, but the
+path must lie on the one face.
 
 .. literalinclude:: /how_to/projection/projection_examples.py
     :language: build123d
@@ -39,9 +39,9 @@ Several faces: ``project_faces``
 its point on the path, x along the path's tangent and z along the surface
 normal, and projects it onto the whole shape along that normal. A letter
 that straddles the boundary between two faces of the part, round a filleted
-corner, comes back as a shell with a piece on each. That is the case a wrap
-of one face cannot do. Projection foreshortens on a slope, so on a single
-surface it is the approximate choice.
+corner, comes back as a shell with a piece on each, which is the case a wrap
+of one face cannot do. The price is that projection foreshortens on a slope,
+so on a single surface it is the approximate choice.
 
 .. literalinclude:: /how_to/projection/projection_examples.py
     :language: build123d

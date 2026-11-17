@@ -39,8 +39,8 @@ past the bend.
 Angle and direction
 *******************
 
-The angle is signed. Positive angles fold toward the normal of the face the
-edge belongs to, which for a blank drawn on ``Plane.XY`` is up; negative
+The angle is signed: positive angles fold toward the normal of the face the
+edge belongs to, which for a blank drawn on ``Plane.XY`` is up, and negative
 angles fold the other way. Anything short of a full fold is allowed, so an
 angle of 45 gives a sloping wall and 90 a square one.
 
@@ -83,11 +83,11 @@ the edge. That is how a wall ends up wider than the edge it folds from, and
 how a closed corner is made: flanges off two edges meeting at a corner reach
 toward each other, and the :ref:`corner relief <sheet_metal_corner_relief>`
 that follows clears the bends where they would cross. The walls must stop
-short of each other by a clearance. Walls that touch are sewn together, and a
-sheet closed into a loop that way cannot be unfolded. How far a negative gap
-can go depends on the angle, the reference surface and what lies beside the
-wall, so it is not checked; a collision shows in the thickened part, as any
-other does.
+short of each other by a clearance, because walls that touch are sewn
+together, and a sheet closed into a loop that way cannot be unfolded. How far
+a negative gap can go depends on the angle, the reference surface and what
+lies beside the wall, so it is not checked; a collision shows in the thickened
+part, as any other does.
 
 .. image:: /how_to/assets/sheet_metal/flange_gaps.svg
     :align: center

@@ -5,11 +5,11 @@ An embossed chalice
 ###################
 
 A sketch is flat, and most decoration starts as one: a band, a logo, a line
-of text. The surfaces that decoration ends up on are often not flat at all.
-*Projection* is how the two are brought together. It carries geometry along
-a direction, as a lamp throws a shadow, and it works both ways: a part can
-be cast down onto a plane to give a sketch, and a sketch can be cast onto a
-part to give faces that lie on its surface.
+of text. The surfaces that decoration ends up on, however, are often not
+flat at all, and *projection* is how the two are brought together. It
+carries geometry along a direction, as a lamp throws a shadow, and it works
+both ways: a part can be cast down onto a plane to give a sketch, and a
+sketch can be cast onto a part to give faces that lie on its surface.
 
 In this tutorial you will use both, one after the other, to put a raised
 scalloped band round the bowl of a chalice:
@@ -101,8 +101,8 @@ bulges a little further out. Keep that in mind for step 4.
 Step 3: The cup
 *********************
 
-:func:`~operations_part.revolve` turns the profile round ``Axis.Z``, the
-centre line it was drawn against.
+The profile becomes a cup when :func:`~operations_part.revolve` turns it
+round ``Axis.Z``, the centre line it was drawn against.
 
 .. tab-set::
 
@@ -127,9 +127,9 @@ centre line it was drawn against.
     :width: 55%
 
 The chalice stands upright, with its foot at Z = -40 and its lip at
-Z = 80. That is more than tidiness. The next step looks straight down on
-it, and the plane to look down on is ``Plane.XY``, which is also where
-sketches are drawn. Step 4 says why that matters.
+Z = 80. That is more than tidiness, because the next step looks straight
+down on it, and the plane to look down on is ``Plane.XY``, which is also
+where sketches are drawn. Step 4 says why that matters.
 
 ***************************
 Step 4: The footprint
@@ -162,7 +162,7 @@ along the plane's normal.
     :align: center
     :width: 55%
 
-In builder mode the projection is made inside a new sketch. With nothing
+In builder mode the projection is made inside a new sketch: with nothing
 in its brackets ``project_to_plane`` casts the part being built onto the
 sketch's plane and draws the result into the sketch. In algebra mode it is
 given the part and the plane, and returns the result.
@@ -253,9 +253,9 @@ and well clear of it, with the bowl above.
 Step 6: Onto the cup
 ***************************
 
-:func:`~operations_part.project_to_shape` casts the band along
-``direction``, straight up, and gives back the part of the cup's surface
-it lands on.
+The flat band now goes back to the cup.
+:func:`~operations_part.project_to_shape` casts it along ``direction``,
+straight up, and gives back the part of the cup's surface it lands on.
 
 .. tab-set::
 
@@ -284,7 +284,7 @@ and not yet used, casts it onto the part, and leaves the result waiting
 for the next operation, as a sketch waits for ``extrude``. In algebra mode
 it is given the band and the cup, and the result is kept in ``on_cup``.
 
-The result, in red, is no longer flat. It is a piece of the bowl's own
+The result, in red, is no longer flat: it is a piece of the bowl's own
 surface, cut to the outline of the band.
 
 It is also more than twice the area of the band: 1475 square millimetres
@@ -295,18 +295,18 @@ which reach furthest out to where the wall is steepest, are drawn out into
 tall spikes. Projection keeps the shape as seen along the direction and
 lets everything else stretch.
 
-``hit`` chooses among the surfaces that are met. A projection does not stop
-at the first one: it carries on through the part. Without ``hit`` this one
-would return thirty-two faces, nearest first: the underside of the bowl,
-then the hollow inside it, the top of the rim, and the outside again where
-it bulges above its widest point. ``Hit.NEAREST`` keeps the first of them,
-which is the one wanted here.
+``hit`` chooses among the surfaces that are met, which is needed because a
+projection does not stop at the first one: it carries on through the part.
+Without ``hit`` this one would return thirty-two faces, nearest first: the
+underside of the bowl, then the hollow inside it, the top of the rim, and
+the outside again where it bulges above its widest point. ``Hit.NEAREST``
+keeps the first of them, which is the one wanted here.
 
 *************************
 Step 7: The relief
 *************************
 
-A face has no thickness. To emboss the band it is given some, and the
+A face has no thickness, so to emboss the band it is given some, and the
 result is added to the cup.
 
 .. tab-set::

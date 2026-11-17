@@ -96,7 +96,7 @@ Plane will select faces parallel to the plane.
 It might be useful to filter by an Axis or Plane in other ways. A lambda can be used to
 accomplish this with feature properties or methods. Here, we are looking for faces where
 the dot product of face normal and either the axis direction or the plane normal is about
-to 0. The result is faces parallel to the axis or perpendicular to the plane.
+0. The result is faces parallel to the axis or perpendicular to the plane.
 
 .. code-block:: build123d
 
@@ -183,7 +183,7 @@ Shape Properties
 ========================
 
 Selected features can be quickly filtered by feature properties. First, we filter by
-interior and exterior edges using the ``Edge`` ``is interior`` property to apply
+interior and exterior edges using the ``Edge`` ``is_interior`` property to apply
 different fillets accordingly. Then the ``Face`` ``is_circular_*`` properties are used
 to highlight the resulting fillets.
 

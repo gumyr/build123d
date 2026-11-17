@@ -271,7 +271,8 @@ The class and its arguments are in the reference: :class:`~joints.RigidJoint`.
 Revolute Joint
 **************
 
-Component rotates around axis like a hinge. The :ref:`joint_tutorial` covers Revolute Joints in detail.
+A revolute joint lets a component rotate about an axis, like a hinge. The
+:ref:`joint_tutorial` covers Revolute Joints in detail.
 
 During instantiation of a :class:`~joints.RevoluteJoint` there are three parameters not present with
 Rigid Joints: ``axis``, ``angle_reference``, and ``range`` that allow the circular motion to be fully
@@ -286,7 +287,8 @@ The class and its arguments are in the reference: :class:`~joints.RevoluteJoint`
 Linear Joint
 ************
 
-Component moves along a single axis as with a sliding latch shown here:
+A linear joint lets a component move along a single axis, as with the
+sliding latch shown here:
 
 .. image:: /how_to/assets/joints/joint-latch-slide.png
 

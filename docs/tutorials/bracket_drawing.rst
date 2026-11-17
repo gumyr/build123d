@@ -90,8 +90,9 @@ reduced from their defaults to suit a small sheet.
 Step 3: A view
 *******************
 
-A view is the part seen from somewhere, flattened onto paper.
-:meth:`~topology.Mixin3D.drawing_view` makes one.
+The sheet is empty until it has a view on it: the part seen from
+somewhere, flattened onto paper. :meth:`~topology.Mixin3D.drawing_view`
+makes one.
 
 .. literalinclude:: /tutorials/bracket_drawing.py
     :language: build123d
@@ -102,8 +103,8 @@ A view is the part seen from somewhere, flattened onto paper.
     :align: center
     :width: 70%
 
-The first argument is the *viewpoint*: the place the part is looked at
-from. It is a place, not a direction, so it is given as the middle of the
+The first argument is the *viewpoint*: the place the part is looked at from.
+Because it is a place and not a direction, it is given as the middle of the
 part moved a long way along -Y, which is in front of the bracket.
 ``look_at=center`` aims the view at the middle of the part, so the line of
 sight runs exactly along Y and the view is square-on.
@@ -118,9 +119,10 @@ the middle of the sheet. In the picture the hidden edges are dotted.
 Step 4: Put the view in its place
 **********************************
 
-The sheet needs several views, each in its own place. That is worth a small
-function: it takes the direction to look from and a position on the sheet,
-and gives back the two lists of edges, moved there. Keep the ``center``
+The sheet needs several views, each in its own place, and making every one
+as step 3 did would repeat the same lines. That is worth a small function:
+it takes the direction to look from and a position on the sheet, and gives
+back the two lists of edges, moved there. Keep the ``center``
 line of step 3 and replace the line after it with this.
 
 .. literalinclude:: /tutorials/bracket_drawing.py
@@ -178,9 +180,10 @@ slot appears dotted in the top and right views.
 Step 6: Dimensions
 **************************
 
-A drawing says how big things are. An :class:`~drafting.ExtensionLine` is
-the usual way: two thin lines carried out from the part, with an arrowed
-line and a number between them.
+The views show the shape of the bracket, but a drawing must also say how
+big things are. An :class:`~drafting.ExtensionLine` is the usual way: two
+thin lines carried out from the part, with an arrowed line and a number
+between them.
 
 .. literalinclude:: /tutorials/bracket_drawing.py
     :language: build123d
@@ -204,8 +207,9 @@ the length is measured along the bottom of the front view and set 8 mm
 below it, the width up its left side, and the height up the right side of
 the top view.
 
-No number was typed in. Each dimension measures the distance between its
-two points and writes that, so the drawing cannot disagree with the model.
+No number was typed in, because each dimension measures the distance
+between its two points and writes that, so the drawing cannot disagree with
+the model.
 This is also why the views are drawn at real size: a view that had been
 scaled would be measured at its scaled size.
 
@@ -213,8 +217,8 @@ scaled would be measured at its scaled size.
 Step 7: Labels
 *********************
 
-Name the views. A label is a ``Text``, placed like any other sketch
-object.
+A reader should not have to work out which view is which, so name them. A
+label is a ``Text``, placed like any other sketch object.
 
 .. literalinclude:: /tutorials/bracket_drawing.py
     :language: build123d
@@ -232,9 +236,9 @@ follows the view if the view is moved.
 Step 8: Export
 *********************
 
-Everything on the sheet is a flat shape, and
-:class:`~exporters.ExportSVG` writes flat shapes to an SVG file, which a
-web browser will open and print.
+The sheet is finished, and what remains is to get it out of Python.
+Everything on it is a flat shape, and :class:`~exporters.ExportSVG` writes
+flat shapes to an SVG file, which a web browser will open and print.
 
 .. literalinclude:: /tutorials/bracket_drawing.py
     :language: build123d
@@ -258,8 +262,8 @@ is added to one of them:
 so the sheet prints at its real size.
 
 Now go to the top of the file and change ``length`` to 60. The bracket is
-longer, and so is every view of it; the dimension reads 60; and nothing in
-the drawing code was touched.
+longer, and so is every view of it, and the dimension reads 60, although
+nothing in the drawing code was touched.
 
 For a CAD program, :class:`~exporters.ExportDXF` writes a DXF file in the
 same way.

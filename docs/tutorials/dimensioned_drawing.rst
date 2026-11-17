@@ -101,10 +101,10 @@ stands at that point.
 Step 3: Start where the drawing is complete
 ***********************************************
 
-Draw what is fully stated first. It gives the unknown pieces something to
-be tangent to and to end on. The top flat, its corner and the right side
-are one ``Polyline``, and the sloping side is a ``Line`` from where that
-ends.
+Draw what is fully stated first, because it gives the unknown pieces
+something to be tangent to and to end on. The top flat, its corner and the
+right side are one ``Polyline``, and the sloping side is a ``Line`` from
+where that ends.
 
 .. tab-set::
 
@@ -218,7 +218,7 @@ on ``slant``, level with the bottom of the lobe.
     :align: center
     :width: 55%
 
-Four lines, and three of them are construction:
+The step is four lines, and three of them are construction:
 
 * ``c_base`` is a line along the bottom of the lobe, right across the part.
 * ``slant.intersect(c_base)`` finds where the two cross. It returns a list,
@@ -247,8 +247,8 @@ lobe. It is tangent to both, and both already exist as construction:
 ``c_neck`` and ``c_base``. So this is ``ConstrainedArcs`` again, with two
 tangencies and a radius.
 
-There is a catch. Ask for a circle of radius 5 that touches both and there
-are two answers:
+There is a catch, though: ask for a circle of radius 5 that touches both
+and there are two answers:
 
 .. image:: /tutorials/assets/dimensioned_drawing/lever_candidates.svg
     :align: center
@@ -343,7 +343,7 @@ The first and last points of the ``Polyline`` are ``small_arc @ 1`` and
 ``top_arc @ 0``. Neither is a number you could have typed, and the outline
 closes on both exactly.
 
-The 10° slope is drawn here without mentioning the angle. Its two ends are
+The 10° slope is drawn here without mentioning the angle: its two ends are
 both on ``c_slope``, so it has the right slope because of how its ends were
 found.
 
@@ -415,7 +415,8 @@ outline was read correctly.
     264 pixels on the image - and ``origin_pixels`` is the pixel that
     should sit at the origin, the centre of the hole.
 
-The sketch is finished, and it is an ordinary sketch: ``extrude`` it, as in
+The sketch is finished, and since it is an ordinary sketch it can be
+carried on like any other: ``extrude`` it, as in
 :ref:`tutorial_sketch_then_extrude`, to make the part.
 
 Try a ``slope_angle`` of 15, a ``top_radius`` of 25 or a ``neck_fillet`` of

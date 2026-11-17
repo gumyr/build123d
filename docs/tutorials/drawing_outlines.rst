@@ -76,17 +76,18 @@ The lines are the same objects in both modes. In builder mode they are
 created inside a ``with BuildLine()`` block, which collects them; in algebra
 mode they stand on their own.
 
-This works, and it has a weakness. Every corner is typed twice - ``(0, 50)``
+This works, but it has a weakness. Every corner is typed twice - ``(0, 50)``
 ends ``l1`` and starts ``l2`` - and the numbers 50 and 14 are the height and
-width of the hook, written out by hand. Change one and miss another and the
-lines no longer meet.
+width of the hook, written out by hand, so changing one and missing another
+leaves lines that no longer meet.
 
 *******************************
 Step 3: Connect by position
 *******************************
 
-The lines have names, so one line can ask another where it is. The ``@``
-operator gives a position along a line or arc: ``l1 @ 0`` is where ``l1``
+The cure is to stop typing each corner twice. The lines have names, so one
+line can ask another where it is, and the ``@`` operator is how it asks: it
+gives a position along a line or arc: ``l1 @ 0`` is where ``l1``
 starts, ``l1 @ 1`` is where it ends, and ``l1 @ 0.5`` is halfway.
 
 So ``l2`` can start at ``l1 @ 1``, wherever that turns out to be, and end a
@@ -110,11 +111,11 @@ distance of ``width`` to the right of it:
             :start-after: [connected_algebra]
             :end-before: [connected_algebra]
 
-These are exactly the three lines of step 2, and the picture is unchanged.
-But only the first point, ``(0, 0)``, is now a coordinate. Everything else
+These are exactly the three lines of step 2, and the picture is unchanged,
+but only the first point, ``(0, 0)``, is now a coordinate. Everything else
 is "from the end of the last piece, this far in this direction", using the
-dimensions by name. The lines cannot come apart, and changing
-``back_height`` moves all three.
+dimensions by name, which is why the lines cannot come apart and why
+changing ``back_height`` moves all three.
 
 This is build123d's answer to the sketch constraints of a traditional CAD
 program: a line is an ordinary Python value, and the next line is computed
@@ -161,7 +162,8 @@ inside of the hook. ``l4``, ``l5`` and ``l6`` draw the tip. ``a2`` then turns
 right through 180 degrees, on a radius larger than ``a1`` by the width of
 the strip, and arrives back at the start of ``l1``.
 
-Nothing in those eight lines is a coordinate except the starting point.
+As in step 3, nothing in those eight lines is a coordinate except the
+starting point.
 
 **********************************
 Step 5: Close it into a face
@@ -198,8 +200,8 @@ In builder mode the ``BuildLine`` block moves inside a ``BuildSketch``, and
 ``make_face`` with no argument uses the lines just drawn. In algebra mode
 ``make_face`` is given the lines.
 
-``make_face`` needs a closed outline. If the last piece does not end where
-the first began it stops with *Face can only be created with closed wires*.
+``make_face`` needs a closed outline: if the last piece does not end where
+the first began, it stops with *Face can only be created with closed wires*.
 Here ``a2`` closes the outline because its radius is ``reach + width``; an
 outline built from named dimensions closes for every value of them, which
 one built from typed coordinates will not.
@@ -242,7 +244,8 @@ Step 7: The same idea draws a path
 
 Lines and arcs do not have to close. Left open they make a *path*, and
 :func:`~operations_generic.sweep` carries a sketch along a path to make a
-solid. This is the same hook bent from round wire: its path is a line, a
+solid, which gives a second way to make a hook. This is the same one bent
+from round wire: its path is a line, a
 half circle that continues from it, and a short line for the tip, drawn
 exactly as in step 4.
 

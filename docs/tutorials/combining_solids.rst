@@ -50,8 +50,8 @@ shows the whole of the rest of the file as it stands at that point.
 Step 2: A ready-made solid
 **************************
 
-The body of the knob is a :class:`~objects_part.Cylinder`, given its
-radius and its height. No sketch is involved.
+The body of the knob is a :class:`~objects_part.Cylinder`, which needs
+only its radius and its height: no sketch is involved.
 
 .. tab-set::
 
@@ -77,7 +77,7 @@ radius and its height. No sketch is involved.
 
 Left to itself a ready-made solid is centred on the origin in all three
 directions, so half of this cylinder would be below the floor. ``align``
-changes that. It takes one setting for each of X, Y and Z, and
+changes that by taking one setting for each of X, Y and Z, and
 ``on_floor`` - defined in the setup as
 ``(Align.CENTER, Align.CENTER, Align.MIN)`` - keeps the cylinder centred
 in X and Y and puts its lowest point, its ``MIN``, at Z = 0. Every solid
@@ -90,8 +90,8 @@ in this tutorial that stands on something is given it.
 Step 3: Add
 *****************
 
-The knob has a wider flange at the bottom. It is a second, shorter
-cylinder, joined to the first.
+The knob has a wider flange at the bottom, which is made as a second,
+shorter cylinder and joined to the first.
 
 .. tab-set::
 
@@ -117,8 +117,8 @@ cylinder, joined to the first.
 
 This is what you have been doing with shapes in a sketch since the first
 tutorial, one dimension up. In builder mode a new solid is added to the
-part unless it is told otherwise; in algebra mode ``+`` adds it. The two
-cylinders overlap, and the result is a single solid with no seam inside
+part unless it is told otherwise; in algebra mode ``+`` adds it. Although
+the two cylinders overlap, the result is a single solid with no seam inside
 it.
 
 *********************
@@ -224,7 +224,8 @@ by ``split``, the operation that opened up the adapter in
     :align: center
     :width: 22%
 
-The cutter is built on its own first, and then subtracted from the knob.
+Because the cutter has to be shaped before it can cut, it is built on its
+own first and then subtracted from the knob.
 
 .. tab-set::
 
@@ -261,15 +262,16 @@ cutter into the part being built, and takes a ``mode`` like everything
 else. In algebra mode the cutter is one more value, and ``-=`` subtracts
 it.
 
-A solid being combined does not have to be a ready-made one. It can be
-anything you have built, by any means - including every part made in the
-earlier tutorials.
+As the cutter shows, a solid being combined does not have to be a
+ready-made one: it can be anything you have built, by any means - including
+every part made in the earlier tutorials.
 
 ********************************************
 Step 7: The same knob, from a sketch
 ********************************************
 
-The knob is finished, and it was quick to write. Now for the honest look.
+The knob is finished, and it was quick to write. Now for the honest look
+that was promised, which starts from a different view of the same part.
 
 Seen from above, the fluted body is one flat shape pushed straight up:
 
@@ -286,7 +288,7 @@ it is cut out of the knob instead of added to it.
     :align: center
     :width: 15%
 
-Here is the knob again made that way. Only the dome is unchanged.
+Here is the knob again made that way, with only the dome unchanged.
 
 .. tab-set::
 
@@ -342,10 +344,11 @@ the same ``mode=`` as on a ``Cylinder``.
 
 This is why the series began with sketches and came to combining solids
 only now, and it is the same order the mainstream graphical CAD programs
-work in: sketch first, then make the solid. Building with ready-made solids is quick to start and easy to
-picture, and on a part this small it does no harm. As a part grows, each
-solid has to be positioned by arithmetic against all the others, and the
-shape you had in mind is written down nowhere.
+work in: sketch first, then make the solid. Building with ready-made solids
+is quick to start and easy to picture, and on a part this small it does no
+harm. As a part grows, though, each solid has to be positioned by arithmetic
+against all the others, and the shape you had in mind is written down
+nowhere.
 
 The dome stayed as it was, because that is where combining solids is the
 right tool:
@@ -356,7 +359,7 @@ right tool:
 * joining or cutting solids that were each made in their own way.
 
 Try a ``flute_count`` of 8 or a ``dome_radius`` of 40 at the top of the
-file. Both versions follow.
+file, and both versions follow.
 
 ********************
 What you learned

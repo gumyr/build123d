@@ -5,8 +5,8 @@
 A sheet metal enclosure
 ########################
 
-A great many parts are not carved from a block or printed in layers. They
-are cut from flat sheet and folded: brackets, boxes, covers, chassis. A
+A great many parts are not carved from a block or printed in layers but
+cut from flat sheet and folded: brackets, boxes, covers, chassis. Such a
 sheet metal part has one thickness everywhere, and its shape is a flat
 outline plus a set of folds.
 
@@ -49,10 +49,10 @@ millimetres.
     :end-before: [setup]
 
 The floor of the enclosure is ``length`` by ``width``, with walls
-``wall_height`` high standing round it. Two numbers describe the material: the ``thickness`` of the sheet and
-the ``bend_radius``, the inside radius of every fold, which depends on the
-tooling used to bend it. The other values are introduced with the step
-that uses them.
+``wall_height`` high standing round it. Two numbers describe the material:
+the ``thickness`` of the sheet and the ``bend_radius``, the inside radius of
+every fold, which depends on the tooling used to bend it. The other values
+are introduced with the step that uses them.
 
 As before, each step below shows the whole of the rest of the file as it
 stands at that point.
@@ -88,11 +88,11 @@ the floor of the enclosure.
 
 The two modes set the scene differently.
 
-In builder mode a sheet is made inside a :class:`~build_sheet.BuildSheet`.
-It is given the material once, and every operation inside it uses that.
-The blank is a sketch inside the ``BuildSheet``. The ``BuildSheet`` is
-itself inside a ``BuildPart``, which is not needed yet: it is there so
-that step 7 can turn the finished sheet into a solid.
+In builder mode a sheet is made inside a :class:`~build_sheet.BuildSheet`,
+which is given the material once so that every operation inside it uses
+that. The blank is a sketch inside the ``BuildSheet``, and the
+``BuildSheet`` is itself inside a ``BuildPart``, which is not needed yet:
+it is there so that step 7 can turn the finished sheet into a solid.
 
 In algebra mode the material is a ``SheetMetalParameters``
 object, which is passed to each operation. The blank is drawn as an
@@ -109,8 +109,9 @@ is the top of the finished floor. Step 8 comes back to this.
 Step 3: Fold the walls
 ******************************
 
-:ref:`flange <sheet_metal_flange>` folds a wall up from an edge. Fold one up
-from each of the four edges of the blank.
+An enclosure needs walls, and :ref:`flange <sheet_metal_flange>` folds a
+wall up from an edge, so fold one up from each of the four edges of the
+blank.
 
 .. tab-set::
 
@@ -225,7 +226,7 @@ A sheet is cut in two ways, and this step uses both.
 
 **A flat shape cuts the face it lies on.** The holes are circles on the
 floor. In builder mode a sketch object inside a ``BuildSheet`` with
-``Mode.SUBTRACT`` is a cutter. In algebra mode the four circles are
+``Mode.SUBTRACT`` is a cutter, while in algebra mode the four circles are
 subtracted from the sheet with ``-=``, as they would be from a sketch.
 
 **A solid cuts everything it passes through.** The slot crosses from the
@@ -235,7 +236,7 @@ wall, ``slot_width`` across the bend, and reaching ``slot_height`` up the
 wall.
 
 Neither cutter removes material in the way ``Mode.SUBTRACT`` does on a
-solid. The sheet is still a surface, and the cutters trim its faces.
+solid, because the sheet is still a surface: the cutters trim its faces.
 
 ***********************************
 Step 6: Hem the rims
@@ -267,10 +268,11 @@ much stiffer. Hem the two long walls.
     :align: center
     :width: 60%
 
-The rims have changed. There are now many free edges: the tops and ends of
-four walls, and the outlines of the holes and the slot. The selector reads
-from left to right: of all the rims, those that run along X, and of those,
-the highest group, which is the top edges of the two long walls.
+The rims have changed since step 3: there are now many free edges, the tops
+and ends of four walls and the outlines of the holes and the slot. The
+selector therefore narrows them down, reading from left to right: of all
+the rims, those that run along X, and of those, the highest group, which is
+the top edges of the two long walls.
 
 :ref:`hem <sheet_metal_hem>` with ``HemType.OPEN`` folds each back through
 180 degrees, leaving a gap of ``hem_opening`` between the folded strip and
@@ -281,7 +283,8 @@ form than one pressed flat, and the gap is somewhere for a lid to locate.
 Step 7: Thicken
 *************************
 
-Everything so far has been a surface. One operation gives it its material.
+Everything so far has been a surface, and one operation gives it its
+material.
 
 .. tab-set::
 
@@ -380,18 +383,18 @@ The K-factor is set with the rest of the material, as
 It makes a difference that matters. The pattern above is 178.6 by
 155.6 mm. With a K-factor of 0.33 it is 177.8 by 153.2 mm: every bend
 uses up a little less sheet, and the hems, which are bent right over, use
-up a good deal less. The folded part is exactly the same either way. The
-K-factor changes only what has to be cut to make it, and a blank cut with
-the wrong one folds up to the wrong size.
+up a good deal less. The folded part is exactly the same either way: the
+K-factor changes only what has to be cut to make it, which is why a blank
+cut with the wrong one folds up to the wrong size.
 
 The other setting to know about is ``sheet_surface``, which says which
 face of the metal the modelled surface is. With the default,
 ``SheetSurface.INSIDE``, it is the face on the inside of the folds, here
 the top of the floor; ``OUTSIDE`` makes it the underside, and ``MID`` the
-middle of the sheet. This one does *not* change the flat pattern. The bend
-radius is always the true inside radius of the metal, whichever face is
-modelled, so the part and its pattern come out the same, and only where
-the thickness lies relative to what you drew is different. Choose the
+middle of the sheet. This one does *not* change the flat pattern, because
+the bend radius is always the true inside radius of the metal, whichever
+face is modelled, so the part and its pattern come out the same, and only
+where the thickness lies relative to what you drew is different. Choose the
 surface that matches how your drawing is dimensioned.
 :ref:`sheet_metal_concepts` goes into both.
 

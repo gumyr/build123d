@@ -8,7 +8,7 @@ Every tutorial so far has ended by inviting you to change a number at the
 top of the file and watch the part follow. That is what *parametric*
 means: the part is described in terms of values that can change.
 
-Those values have all been dimensions. They do not have to be. A part
+Those values have all been dimensions, but they do not have to be. A part
 exists to do a job, and the job can be the parameter: *this beam must carry
 200 newtons at its end and bend by no more than a millimetre*. How deep the
 beam has to be is then something for the code to work out.
@@ -232,8 +232,9 @@ added below it.
 Step 5: Use it like a built-in object
 ***********************************************
 
-Here is what the base class has bought. A wall plate carries two beams,
-side by side.
+Here is what the base class has bought: a ``Beam`` can go wherever a
+built-in object can. In this step a wall plate carries two beams, side by
+side.
 
 .. tab-set::
 
@@ -258,7 +259,7 @@ side by side.
     :width: 60%
 
 Read the builder version beside step 4 of :ref:`tutorial_combining_solids`,
-where cylinders were placed in a pattern. It is the same code with a
+where cylinders were placed in a pattern: it is the same code with a
 different object. Inside a ``Locations`` block a ``Beam`` is made at every
 location and joined to the part, without being told to; in algebra mode it
 goes on the right of a ``*`` like any other shape.
@@ -271,15 +272,16 @@ The three arguments passed on to the base class work as well:
 * ``mode=Mode.SUBTRACT`` cuts a beam-shaped socket out of whatever is being
   built.
 
-None of that was written in the class. It came with ``BasePartObject``.
+None of that was written in the class; it all came with
+``BasePartObject``.
 
 ****************************************
 Step 6: Change the requirement
 ****************************************
 
 A ``Beam`` is asked for by what it must do, so different answers are one
-argument away. Here is the same requirement in three materials. This step
-is the same in both modes.
+argument away. Here is the same requirement in three materials, in a step
+that is the same in both modes.
 
 .. literalinclude:: /tutorials/parametric_part.py
     :language: build123d
@@ -300,12 +302,12 @@ From the back: aluminium, steel and titanium. Each beam is a different
 depth, because each material is a different stiffness, and all three bend
 by the same millimetre under the same load.
 
-``beam.label`` and ``beam.section_depth`` are the values the class stored.
-``beam.mass()`` is
-something every part can do once it has a material, and it gives the
-answer in grams. Steel makes the slimmest beam and the heaviest; aluminium
-makes the deepest and the lightest. That is a real design decision, and it
-took a three-line loop to lay out.
+``beam.label`` and ``beam.section_depth`` are the values the class stored,
+while ``beam.mass()`` is something every part can do once it has a material,
+and it gives the answer in grams. Together the numbers show a trade-off:
+steel makes the slimmest beam and the heaviest, aluminium the deepest and
+the lightest. That is a real design decision, and it took a three-line loop
+to lay out.
 
 Try a ``load`` of 800 or a ``max_deflection`` of 0.25 at the top of the
 file, or add ``metals.stainless()`` to the loop.
@@ -329,7 +331,7 @@ is called from:
   stop the program with an error.
 * A function has no ``rotation``, ``align`` or ``mode`` unless you write
   each of them yourself.
-* What it returns is a plain part. It is not a ``Beam``, and it has no
+* What it returns is a plain part, not a ``Beam``, so it has no
   ``section_depth`` to read back.
 
 A custom object has none of these problems. Whatever is made inside it is
@@ -343,7 +345,7 @@ sketches and lines as well as parts.
 What you learned
 ********************
 
-* The parameters of a part do not have to be dimensions. They can be what
+* The parameters of a part do not have to be dimensions: they can be what
   the part must do, with the dimensions calculated from them.
 * ``bd_materials`` supplies the properties of real materials, and a part
   with a ``material`` can report its ``mass()``.

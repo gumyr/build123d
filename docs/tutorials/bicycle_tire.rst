@@ -60,6 +60,9 @@ shows the whole of the rest of the file as it stands at that point.
 Step 2: The tire
 ************************
 
+The tire comes first, because the tread and the lettering each need a
+surface to go on.
+
 .. tab-set::
 
     .. tab-item:: Builder
@@ -94,10 +97,10 @@ closes the outline, and ``make_face`` fills it. The sketch is placed
 stands on edge with its axle along X.
 
 Each curve of the profile sweeps out a face of its own, so the tire has
-thirty-seven faces. That decides how the rest of the tutorial goes. The
-road surface, where the tread belongs, is a single face from one shoulder
-to the other. The sidewall, where the lettering belongs, is several faces
-joined edge to edge.
+thirty-seven faces. That decides how the rest of the tutorial goes, because
+the road surface, where the tread belongs, is a single face from one
+shoulder to the other, while the sidewall, where the lettering belongs, is
+several faces joined edge to edge.
 
 The tread comes first, in steps 3 to 5, and the lettering after it, in
 steps 6 to 8.
@@ -155,6 +158,10 @@ wheel.
 Step 4: Onto the road surface
 *************************************
 
+The flat pattern now has to go onto the tire, which takes three things: the
+face to put it on, a line on that face to lay it along, and the wrap
+itself.
+
 .. tab-set::
 
     .. tab-item:: Builder
@@ -203,6 +210,10 @@ are kept in ``wrapped_pattern``.
 *****************************************
 Step 5: Blocks, all the way round
 *****************************************
+
+The wrapped faces lie on the tire but have no thickness, and there is only
+one unit of them, so this step makes them into blocks and repeats the
+blocks round the wheel.
 
 .. tab-set::
 
@@ -278,13 +289,13 @@ exact face from it, and then to project and thicken that face, and each
 of those can fail on an outline that is not clean.
 
 ``font="singleline"`` chooses a font that comes with build123d and avoids
-the problem. Each letter is a single stroke, like handwriting or
-engraving, and ``single_line_width`` gives the stroke a width so that it
-becomes a face. The outlines are simple and do not overlap. Use it
-whenever the text is going to become geometry and its exact style does
-not matter. :class:`~objects_sketch.Text` makes one face for each
-separate piece of each character: seventeen here, one for each of the
-sixteen characters and one more for the dot of the ``i``.
+the problem. Each letter is a single stroke, like handwriting or engraving,
+and ``single_line_width`` gives the stroke a width so that it becomes a
+face. Because the outlines are simple and do not overlap, it is the font to
+use whenever the text is going to become geometry and its exact style does
+not matter. :class:`~objects_sketch.Text` makes one face for each separate
+piece of each character: seventeen here, one for each of the sixteen
+characters and one more for the dot of the ``i``.
 
 **The path.** Lettering on a tire follows the curve of the wheel, so the
 text is given a ``path``: an arc of radius ``label_radius`` about the
@@ -302,6 +313,9 @@ it, as the picture shows.
 *********************************
 Step 7: Onto the sidewall
 *********************************
+
+The flat lettering now has to reach the tire as the tread did, but this
+time it is cast onto the tire from the side rather than wrapped.
 
 .. tab-set::
 
@@ -344,7 +358,8 @@ sketch that has just been made, and the projected faces replace it as the
 ones waiting in the part. In algebra mode it is given the sketch and the
 result is kept in ``letters``.
 
-That is why the two jobs get different tools:
+Landing across several faces is what the lettering needs and the tread
+does not, which is why the two jobs get different tools:
 
 .. list-table::
     :header-rows: 1
@@ -412,7 +427,8 @@ Step 9: The whole tire
 ******************************
 
 The tire is now three things: the smooth tire, a list of tread units,
-and the lettering.
+and the lettering. The last step puts them together and measures what the
+tread and lettering have added.
 
 .. tab-set::
 
@@ -446,8 +462,8 @@ and the lettering.
 its lettering into one shape without fusing them. A compound can be
 shown, exported and measured like any other shape.
 
-Giving the tire a material gives it a density, and ``mass()`` then
-returns its mass, in grams unless told otherwise.
+Giving the tire a material gives it a density, which is what ``mass()``
+needs to return its mass, in grams unless told otherwise.
 
 A wheel also has to be spun up to speed, and how hard that is depends on
 its *moment of inertia* about the axle: how much material there is, and

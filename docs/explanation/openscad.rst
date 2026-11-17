@@ -11,9 +11,9 @@ few things will change how you design. This page sets out which is which.
 What is the same
 ********************
 
-A model is a program. Dimensions are variables, repetition is a loop, and
-a part that is wanted twice is a function. That carries over unchanged,
-with the whole of Python behind it.
+A model is a program, in which dimensions are variables, repetition is a loop,
+and a part that is wanted twice is a function. All of that carries over
+unchanged, with the whole of Python behind it.
 
 Constructive solid geometry carries over too. build123d has the primitive
 solids, and they are added, subtracted and intersected:
@@ -44,20 +44,21 @@ and for some parts it is the right way to build them.
 What is different
 *********************
 
-Three things, and each one is something to use, not just to get used to.
+Three things are different, and each one is something to use, not just to get
+used to.
 
 **The geometry is exact.** OpenSCAD works with meshes: a cylinder is a
 prism with ``$fn`` sides. build123d works with the surfaces themselves, so
-a cylinder is a cylinder, at any size and from any distance. There is no
+a cylinder is a cylinder, at any size and from any distance, and there is no
 ``$fn`` to tune. Triangles appear only when a model is exported to a mesh
 format such as STL, and their fineness is set there.
 
 **A part usually starts as a sketch.** The common way to make a solid in
 build123d is to draw its outline in 2D and then extrude, revolve, loft or
-sweep it. This is how most CAD systems work. A flat outline is easier to
-get right than the same shape carved out of blocks, and it leaves fewer
-operations to be done on solids, which are the slower and more delicate
-ones.
+sweep it. This is how most CAD systems work, and for good reason: a flat
+outline is easier to get right than the same shape carved out of blocks, and
+it leaves fewer operations to be done on solids, which are the slower and more
+delicate ones.
 
 **The model can be asked about itself.** A build123d part knows its own
 faces, edges and vertices, and they can be selected: the top face, the
@@ -130,8 +131,9 @@ Here it is in build123d:
 * ``filter_by(Convexity.CONCAVE)`` selects the one edge where the part
   turns inward, the inside corner, and ``fillet`` rounds it. The fillet
   is a true cylindrical surface.
-* There is no ``delta``. OpenSCAD needs the cutting shapes to poke a
-  little way out of the block to cut cleanly; an exact modeller does not.
+* There is no ``delta``, because it is only OpenSCAD that needs the cutting
+  shapes to poke a little way out of the block to cut cleanly; an exact
+  modeller does not.
 * To change the radius, change one number. To round the outside corner as
   well, select it too.
 

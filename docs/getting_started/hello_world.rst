@@ -15,17 +15,25 @@ With build123d :ref:`installed <installation>`, this is a complete first model:
 .. image:: /getting_started/assets/hello_world_box.svg
     :align: center
 
-A build123d model is an ordinary Python script, and
-:class:`~objects_part.Box` creates a solid of the given length, width and
-height.
+A simple model needs nothing more than this: an ordinary Python script, here
+with a single line of substance, in which :class:`~objects_part.Box` creates
+a solid from its length, width and height.
+
+Because a model is Python, it can grow in the way any software does. A larger
+design is usually a project rather than one script: parts written as classes
+in files of their own, dimensions kept in data files such as JSON or YAML,
+tests that check the parts, and documentation generated from the code. Parts
+that are needed again and again can be gathered into a library and shared.
+All the tools and habits of software development are available, and none of
+them is needed to begin.
 
 **********
 Viewing it
 **********
 
-build123d creates the model; a separate viewer displays it. With OCP Viewer
-installed and running, as :ref:`installation` describes, two more lines send
-the box to it:
+build123d only creates the model; displaying it requires a separate viewer.
+With OCP Viewer installed and running, as :ref:`installation` describes, two
+more lines send the box to it:
 
 .. code-block:: build123d
 
@@ -36,23 +44,27 @@ the box to it:
 
     show(box)
 
-Run the script, and the box appears in the browser page. The viewer inside
-Visual Studio Code, one of those listed in :ref:`external`, is driven by the
-same ``show``.
+Run the script, and the box appears in the browser page. If you would rather
+use another viewer, such as the one inside Visual Studio Code, the script does
+not change, because those listed in :ref:`external` are driven by the same
+``show``.
 
 ************
 Exporting it
 ************
 
-To use the model outside of Python, export it:
+So far the box exists only while the script is running. To use it anywhere
+else, in another CAD program or in a slicer, export it to a file:
 
 .. code-block:: build123d
 
     export_step(box, "box.step")
     export_stl(box, "box.stl")
 
-STEP keeps the exact geometry for other CAD tools and STL is the usual input
-for a 3D printing slicer; :doc:`/how_to/import_export` covers the other formats.
+The two formats serve different purposes: STEP keeps the exact geometry, which
+is what other CAD tools want, while STL is a mesh of triangles, the usual
+input for a 3D printing slicer. :doc:`/how_to/import_export` covers the other
+formats.
 
 Before going further, :ref:`builder_and_algebra` explains the two ways of
 writing a model that the rest of this documentation uses.

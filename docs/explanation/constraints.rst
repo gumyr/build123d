@@ -192,8 +192,8 @@ start from, and a tangency problem typically has several valid answers,
 depending on which side of each reference the solution lies.
 
 For example, there can be up to eight circles of a given radius tangent to
-two circles that cross each other. All eight are correct. This is expected
-behaviour, not an error.
+two circles that cross each other. All eight are correct, so getting several
+back is expected behaviour, not an error.
 
 .. figure:: /tutorials/assets/constraints/tangent_circles.svg
     :align: center

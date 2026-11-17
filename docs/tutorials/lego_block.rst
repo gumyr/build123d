@@ -5,17 +5,17 @@ A Lego block
 ############
 
 The tutorials before this one each introduced something new. This one does
-not. It takes what they taught and uses it to build one familiar object from
-start to finish: a Lego block of any size - a 2x4, a 1x8, a brick or a
+not: it takes what they taught and uses it to build one familiar object from
+start to finish, a Lego block of any size - a 2x4, a 1x8, a brick or a
 plate - which ends up as a ``LegoBlock`` object of your own.
 
 .. image:: /tutorials/assets/lego_block/brick_finished.svg
     :align: center
     :width: 60%
 
-The block looks simple from above. Nearly all of its detail is underneath -
-thin walls, small ridges on the inside of them, and a row of tubes that the
-studs of the block below push against:
+The block looks simple from above, but nearly all of its detail is
+underneath - thin walls, small ridges on the inside of them, and a row of
+tubes that the studs of the block below push against:
 
 .. image:: /tutorials/assets/lego_block/brick_underside.svg
     :align: center
@@ -144,7 +144,7 @@ its ends are buried in a wall.
 Step 4: Cut the bars back to ridges
 *********************************************
 
-Now take the middle out. One rectangle, a little smaller than the inside of
+Now take the middle out: one rectangle, a little smaller than the inside of
 the walls, removes all of each bar except its two ends.
 
 .. tab-set::
@@ -184,10 +184,10 @@ Step 5: Tubes, or posts
 
 What grips the studs of the block below depends on the block. One that is
 two or more studs wide has tubes: rings, each a circle with a smaller
-circle taken out, sitting in the middle of every square of four studs. That
-is one fewer than the studs in each direction. A block one stud wide has no
-room for tubes and has small solid posts between its studs instead. A 1x1
-has neither.
+circle taken out, sitting in the middle of every square of four studs, which
+makes one fewer than the studs in each direction. A block one stud wide has
+no room for tubes, so it has small solid posts between its studs instead,
+and a 1x1 has neither.
 
 That is a choice, and a choice in build123d is made in plain Python, with
 ``if``.
@@ -234,9 +234,10 @@ The plan of the block is now complete.
 Step 6: Extrude the plan
 *********************************
 
-One ``extrude`` turns the whole plan into the walls, ridges and tubes. They
-are ``wall_thickness`` shorter than ``base_height``, the height of the
-block without its studs, to leave room for its top.
+Because everything is in the plan, one ``extrude`` turns the whole of it
+into the walls, ridges and tubes. They are made ``wall_thickness`` shorter
+than ``base_height``, the height of the block without its studs, to leave
+room for its top.
 
 .. tab-set::
 
@@ -273,9 +274,9 @@ less reliable way round.
 Step 7: Close the top
 ***************************
 
-The top of the block is a plain slab. It is one more sketch - the outline
-of the block again - drawn on a plane at the height where the walls end,
-and extruded by ``wall_thickness``.
+The top of the block is a plain slab, made from one more sketch - the
+outline of the block again - drawn on a plane at the height where the walls
+end, and extruded by ``wall_thickness``.
 
 .. tab-set::
 
@@ -393,15 +394,15 @@ These are the four parts that every custom object has:
 #. ``super().__init__`` is handed the finished shape, with ``rotation``,
    ``align`` and ``mode``.
 
-The sizes that every block shares are not arguments. A stud is 4.8 mm
-across on every Lego block there is, and nobody making a block should be
-asked for it. Those sizes are written once, directly under the ``class``
+The sizes that every block shares are not arguments, because a stud is
+4.8 mm across on every Lego block there is, and nobody making a block should
+be asked for it. Those sizes are written once, directly under the ``class``
 line, which makes them **class attributes**: values that belong to
 ``LegoBlock`` itself and not to any one block. Inside ``__init__`` each is
 read with ``self.`` in front, as in ``self.unit_size``, and that is the only
 change to the code of step 8.
 
-The rule is a general one. *What varies from one part to the next is an
+The rule is a general one: *what varies from one part to the next is an
 argument; what is fixed for the whole family belongs to the class.*
 
 Two more things are new:
@@ -444,8 +445,8 @@ class attribute, asked for from the class itself, and ``base_height`` is
 the value each block stored. Moving a ``LegoBlock`` gives a ``LegoBlock``,
 so the moved blocks still have their labels.
 
-The blocks are not added together. They are separate parts that happen to
-touch, so they are gathered into an assembly with
+The blocks are not added together, because they are separate parts that
+happen to touch. They are gathered instead into an assembly with
 ``Compound(children=[...])``, in which each keeps its own shape and label.
 
 Because ``LegoBlock`` is built on ``BasePartObject`` it also works wherever
@@ -453,16 +454,16 @@ a ``Box`` would: inside a ``BuildPart``, at every place of a ``Locations``
 or ``GridLocations``, and with ``mode=Mode.SUBTRACT`` to cut a block-shaped
 pocket.
 
-Class attributes have one more use. A different system of blocks is a
-subclass that changes them and nothing else:
+Class attributes have one more use, which is that a different system of
+blocks can be a subclass that changes them and nothing else:
 
 .. literalinclude:: /tutorials/lego_block.py
     :language: build123d
     :start-after: [subclass]
     :end-before: [subclass]
 
-``BigBlock`` has no ``__init__`` of its own. It uses the one in
-``LegoBlock``, which reads every size through ``self`` and so finds the new
+``BigBlock`` needs no ``__init__`` of its own, because the one it inherits
+from ``LegoBlock`` reads every size through ``self`` and so finds the new
 values.
 
 ********************
@@ -473,9 +474,9 @@ Nothing here was new, and that is the point: a part with this much detail,
 and an object to make it with, needed only the tools of the earlier
 tutorials.
 
-* Look for the direction in which a part does not change. Everything that
-  is constant along it belongs in one sketch.
-* Draw more than you need and cut back. Bars across the block, trimmed by
+* Look for the direction in which a part does not change, because
+  everything that is constant along it belongs in one sketch.
+* Draw more than you need and cut back: bars across the block, trimmed by
   one rectangle, were less work than sixteen separate ridges.
 * A ``GridLocations`` with a count of 1 is a row or a column.
 * Count features from a parameter, and the part follows when the parameter

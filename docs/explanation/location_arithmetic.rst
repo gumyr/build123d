@@ -5,13 +5,13 @@ How placements combine
 #######################
 
 Every object in build123d is made at the origin and then put where it
-belongs. A single placement is easy to follow. Designs are built from
-several, one on top of another: a hole on a face of a bracket that sits on
-a plate. This page explains how placements combine, which is the same in
-algebra mode, where they are written as a chain of ``*``, and in builder
-mode, where they are nested ``with`` blocks.
+belongs. A single placement is easy to follow, but designs are built from
+several, one on top of another: a hole on a face of a bracket that sits on a
+plate. This page explains how placements combine, which is the same in algebra
+mode, where they are written as a chain of ``*``, and in builder mode, where
+they are nested ``with`` blocks.
 
-:ref:`moving_objects` is the practical guide to placing things. This page
+:ref:`moving_objects` is the practical guide to placing things, and this page
 is the reasoning behind it.
 
 In the pictures the grey lines marked X, Y and Z are the axes of the world.
@@ -39,8 +39,8 @@ degrees about X, Y and Z. Multiplying the rectangle by it puts the
 rectangle in that frame: its centre on the frame's origin, lying in the
 frame's xy plane, facing along its z.
 
-A :class:`~geometry.Plane` is the same thing seen as a place to draw. It
-has an origin, an x direction and a normal, and that is a frame.
+A :class:`~geometry.Plane` is the same thing seen as a place to draw: it has
+an origin, an x direction and a normal, and that is a frame.
 
 .. literalinclude:: /explanation/location_arithmetic.py
     :language: build123d
@@ -52,9 +52,9 @@ has an origin, an x direction and a normal, and that is a frame.
     :width: 50%
 
 ``Plane.XZ`` has its x along the world's X, its y along the world's Z and
-its normal along ``-Y``. So the rectangle's width of 1 runs along world X
-and its height of 2 along world Z. ``Plane.XY`` is the frame of the world
-itself, which is why ``Plane.XY *`` changes nothing.
+its normal along ``-Y``, so the rectangle's width of 1 runs along world X and
+its height of 2 along world Z. ``Plane.XY`` is the frame of the world itself,
+which is why ``Plane.XY *`` changes nothing.
 
 *****************
 The rule
@@ -75,8 +75,8 @@ A position
     :align: center
     :width: 55%
 
-``Pos(0.2, 0.4, 0.1)`` is not 0.2 along the world's X. It is 0.2 along the
-x of ``loc``, 0.4 along its y and 0.1 along its z, off the face.
+``Pos(0.2, 0.4, 0.1)`` is not 0.2 along the world's X but 0.2 along the x of
+``loc``, 0.4 along its y and 0.1 along its z, off the face.
 
 A rotation
 ==========
@@ -142,8 +142,8 @@ Two ways to read a chain
 ****************************
 
 :ref:`moving_objects` and :ref:`how_algebra_mode_works` say to read a chain
-from the right. This page has been reading from the left. Both are correct,
-and they always agree.
+from the right, while this page has been reading from the left. Both are
+correct, and they always agree.
 
 .. literalinclude:: /explanation/location_arithmetic.py
     :language: build123d
