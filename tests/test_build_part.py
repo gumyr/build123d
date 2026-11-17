@@ -1370,6 +1370,16 @@ class TestSplit(unittest.TestCase):
 
 
 class TestThicken(unittest.TestCase):
+    def test_several_faces_give_one_level_of_compound(self):
+        """The solids are direct members of the Part, not wrapped in a second
+        compound, so the part still counts once it is put in an assembly"""
+        faces = [Pos(X=3 * i) * Rectangle(1, 1).face() for i in range(2)]
+        unit = thicken(Sketch(faces), amount=1)
+        self.assertIsInstance(unit, Part)
+        self.assertEqual(len(unit.get_type(Solid)), 2)
+        self.assertEqual(len(unit.compounds()), 1)
+        self.assertAlmostEqual(Compound(children=[unit]).volume, 2, 5)
+
     def test_thicken(self):
         with BuildPart() as bp:
             with BuildSketch():

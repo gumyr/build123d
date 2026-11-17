@@ -714,7 +714,8 @@ def mirror(
     if context is not None:
         context._add_to_context(*mirrored, mode=mode)
 
-    mirrored_compound: Compound = Compound(mirrored)
+    # one object that is already a compound, a Box say, needs no second wrapper
+    mirrored_compound = cast(Compound, Compound(mirrored).unwrap(fully=False))
     if all([obj._dim == 3 for obj in object_list]):
         mirrored_compound = Part(mirrored_compound.wrapped)
     elif all([obj._dim == 2 for obj in object_list]):

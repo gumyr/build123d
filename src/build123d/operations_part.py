@@ -998,4 +998,5 @@ def thicken(
         if clean and not sheet_thickening:
             new_solids = [solid.clean() for solid in new_solids]
 
-    return Part(Compound(new_solids).wrapped)
+    # several solids arrive fused into one compound: don't wrap it in another
+    return Part(Compound(new_solids).unwrap(fully=False).wrapped)
