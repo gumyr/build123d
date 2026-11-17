@@ -33,6 +33,8 @@ from typing import cast, ClassVar, TypeAlias
 
 from collections.abc import Iterable
 
+from typing_extensions import deprecated
+
 from build123d.build_constants import IN, MM
 from build123d.build_enums import (
     Align,
@@ -161,8 +163,8 @@ PathDescriptor: TypeAlias = Wire | Edge | list[PointLike]
 
 
 @dataclass
-class Draft:
-    """Draft
+class Drafting:
+    """Drafting
 
     Documenting build123d designs with dimension and extension lines as well as callouts.
 
@@ -248,7 +250,7 @@ class Draft:
         else:
             qualified_display_units = display_units
 
-        unit_str = Draft.unit_LUT[self.is_metric] if qualified_display_units else ""
+        unit_str = Drafting.unit_LUT[self.is_metric] if qualified_display_units else ""
         if tolerance is None:
             tolerance_str = ""
         elif isinstance(tolerance, float):
@@ -327,6 +329,18 @@ class Draft:
         return Location(path.position_at(u_value), (0, 0, 1), angle)
 
 
+@deprecated("Draft is deprecated; use Drafting instead.")
+class Draft(Drafting):
+    """Draft
+
+    .. deprecated::
+        Use :class:`~drafting.Drafting` instead; the new name no longer
+        differs from the :func:`~operations_part.draft` operation only by
+        the case of a letter.
+
+    """
+
+
 class DimensionLine(BaseSketchObject):
     """Sketch Object: DimensionLine
 
@@ -347,7 +361,7 @@ class DimensionLine(BaseSketchObject):
     Args:
         path (PathDescriptor): a very general type of input used to describe the path the
             dimension line will follow.
-        draft (Draft): instance of Draft dataclass
+        draft (Drafting): instance of Drafting dataclass
         sketch (Sketch): the Sketch being created to check for possible overlaps. In builder
             mode the active Sketch will be used if None is provided.
         label (str, optional): a text string which will replace the length (or
@@ -373,7 +387,7 @@ class DimensionLine(BaseSketchObject):
     def __init__(
         self,
         path: PathDescriptor,
-        draft: Draft,
+        draft: Drafting,
         sketch: Sketch | None = None,
         label: str | None = None,
         arrows: tuple[bool, bool] = (True, True),
@@ -389,7 +403,7 @@ class DimensionLine(BaseSketchObject):
         # Create a wire modelling the path of the dimension lines from a variety of input types
         if isinstance(path, Iterable) and len(path) > 2:
             raise ValueError("Only two points are allowed for dimension lines")
-        path_obj = Draft._process_path(path)  # Edge or Wire
+        path_obj = Drafting._process_path(path)  # Edge or Wire
         path_length = path_obj.length
 
         self.dimension = path_length  #: length of the dimension
@@ -458,7 +472,7 @@ class DimensionLine(BaseSketchObject):
             ]
             d_line = Sketch(select_arrow_shapes)
             flip_label = path_obj.tangent_at(u_value).get_angle(Vector(1, 0, 0)) >= 180
-            loc = Draft._sketch_location(path_obj, u_value, flip_label)
+            loc = Drafting._sketch_location(path_obj, u_value, flip_label)
             placed_label = label_shape.located(loc)
             self_intersection = cast(
                 Sketch | None, Sketch.intersect(d_line, placed_label)
@@ -524,7 +538,7 @@ class ExtensionLine(BaseSketchObject):
             ``measurement_direction`` is also given the two must be perpendicular,
             otherwise the dimension line direction is inferred perpendicular to the
             offset.
-        draft (Draft): instance of Draft dataclass
+        draft (Drafting): instance of Drafting dataclass
         label (str, optional): a text string which will replace the length (or arc length)
             that would otherwise be extracted from the provided path. Providing a label is
             useful when illustrating a parameterized input where the name of an argument
@@ -551,7 +565,7 @@ class ExtensionLine(BaseSketchObject):
         self,
         border: PathDescriptor,
         offset: float | VectorLike,
-        draft: Draft,
+        draft: Drafting,
         sketch: Sketch | None = None,
         label: str | None = None,
         arrows: tuple[bool, bool] = (True, True),
@@ -582,7 +596,7 @@ class ExtensionLine(BaseSketchObject):
             offset_vector = Vector(offset_vector.X, offset_vector.Y)
 
         # Create a wire modelling the path of the dimension lines from a variety of input types
-        object_to_measure = Draft._process_path(border)
+        object_to_measure = Drafting._process_path(border)
         if object_to_measure.position_at(0) == object_to_measure.position_at(1):
             raise ValueError("Start and end points of border must be different.")
 
