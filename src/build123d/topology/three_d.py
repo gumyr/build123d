@@ -934,12 +934,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
         """Build a solid from an OCCT TopoDS_Shape/TopoDS_Solid
 
         Args:
-            obj (TopoDS_Shape | Shell, optional): OCCT Solid or Shell.
+            obj (TopoDS_Shape | Shell, optional): OCCT Solid or Shell. A Shell
+                must be closed, as a solid is the region it encloses.
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             material (str, optional): tag for external tools. Defaults to ''.
             joints (dict[str, Joint], optional): names joints. Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
+
+        Raises:
+            ValueError: the Shell is not closed
         """
 
         if isinstance(obj, Shell):
@@ -1184,6 +1188,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
     @classmethod
     def _make_solid(cls, shell: Shell) -> TopoDS_Solid:
         """Create a Solid object from the surface shell"""
+        if shell and not shell.is_manifold:
+            raise ValueError(
+                "the shell is not closed, so it does not enclose a solid: "
+                "check shell.is_manifold"
+            )
         return ShapeFix_Solid().SolidFromShell(shell.wrapped)
 
     @classmethod

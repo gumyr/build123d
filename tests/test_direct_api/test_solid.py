@@ -64,6 +64,17 @@ class TestSolid(unittest.TestCase):
         self.assertAlmostEqual(box.volume, 1, 5)
         self.assertTrue(box.is_valid)
 
+    def test_an_open_shell_is_refused(self):
+        """A shell that is not closed encloses nothing, so there is no solid
+        to make from it"""
+        box_faces = Solid.make_box(1, 1, 1).faces().sort_by(Axis.Z)
+        without_its_top = Shell(box_faces[:5])
+        self.assertFalse(without_its_top.is_manifold)
+        with self.assertRaisesRegex(ValueError, "not closed"):
+            Solid(without_its_top)
+        with self.assertRaisesRegex(ValueError, "not closed"):
+            Solid(Shell(box_faces[0]))
+
     def test_extrude(self):
         v = Edge.extrude(Vertex(1, 1, 1), (0, 0, 1))
         self.assertAlmostEqual(v.length, 1, 5)
