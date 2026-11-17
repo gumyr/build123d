@@ -1691,10 +1691,8 @@ def unfold(
     press brake needs that the outline alone does not say.
 
     Each bend is developed at its neutral radius, derived from the thickness,
-    K-factor and reference surface. :meth:`~topology.Shell.unfold` defaults to
-    the geometric radius of each bend when given no parameters, which produces
-    a pattern that will not fold back to the requested part; this operation
-    requires the parameters instead, taking them from an enclosing
+    K-factor and reference surface. The parameters are required, as they are
+    by :meth:`~topology.Shell.unfold`, and are taken from an enclosing
     ``BuildSheet`` when there is one.
 
     The pattern is always built on ``Plane.XY``; ``align`` places it within

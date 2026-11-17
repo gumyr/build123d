@@ -1979,11 +1979,16 @@ class TestUnfoldFaceMap(unittest.TestCase):
             loose_lines[0].center() + shift, cornered_lines[0].center(), 5
         )
 
-    def test_the_geometric_unfold_reports_the_source_radius(self):
-        """Without parameters a bend develops at the radius of its reference
-        face, and that is the radius the record reports for both"""
-        sheet, _ = TestUnfoldOperation.flanged()
-        _, faces = sheet.unfold()
+    def test_a_zero_k_factor_unfold_reports_the_source_radius(self):
+        """With a K-factor of zero a bend develops at its inside radius, here
+        the radius of its reference face, and the record reports that for both"""
+        sheet, parameters = TestUnfoldOperation.flanged()
+        geometric = SheetMetalParameters(
+            thickness=parameters.thickness,
+            k_factor=0,
+            sheet_surface=SheetSurface.INSIDE,
+        )
+        _, faces = sheet.unfold(geometric)
         (record,) = [r for r in faces.values() if r.is_bend]
         self.assertAlmostEqual(record.inside_radius, 2, 5)
         self.assertAlmostEqual(record.neutral_radius, 2, 5)
@@ -2369,7 +2374,9 @@ class TestSheetSelectors(unittest.TestCase):
             self.assertEqual(len(bs.flats(Select.LAST)), 0)
             self.assertEqual(len(bs.edges(Select.LAST)), 2)
             self.assertEqual(len(bs.edges(Select.NEW)), 2)
-            self.assertTrue(all(e.geom_type == GeomType.LINE for e in bs.edges(Select.LAST)))
+            self.assertTrue(
+                all(e.geom_type == GeomType.LINE for e in bs.edges(Select.LAST))
+            )
 
     def test_a_bend_moves_the_far_side_and_leaves_the_near_side(self):
         with BuildSheet(thickness=1, bend_radius=2) as bs:
@@ -2562,7 +2569,7 @@ class TestUnfold(unittest.TestCase):
             flat.bounding_box().size.X, 30 + 25 + radians(90) * 2.6, 4
         )
 
-    def test_geometric_and_neutral_axis_development(self):
+    def test_neutral_axis_development(self):
         """All reference surfaces produce the same neutral development, and so
         do both bend directions: the neutral fibre is k*t from the inside of the
         bend whichever face that is."""
@@ -2584,22 +2591,29 @@ class TestUnfold(unittest.TestCase):
                         sheet_parameters=parameters,
                     )
 
-                    geometric = sheet.unfold().flat
                     neutral = sheet.unfold(parameters).flat
 
-                    self.assertTrue(geometric.is_valid)
                     self.assertTrue(neutral.is_valid)
-                    self.assertAlmostEqual(geometric.area, sheet.area, 5)
                     self.assertAlmostEqual(neutral.area, expected_area, 5)
                     self.assertAlmostEqual(neutral.bounding_box().size.Z, 0, 5)
 
     def test_validation(self):
+        parameters = SheetMetalParameters(thickness=1)
         with self.assertRaisesRegex(ValueError, "non-empty Shell"):
-            Shell().unfold()
+            Shell().unfold(parameters)
         with self.assertRaisesRegex(TypeError, "SheetMetalParameters"):
             Shell(Rectangle(10, 10).face()).unfold("parameters")
         with self.assertRaisesRegex(ValueError, "planes and cylinders"):
-            Solid.make_sphere(10).shell().unfold()
+            Solid.make_sphere(10).shell().unfold(parameters)
+
+    def test_the_parameters_are_required(self):
+        """A pattern developed without parameters would not fold back to the
+        part, so the method refuses to make one"""
+        sheet = Shell(Rectangle(10, 10).face())
+        with self.assertRaises(TypeError):
+            sheet.unfold()  # pylint: disable=no-value-for-parameter
+        with self.assertRaisesRegex(TypeError, "SheetMetalParameters"):
+            sheet.unfold(None)
 
 
 class TestMiter(unittest.TestCase):
@@ -3655,6 +3669,9 @@ class TestBendRelief(unittest.TestCase):
     def test_relief_survives_developing(self):
         """A relief cut in the flat pattern removes the same area folded."""
         sheet = self.tab_sheet().sheet_local
+        # a K-factor of zero develops each bend at the radius of the shell
+        # itself, so areas on the pattern and on the shell can be compared
+        geometric = SheetMetalParameters(thickness=1, bend_radius=2, k_factor=0)
         for relief_type, kwargs in (
             (ReliefType.ROUND, {"radius": 1.5}),
             (ReliefType.SQUARE, {"depth": 3.0, "width": 1.5}),
@@ -3669,7 +3686,8 @@ class TestBendRelief(unittest.TestCase):
                 )
                 self.assertAlmostEqual(
                     sheet.area - result.area,
-                    sheet.unfold().flat.area - result.unfold().flat.area,
+                    sheet.unfold(geometric).flat.area
+                    - result.unfold(geometric).flat.area,
                     6,
                 )
 
