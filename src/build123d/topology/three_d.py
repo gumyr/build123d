@@ -1418,7 +1418,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                     taper_wires.append(taper_wire)
 
                 solids = [
-                    Solid.make_loft([p, t]) for p, t in zip(profile_wires, taper_wires)
+                    Solid.loft([p, t]) for p, t in zip(profile_wires, taper_wires)
                 ]
             except (RuntimeError, Standard_Failure) as err:
                 raise RuntimeError(
@@ -1744,8 +1744,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
         )
 
     @classmethod
-    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Solid:
-        """make loft
+    def loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Solid:
+        """loft
 
         Makes a loft from a list of wires and vertices. Vertices can appear only at the
         beginning or end of the list, but cannot appear consecutively within the list
@@ -1762,6 +1762,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
             Solid: Lofted object
         """
         return cls(TopoDS.Solid(_make_loft(objs, True, ruled)))
+
+    @classmethod
+    @deprecated("Solid.make_loft is deprecated; use Solid.loft instead.")
+    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Solid:
+        """make loft
+
+        .. deprecated::
+            Use :meth:`loft` instead.
+        """
+        return cls.loft(objs, ruled)
 
     @classmethod
     def make_sphere(

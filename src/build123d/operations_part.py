@@ -362,9 +362,9 @@ def loft(
                 hole_sections[j].append(face.inner_wires()[k])
 
     # Perform lofts
-    new_solid = Solid.make_loft(loft_sections, ruled)
+    new_solid = Solid.loft(loft_sections, ruled)
     if hole_sections:
-        hole_solids = [Solid.make_loft(holes, ruled) for holes in hole_sections]
+        hole_solids = [Solid.loft(holes, ruled) for holes in hole_sections]
         new_solid = cast(Solid, new_solid.cut(*hole_solids))
 
     # Try to recover an invalid loft

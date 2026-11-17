@@ -232,31 +232,35 @@ class TestSolid(unittest.TestCase):
         area = sum(f.area for f in intersect.faces())
         self.assertAlmostEqual(area, 1, 5)
 
-    def test_make_loft(self):
-        loft = Solid.make_loft(
-            [Wire.make_rect(2, 2), Wire.make_circle(1, Plane((0, 0, 1)))]
-        )
+    def test_make_loft_is_deprecated(self):
+        """Solid.make_loft still works, as Solid.loft, but warns."""
+        sections = [Wire.make_rect(2, 2), Wire.make_circle(1, Plane((0, 0, 1)))]
+        with self.assertWarnsRegex(DeprecationWarning, "use Solid.loft"):
+            old = Solid.make_loft(sections)
+        self.assertIsInstance(old, Solid)
+        self.assertAlmostEqual(old.volume, Solid.loft(sections).volume, 5)
+
+    def test_loft(self):
+        loft = Solid.loft([Wire.make_rect(2, 2), Wire.make_circle(1, Plane((0, 0, 1)))])
         self.assertAlmostEqual(loft.volume, (4 + math.pi) / 2, 1)
 
         with self.assertRaises(ValueError):
-            Solid.make_loft([Wire.make_rect(1, 1)])
+            Solid.loft([Wire.make_rect(1, 1)])
 
-    def test_make_loft_with_vertices(self):
-        loft = Solid.make_loft(
+    def test_loft_with_vertices(self):
+        loft = Solid.loft(
             [Vertex(0, 0, -1), Wire.make_rect(1, 1.5), Vertex(0, 0, 1)], True
         )
         self.assertAlmostEqual(loft.volume, 1, 5)
 
         with self.assertRaises(ValueError):
-            Solid.make_loft(
-                [Wire.make_rect(1, 1), Vertex(0, 0, 1), Wire.make_rect(1, 1)]
-            )
+            Solid.loft([Wire.make_rect(1, 1), Vertex(0, 0, 1), Wire.make_rect(1, 1)])
 
         with self.assertRaises(ValueError):
-            Solid.make_loft([Vertex(0, 0, 1), Vertex(0, 0, 2)])
+            Solid.loft([Vertex(0, 0, 1), Vertex(0, 0, 2)])
 
         with self.assertRaises(ValueError):
-            Solid.make_loft(
+            Solid.loft(
                 [
                     Vertex(0, 0, 1),
                     Wire.make_rect(1, 1),
@@ -267,7 +271,7 @@ class TestSolid(unittest.TestCase):
 
         # two vertices, but not one at each end of the list
         with self.assertRaisesRegex(ValueError, "beginning and end of the list"):
-            Solid.make_loft([Vertex(0, 0, 1), Vertex(0, 0, 2), Wire.make_rect(1, 1)])
+            Solid.loft([Vertex(0, 0, 1), Vertex(0, 0, 2), Wire.make_rect(1, 1)])
 
     def test_extrude_until(self):
         square = Face.make_rect(1, 1)

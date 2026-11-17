@@ -887,7 +887,7 @@ class TestLoft(unittest.TestCase):
     ):
         section = Face.make_rect(2, 2)
         fallback_solid = Solid.make_box(2, 2, 1)
-        mock_solid_class.make_loft.return_value = fallback_solid
+        mock_solid_class.loft.return_value = fallback_solid
         mock_solid_class.return_value = fallback_solid
 
         with patch.object(

@@ -3343,8 +3343,8 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return Shell(TopoDS.Shell(_extrude_topods_shape(obj.wrapped, direction)))
 
     @classmethod
-    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Shell:
-        """make loft
+    def loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Shell:
+        """loft
 
         Makes a loft from a list of wires and vertices. Vertices can appear only at the
         beginning or end of the list, but cannot appear consecutively within the list nor
@@ -3361,6 +3361,16 @@ class Shell(Mixin2D[TopoDS_Shell]):
             Shell: Lofted object
         """
         return cls(TopoDS.Shell(_make_loft(objs, False, ruled)))
+
+    @classmethod
+    @deprecated("Shell.make_loft is deprecated; use Shell.loft instead.")
+    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Shell:
+        """make loft
+
+        .. deprecated::
+            Use :meth:`loft` instead.
+        """
+        return cls.loft(objs, ruled)
 
     @classmethod
     def revolve(

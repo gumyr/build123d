@@ -407,7 +407,7 @@ class TestFace(unittest.TestCase):
             Solid.make_cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0].is_planar
         )
         # Some of these faces have geom_type BSPLINE but are planar
-        mount = Solid.make_loft(
+        mount = Solid.loft(
             [
                 Rectangle((1 + 16 + 4), 20, align=(Align.MIN, Align.CENTER)).wire(),
                 Pos(1, 0, 4)

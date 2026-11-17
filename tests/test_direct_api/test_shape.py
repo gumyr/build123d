@@ -204,7 +204,7 @@ class TestShape(unittest.TestCase):
                 (1, 2, 2, 1), (10, 0, 0, -10), (0, 0.33, 0.66, 1)
             )
         ]
-        solid = Solid.make_loft(sections)
+        solid = Solid.loft(sections)
         edge = (
             solid.edges()
             .group_by(Edge.length)[-1]
