@@ -149,6 +149,7 @@ __all__ = [
     "BaseSketchObject",
     "Circle",
     "Draft",
+    "Drafting",
     "DimensionLine",
     "Ellipse",
     "ExtensionLine",
