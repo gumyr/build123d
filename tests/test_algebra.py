@@ -208,6 +208,27 @@ class ObjectTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             obj -= CounterBoreHole(3, 6, 2)
 
+    def test_counter_drill_hole(self):
+        obj = Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MAX))
+        obj -= CounterDrillHole(
+            radius=2,
+            counter_drill_radius=3,
+            counter_drill_depth=2,
+            depth=6,
+            counter_drill_angle=90,
+        )
+        step = math.pi / 3 * (3**2 + 3 * 2 + 2**2)
+        self.assertAlmostEqual(
+            obj.volume,
+            10**3 - 2 * math.pi * 3**2 - step - 3 * math.pi * 2**2,
+            4,
+        )
+
+    def test_counter_drill_hole_error(self):
+        obj = Box(10, 10, 10)
+        with self.assertRaises(ValueError):
+            obj -= CounterDrillHole(2, 3, 2)
+
     def test_counter_sink_hole(self):
         obj = Box(10, 10, 10, align=(Align.CENTER, Align.CENTER, Align.MAX))
         obj -= CounterSinkHole(radius=3, counter_sink_radius=6, depth=3)

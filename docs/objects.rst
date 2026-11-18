@@ -479,6 +479,13 @@ Reference
         +++
         Counter bore hole defined by radii and depths
 
+    .. grid-item-card:: :class:`~objects_part.CounterDrillHole`
+
+        .. image:: assets/counter_drill_hole_section.svg
+
+        +++
+        Counter drill hole defined by radii, depths and drill point angles
+
     .. grid-item-card:: :class:`~objects_part.CounterSinkHole`
 
         .. image:: assets/counter_sink_hole_example.svg
@@ -522,6 +529,15 @@ Reference
         Wedge defined by lengths along multiple Axes
 
 
+Holes
+^^^^^
+
+:class:`~objects_part.Hole`, :class:`~objects_part.CounterSinkHole`,
+:class:`~objects_part.CounterBoreHole` and :class:`~objects_part.CounterDrillHole`
+have a page of their own, :doc:`holes`, with a dimensioned section of each and
+their drill points.
+
+
 Reference
 ^^^^^^^^^
 .. py:module:: objects_part
@@ -531,6 +547,7 @@ Reference
 .. autoclass:: Cone
 .. autoclass:: ConvexPolyhedron
 .. autoclass:: CounterBoreHole
+.. autoclass:: CounterDrillHole
 .. autoclass:: CounterSinkHole
 .. autoclass:: Cylinder
 .. autoclass:: Hole

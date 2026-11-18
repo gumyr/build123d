@@ -96,6 +96,7 @@ Table Of Contents
     introductory_examples.rst
     tutorials.rst
     objects.rst
+    holes.rst
     operations.rst
     topology_selection.rst
     builders.rst

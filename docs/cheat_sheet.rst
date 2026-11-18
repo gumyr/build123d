@@ -68,6 +68,7 @@ Cheat Sheet
             | :class:`~objects_part.Cone`
             | :class:`~objects_part.ConvexPolyhedron`
             | :class:`~objects_part.CounterBoreHole`
+            | :class:`~objects_part.CounterDrillHole`
             | :class:`~objects_part.CounterSinkHole`
             | :class:`~objects_part.Cylinder`
             | :class:`~objects_part.Hole`
