@@ -359,8 +359,9 @@ class DimensionLine(BaseSketchObject):
             attribute does not rebuild the geometry.
 
     Args:
-        path (PathDescriptor): a very general type of input used to describe the path the
-            dimension line will follow.
+        path (Wire | Edge | list[Vector | Vertex | tuple[float, float, float]]): a
+            very general type of input used to describe the path the dimension
+            line will follow.
         draft (Drafting): instance of Drafting dataclass
         sketch (Sketch): the Sketch being created to check for possible overlaps. In builder
             mode the active Sketch will be used if None is provided.
@@ -526,9 +527,10 @@ class ExtensionLine(BaseSketchObject):
             attribute does not rebuild the geometry.
 
     Args:
-        border (PathDescriptor): a very general type of input defining the object to
-            be dimensioned. Typically this value would be extracted from the part but is
-            not restricted to this use.
+        border (Wire | Edge | list[Vector | Vertex | tuple[float, float, float]]): a
+            very general type of input defining the object to be dimensioned.
+            Typically this value would be extracted from the part but is not
+            restricted to this use.
         offset (float | VectorLike): displacement of the dimension line from the edge of
             the object. A ``float`` is a signed perpendicular distance (the legacy
             behaviour, where the sign selects the side). A ``VectorLike`` is an explicit

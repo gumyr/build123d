@@ -839,7 +839,10 @@ class ExportDXF(Export2D):
 
         order = spline.Degree() + 1
         knots = list(spline.KnotSequence())
-        poles = [self._convert_point(p) for p in spline.Poles()]
+        # read the poles by index: iterating the OCP array is far slower
+        poles = [
+            self._convert_point(spline.Pole(i)) for i in range(1, spline.NbPoles() + 1)
+        ]
         weights = (
             [spline.Weight(i) for i in range(1, spline.NbPoles() + 1)]
             if spline.IsRational()
@@ -1451,7 +1454,10 @@ class ExportSVG(Export2D):
         )
 
         def make_segment(bezier: Geom_BezierCurve, reverse: bool) -> PathSegment:
-            p = [self._path_point(p) for p in bezier.Poles()]
+            # read the poles by index: iterating the OCP array is far slower
+            p = [
+                self._path_point(bezier.Pole(i)) for i in range(1, bezier.NbPoles() + 1)
+            ]
             if reverse:
                 p.reverse()
             if len(p) == 2:

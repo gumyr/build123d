@@ -1,7 +1,7 @@
 # [Code]
 
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 # Taper Extrude and Extrude to "next" while creating a Cherry MX key cap
 # See: https://www.cherrymx.de/en/dev.html

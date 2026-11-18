@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="111.950003mm" height="79.494471mm" viewBox="-0.24598 -2.24598 3.449335 2.449335" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.002773024947075771" id="Given">
+      <line x1="0.0" y1="0.0" x2="3.0" y2="1.0" />
+    </g>
+    <g fill="none" stroke="rgb(30,78,163)" stroke-width="0.021567971810589327" id="Made">
+      <path d="M -0.0,-0.0 A 1.5811388300841898,1.5811388300841898 -161.565051177078 1,0 3.0,1.0" />
+    </g>
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.002773024947075771" id="Marks">
+      <circle cx="0.0" cy="0.0" r="0.03851423537605238" />
+      <circle cx="1.5" cy="0.5" r="0.03851423537605238" />
+      <circle cx="3.0" cy="1.0" r="0.03851423537605238" />
+    </g>
+  </g>
+</svg>

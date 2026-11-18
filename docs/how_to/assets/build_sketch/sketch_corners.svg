@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="110.5mm" height="60.5mm" viewBox="-22.1 -12.1 44.2 24.2" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(138,138,138)" stroke-width="0.036" id="Before">
+      <line x1="-20.0" y1="-10.0" x2="-20.0" y2="10.0" />
+      <line x1="-20.0" y1="-10.0" x2="20.0" y2="-10.0" />
+      <line x1="20.0" y1="-10.0" x2="20.0" y2="10.0" />
+      <line x1="-20.0" y1="10.0" x2="20.0" y2="10.0" />
+    </g>
+    <g fill="rgb(214,225,244)" stroke="rgb(30,78,163)" stroke-width="0.2" id="Sketch">
+      <path d="M -20.0,6.0 L -20.0,-6.0 L -16.0,-10.0 L 14.0,-10.0 A 6.0,6.0 180.0 0,1 20.0,-4.0 L 20.0,4.0 A 6.0,6.0 180.0 0,1 14.0,10.0 L -16.0,10.0 L -20.0,6.0" />
+    </g>
+  </g>
+</svg>

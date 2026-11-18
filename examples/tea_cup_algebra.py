@@ -1,7 +1,7 @@
 # [Code]
 
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 wall_thickness = 3 * MM
 fillet_radius = wall_thickness * 0.49

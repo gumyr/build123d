@@ -27,7 +27,7 @@ license:
 """
 
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 # Extrude pending face by amount
 with BuildPart() as simple:

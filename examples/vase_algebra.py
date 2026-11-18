@@ -1,7 +1,7 @@
 # [Code]
 
 from build123d import *
-from ocp_vscode import show_object
+from ocp_viewer import show_object
 
 l1 = Line((0, 0), (12, 0))
 l2 = RadiusArc(l1 @ 1, (15, 20), 50)

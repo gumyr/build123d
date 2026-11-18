@@ -18,14 +18,15 @@ image_files:
     - "example_build123d_logo_01.png"
 """
 # [Imports]
+# [Code]
+
 from build123d import *
 from build123d import Shape
-from ocp_vscode import *
+from ocp_viewer import *
 
 # [Parameters]
 # - none
 
-# [Code]
 with BuildSketch() as logo_text:
     Text("123d", font_size=10, align=(Align.MIN, Align.MIN))
     font_height = logo_text.vertices().sort_by(Axis.Y)[-1].Y

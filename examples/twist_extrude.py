@@ -27,7 +27,7 @@ license:
     limitations under the License.
 """
 
-from ocp_vscode import show
+from ocp_viewer import show
 
 from build123d import *
 

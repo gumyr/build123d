@@ -82,10 +82,11 @@ from build123d.geometry import (
 )
 from build123d.build_enums import Convexity, Keep, Select, Unit
 from .kernel import list_shapes
-from .shape_core import Shape, ShapeList, TrimmingTool, downcast, find_same_topods
+from .shape_core import Shape, ShapeList, downcast, find_same_topods
 
 if TYPE_CHECKING:  # pragma: no cover
     from .one_d import Edge, Wire  # pylint: disable=R0801
+    from .two_d import Face, Shell  # pylint: disable=R0801
 
 
 class Vertex(Shape[TopoDS_Vertex]):
@@ -489,7 +490,11 @@ class Vertex(Shape[TopoDS_Vertex]):
         self._needs_geometry("center")
         return Vector(self)
 
-    def split(self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Keep = Keep.TOP):
+    def split(
+        self,
+        tool: Plane | Face | Shell | Iterable[Plane | Face | Shell],
+        keep: Keep = Keep.TOP,
+    ):
         """split - not implemented"""
         raise NotImplementedError("Vertices cannot be split.")
 

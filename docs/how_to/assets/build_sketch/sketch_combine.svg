@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="110.5mm" height="110.5mm" viewBox="-49.725 -49.725 99.45 99.45" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="rgb(214,225,244)" stroke="rgb(30,78,163)" stroke-width="0.44999999999999996" id="Sketch">
+      <path d="M -30.0,20.0 L -30.0,-20.0 L 30.0,-20.0 A 20.0,20.0 -90.0 0,1 42.083333,-15.93716 A 45.0,45.0 -20.741916480731906 0,1 42.083333,15.93716 A 20.0,20.0 -90.0 0,1 30.0,20.0 L -30.0,20.0 M 10.0,-0.0 A 10.0,10.0 0.0 0,0 -10.0,0.0 A 10.0,10.0 0.0 0,0 10.0,0.0" />
+    </g>
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.08099999999999999" id="Construction" stroke-dasharray="0.972 0.243">
+      <circle cx="0.0" cy="0.0" r="45.0" />
+    </g>
+  </g>
+</svg>

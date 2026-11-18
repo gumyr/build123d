@@ -32,7 +32,7 @@ license:
 
 from typing import Literal
 from build123d import *
-from ocp_vscode import show_object
+from ocp_viewer import show_object
 
 
 # [Club]

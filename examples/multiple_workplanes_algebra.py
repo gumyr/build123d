@@ -1,5 +1,5 @@
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 obj = Box(5, 5, 1)
 planes = [Plane(f) for f in obj.faces().filter_by(Axis.Z)]
