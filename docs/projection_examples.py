@@ -154,7 +154,8 @@ def drawing_order(shapes: list[Shape]) -> list[Shape]:
 # [plane_faces]
 housing = Box(40, 30, 20) - Pos(0, 0, 10) * Cylinder(8, 20)
 with BuildSketch() as top_view:
-    project_to_plane(housing.faces().sort_by(Axis.Z)[-1])  # the top, hole included
+    top = housing.faces().sort_by(Axis.Z)[-1]
+    project_to_plane(top, Plane.XY)  # the top, hole included
 # [plane_faces]
 
 # [plane_silhouette]
@@ -163,7 +164,7 @@ with BuildPart() as knob:
     with Locations((0, 0, 3)):
         Sphere(8)
     with BuildSketch() as footprint:
-        project_to_plane()  # the part casts its silhouette, holes included
+        project_to_plane(workplane=Plane.XY)  # the part's silhouette, holes included
         Rectangle(4, 30, mode=Mode.SUBTRACT)  # enhance the sketch
     extrude(amount=20, both=True, mode=Mode.INTERSECT)  # and modify the part with it
 # [plane_silhouette]
@@ -177,8 +178,9 @@ knob &= extrude(footprint, 20, both=True)  # and modify the part with it
 
 # [plane_edges]
 with BuildLine() as outline:
-    project_to_plane(housing.faces().sort_by(Axis.Z)[-1])  # a face gives its edges
-    corners = project_to_plane(housing.vertices())  # points are returned, not drawn
+    top = housing.faces().sort_by(Axis.Z)[-1]
+    project_to_plane(top, Plane.XY)  # a face gives its edges
+    corners = project_to_plane(housing.vertices(), Plane.XY)  # returned, not drawn
 # [plane_edges]
 
 # [plane_edges_algebra]
