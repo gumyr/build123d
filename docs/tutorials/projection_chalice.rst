@@ -162,9 +162,9 @@ along the plane's normal.
     :align: center
     :width: 55%
 
-In builder mode the projection is made inside a new sketch: with nothing
-in its brackets ``project_to_plane`` casts the part being built onto the
-sketch's plane and draws the result into the sketch. In algebra mode it is
+In builder mode the projection is made inside a new sketch: given only the
+plane, ``project_to_plane`` casts the part being built onto it and draws
+the result into the sketch. In algebra mode it is
 given the part and the plane, and returns the result.
 
 A solid casts its *silhouette*: one face covering everything the solid

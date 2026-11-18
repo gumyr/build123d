@@ -30,18 +30,16 @@ sketch or a line, enhance it there, and use the result to modify the object.
             :start-after: [plane_faces_algebra]
             :end-before: [plane_faces_algebra]
 
-In ``BuildSketch`` or ``BuildLine`` the objects are projected onto the
-builder's construction plane, ``Plane.XY``, and ``workplane`` must not be
-given. A sketch may be placed on many workplanes at once, so there is no one
-plane to project onto; the projection is drawn in the sketch's own coordinates
-like any other content and placed with it on exit. A sketch on ``Plane.XZ``
-therefore holds the object's shadow on ``Plane.XY``, standing in ``Plane.XZ``;
-to draw a side view, bring the object into the sketch's coordinates first.
-With no objects given, the sketch or line projects the object of the builder
-it is nested in, so a part can be brought into a sketch inside its own
-``BuildPart``. In Algebra mode the plane is given as ``workplane`` and the
-result is returned in that plane's coordinates: a ``Sketch`` of faces, a
-``Curve`` of edges, or a list of points.
+The plane to project onto is the ``workplane`` argument. It is always
+required, in a builder as much as in Algebra mode, and no plane is inferred
+from the builder. The result lies in that plane's coordinates: a ``Sketch`` of
+faces, a ``Curve`` of edges, or a list of points. In Algebra mode it is
+returned. In ``BuildSketch`` or ``BuildLine`` it is drawn in the builder's own
+coordinates like any other content and placed with it on exit, so projecting
+onto the plane the sketch was created with puts the result back where the
+object is. With no objects given, the sketch or line projects the object of
+the builder it is nested in, so a part can be brought into a sketch inside its
+own ``BuildPart``.
 
 ****************************
 What a builder can hold
@@ -105,11 +103,10 @@ A builder takes what it can hold and reduces or refuses the rest.
 Onto another plane
 ******************
 
-In Algebra mode the plane is the ``workplane`` argument, and the result comes
-back in that plane's coordinates. A sketch has only its own flat coordinates
-to project onto, so in Builder mode the part is first expressed in the
-plane's coordinates with ``to_local_coords`` and then projected; the sketch,
-placed on the plane, carries the result there.
+Any plane will do as the ``workplane``, and the result comes back in that
+plane's coordinates. In Builder mode, create the sketch on the same plane and
+it carries the result there: the side view of the part, standing in
+``Plane.XZ``. To work on one face of a part, use ``Plane(face)`` for both.
 
 .. tab-set::
 

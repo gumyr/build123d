@@ -273,9 +273,25 @@ class Mixin2D(ABC, Shape[TOPODS]):
         if not all(summand._dim == 2 for summand in summands):
             raise ValueError("Only shapes with the same dimension can be added")
 
-        faces = list(self.faces()) + [f for s in summands for f in s.faces()]
+        own_faces = [f.wrapped for f in self.faces()]
+        brought_faces = [f.wrapped for s in summands for f in s.faces()]
+        all_faces = own_faces + brought_faces
         try:
-            sum_shape: Shape = Shell(faces)
+            if len(all_faces) == 1:
+                sum_shape: Shape = Shell(Face(all_faces[0]))
+                record = ShapeHistory()
+            else:
+                # sewn here rather than by Shell(faces) to keep the sewing's
+                # own account of what became of each face
+                sewing = BRepBuilderAPI_Sewing(TOLERANCE)
+                for face in all_faces:
+                    sewing.Add(face)
+                sewing.Perform()
+                sewn = downcast(sewing.SewedShape())
+                if not isinstance(sewn, TopoDS_Shell):
+                    raise ValueError("the faces do not sew into one connected shell")
+                sum_shape = Shell(sewn)
+                record = ShapeHistory.from_sewing(sewing, all_faces)
         except (
             TypeError,
             ValueError,
@@ -286,6 +302,8 @@ class Mixin2D(ABC, Shape[TOPODS]):
                 "Unable to sew faces into a single connected Shell - faces must "
                 "meet along shared edges, with at most two faces on an edge"
             ) from exc
+        # as for a fuse: what this shell had was there before, the rest brought in
+        sum_shape._made_by(record.with_inputs(own_faces, brought_faces))
 
         if SkipClean.clean:
             sum_shape = sum_shape.clean()

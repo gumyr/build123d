@@ -181,7 +181,7 @@ with BuildPart() as chalice:
     revolve(axis=Axis.Z)
 
     with BuildSketch() as band:
-        footprint = project_to_plane()
+        footprint = project_to_plane(workplane=Plane.XY)
 # [footprint_builder]
 builder_result = band.sketch  # the footprint is the whole of the sketch so far
 
@@ -238,7 +238,7 @@ with BuildPart() as chalice:
     revolve(axis=Axis.Z)
 
     with BuildSketch() as band:
-        footprint = project_to_plane()
+        footprint = project_to_plane(workplane=Plane.XY)
         guide = offset(amount=-inset).wire()
         start, end = guide.positions([0, 1 / scallops])
         with BuildLine():
@@ -309,7 +309,7 @@ with BuildPart() as chalice:
     revolve(axis=Axis.Z)
 
     with BuildSketch() as band:
-        footprint = project_to_plane()
+        footprint = project_to_plane(workplane=Plane.XY)
         guide = offset(amount=-inset).wire()
         start, end = guide.positions([0, 1 / scallops])
         with BuildLine():
@@ -387,7 +387,7 @@ with BuildPart() as chalice:
     revolve(axis=Axis.Z)
 
     with BuildSketch() as band:
-        footprint = project_to_plane()
+        footprint = project_to_plane(workplane=Plane.XY)
         guide = offset(amount=-inset).wire()
         start, end = guide.positions([0, 1 / scallops])
         with BuildLine():
