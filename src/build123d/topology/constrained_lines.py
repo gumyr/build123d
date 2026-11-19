@@ -565,7 +565,9 @@ def _make_2tan_on_arcs(
         if not _ok(1, u_arg2):
             continue
 
-        u_circs = _enclosed_circ_param_offset(tangent_tuples, circ, [u_circ1, u_circ2])
+        # The solver can report a parameter half a turn from the tangency, so
+        # each one is checked against its curve
+        u_circs = _circ_params_on_curves(circ, [u_circ1, u_circ2], h_e)
         # Each arc runs from the first of arc_ends to the second
         u_circ1, u_circ2 = u_circs[arc_ends[0]], u_circs[arc_ends[1]]
 

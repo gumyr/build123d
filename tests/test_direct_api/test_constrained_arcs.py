@@ -611,6 +611,38 @@ def test_3tan_arcs_with_points(tangencies, count):
             assert distance(ordered[1], arc @ 1) < TOLERANCE
 
 
+@pytest.mark.parametrize(
+    "tangencies",
+    [
+        (CenterArc((0, 0), 5, 0, 360), Vector(8, 1)),
+        (CenterArc((0, 0), 5, 0, 360), Vector(1, 0)),
+        (CenterArc((1, 1), 1, 0, 360), Vector(-1, -1)),
+        (CenterArc((0, 0), 5, 0, 360), Line((-10, -7), (10, -7))),
+        (CenterArc((0, 0), 5, 0, 360), Line((-4, -1), (4, -1))),
+    ],
+)
+@pytest.mark.parametrize(
+    "center_on", [Line((-20, 0.5), (20, 0.5)), Line((0.3, -20), (0.3, 20))]
+)
+def test_2tan_on_arcs_end_on_tangencies(tangencies, center_on):
+    """arcs with a center_on constraint end on their tangencies wherever the
+    solution circle lies relative to a tangent circle"""
+
+    def distance(tangency, position: Vector) -> float:
+        if isinstance(tangency, Edge):
+            return tangency.distance_to(position)
+        return (tangency - position).length
+
+    for ordered in permutations(tangencies):
+        arcs = Edge.make_constrained_arcs(
+            *ordered, center_on=center_on, sagitta=Sagitta.BOTH
+        )
+        assert arcs
+        for arc in arcs:
+            assert distance(ordered[0], arc @ 0) < TOLERANCE
+            assert distance(ordered[1], arc @ 1) < TOLERANCE
+
+
 def test_make_constrained_arcs_3tan():
     """test correct trimming in _make_3tan_arcs"""
     c1 = CenterArc((0, 20), 20, -90, 90)
