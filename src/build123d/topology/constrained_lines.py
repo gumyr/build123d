@@ -75,7 +75,12 @@ from OCP.gp import (
     gp_Vec2d,
 )
 from OCP.IntAna2d import IntAna2d_AnaIntersection
-from OCP.Standard import Standard_ConstructionError, Standard_Failure
+from OCP.Standard import (
+    Standard_ConstructionError,
+    Standard_DomainError,
+    Standard_Failure,
+    Standard_OutOfRange,
+)
 from OCP.TopoDS import TopoDS_Edge
 
 from build123d.build_enums import Sagitta, Tangency
@@ -91,6 +96,16 @@ TWrap = TypeVar("TWrap")  # whatever the factory returns (Edge or a subclass)
 # Reuse a single XY plane for 3D->2D projection and for 2D-edge building
 _pln_xy = gp_Pln(gp_Ax3(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(0.0, 0.0, 1.0)))
 _surf_xy = Geom_Plane(_pln_xy)
+
+# The exceptions a tangency solver raises when it fails. OCP's exception classes
+# do not derive from one another and the class raised for the same failure
+# differs between platforms, so each has to be named.
+_SOLVER_ERRORS = (
+    Standard_ConstructionError,
+    Standard_DomainError,
+    Standard_Failure,
+    Standard_OutOfRange,
+)
 
 
 # ---------------------------
@@ -389,7 +404,7 @@ def _make_2tan_rad_arcs(
     msg = "Unable to find a tangent arc"
     try:
         gcc = Geom2dGcc_Circ2d2TanRad(*q_o, radius, TOLERANCE)
-    except (Standard_ConstructionError, Standard_Failure) as con_err:
+    except _SOLVER_ERRORS as con_err:
         raise RuntimeError(msg) from con_err
     if not gcc.IsDone() or gcc.NbSolutions() == 0:
         raise RuntimeError(msg)
@@ -542,7 +557,7 @@ def _make_2tan_on_arcs(
             assert isinstance(q_o[0], Geom2d_Point)
             assert isinstance(q_o[1], Geom2d_Point)
             gcc = Geom2dGcc_Circ2d2TanOn(q_o[0], q_o[1], adapt_on, TOLERANCE)
-    except (Standard_ConstructionError, Standard_Failure) as con_err:
+    except _SOLVER_ERRORS as con_err:
         raise RuntimeError(msg) from con_err
 
     if not gcc.IsDone() or gcc.NbSolutions() == 0:
@@ -640,7 +655,7 @@ def _make_3tan_arcs(
     msg = "Unable to find a circle tangent to all three objects"
     try:
         gcc = Geom2dGcc_Circ2d3Tan(*q_o, TOLERANCE, *guesses)
-    except (Standard_ConstructionError, Standard_Failure) as con_err:
+    except _SOLVER_ERRORS as con_err:
         raise RuntimeError(msg) from con_err
     if not gcc.IsDone() or gcc.NbSolutions() == 0:
         raise RuntimeError(msg)
