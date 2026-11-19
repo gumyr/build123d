@@ -30,6 +30,7 @@ license:
 from __future__ import annotations
 
 from math import atan2, cos, isnan, sin, pi
+from collections.abc import Sequence
 from typing import overload, TYPE_CHECKING, Callable, TypeVar
 from typing import cast as tcast
 
@@ -321,6 +322,28 @@ def _enclosed_circ_param_offset(
     return pars
 
 
+def _circ_params_on_curves(
+    circ: gp_Circ2d,
+    params: list[float],
+    curves: Sequence[Geom2d_Curve | None],
+) -> list[float]:
+    """
+    Corrects solution-circle parameters the solver reports half a turn away from
+    the tangency: a parameter whose point on the solution circle is not on its
+    tangent curve is moved by pi. Point inputs, which have no curve, are left
+    as they are.
+    """
+    h2d_circle = Geom2d_Circle(circ)
+    pars = list(params)
+    for i, (par, curve) in enumerate(zip(params, curves)):
+        if curve is None:
+            continue
+        proj = Geom2dAPI_ProjectPointOnCurve(h2d_circle.Value(par), curve)
+        if proj.NbPoints() == 0 or proj.LowerDistance() > TOLERANCE:
+            pars[i] = par + pi
+    return pars
+
+
 def _make_2tan_rad_arcs(
     *tangencies: tuple[Edge, Tangency] | Edge | Vector,  # 2
     radius: float,
@@ -572,7 +595,7 @@ def _make_3tan_arcs(
     run from the tangency point on `tangencies[arc_ends[0]]` to the one on
     `tangencies[arc_ends[1]]`, by default from `tangencies[0]` to `tangencies[1]`.
     Use `sagitta` to select the shorter/longer (or both) arc.
-    Inputs must be representable on Plane.XY.
+    Inputs must be representable on Plane.XY, with any points after the edges.
     """
 
     # Unpack optional per-edge qualifiers (default UNQUALIFIED)
@@ -587,10 +610,11 @@ def _make_3tan_arcs(
     ]
     q_o, h_e, e_first, e_last, is_edge = map(tuple, zip(*results))
 
-    # Provide initial middle guess parameters for all of the edges
-    guesses: tuple[float, float, float] = tuple(
-        (e_last[i] - e_first[i]) / 2 + e_first[i] for i in range(3)
-    )
+    # Provide initial middle guess parameters for all of the edges - points,
+    # which are always last, take none
+    guesses: list[float] = [
+        (e_last[i] - e_first[i]) / 2 + e_first[i] for i in range(3) if is_edge[i]
+    ]
 
     # Generate all valid circles tangent to the 3 inputs
     msg = "Unable to find a circle tangent to all three objects"
@@ -638,11 +662,14 @@ def _make_3tan_arcs(
         if not _ok(2, u_arg3):
             continue
 
-        u_circs = _enclosed_circ_param_offset(
-            tangent_tuples,
-            circ,
-            [u_circ1, u_circ2, u_circ3],
-        )
+        # The solver can report a parameter half a turn from the tangency. With
+        # a point among the inputs when it does so depends on the order of the
+        # inputs, so each parameter is checked against its curve instead
+        u_circs = [u_circ1, u_circ2, u_circ3]
+        if all(is_edge):
+            u_circs = _enclosed_circ_param_offset(tangent_tuples, circ, u_circs)
+        else:
+            u_circs = _circ_params_on_curves(circ, u_circs, h_e)
         # Each arc runs from the first of arc_ends to the second; the remaining
         # tangency validates the circle without defining an arc endpoint
         u_circ1, u_circ2 = u_circs[arc_ends[0]], u_circs[arc_ends[1]]

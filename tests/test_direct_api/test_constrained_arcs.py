@@ -27,6 +27,7 @@ license:
 """
 
 import platform
+from itertools import permutations
 
 import pytest
 from OCP.BRep import BRep_Tool
@@ -573,6 +574,41 @@ def test_axis_with_tangency_qualifier():
         assert (arc @ 0 - expected_arc @ 0).length < TOLERANCE
         assert (arc @ 1 - expected_arc @ 1).length < TOLERANCE
         assert abs(arc.length - expected_arc.length) < TOLERANCE
+
+
+@pytest.mark.parametrize(
+    "tangencies, count",
+    [
+        ((Line((0, 0), (10, 0)), Line((0, 0), (0, 10)), Vector(3, 3)), 2),
+        ((Line((0, 0), (10, 0)), Vector(3, 3), Vector(5, 2)), 2),
+        ((Vector(0, 0), Vertex(2, 0), (1, 3)), 2),
+        ((CenterArc((0, 0), 5, 0, 360), Vector(1, 0), Vector(0, 1)), 4),
+        ((CenterArc((0, 0), 5, 0, 360), Line((-4, -1), (4, -1)), Vector(0, 1)), 4),
+        (
+            (
+                CenterArc((0, 0), 5, 0, 360),
+                CenterArc((1, 1), 1, 0, 360),
+                Vector(-1, -1),
+            ),
+            8,
+        ),
+    ],
+)
+def test_3tan_arcs_with_points(tangencies, count):
+    """three tangencies may include points, given in any order; the arcs still
+    run from the first tangency to the second"""
+
+    def distance(tangency, position: Vector) -> float:
+        if isinstance(tangency, Edge):
+            return tangency.distance_to(position)
+        return (Vector(tangency) - position).length
+
+    for ordered in permutations(tangencies):
+        arcs = Edge.make_constrained_arcs(*ordered, sagitta=Sagitta.BOTH)
+        assert len(arcs) == count
+        for arc in arcs:
+            assert distance(ordered[0], arc @ 0) < TOLERANCE
+            assert distance(ordered[1], arc @ 1) < TOLERANCE
 
 
 def test_make_constrained_arcs_3tan():
