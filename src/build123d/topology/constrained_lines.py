@@ -325,6 +325,7 @@ def _make_2tan_rad_arcs(
     *tangencies: tuple[Edge, Tangency] | Edge | Vector,  # 2
     radius: float,
     sagitta: Sagitta = Sagitta.SHORT,
+    arc_ends: tuple[int, int] = (0, 1),
     edge_factory: Callable[[TopoDS_Edge], Edge],
 ) -> ShapeList[Edge]:
     """
@@ -337,6 +338,8 @@ def _make_2tan_rad_arcs(
         tangencies (tuple[Edge, PositionConstraint] | Edge | Vertex | VectorLike:
             Curve tangency targets or point-incidence targets for the circle(s)
         radius (float): Circle radius for all candidate solutions.
+        arc_ends (tuple[int, int]): indices into ``tangencies`` of the tangency
+            each arc starts on and the one it ends on. Defaults to (0, 1).
 
     Raises:
         ValueError: Invalid input
@@ -449,8 +452,9 @@ def _make_2tan_rad_arcs(
         if not valid_solution:
             continue
 
-        u_circ1, _ = corrected_params[0]
-        u_circ2, _ = corrected_params[1]
+        # Each arc runs from the first of arc_ends to the second
+        u_circ1, _ = corrected_params[arc_ends[0]]
+        u_circ2, _ = corrected_params[arc_ends[1]]
 
         # Build BOTH sagitta arcs and select by LengthConstraint
         if sagitta == Sagitta.BOTH:
@@ -468,6 +472,7 @@ def _make_2tan_on_arcs(
     *tangencies: tuple[Edge, Tangency] | Edge | Vector,  # 2
     center_on: Edge,
     sagitta: Sagitta = Sagitta.SHORT,
+    arc_ends: tuple[int, int] = (0, 1),
     edge_factory: Callable[[TopoDS_Edge], Edge],
 ) -> ShapeList[Edge]:
     """
@@ -477,6 +482,8 @@ def _make_2tan_on_arcs(
     Notes
     -----
     - `center_on` is treated as a **center locus** (not a tangency target).
+    - `arc_ends` holds the indices into `tangencies` of the tangency each arc
+      starts on and the one it ends on.
     """
 
     # Unpack optional per-edge qualifiers (default UNQUALIFIED)
@@ -535,9 +542,9 @@ def _make_2tan_on_arcs(
         if not _ok(1, u_arg2):
             continue
 
-        u_circ1, u_circ2 = _enclosed_circ_param_offset(
-            tangent_tuples, circ, [u_circ1, u_circ2]
-        )
+        u_circs = _enclosed_circ_param_offset(tangent_tuples, circ, [u_circ1, u_circ2])
+        # Each arc runs from the first of arc_ends to the second
+        u_circ1, u_circ2 = u_circs[arc_ends[0]], u_circs[arc_ends[1]]
 
         # Build sagitta arc(s) and select by LengthConstraint
         if sagitta == Sagitta.BOTH:
@@ -555,14 +562,16 @@ def _make_2tan_on_arcs(
 def _make_3tan_arcs(
     *tangencies: tuple[Edge, Tangency] | Edge | Vector,  # 3
     sagitta: Sagitta = Sagitta.SHORT,
+    arc_ends: tuple[int, int] = (0, 1),
     edge_factory: Callable[[TopoDS_Edge], Edge],
 ) -> ShapeList[Edge]:
     """
     Create planar circular arc(s) on XY tangent to three provided objects.
 
     The circle is determined by the three tangency constraints; the returned arc(s)
-    are trimmed between the two tangency points corresponding to `tangencies[0]` and
-    `tangencies[1]`. Use `sagitta` to select the shorter/longer (or both) arc.
+    run from the tangency point on `tangencies[arc_ends[0]]` to the one on
+    `tangencies[arc_ends[1]]`, by default from `tangencies[0]` to `tangencies[1]`.
+    Use `sagitta` to select the shorter/longer (or both) arc.
     Inputs must be representable on Plane.XY.
     """
 
@@ -611,29 +620,33 @@ def _make_3tan_arcs(
         # out_topos.append(BRepBuilderAPI_MakeEdge(arc2d, _surf_xy).Edge())
         # continue
 
-        # Tangency on curve 1 (arc endpoint A)
+        # Tangency on curve 1
         p1 = gp_Pnt2d()
         u_circ1, u_arg1 = gcc.Tangency1(i, p1)
         if not _ok(0, u_arg1):
             continue
 
-        # Tangency on curve 2 (arc endpoint B)
+        # Tangency on curve 2
         p2 = gp_Pnt2d()
         u_circ2, u_arg2 = gcc.Tangency2(i, p2)
         if not _ok(1, u_arg2):
             continue
 
-        # Tangency on curve 3 (validates circle; does not define arc endpoints)
+        # Tangency on curve 3
         p3 = gp_Pnt2d()
-        _u_circ3, u_arg3 = gcc.Tangency3(i, p3)
+        u_circ3, u_arg3 = gcc.Tangency3(i, p3)
         if not _ok(2, u_arg3):
             continue
 
-        u_circ1, u_circ2, _u_circ3 = _enclosed_circ_param_offset(
+        u_circs = _enclosed_circ_param_offset(
             tangent_tuples,
             circ,
-            [u_circ1, u_circ2, _u_circ3],
+            [u_circ1, u_circ2, u_circ3],
         )
+        # Each arc runs from the first of arc_ends to the second; the remaining
+        # tangency validates the circle without defining an arc endpoint
+        u_circ1, u_circ2 = u_circs[arc_ends[0]], u_circs[arc_ends[1]]
+
         # Build arc(s) between u_circ1 and u_circ2 per LengthConstraint
         if sagitta == Sagitta.BOTH:
             out_topos.extend(_two_arc_edges_from_params(circ, u_circ1, u_circ2))

@@ -538,6 +538,27 @@ def test_arcs_run_from_first_to_second_tangency(sagitta):
             assert second.distance_to(arc @ 1) < TOLERANCE
 
 
+@pytest.mark.parametrize("sagitta", [Sagitta.SHORT, Sagitta.LONG, Sagitta.BOTH])
+@pytest.mark.parametrize("point", [(5, 3), Vector(5, 3), Vertex(5, 3)])
+@pytest.mark.parametrize("point_first", [True, False])
+@pytest.mark.parametrize(
+    "constraint", [{"radius": 4}, {"center_on": Line((-20, 5), (20, 5))}]
+)
+def test_arcs_run_from_first_to_second_tangency_mixed(
+    sagitta, point, point_first, constraint
+):
+    """a point given before an edge is still the start of the arc, issue #1578"""
+    edge = Line((0, 0), (10, 0))
+    first, second = (point, edge) if point_first else (edge, point)
+    arcs = Edge.make_constrained_arcs(first, second, sagitta=sagitta, **constraint)
+    assert arcs
+    position = Vector(5, 3)
+    for arc in arcs:
+        start, end = (arc @ 0, arc @ 1) if point_first else (arc @ 1, arc @ 0)
+        assert (start - position).length < TOLERANCE
+        assert edge.distance_to(end) < TOLERANCE
+
+
 def test_make_constrained_arcs_3tan():
     """test correct trimming in _make_3tan_arcs"""
     c1 = CenterArc((0, 20), 20, -90, 90)

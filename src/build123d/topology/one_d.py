@@ -2209,8 +2209,13 @@ class Edge(Mixin1D[TopoDS_Edge]):
             except Exception as exc:
                 raise TypeError(f"Invalid tangency: {tangency_arg!r}") from exc
 
-        # # Sort the tangency inputs so points are always last
-        tangencies = sorted(tangencies, key=lambda x: isinstance(x, Vector))
+        # Sort the tangency inputs so points are always last, recording where the
+        # first two land as the arcs run from the first tangency to the second
+        order = sorted(
+            range(len(tangencies)), key=lambda i: isinstance(tangencies[i], Vector)
+        )
+        tangencies = [tangencies[i] for i in order]
+        arc_ends = (order.index(0), order.index(1)) if len(order) > 1 else (0, 1)
 
         tan_count = len(tangencies)
         if not 1 <= tan_count <= 3:
@@ -2234,6 +2239,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 *tangencies,
                 radius=radius,
                 sagitta=sagitta,
+                arc_ends=arc_ends,
                 edge_factory=cls,
             )
         if (
@@ -2246,10 +2252,13 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 *tangencies,
                 center_on=center_on,
                 sagitta=sagitta,
+                arc_ends=arc_ends,
                 edge_factory=cls,
             )
         if tan_count == 3 and radius is None and center is None and center_on is None:
-            return _make_3tan_arcs(*tangencies, sagitta=sagitta, edge_factory=cls)
+            return _make_3tan_arcs(
+                *tangencies, sagitta=sagitta, arc_ends=arc_ends, edge_factory=cls
+            )
         if (
             tan_count == 1
             and center is not None
