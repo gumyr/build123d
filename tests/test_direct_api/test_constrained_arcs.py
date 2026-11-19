@@ -559,6 +559,22 @@ def test_arcs_run_from_first_to_second_tangency_mixed(
         assert edge.distance_to(end) < TOLERANCE
 
 
+def test_axis_with_tangency_qualifier():
+    """an Axis in a (Axis, Tangency) tuple acts as the Edge would"""
+    circle = CenterArc((0, 3), 1, 0, 360)
+    arcs = Edge.make_constrained_arcs(
+        (Axis.X, Tangency.UNQUALIFIED), circle, radius=1, sagitta=Sagitta.BOTH
+    )
+    expected = Edge.make_constrained_arcs(
+        (Edge(Axis.X), Tangency.UNQUALIFIED), circle, radius=1, sagitta=Sagitta.BOTH
+    )
+    assert len(arcs) == len(expected) == 2
+    for arc, expected_arc in zip(arcs, expected):
+        assert (arc @ 0 - expected_arc @ 0).length < TOLERANCE
+        assert (arc @ 1 - expected_arc @ 1).length < TOLERANCE
+        assert abs(arc.length - expected_arc.length) < TOLERANCE
+
+
 def test_make_constrained_arcs_3tan():
     """test correct trimming in _make_3tan_arcs"""
     c1 = CenterArc((0, 20), 20, -90, 90)

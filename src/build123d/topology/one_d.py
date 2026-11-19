@@ -2194,7 +2194,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
                 continue
             if isinstance(tangency_arg, tuple):
                 if isinstance(tangency_arg[0], Axis):
-                    tangencies.append(tuple(Edge(tangency_arg[0], tangency_arg[1])))
+                    tangencies.append((Edge(tangency_arg[0]), tangency_arg[1]))
                     continue
                 if isinstance(tangency_arg[0], Edge):
                     tangencies.append(tangency_arg)
