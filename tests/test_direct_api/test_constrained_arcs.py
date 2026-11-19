@@ -643,6 +643,57 @@ def test_2tan_on_arcs_end_on_tangencies(tangencies, center_on):
             assert distance(ordered[1], arc @ 1) < TOLERANCE
 
 
+@pytest.mark.parametrize(
+    "circle, point, center_on, count",
+    [
+        (CenterArc((0, 0), 5, 0, 360), Vector(8, 1), CenterArc((0, 0), 2, 0, 360), 4),
+        (CenterArc((0, 0), 5, 0, 360), Vector(1, 0), CenterArc((0, 0), 2, 0, 360), 2),
+        (
+            CenterArc((1, 1), 1, 0, 360),
+            Vector(-1, -1),
+            CenterArc((1, -1), 9, 0, 360),
+            4,
+        ),
+    ],
+)
+def test_2tan_on_arcs_pass_through_point(circle, point, center_on, count):
+    """with a circular center_on, circles the solver returns that miss the point
+    are not solutions"""
+    for ordered in ((circle, point), (point, circle)):
+        arcs = Edge.make_constrained_arcs(
+            *ordered, center_on=center_on, sagitta=Sagitta.BOTH
+        )
+        assert len(arcs) == count
+        for arc in arcs:
+            assert abs((arc.arc_center - point).length - arc.radius) < TOLERANCE
+            assert center_on.distance_to(arc.arc_center) < TOLERANCE
+            start, end = (
+                (arc @ 0, arc @ 1) if ordered[0] is circle else (arc @ 1, arc @ 0)
+            )
+            assert circle.distance_to(start) < TOLERANCE
+            assert (end - point).length < TOLERANCE
+
+
+def test_2tan_on_arcs_solver_failure():
+    """a failure inside the solver is reported as no arc being found"""
+    with pytest.raises(RuntimeError, match="Unable to find a tangent arc"):
+        Edge.make_constrained_arcs(
+            CenterArc((0, 0), 5, 0, 360),
+            CenterArc((1, 1), 1, 0, 360),
+            center_on=Line((-20, 0.5), (20, 0.5)),
+        )
+
+
+def test_2tan_rad_arcs_solver_failure():
+    """a failure inside the solver is reported as no arc being found"""
+    with pytest.raises(RuntimeError, match="Unable to find a tangent arc"):
+        Edge.make_constrained_arcs(
+            (Line((-5, 0), (5, 0)), Tangency.ENCLOSING),
+            CenterArc((0, 3), 1, 0, 360),
+            radius=1,
+        )
+
+
 def test_make_constrained_arcs_3tan():
     """test correct trimming in _make_3tan_arcs"""
     c1 = CenterArc((0, 20), 20, -90, 90)

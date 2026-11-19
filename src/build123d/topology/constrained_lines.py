@@ -386,9 +386,13 @@ def _make_2tan_rad_arcs(
     q_o: tuple[Geom2dGcc_QualifiedCurve, Geom2dGcc_QualifiedCurve]
     q_o, h_e, e_first, e_last, is_edge = map(tuple, zip(*results))
 
-    gcc = Geom2dGcc_Circ2d2TanRad(*q_o, radius, TOLERANCE)
+    msg = "Unable to find a tangent arc"
+    try:
+        gcc = Geom2dGcc_Circ2d2TanRad(*q_o, radius, TOLERANCE)
+    except (Standard_ConstructionError, Standard_Failure) as con_err:
+        raise RuntimeError(msg) from con_err
     if not gcc.IsDone() or gcc.NbSolutions() == 0:
-        raise RuntimeError("Unable to find a tangent arc")
+        raise RuntimeError(msg)
 
     def _ok(i: int, u: float) -> bool:
         """Does the given parameter value lie within the edge range?"""
@@ -530,15 +534,19 @@ def _make_2tan_on_arcs(
         if is_edge[i]
     ]
 
-    if sum(is_edge) > 1:
-        gcc = Geom2dGcc_Circ2d2TanOn(q_o[0], q_o[1], adapt_on, TOLERANCE, *guesses)
-    else:
-        assert isinstance(q_o[0], Geom2d_Point)
-        assert isinstance(q_o[1], Geom2d_Point)
-        gcc = Geom2dGcc_Circ2d2TanOn(q_o[0], q_o[1], adapt_on, TOLERANCE)
+    msg = "Unable to find a tangent arc with center_on constraint"
+    try:
+        if sum(is_edge) > 1:
+            gcc = Geom2dGcc_Circ2d2TanOn(q_o[0], q_o[1], adapt_on, TOLERANCE, *guesses)
+        else:
+            assert isinstance(q_o[0], Geom2d_Point)
+            assert isinstance(q_o[1], Geom2d_Point)
+            gcc = Geom2dGcc_Circ2d2TanOn(q_o[0], q_o[1], adapt_on, TOLERANCE)
+    except (Standard_ConstructionError, Standard_Failure) as con_err:
+        raise RuntimeError(msg) from con_err
 
     if not gcc.IsDone() or gcc.NbSolutions() == 0:
-        raise RuntimeError("Unable to find a tangent arc with center_on constraint")
+        raise RuntimeError(msg)
 
     def _ok(i: int, u: float) -> bool:
         """Does the given parameter value lie within the edge range?"""
@@ -552,6 +560,16 @@ def _make_2tan_on_arcs(
     solutions: list[TopoDS_Edge] = []
     for i in range(1, gcc.NbSolutions() + 1):
         circ: gp_Circ2d = gcc.ThisSolution(i)
+
+        # With a circular center locus the solver can return circles that miss
+        # a point input, which are not solutions
+        center = circ.Location()
+        if any(
+            abs(center.Distance(gp_Pnt2d(t[0].X, t[0].Y)) - circ.Radius()) > TOLERANCE
+            for t in tangent_tuples[:2]
+            if isinstance(t[0], Vector)
+        ):
+            continue
 
         # Tangency on curve 1
         p1 = gp_Pnt2d()
