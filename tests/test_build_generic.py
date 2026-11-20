@@ -1431,6 +1431,24 @@ class TestProjectToPlane(unittest.TestCase):
         # in the workplane's own coordinates, as every projection onto a plane
         self.assertAlmostEqual(projection.faces()[0].center().Z, 0, 5)
 
+    def test_free_form_walls_along_the_direction_cast_no_shadow(self):
+        # A sweep along a helix makes its upright walls as B-splines, which are
+        # only nearly edge-on to the plane; they must not cast the whole screen
+        profile = make_face(
+            offset(
+                Polyline((-0.5, 0.2), (-0.5, 0), (0.5, 0), (0.5, 0.2)),
+                0.1,
+                side=Side.RIGHT,
+            )
+        )
+        path = Helix(3, 3 * 0.75, 10)
+        ramp = Pos(Z=3) * sweep(path.location_at(0) * profile, path, is_frenet=True)
+        projection = project_to_plane(ramp, workplane=Plane.XY)
+        self.assertIsInstance(projection, Sketch)
+        self.assertEqual(len(projection.faces()), 1)
+        # three quarters of the ring between the ramp's inner and outer radii
+        self.assertAlmostEqual(projection.area, 0.75 * pi * (10.6**2 - 9.4**2), 1)
+
     def test_objects_far_from_the_plane_origin(self):
         far = Pos(1000, 1000, 50) * Box(10, 10, 10)
         projection = project_to_plane(
