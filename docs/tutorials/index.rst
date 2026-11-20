@@ -34,3 +34,4 @@ take up one subject and can be read in any order once the series is done.
     surface_spitfire_wing.rst
     projection_chalice.rst
     bicycle_tire.rst
+    spiral_ramp.rst
