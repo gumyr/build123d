@@ -11,6 +11,17 @@ that extend its functionality.
 Editors & Viewers
 *****************
 
+text-to-cad
+===========
+
+Open-source skills that let AI coding agents (Claude Code, Codex, Cursor and
+others) model parts and assemblies in build123d. A warm CAD server replays
+every kernel operation an edit didn't touch, so dimension changes rebuild
+near-instantly in a live browser viewer. Also exports STEP/STL/3MF/GLB, checks
+manufacturability, runs CalculiX stress checks and makes engineering drawings.
+
+See: `text-to-cad <https://github.com/earthtojake/text-to-cad>`_
+
 OCP Viewer
 ==========
 
