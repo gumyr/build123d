@@ -49,6 +49,7 @@ from build123d.topology import (
     ShapeList,
     Solid,
     Sketch,
+    Wire,
 )
 
 
@@ -401,6 +402,19 @@ class TestCurveOperators(unittest.TestCase):
     def test_matches_position_and_tangent(self):
         self.assertAlmostEqual((self.curve ^ 0.5).position, self.curve @ 0.5, 5)
         self.assertAlmostEqual((self.curve ^ 0.5).z_axis.direction, self.curve % 0.5, 5)
+
+    def test_wire_agrees_with_wires(self):
+        # The edges of a Curve aren't stored in a Wire, see issue #1232
+        wire = self.curve.wire()
+        self.assertIsInstance(wire, Wire)
+        self.assertAlmostEqual(wire.length, 10, 5)
+        self.assertEqual(len(self.curve.wires()), 1)
+
+    def test_wire_disconnected(self):
+        curve = Curve(self.curve.edges() + [Edge.make_line((0, 10), (5, 10))])
+        self.assertEqual(len(curve.wires()), 2)
+        with self.assertRaises(ValueError):
+            curve.wire()
 
 
 class TestCompoundTreeValidation(unittest.TestCase):

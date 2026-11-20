@@ -1062,6 +1062,14 @@ class Curve(Compound):
         """Location on wire operator ^ - only works if continuous"""
         return Wire(self.edges()).location_at(position)
 
+    def wire(self) -> Wire:
+        """Return the Wire created from the edges"""
+        wires = self.wires()
+        wire_count = len(wires)
+        if wire_count != 1:
+            raise ValueError(f"Expected exactly one wire, found {wire_count}")
+        return wires[0]
+
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:  # type: ignore
         """A list of wires created from the edges"""
         return Wire.combine(self.edges(select))
