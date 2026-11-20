@@ -33,6 +33,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 from build123d import *
 from build123d import LocationList
+from build123d.topology import Shape
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -690,6 +691,26 @@ class TestExtrude(unittest.TestCase):
         self.assertTrue(span.is_valid)
         self.assertAlmostEqual(span.volume, 12 * 10 * 10, 4)
         self.assertAlmostEqual(span.bounding_box().min.X, -8, 5)
+
+    def test_extrude_until_splits_only_what_holds_the_profile(self):
+        """What lies beyond the surface reached is discarded, so it is never
+        split by the walls: the kernel can return it as a solid that it then
+        fails to split, as beyond the underside of a ramp swept along a helix"""
+        target = Pos(Z=10) * Box(10, 10, 4)
+        split = Shape.split
+
+        def split_near_the_profile(shape, *args, **kwargs):
+            if isinstance(shape, Solid) and shape.bounding_box().min.Z > 1:
+                raise ValueError("Null TopoDS_Shape object")
+            return split(shape, *args, **kwargs)
+
+        with patch.object(Shape, "split", split_near_the_profile):
+            column = extrude(
+                Rectangle(2, 2), until=Until.NEXT, dir=(0, 0, 1), target=target
+            )
+        self.assertTrue(column.is_valid)
+        self.assertAlmostEqual(column.volume, 4 * 8, 5)
+        self.assertAlmostEqual(column.bounding_box().max.Z, 8, 5)
 
     def test_extrude_until_a_hole_misses(self):
         """A profile inside a through hole reaches nothing"""

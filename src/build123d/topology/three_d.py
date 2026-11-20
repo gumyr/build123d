@@ -1599,27 +1599,41 @@ class Solid(Mixin3D[TopoDS_Solid]):
         #    the splitter fails when one pass is given coincident tools.
         #    The profile is the extrusion's own base face. A target edge lying
         #    in the profile's plane cuts it into sub-faces, so the profile is
-        #    followed through the splits' records to know what it became
+        #    followed through the splits' records to know what it became.
+        #    A piece without the profile is discarded whatever the walls would
+        #    make of it, so it is left whole: the kernel can hand back the
+        #    remainder beyond a free-form surface as a solid it then fails to
+        #    split
+        def holding(candidates: Iterable[Shape]) -> list[Shape]:
+            """The candidates with a face the profile is, or became"""
+            return [
+                piece
+                for piece in candidates
+                if any(
+                    face.wrapped.IsSame(base)
+                    for face in piece.faces()
+                    for base in base_faces
+                )
+            ]
+
         pieces = extrusion.split(list(faces), keep=Keep.ALL)
         base_faces = cls._became(pieces, [profile.wrapped])
         if walls:
-            pieces = ShapeList(
-                piece for whole in pieces for piece in whole.split(walls, keep=Keep.ALL)
+            with_profile = holding(pieces)
+            kept = {id(piece) for piece in with_profile}
+            without = [piece for piece in pieces if id(piece) not in kept]
+            cut = ShapeList(
+                piece
+                for whole in with_profile
+                for piece in whole.split(walls, keep=Keep.ALL)
             )
-            base_faces = cls._became(pieces, base_faces)
+            base_faces = cls._became(cut, base_faces)
+            pieces = cut + ShapeList(without)
 
         # 4: The pieces to return are those holding the profile, or what it
         #    became. A target the extrusion never reaches leaves it in one
         #    piece; so does one that only touches it
-        holders = [
-            piece
-            for piece in pieces
-            if any(
-                face.wrapped.IsSame(base)
-                for face in piece.faces()
-                for base in base_faces
-            )
-        ]
+        holders = holding(pieces)
         if len(pieces) == 1 and extrusion.distance(target) > TOLERANCE:
             raise ValueError("No intersection: extrusion does not contact target")
         if len(pieces) == 1 or not holders:
