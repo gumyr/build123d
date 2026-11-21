@@ -810,6 +810,9 @@ class Mixin2D(ABC, Shape[TOPODS]):
         the pieces of an edge split by hidden-line removal, are merged into
         one. Visible and hidden edges are merged separately.
 
+        Edges that the kernel returns as splines but which are straight,
+        circular or elliptical come back as lines, circles and ellipses.
+
         Args:
             viewpoint (VectorLike): where the view is taken from
             up (VectorLike, optional): direction of the view's y axis.

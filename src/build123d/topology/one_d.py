@@ -1937,6 +1937,9 @@ class Mixin1D(Shape[TOPODS]):
         the pieces of an edge split by hidden-line removal, are merged into
         one. Visible and hidden edges are merged separately.
 
+        Edges that the kernel returns as splines but which are straight,
+        circular or elliptical come back as lines, circles and ellipses.
+
         Args:
             viewpoint (VectorLike): where the view is taken from
             up (VectorLike, optional): direction of the view's y axis.
@@ -2016,9 +2019,10 @@ class Mixin1D(Shape[TOPODS]):
         for edge in hidden_edges:
             BRepLib.BuildCurves3d_s(edge, TOLERANCE)
 
-        # convert to native shape objects
-        visible = [Edge(e) for e in visible_edges]
-        hidden = [Edge(e) for e in hidden_edges]
+        # convert to native shape objects, as lines, circles and ellipses
+        # where the kernel returned those as splines
+        visible = [Edge(e).to_analytic() for e in visible_edges]
+        hidden = [Edge(e).to_analytic() for e in hidden_edges]
 
         # The kernel can return the same line more than once: in two of the
         # compounds above, once per part where unfused parts meet, or hidden

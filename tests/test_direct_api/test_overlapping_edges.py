@@ -30,11 +30,12 @@ license:
 
 import unittest
 
+from build123d.build_enums import GeomType
 from build123d.topology import one_d
 from build123d.geometry import Pos
 from build123d.objects_part import Box
 from build123d.operations_generic import fillet
-from build123d.topology import Compound, Edge, Solid
+from build123d.topology import Compound, Edge, Solid, Wire
 
 TOL = 1e-5
 
@@ -166,6 +167,21 @@ class TestDrawingViewOverlaps(unittest.TestCase):
                 visible, hidden = shape.drawing_view((0, 0, 100), (0, 1, 0))
                 self.assertEqual(count_duplicates(visible), 0)
                 self.assertEqual(count_duplicates(hidden, visible), 0)
+
+    def test_edges_are_analytic(self):
+        """Straight and elliptical edges do not come back as splines"""
+        # the kernel returns the sloping edges of this loft as straight splines
+        tapered = Solid.loft([Wire.make_rect(10, 10), Pos(Z=10) * Wire.make_circle(4)])
+        visible, hidden = tapered.drawing_view((0, 0, 100), (0, 1, 0))
+        self.assertEqual(len(hidden), 0)
+        kinds = [e.geom_type for e in visible]
+        self.assertEqual(kinds.count(GeomType.LINE), 8)
+        self.assertEqual(kinds.count(GeomType.ELLIPSE), 1)
+
+        # a silhouette that is none of those stays a spline
+        torus = Solid.make_torus(10, 3)
+        visible, _ = torus.drawing_view((100, -100, 100))
+        self.assertTrue(all(e.geom_type == GeomType.BSPLINE for e in visible))
 
 
 if __name__ == "__main__":

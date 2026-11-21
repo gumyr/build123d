@@ -35,6 +35,10 @@ curve and touch or overlap, such as the pieces of an edge split where another
 crosses it in the view. A hidden line drawn dashed then never overprints a
 solid one.
 
+Hidden-line removal also returns some straight, circular and elliptical edges
+as splines. ``drawing_view`` converts these back, so such an edge has the
+``geom_type`` its shape suggests and exports as a line, circle or ellipse.
+
 *****************
 Making a drawing
 *****************
