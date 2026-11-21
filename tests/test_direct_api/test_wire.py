@@ -841,6 +841,24 @@ class TestWireValidation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Could not find fillet vertex"):
             self.wire.fillet_2d(1, [Vertex(100, 100, 0)])
 
+    def test_fillet_2d_errors_name_the_original_vertex(self):
+        """A wire off Plane.XY is relocated to be filleted - failures name the
+        vertex that was passed in, not where the relocation put it"""
+        points = [(0, 0, 1), (2, 0, 1), (2, 0, 3), (0, 0, 3)]
+        closed = Wire.make_polygon(points, close=True)
+        corner = closed.vertices().sort_by_distance((2, 0, 1))[0]
+        with self.assertRaisesRegex(
+            ValueError, r"Fillet algorithm failed for Vertex\(2\.0, 0\.0, 1\.0\)"
+        ):
+            closed.fillet_2d(2.5, [corner])
+
+        opened = Wire.make_polygon(points, close=False)
+        end = opened.vertices().sort_by_distance((0, 0, 3))[0]
+        with self.assertRaisesRegex(
+            ValueError, r"exactly two edges: Vertex\(0\.0, 0\.0, 3\.0\)"
+        ):
+            opened.fillet_2d(0.2, [end])
+
     def test_param_at_point_no_extrema(self):
         extrema = MagicMock()
         extrema.IsDone.return_value = False

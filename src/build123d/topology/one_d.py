@@ -277,7 +277,9 @@ class _WireFilletSolution:
     fillet_topods_edge: TopoDS_Edge
 
 
-def _analyze_wire_fillet_corner(wire: Wire, vertex: Vertex) -> _WireFilletCorner:
+def _analyze_wire_fillet_corner(
+    wire: Wire, vertex: Vertex, *, original_vertex: Vertex | None = None
+) -> _WireFilletCorner:
     """Collect the topology needed to fillet a single wire corner."""
 
     all_edges = wire.edges()
@@ -287,7 +289,7 @@ def _analyze_wire_fillet_corner(wire: Wire, vertex: Vertex) -> _WireFilletCorner
             for edge_vertex in edge.vertices()
         )
     )
-    vertex_label = str(vertex)
+    vertex_label = str(original_vertex if original_vertex is not None else vertex)
     if not connected_edges:
         raise ValueError(f"Could not find shared vertex on wire: {vertex_label}")
     if len(connected_edges) != 2:
@@ -568,7 +570,7 @@ def _fillet_wire_corner(
 ) -> Wire:
     """Fillet a single planar wire corner with the available 2D fillet solvers."""
 
-    corner = _analyze_wire_fillet_corner(wire, vertex)
+    corner = _analyze_wire_fillet_corner(wire, vertex, original_vertex=original_vertex)
     if _wire_fillet_corner_is_tangent_continuous(corner):
         return wire
 
