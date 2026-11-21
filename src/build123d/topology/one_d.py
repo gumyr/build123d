@@ -249,7 +249,7 @@ from .shape_core import (
     topods_dim,
     unwrap_topods_compound,
 )
-from .utils import _extrude_topods_shape, _make_topods_face_from_wires, isclose_b
+from .utils import _extrude_shape, _make_topods_face_from_wires, isclose_b
 from .zero_d import Vertex, topo_explore_common_vertex
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -1937,7 +1937,7 @@ class Edge(Mixin1D[TopoDS_Edge]):
         """
         if not obj:
             raise ValueError("Can't extrude empty vertex")
-        return Edge(TopoDS.Edge(_extrude_topods_shape(obj.wrapped, direction)))
+        return _extrude_shape(Edge, obj, direction)
 
     @classmethod
     def make_bezier(

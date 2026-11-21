@@ -114,7 +114,7 @@ from .shape_core import (
 from .three_d import Mixin3D, Solid
 from .two_d import Face, Shell
 from .utils import (
-    _extrude_topods_shape,
+    _extrude_shape,
     tuplify,
     unwrapped_shapetype,
 )
@@ -158,10 +158,12 @@ class Compound(Mixin3D[TopoDS_Compound]):
             children (Sequence[Shape], optional): assembly children. Defaults to None.
         """
         topods_compound: TopoDS_Compound | None
+        members = []
         if isinstance(obj, Iterable):
             # empty shapes add nothing, so a compound of only those is empty
+            members = [s for s in obj if not s.is_empty]
             topods_compound = _make_topods_compound_from_shapes(
-                [s.wrapped for s in obj if not s.is_empty]
+                s.wrapped for s in members
             )
         else:
             topods_compound = obj
@@ -175,6 +177,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
         self.material = material
         self.joints = JointDict(self, joints)
         self.children = [] if children is None else children
+        if members:
+            self._carry_tags(members)
 
     # ---- Properties ----
 
@@ -227,7 +231,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
         Returns:
             Edge: extruded shape
         """
-        return Compound(TopoDS.Compound(_extrude_topods_shape(obj.wrapped, direction)))
+        return _extrude_shape(Compound, obj, direction)
 
     @staticmethod
     def resolve_font(

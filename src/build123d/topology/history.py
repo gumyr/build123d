@@ -37,8 +37,8 @@ license:
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
-from typing import Protocol
+from collections.abc import Callable, Iterable, Iterator
+from typing import Any, Protocol
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_BuilderAlgo
@@ -92,6 +92,81 @@ def tracked_subshapes(shapes: Iterable[TopoDS_Shape]) -> list[TopoDS_Shape]:
         for shape_type in TRACKED_TYPES:
             TopExp.MapShapes_s(shape, shape_type, found)
     return [found(i + 1) for i in range(found.Extent())]
+
+
+class SubshapeTags:
+    """Attributes keyed by OCCT identity in the owner's local coordinate system."""
+
+    def __init__(self) -> None:
+        self.shapes = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+        self.values: list[dict[str, Any]] = []
+
+        self.owner: TopoDS_Shape | None = None
+
+    def _at(self, owner: TopoDS_Shape) -> None:
+        """Discard removed occurrences after a builder or assembly rebuilds the owner."""
+        if self.owner is not None and not self.owner.IsPartner(owner):
+            members = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+            TopExp.MapShapes_s(owner, members)
+            shapes = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+            retained = []
+            for i, attrs in enumerate(self.values, 1):
+                key = self.shapes(i)
+                if members.Contains(key.Moved(owner.Location())):
+                    shapes.Add(key)
+                    retained.append(attrs)
+            self.shapes, self.values = shapes, retained
+        self.owner = owner
+
+    def attributes(self, owner: TopoDS_Shape, shape: TopoDS_Shape) -> dict[str, Any]:
+        """Read a sub-shape's attributes without creating an entry."""
+        self._at(owner)
+        key = shape.Moved(owner.Location().Inverted())
+        index = self.shapes.FindIndex(key)
+        return self.values[index - 1].copy() if index else {}
+
+    def entries(
+        self, owner: TopoDS_Shape
+    ) -> Iterator[tuple[TopoDS_Shape, dict[str, Any]]]:
+        """Yield the tagged occurrences in the owner's current placement."""
+        self._at(owner)
+        for index, attributes in enumerate(self.values, 1):
+            yield self.shapes(index).Moved(owner.Location()), attributes
+
+    def put(
+        self,
+        owner: TopoDS_Shape,
+        shape: TopoDS_Shape,
+        attributes: dict[str, Any],
+        *,
+        merge: bool = False,
+    ) -> None:
+        """Update one occurrence, retaining conflicting values from merged inputs."""
+        self._at(owner)
+        index = self.shapes.Add(shape.Moved(owner.Location().Inverted()))
+        if index > len(self.values):
+            self.values.append({})
+        current = self.values[index - 1]
+        if not merge:
+            current.update(attributes)
+            return
+        conflicts = {k: list(v) for k, v in current.get("_conflicts", {}).items()}
+        for key, value in attributes.items():
+            if key == "_conflicts":
+                for name, alternatives in value.items():
+                    conflicts.setdefault(name, []).extend(alternatives)
+            elif key not in current:
+                current[key] = value
+            elif current[key] is not value:
+                # Tag values may be arrays or other objects without scalar equality.
+                try:
+                    equal = bool(current[key] == value)
+                except (TypeError, ValueError):
+                    equal = False
+                if not equal:
+                    conflicts.setdefault(key, []).append(value)
+        if conflicts:
+            current["_conflicts"] = conflicts
 
 
 class ShapeHistory:

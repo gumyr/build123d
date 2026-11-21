@@ -53,7 +53,7 @@ license:
 from __future__ import annotations
 
 from math import radians, sin, cos, isclose
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, TypeVar
 
 from collections.abc import Iterable
 
@@ -95,6 +95,8 @@ from .shape_core import (
     _sew_topods_faces,
     _topods_face_normal_at,
 )
+
+from .history import ShapeHistory
 
 if TYPE_CHECKING:  # pragma: no cover
     from .zero_d import Vertex  # pylint: disable=R0801
@@ -200,6 +202,28 @@ def _topods_material_side(face: TopoDS_Face, edge: TopoDS_Edge) -> Vector:
 
 
 def _extrude_topods_shape(obj: TopoDS_Shape, direction: VectorLike) -> TopoDS_Shape:
+    """Return only the kernel geometry for callers constructing intermediate shapes."""
+    return _extrude_prism(obj, direction)[0]
+
+
+ShapeResult = TypeVar("ShapeResult", bound=Shape)
+
+
+def _extrude_shape(
+    cls: type[ShapeResult], source: Shape, direction: VectorLike
+) -> ShapeResult:
+    """Extrude a wrapper, transferring its tags through the prism when present."""
+    extrusion, prism = _extrude_prism(source.wrapped, direction)
+    result = cls(extrusion)
+    if source._subshape_tags is not None:
+        record = ShapeHistory.from_algorithm(prism, [source.wrapped], extrusion)
+        result._made_by(record, source)
+    return result
+
+
+def _extrude_prism(
+    obj: TopoDS_Shape, direction: VectorLike
+) -> tuple[TopoDS_Shape, BRepPrimAPI_MakePrism]:
     """extrude
 
     Extrude a Shape in the provided direction.
@@ -237,7 +261,7 @@ def _extrude_topods_shape(obj: TopoDS_Shape, direction: VectorLike) -> TopoDS_Sh
             solids.append(downcast(explorer.Current()))
             explorer.Next()
         extrusion = _make_topods_compound_from_shapes(solids)
-    return extrusion
+    return extrusion, prism_builder
 
 
 def _make_loft(
