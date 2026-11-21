@@ -648,6 +648,30 @@ The standalone :func:`~topology.new_edges` function predates the record. It comp
 shapes geometrically and still works, but ``edges(Select.NEW)`` answers the same
 question from the record, for every shape type.
 
+******************************************
+Keeping the meaning of a face through a cut
+******************************************
+
+Tag a face on its owner before editing the part. Query the result for the
+same key to recover the surviving faces, including both halves of a split:
+
+.. code-block:: python
+
+    plate = Solid.make_box(12, 10, 4)
+    plate.tag(plate.faces().sort_by(Axis.Z)[-1], datum="top")
+    slot = Solid.make_box(2, 12, 6, Plane((5, -1, -1)))
+    cut = plate.cut(slot)
+    tops = cut.tagged("datum")
+    assert len(tops) == 2
+    assert all(cut.tags(face)["datum"] == "top" for face in tops)
+
+An untouched occurrence keeps its attributes. A removed occurrence drops
+them. If modified faces merge, the first input supplies the value of each
+key and other values are kept in a dictionary under ``_conflicts``.
+Generated shapes of a different kind inherit attributes only if tagged
+with ``_inherit=True``. These tags are modeling metadata held by the shape.
+
+
 ********
 See also
 ********

@@ -446,7 +446,8 @@ def chamfer(
     if target._dim == 3:
         source = target
         # Convert BasePartObject into Part so casting into Part during construction works
-        target = Part(target.wrapped) if isinstance(target, BasePartObject) else target
+        if isinstance(target, BasePartObject):
+            target = Part(target.wrapped)._carry_tags((target,))
 
         if not all([isinstance(obj, Edge) for obj in object_list]):
             raise ValueError("3D chamfer operation takes only Edges")
@@ -454,7 +455,7 @@ def chamfer(
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
-        result = Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
+        result = Part([new_part])._made_by(ShapeHistory.of(new_part))
         source.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
         return result
 
@@ -474,9 +475,7 @@ def chamfer(
                 )
             else:
                 new_faces.append(face)
-        new_sketch = Sketch(Compound(new_faces).wrapped)._made_by(
-            ShapeHistory.of(*new_faces)
-        )
+        new_sketch = Sketch(new_faces)._made_by(ShapeHistory.of(*new_faces))
 
         if context is not None:
             context._add_to_context(new_sketch, mode=Mode.REPLACE)
@@ -588,7 +587,8 @@ def fillet(
     if target._dim == 3:
         source = target
         # Convert BasePartObject in Part so casting into Part during construction works
-        target = Part(target.wrapped) if isinstance(target, BasePartObject) else target
+        if isinstance(target, BasePartObject):
+            target = Part(target.wrapped)._carry_tags((target,))
 
         if not all([isinstance(obj, Edge) for obj in object_list]):
             raise ValueError("3D fillet operation takes only Edges")
@@ -596,7 +596,7 @@ def fillet(
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
-        result = Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
+        result = Part([new_part])._made_by(ShapeHistory.of(new_part))
         source.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
         return result
 
@@ -615,9 +615,7 @@ def fillet(
                 new_faces.append(face.fillet_2d(radius, vertices_in_face))
             else:
                 new_faces.append(face)
-        new_sketch = Sketch(Compound(new_faces).wrapped)._made_by(
-            ShapeHistory.of(*new_faces)
-        )
+        new_sketch = Sketch(new_faces)._made_by(ShapeHistory.of(*new_faces))
 
         if context is not None:
             context._add_to_context(new_sketch, mode=Mode.REPLACE)

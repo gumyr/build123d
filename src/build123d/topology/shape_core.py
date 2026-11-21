@@ -135,6 +135,7 @@ from OCP.TopoDS import (
 )
 from OCP.collections import (
     IndexedDataMap_TopoDS_Shape_List_TopoDS_Shape_TopTools_ShapeMapHasher,
+    IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher,
 )
 from OCP.collections import List_TopoDS_Shape
 from OCP.TopTools import TopTools_ShapeMapHasher
@@ -171,7 +172,7 @@ from build123d.geometry import (
 )
 from build123d.pack_utils import _pack2d
 
-from .history import ShapeHistory
+from .history import ShapeHistory, SubshapeTags, TRACKED_TYPES
 from .kernel import list_shapes
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -384,6 +385,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def _extracted_from(self, source: Shape) -> None:
         """Note that this shape was taken out of another, and how."""
         self.topo_path = source.topo_path + (source,)
+        if source._subshape_tags is not None:
+            self._carry_tags((source,))
 
     @property
     def wrapped(self):
@@ -526,8 +529,81 @@ class Shape(NodeMixin, Generic[TOPODS]):
             if color:
                 self.color = color
 
-    def _made_by(self, history: ShapeHistory | None) -> Self:
+    _subshape_tags: SubshapeTags | None = None
+
+    def tag(self, subshapes: Shape | Iterable[Shape], **attributes: Any) -> None:
+        """Attach named attributes to vertices, edges, faces or solids of this shape.
+
+        Keys starting with an underscore are reserved. Set ``_inherit=True`` to
+        include generated topology, for example the wall generated from an edge.
+        """
+        if any(k.startswith("_") and k != "_inherit" for k in attributes):
+            raise ValueError("Unknown reserved tag key")
+        selected = [subshapes] if isinstance(subshapes, Shape) else list(subshapes)
+        if not selected or not attributes:
+            return
+        members = self._tag_members()
+        if any(s.is_empty or not members.Contains(s.wrapped) for s in selected):
+            raise ValueError("Can only tag a sub-shape of this shape")
+        if self._subshape_tags is None:
+            self._subshape_tags = SubshapeTags()
+        for shape in selected:
+            self._subshape_tags.put(self.wrapped, shape.wrapped, attributes)
+
+    def tags(self, subshape: Shape) -> dict[str, Any]:
+        """Return the attributes of the given occurrence, or an empty dict."""
+        if self._subshape_tags is None or subshape.is_empty:
+            return {}
+        return self._subshape_tags.attributes(self.wrapped, subshape.wrapped)
+
+    def tagged(self, key: str) -> ShapeList[Shape]:
+        """Return the sub-shapes carrying a given attribute."""
+        if self._subshape_tags is None:
+            return ShapeList()
+        return ShapeList(
+            self.cast(shape)
+            for shape, attributes in self._subshape_tags.entries(self.wrapped)
+            if key in attributes
+        )
+
+    def _tag_members(self) -> IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher:
+        """Index the occurrences on which modeling history can carry a tag."""
+        members = IndexedMap_TopoDS_Shape_TopTools_ShapeMapHasher()
+        for kind in TRACKED_TYPES:
+            TopExp.MapShapes_s(self.wrapped, kind, members)
+        return members
+
+    def _carry_tags(
+        self, sources: Iterable[Shape], history: ShapeHistory | None = None
+    ) -> Self:
+        """Transfer only occurrences present in this result, following kernel history."""
+        members = None
+        store = None
+        for source in sources:
+            tags = source._subshape_tags
+            if tags is None:
+                continue
+            if members is None:
+                members = self._tag_members()
+            for old, attributes in tags.entries(source.wrapped):
+                successors = history.modified(old) if history else []
+                if not successors and (not history or not history.is_removed(old)):
+                    successors = [old]
+                if history and attributes.get("_inherit"):
+                    successors.extend(history.generated(old))
+                for shape in successors:
+                    if members.Contains(shape):
+                        if store is None:
+                            store = SubshapeTags()
+                        store.put(self.wrapped, shape, attributes, merge=True)
+        if store is not None or self._subshape_tags is not None:
+            self._subshape_tags = store
+        return self
+
+    def _made_by(self, history: ShapeHistory | None, *sources: Shape) -> Self:
         """Note the record of how this shape was made, for ``Select.LAST``/``NEW``."""
+        if sources:
+            self._carry_tags(sources, history)
         self._history = history
         self._history_at = None if self.wrapped is None else self.wrapped.Location()
         return self
@@ -1221,8 +1297,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @overload
     def __add__(self, other: None) -> Self: ...
+
     @overload
     def __add__(self, other: Shape | Iterable[Shape]) -> Self | Compound: ...
+
     def __add__(self, other):
         """fuse shape to self operator +"""
         summands = Shape._operands(other)
@@ -1320,7 +1398,35 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 return copied.Located(node.wrapped.Location())
             return copier.ModifiedShape(node.wrapped)
 
-        return self._copied(kernel_copy, memo, deep=True, keep_history=False)
+        result = self._copied(kernel_copy, memo, deep=True, keep_history=False)
+        for source, target in self._placed_pairs(result):
+            if source._subshape_tags is not None:
+                target._subshape_tags = SubshapeTags()
+                # The kernel copies the leaves in their own frames. Map an
+                # assembly occurrence back to the leaf before querying the copier.
+                for leaf in source.leaves:
+                    frame = TopLoc_Location()
+                    ancestor = leaf
+                    while ancestor is not source:
+                        ancestor = tcast(Shape, ancestor.parent)
+                        frame = ancestor.wrapped.Location().Multiplied(frame)
+                    members = leaf._tag_members()
+                    for sub, attrs in source._subshape_tags.entries(source.wrapped):
+                        local = sub.Moved(frame.Inverted())
+                        if not members.Contains(local):
+                            continue
+                        copied = (
+                            memo[id(leaf)].wrapped
+                            if isinstance(leaf.wrapped, TopoDS_Vertex)
+                            else copier.ModifiedShape(local)
+                        )
+                        target._subshape_tags.put(
+                            target.wrapped,
+                            copied.Moved(frame),
+                            copy.deepcopy(attrs, memo),
+                        )
+
+        return result
 
     def _placed(self, wrapped: TOPODS) -> Self:
         """A copy of self around an already placed kernel shape
@@ -1347,7 +1453,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
             )
         )
 
-    def _transformed(self, transform: Callable[[TopoDS_Shape], TopoDS_Shape]) -> Self:
+    def _transformed(
+        self,
+        transform: Callable[
+            [TopoDS_Shape], BRepBuilderAPI_Transform | BRepBuilderAPI_GTransform
+        ],
+    ) -> Self:
         """A copy of self with its geometry transformed in the kernel
 
         The children of an assembly are placed relative to it, so each is
@@ -1357,18 +1468,44 @@ class Shape(NodeMixin, Generic[TOPODS]):
         transformed sub-shapes are new.
         """
 
+        mapped_tags: dict[int, list[tuple[TopoDS_Shape, dict[str, Any]]]] = {}
+
         def kernel_copy(node: Shape) -> TopoDS_Shape:
             if node.children:  # rebuilt from the transformed children
                 return _empty_compound_at(TopLoc_Location())
-            # where the assembly, self, places the node
+            # A tag on either the leaf or an enclosing assembly refers to the
+            # leaf in that owner's coordinates. Transform its actual occurrence.
             within = TopLoc_Location()
             ancestor = node
-            while ancestor is not self:
+            owners = []
+            while True:
+                if ancestor._subshape_tags is not None:
+                    owners.append((ancestor, within, ancestor._subshape_tags))
+                if ancestor is self:
+                    break
                 ancestor = tcast(Shape, ancestor.parent)
                 within = ancestor.wrapped.Location().Multiplied(within)
-            return transform(node.wrapped.Moved(within))
+            builder = transform(node.wrapped.Moved(within))
+            if owners:
+                members = node._tag_members()
+                for owner, relative, tags in owners:
+                    for sub, attrs in tags.entries(owner.wrapped):
+                        leaf_sub = sub.Moved(relative.Inverted())
+                        if members.Contains(leaf_sub):
+                            mapped = builder.ModifiedShape(leaf_sub.Moved(within))
+                            mapped_tags.setdefault(id(owner), []).append(
+                                (mapped, attrs)
+                            )
+            return builder.Shape()
 
-        return self._copied(kernel_copy, keep_history=False)
+        result = self._copied(kernel_copy, keep_history=False)
+        if mapped_tags:
+            for source, target in self._placed_pairs(result):
+                if id(source) in mapped_tags:
+                    target._subshape_tags = SubshapeTags()
+                    for sub, attrs in mapped_tags[id(source)]:
+                        target._subshape_tags.put(target.wrapped, sub, attrs)
+        return result
 
     def _copied(
         self,
@@ -1437,6 +1574,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
         for key, value in self.__dict__.items():
             if key in ("_wrapped", "_NodeMixin__parent", "_NodeMixin__children"):
                 continue
+            if key == "_subshape_tags":
+                continue
             if key == "joints":
                 value = {}  # bound to the copy once every node exists
             elif key in ("_history", "_history_at"):
@@ -1447,6 +1586,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 value = copy.deepcopy(value, copies)
             result.__dict__[key] = value
         result._wrapped = tcast(TOPODS, downcast(kernel_copy(self)))
+        if keep_history and self._subshape_tags is not None:
+            result._subshape_tags = SubshapeTags()
+            for sub, attrs in self._subshape_tags.entries(self.wrapped):
+                result._subshape_tags.put(self.wrapped, sub, attrs)
+
         if self.children:
             result.children = [
                 child._copied_node(kernel_copy, copies, deep, keep_history)
@@ -1467,6 +1611,12 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # self. Unpickling rebuilds self from new kernel shapes, so the record
         # would describe nothing in the restored shape and it is left behind.
         state = self.__dict__.copy()
+        if self._subshape_tags is not None:
+            members = self._tag_members()
+            state["_subshape_tags"] = [
+                (members.FindIndex(sub), attributes)
+                for sub, attributes in self._subshape_tags.entries(self.wrapped)
+            ]
         state["_history"] = None
         state["_history_at"] = None
         # A shape pickled on its own stands outside its assembly, as a copy
@@ -1480,12 +1630,18 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore the pickled state, reattaching the children of an assembly"""
+        tagged = state.get("_subshape_tags")
         self.__dict__.update(state)
         children = state.get("_NodeMixin__children")
         if children:
             for child in children:
                 child.__dict__["_NodeMixin__parent"] = self
             self._rebuild_from_children()
+        if tagged:
+            members = self._tag_members()
+            self._subshape_tags = SubshapeTags()
+            for index, attrs in tagged:
+                self._subshape_tags.put(self.wrapped, members(index), attrs)
 
     def _rebuild_from_children(self) -> None:
         """Rebuild the kernel shape from the children; only a Compound has any"""
@@ -1518,16 +1674,20 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @overload
     def __rmul__(self, other: Plane | Location) -> Self: ...
+
     @overload
     def __rmul__(self, other: Iterable[Plane | Location]) -> list[Self]: ...
+
     def __rmul__(self, other: Plane | Location | Iterable[Plane | Location]):
         """right multiply for positioning operator *"""
         return apply_location_like(self, other)
 
     @overload
     def __sub__(self, other: None) -> Self: ...
+
     @overload
     def __sub__(self, other: Shape | Iterable[Shape]) -> Self | Compound: ...
+
     def __sub__(self, other):
         """cut shape from self operator -"""
 
@@ -1654,8 +1814,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
         try:
             upgrader.Build()
             record = self._history_here()
+            tagged_before = copy.copy(self) if self._subshape_tags is not None else None
             self.wrapped = tcast(TOPODS, downcast(upgrader.Shape()))
             unified = ShapeHistory.from_unify(upgrader)
+            if tagged_before is not None:
+                self._carry_tags((tagged_before,), unified)
             self._made_by(unified if record is None else record.merge(unified))
         except Exception:  # pylint: disable=broad-exception-caught
             warnings.warn(f"Unable to clean {self}", stacklevel=2)
@@ -1693,6 +1856,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         common_attrs = attrs1 & attrs2
         common_attrs.discard("_history")  # says how self was made, not target
         common_attrs.discard("_history_at")
+        common_attrs.discard("_subshape_tags")
         common_attrs.discard("_NodeMixin__parent")  # membership, not an attribute
         if exceptions is not None:
             common_attrs -= set(exceptions)
@@ -3064,17 +3228,13 @@ class Shape(NodeMixin, Generic[TOPODS]):
             # a general affine transform (stretch, shear): only GTransform
             # can apply it, at the cost of converting geometry to splines
             return self._transformed(
-                lambda shape: BRepBuilderAPI_GTransform(
-                    shape, t_matrix.wrapped, True
-                ).Shape()
+                lambda shape: BRepBuilderAPI_GTransform(shape, t_matrix.wrapped, True)
             )
         # a similarity: Transform applies it exactly and keeps the geometry
         # types; GTransform would drop its scale factor, which a gp_GTrsf
         # of any recognised form keeps apart from its matrix
         return self._transformed(
-            lambda shape: BRepBuilderAPI_Transform(
-                shape, t_matrix.wrapped.Trsf(), True
-            ).Shape()
+            lambda shape: BRepBuilderAPI_Transform(shape, t_matrix.wrapped.Trsf(), True)
         )
 
     def transform_shape(self, t_matrix: Matrix) -> Self:
@@ -3093,9 +3253,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if self.is_empty:
             return self
         return self._transformed(
-            lambda shape: BRepBuilderAPI_Transform(
-                shape, t_matrix.wrapped.Trsf()
-            ).Shape()
+            lambda shape: BRepBuilderAPI_Transform(shape, t_matrix.wrapped.Trsf())
         )
 
     def transformed(
@@ -3173,10 +3331,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return self
         builders: list[BRepBuilderAPI_Transform] = []
 
-        def transform(shape: TopoDS_Shape) -> TopoDS_Shape:
+        def transform(shape: TopoDS_Shape) -> BRepBuilderAPI_Transform:
             builder = BRepBuilderAPI_Transform(shape, transformation, True)
             builders.append(builder)
-            return builder.Shape()
+            return builder
 
         shape_copy = self._transformed(transform)
         # The geometry moved under each node's unchanged frame; so must its joints
@@ -3308,14 +3466,14 @@ class Shape(NodeMixin, Generic[TOPODS]):
             )
             for result in results:
                 base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
-                result._made_by(history)
+                result._made_by(history, *args, *tools)
             result = Shape.make_composite(results, highest_order[1])
             base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
-            return result._made_by(history)
+            return result._made_by(history, *args, *tools)
 
         result = highest_order[0].cast(topo_result)
         base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
-        return result._made_by(history)
+        return result._made_by(history, *args, *tools)
 
     def _bool_op_list(
         self,
@@ -3343,7 +3501,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         if isinstance(result.wrapped, TopoDS_Compound):
             pieces = result.get_top_level_shapes()
             for piece in pieces:
-                piece._made_by(result._history)  # the same operation made them all
+                piece._made_by(result._history)._carry_tags(
+                    (result,)
+                )  # the same operation made them all
             return pieces
         return ShapeList([result])
 

@@ -114,7 +114,7 @@ def draft(
     if context is not None:
         context._add_to_context(new_solid, clean=False, mode=Mode.REPLACE)
 
-    result = Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
+    result = Part([new_solid])._made_by(ShapeHistory.of(new_solid))
     topo_parent.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
     return result
 
@@ -387,7 +387,7 @@ def loft(
     if context is not None:
         context._add_to_context(new_solid, clean=clean, mode=mode)
 
-    return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
+    return Part([new_solid])._made_by(ShapeHistory.of(new_solid))
 
 
 @deprecated("make_brake_formed() is deprecated; use BuildSheet instead.")
@@ -503,7 +503,7 @@ def make_brake_formed(
     elif clean:
         new_solid = new_solid.clean()
 
-    return Part(Compound([new_solid]).wrapped)._made_by(ShapeHistory.of(new_solid))
+    return Part([new_solid])._made_by(ShapeHistory.of(new_solid))
 
 
 @deprecated(

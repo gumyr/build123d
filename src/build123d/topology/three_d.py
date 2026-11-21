@@ -157,7 +157,7 @@ from .two_d import (
     sort_wires_by_build_order,
 )
 from .utils import (
-    _extrude_topods_shape,
+    _extrude_shape,
     _make_loft,
     find_max_dimension,
 )
@@ -178,10 +178,12 @@ class Mixin3D(Shape[TOPODS]):
     # wider operand type on an overloaded operator override, hence the ignore.
     @overload  # type: ignore[override]
     def __add__(self, other: None) -> Self: ...
+
     @overload
     def __add__(
         self, other: Shape | Joint | Iterable[Shape | Joint]
     ) -> Self | Compound: ...
+
     def __add__(self, other):
         """fuse shape to self operator +; joints among other are bound to the result"""
         joints, shapes = Mixin3D._joint_operands(other)
@@ -356,7 +358,8 @@ class Mixin3D(Shape[TOPODS]):
         return new_shape._made_by(
             ShapeHistory.from_algorithm(
                 chamfer_builder, [self.wrapped], new_shape.wrapped
-            )
+            ),
+            self,
         )
 
     def dprism(
@@ -457,7 +460,8 @@ class Mixin3D(Shape[TOPODS]):
         return new_shape._made_by(
             ShapeHistory.from_algorithm(
                 fillet_builder, [self.wrapped], new_shape.wrapped
-            )
+            ),
+            self,
         )
 
     def hollow(
@@ -1231,7 +1235,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         Returns:
             Edge: extruded shape
         """
-        return Solid(TopoDS.Solid(_extrude_topods_shape(obj.wrapped, direction)))
+        return _extrude_shape(Solid, obj, direction)
 
     @classmethod
     def extrude_linear_with_rotation(

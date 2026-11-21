@@ -193,7 +193,7 @@ from .silhouette import (
     visible_regions,
 )
 from .utils import (
-    _extrude_topods_shape,
+    _extrude_shape,
     _make_loft,
     _make_topods_face_from_wires,
     _make_topods_face_on_surface,
@@ -1475,7 +1475,7 @@ class Face(Mixin2D[TopoDS_Face]):
         """
         if not obj:
             raise ValueError("Can't extrude empty object")
-        return Face(TopoDS.Face(_extrude_topods_shape(obj.wrapped, direction)))
+        return _extrude_shape(Face, obj, direction)
 
     @classmethod
     def make_bezier_surface(
@@ -2252,7 +2252,9 @@ class Face(Mixin2D[TopoDS_Face]):
         filleted_face = self.__class__(filleted_wires[0], filleted_wires[1:])
         if self.normal_at() != filleted_face.normal_at():
             filleted_face = -filleted_face  # pylint: disable=invalid-unary-operand-type
-        filleted_face._made_by(record.add_modified(self.wrapped, filleted_face.wrapped))
+        filleted_face._made_by(
+            record.add_modified(self.wrapped, filleted_face.wrapped), self
+        )
 
         return filleted_face
 
@@ -2895,10 +2897,12 @@ class Face(Mixin2D[TopoDS_Face]):
     def wrap(
         self, planar_shape: Edge, surface_loc: Location, tolerance: float = 1e-4
     ) -> Edge: ...
+
     @overload
     def wrap(
         self, planar_shape: Wire, surface_loc: Location, tolerance: float = 1e-4
     ) -> Wire: ...
+
     @overload
     def wrap(
         self, planar_shape: Face, surface_loc: Location, tolerance: float = 1e-4
@@ -3358,7 +3362,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         Returns:
             Edge: extruded shape
         """
-        return Shell(TopoDS.Shell(_extrude_topods_shape(obj.wrapped, direction)))
+        return _extrude_shape(Shell, obj, direction)
 
     @classmethod
     def loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Shell:
@@ -3452,8 +3456,10 @@ class Shell(Mixin2D[TopoDS_Shell]):
 
     @overload
     def __add__(self, other: None) -> Self: ...
+
     @overload
     def __add__(self, other: Shape | Iterable[Shape]) -> Shell: ...
+
     def __add__(self, other):
         """sew shape into this shell operator +
 

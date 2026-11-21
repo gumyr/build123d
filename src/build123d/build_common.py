@@ -269,6 +269,10 @@ class Builder(ABC, Generic[ShapeT]):
     def _obj(self, value: Part) -> None:
         raise NotImplementedError  # pragma: no cover
 
+    def tag(self, subshapes: Shape | Iterable[Shape], **attributes: Any) -> None:
+        """Tag sub-shapes of the current builder object."""
+        self._obj.tag(subshapes, **attributes)
+
     @property
     def max_dimension(self) -> float:
         """Maximum size of object in all directions"""
@@ -751,7 +755,8 @@ class Builder(ABC, Generic[ShapeT]):
                 self._obj = self._sub_class(self._obj.wrapped)
             else:
                 self._obj = self._sub_class(Compound(self._shapes()).wrapped)
-            self._obj._made_by(record)
+            sources = [self.obj_before, *brought_in] if self.obj_before else brought_in
+            self._obj._made_by(record, *sources)
 
             # Add to pending
             if self._tag == "BuildPart":
