@@ -34,8 +34,8 @@ what they project onto and what comes back.
       - always edges, split into visible and hidden
 
 The first two keep the dimension of their input and are operations in both
-Builder and Algebra mode. The third is a method on any shape and is the
-basis of technical drawings.
+Builder and Algebra mode. The third is a method of edges, wires, faces,
+solids and compounds and is the basis of technical drawings.
 
 .. tab-set::
 
