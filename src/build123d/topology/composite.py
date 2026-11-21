@@ -644,15 +644,17 @@ class Compound(Mixin3D[TopoDS_Compound]):
         return shape_list[0]
 
     def compounds(self) -> ShapeList[Compound]:
-        """compounds - all the compounds in this Shape"""
+        """compounds - all the compounds in this Shape, however deeply nested,
+        each after the compounds it holds and this one last"""
         if self.is_empty:
             return ShapeList()
+        sub_compounds: list[Compound] = []
         if isinstance(self.wrapped, TopoDS_Compound):
             # pylint: disable=not-an-iterable
-            sub_compounds = [c for c in self if isinstance(c.wrapped, TopoDS_Compound)]
+            for member in self:
+                if isinstance(member.wrapped, TopoDS_Compound):
+                    sub_compounds.extend(member.compounds())
             sub_compounds.append(self)
-        else:
-            sub_compounds = []
         return ShapeList(sub_compounds)
 
     def do_children_intersect(

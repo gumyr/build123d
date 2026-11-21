@@ -139,6 +139,102 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual(part_builder.part.label, "part label")
         self.assertEqual(sketch_builder.sketch.label, "sketch label")
 
+    def test_color_and_material_propagate_to_builder_output(self):
+        """Builder color and material reach the placed output, with or without a
+        workplane, as the label does"""
+        with BuildPart() as flat:
+            flat.color = "red"
+            flat.material = "stainless"
+            Box(1, 1, 1)
+        with BuildPart(Plane.XZ) as placed:
+            placed.color = (0, 0, 1)
+            placed.material = "stainless"
+            Box(1, 1, 1)
+        with BuildPart() as outer:
+            with BuildPart(Plane.XZ, Plane.YZ) as nested:
+                nested.color = Color("green")
+                Box(1, 1, 1)
+        with BuildSketch(Plane.XZ) as sketch_builder:
+            sketch_builder.color = "red"
+            Rectangle(1, 1)
+
+        for builder in (flat, placed):
+            self.assertEqual(builder.material, builder.part.material)
+            self.assertEqual(builder.part.material.name, "Stainless_G304_ANNEALED")
+        self.assertEqual(flat.part.color, Color("red"))
+        self.assertEqual(placed.part.color, Color(0, 0, 1))
+        self.assertEqual(nested.part.color, Color("green"))
+        self.assertEqual(sketch_builder.sketch.color, Color("red"))
+        self.assertIsNone(outer.color)
+        self.assertIsNone(outer.material)
+
+    def test_builder_color_beats_material_color(self):
+        """An assigned color wins over the one the material would bring"""
+        with BuildPart(Plane.XZ) as builder:
+            builder.material = "stainless"
+            builder.color = "red"
+            Box(1, 1, 1)
+        self.assertEqual(builder.part.color, Color("red"))
+
+    def test_attributes_set_on_output_as_last_step_are_kept(self):
+        """A label, color or material assigned to the placed output as the last
+        step before exit reaches the result, with a workplane, within Locations
+        and in a nested sketch, where the output read while open is a copy"""
+        with BuildPart() as flat:
+            Box(1, 1, 1)
+            flat.part.label = "flat"
+            flat.part.material = "stainless"
+        with BuildPart(Plane.XZ) as placed:
+            Box(1, 1, 1)
+            self.assertIs(placed.part, placed.part)
+            placed.part.label = "placed"
+            placed.part.material = "stainless"
+            placed.part.color = "red"
+        with BuildPart() as outer:
+            with Locations((0, 0, 0), (5, 0, 0)):
+                with BuildPart() as located:
+                    Box(1, 1, 1)
+                    located.part.label = "located"
+            with BuildSketch(Plane.XZ) as nested_sketch:
+                Rectangle(1, 1)
+                nested_sketch.sketch.color = "blue"
+            extrude(amount=1)
+
+        for builder, label in ((flat, "flat"), (placed, "placed")):
+            self.assertEqual(builder.part.label, label)
+            self.assertEqual(builder.part.material.name, "Stainless_G304_ANNEALED")
+        self.assertEqual(placed.part.color, Color("red"))
+        self.assertEqual(located.part.label, "located")
+        self.assertEqual(nested_sketch.sketch.color, Color("blue"))
+        self.assertEqual(outer.part.label, "")
+        self.assertIsNone(outer.material)
+
+    def test_builder_attributes_win_over_those_set_on_output(self):
+        """The builder's own attribute overrides one assigned to its output"""
+        with BuildPart(Plane.XZ) as builder:
+            builder.material = "stainless"
+            Box(1, 1, 1)
+            builder.part.material = "aluminum"
+        self.assertEqual(builder.part.material.name, "Stainless_G304_ANNEALED")
+
+    def test_attributes_set_on_output_before_a_later_step_are_not_kept(self):
+        """Only the last step before exit counts: a later operation makes a new
+        product without the attributes"""
+        with BuildPart(Plane.XZ) as builder:
+            Box(1, 1, 1)
+            builder.part.label = "early"
+            Box(2, 2, 2)
+        self.assertEqual(builder.part.label, "")
+
+    def test_builder_color_and_material_validation(self):
+        builder = BuildPart()
+        builder.color = None
+        builder.material = None
+        self.assertIsNone(builder.color)
+        self.assertIsNone(builder.material)
+        with self.assertRaises(TypeError):
+            builder.material = 42
+
     def test_exit(self):
         """test transferring objects to parent"""
         with BuildPart() as outer:
@@ -475,6 +571,172 @@ class TestCommonOperations(unittest.TestCase):
 
 
 class TestLocations(unittest.TestCase):
+    def test_location_list_product(self):
+        """g1 * g2 composes two location lists as nesting g2 inside g1 does"""
+        g1 = GridLocations(1, 1, 2, 2)
+        g2 = GridLocations(4, 4, 2, 1)
+        product = g1 * g2
+        with g1:
+            nested = GridLocations(4, 4, 2, 1).locations
+        self.assertIsInstance(product, LocationList)
+        self.assertEqual(len(product.locations), 8)
+        for composed, expected in zip(product, nested):
+            self.assertEqual(composed, expected)
+
+        # the product is a context and a placement, like any location list
+        with BuildPart() as builder:
+            with product:
+                Box(0.1, 0.1, 0.1)
+        self.assertEqual(len(builder.part.solids()), 8)
+        placed = product * Box(0.1, 0.1, 0.1)
+        self.assertEqual(len(placed), 8)
+        self.assertIsInstance(Location((1, 0, 0)) * product, list)
+
+        with self.assertRaises(TypeError):
+            g1 * 3  # pylint: disable=pointless-statement
+
+    def test_location_list_is_a_list(self):
+        """A location list is a list of Location, with slices that are lists too"""
+        grid = GridLocations(1, 1, 2, 2)
+        self.assertIsInstance(grid, list)
+        self.assertEqual(len(grid), 4)
+        self.assertEqual(grid[0], Location((-0.5, -0.5, 0)))
+        self.assertIsInstance(grid[1:], LocationList)
+        self.assertEqual(grid[1:], list(grid)[1:])
+        self.assertIs(grid.locations, grid)
+        self.assertIs(grid.local_locations, grid)
+        self.assertIsInstance(grid.copy(), LocationList)
+        self.assertEqual(grid.copy(), grid)
+        self.assertEqual(grid, GridLocations(1, 1, 2, 2))
+
+    def test_location_list_editing(self):
+        """Edits behave as on a list, and the edited list places as it reads"""
+        grid = GridLocations(1, 1, 2, 1)
+        grid.append(Location((5, 0, 0)))
+        grid.extend([Location((6, 0, 0)), Location((7, 0, 0))])
+        grid.insert(0, Location((8, 0, 0)))
+        self.assertEqual(grid.pop(0), Location((8, 0, 0)))
+        grid.remove(Location((7, 0, 0)))
+        del grid[0]
+        grid[0] = Location((9, 0, 0))
+        grid += [Location((10, 0, 0))]
+        grid.reverse()
+        grid.sort(key=lambda loc: loc.position.X)
+        self.assertEqual([loc.position.X for loc in grid], [5, 6, 9, 10])
+
+        with BuildPart() as builder:
+            with grid:
+                Box(0.1, 0.1, 0.1)
+        self.assertEqual(
+            sorted(s.center().X for s in builder.part.solids()), [5, 6, 9, 10]
+        )
+        self.assertEqual(len(grid * Box(0.1, 0.1, 0.1)), 4)
+        grid.clear()
+        self.assertEqual(grid, [])
+
+    def test_location_list_concatenation(self):
+        both = GridLocations(1, 1, 2, 1) + PolarLocations(3, 3)
+        self.assertIsInstance(both, LocationList)
+        self.assertEqual(len(both), 5)
+        prefixed = [Location((1, 1, 1))] + GridLocations(1, 1, 2, 1)
+        self.assertIsInstance(prefixed, LocationList)
+        self.assertEqual(prefixed[0], Location((1, 1, 1)))
+        composed = GridLocations(1, 1, 2, 1)
+        composed *= GridLocations(1, 1, 1, 2)
+        self.assertEqual(len(composed), 4)
+        with self.assertRaises(TypeError):
+            3 * GridLocations(1, 1, 2, 1)  # pylint: disable=expression-not-assigned
+        with self.assertRaises(TypeError):
+            GridLocations(1, 1, 2, 1) + 3  # pylint: disable=expression-not-assigned
+
+    def test_location_list_edits_not_while_active(self):
+        grid = GridLocations(1, 1, 2, 1)
+        with grid:
+            with self.assertRaises(RuntimeError):
+                grid.append(Location())
+        grid.append(Location())
+        self.assertEqual(len(grid), 3)
+
+    def test_location_list_made_in_a_group_is_a_product(self):
+        """Inside a context of several locations the entries are a product and
+        can't be edited; a slice of them stands on its own"""
+        with Locations((0, 0, 0), (10, 0, 0)):
+            grid = GridLocations(1, 1, 2, 1)
+        self.assertEqual(len(grid), 4)
+        with self.assertRaises(ValueError):
+            grid.append(Location())
+        with self.assertRaises(ValueError):
+            grid + [Location()]  # pylint: disable=expression-not-assigned
+        head = grid[:2]
+        self.assertIsInstance(head, LocationList)
+        self.assertEqual(head._own_locations, list(head))
+        head.append(Location())
+
+    def test_edited_list_places_where_it_reads_from_a_function(self):
+        """A list made and edited in a function under a caller's context keeps
+        its own locations in step, so the inserted builder lands on the entries"""
+
+        def row() -> BuildPart:
+            locs = GridLocations(20, 0, 2, 1)
+            locs.append(Location((30, 0, 0)))
+            self.assertEqual(
+                [loc.position.X for loc in locs._own_locations], [-10, 10, 30]
+            )
+            with locs:
+                with BuildPart() as builder:
+                    Box(1, 1, 1)
+            return builder
+
+        with BuildPart() as outer:
+            with Locations((0, 0, 50)):
+                row_builder = row()
+                insert(row_builder)
+        # the grid entries carry the caller's Z=50, the appended entry reads Z=0,
+        # and each box is where its entry reads
+        centers = sorted((s.center().X, s.center().Z) for s in outer.part.solids())
+        self.assertEqual(centers, [(-10, 50), (10, 50), (30, 0)])
+
+    def test_location_times_location_list(self):
+        """A Location or Plane times a location list is a location list"""
+        grid = GridLocations(1, 1, 2, 1)
+        moved = Pos(10, 0, 0) * grid
+        self.assertIsInstance(moved, LocationList)
+        self.assertEqual([loc.position.X for loc in moved], [9.5, 10.5])
+        self.assertEqual(moved, grid.moved(Pos(10, 0, 0)))
+        on_plane = Plane.XZ * grid
+        self.assertIsInstance(on_plane, LocationList)
+        self.assertEqual(on_plane, [Plane.XZ * loc for loc in list(grid)])
+        self.assertIs(type(Pos(10, 0, 0) * list(grid)), list)
+
+        with BuildSketch() as sketch_builder:
+            with Plane.XY * Pos(5, 0, 0) * grid:
+                Circle(0.1)
+        self.assertEqual(len(sketch_builder.sketch.faces()), 2)
+        self.assertEqual(len(Pos(1, 0, 0) * grid * Box(1, 1, 1)), 2)
+
+        # own locations follow the move, in step with the entries
+        with Locations((0, 0, 50)):
+            inner = GridLocations(1, 1, 2, 1)
+        shifted = Pos(10, 0, 0) * inner
+        self.assertEqual(
+            [(loc.position.X, loc.position.Z) for loc in shifted._own_locations],
+            [(9.5, 0), (10.5, 0)],
+        )
+
+    def test_location_list_product_in_a_context(self):
+        """Lists made inside a Locations context carry that context once"""
+        with Locations((10, 0, 0)):
+            g1 = GridLocations(1, 1, 2, 2)
+            g2 = GridLocations(4, 4, 2, 1)
+            product = g1 * g2
+            with g1:
+                nested = GridLocations(4, 4, 2, 1).locations
+        for composed, expected in zip(product, nested):
+            self.assertEqual(composed, expected)
+        self.assertAlmostEqual(
+            sum(loc.position.X for loc in product) / len(product.locations), 10, 5
+        )
+
     def test_polar_locations(self):
         locs = PolarLocations(1, 5, 45, 90, False).local_locations
         for i, angle in enumerate(range(45, 135, 18)):
@@ -863,40 +1125,40 @@ class TestShapeList(unittest.TestCase):
 
     def test_sort_by_type(self):
         """test sorting by different attributes"""
-        with self.subTest(sort_by=SortBy.AREA):
+        with self.subTest(sort_by="area"):
             with BuildPart() as test:
                 Wedge(1, 1, 1, 0, 0, 0.5, 0.5)
-                faces = test.faces().sort_by(SortBy.AREA)
+                faces = test.faces().sort_by(Face.area)
             self.assertEqual(faces[0].area, 0.25)
             self.assertEqual(faces[-1].area, 1)
 
-        with self.subTest(sort_by=SortBy.LENGTH):
+        with self.subTest(sort_by="length"):
             with BuildPart() as test:
                 Wedge(1, 1, 1, 0, 0, 0.5, 0.5)
-                edges = test.edges().sort_by(SortBy.LENGTH)
+                edges = test.edges().sort_by(Edge.length)
             self.assertEqual(edges[0].length, 0.5)
             self.assertAlmostEqual(edges[-1].length, 1.2247448713915892, 7)
 
-        with self.subTest(sort_by=SortBy.DISTANCE):
+        with self.subTest(sort_by="distance"):
             with BuildPart() as test:
                 Box(1, 1, 1, align=(Align.MIN, Align.CENTER, Align.CENTER))
-                faces = test.faces().sort_by(SortBy.DISTANCE)
+                faces = test.faces().sort_by(lambda f: f.center().length)
             self.assertAlmostEqual(faces[0].center().length, 0, 7)
             self.assertAlmostEqual(faces[-1].center().length, 1, 7)
 
-        with self.subTest(sort_by=SortBy.VOLUME):
+        with self.subTest(sort_by="volume"):
             with BuildPart() as test:
                 Box(1, 1, 1)
                 with Locations((0, 0, 10)):
                     Box(2, 2, 2)
-                solids = test.solids().sort_by(SortBy.VOLUME)
+                solids = test.solids().sort_by(Solid.volume)
             self.assertAlmostEqual(solids[0].volume, 1, 7)
             self.assertAlmostEqual(solids[-1].volume, 8, 7)
 
-        with self.subTest(sort_by=SortBy.RADIUS):
+        with self.subTest(sort_by="radius"):
             with BuildPart() as test:
                 Cone(1, 0.5, 2)
-                edges = test.edges().filter_by(GeomType.CIRCLE).sort_by(SortBy.RADIUS)
+                edges = test.edges().filter_by(GeomType.CIRCLE).sort_by(Edge.radius)
             self.assertEqual(edges[0].radius, 0.5)
             self.assertEqual(edges[-1].radius, 1)
 

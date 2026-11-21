@@ -25,7 +25,7 @@ license:
 """
 # [Imports]
 import build123d as bd
-from ocp_vscode import *
+from ocp_viewer import *
 
 # [Code]
 with bd.BuildPart() as bp:

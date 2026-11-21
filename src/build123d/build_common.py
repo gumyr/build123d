@@ -55,10 +55,12 @@ from dataclasses import dataclass, field as dataclass_field
 from itertools import product
 from math import cos, pi, sqrt
 from types import FrameType
-from typing import Any, Generic, Type, TypeVar, cast
+from typing import Any, Generic, SupportsIndex, Type, TypeVar, cast, overload
 
 from OCP.Standard import Standard_ConstructionError
 from typing_extensions import Self, deprecated
+
+from bd_materials import FinishedMaterial, resolve as resolve_material
 
 from build123d.build_enums import Align, Mode, Select
 
@@ -80,6 +82,8 @@ from build123d.build_constants import (  # pylint: disable=unused-import
 )
 from build123d.geometry import (
     Axis,
+    Color,
+    ColorLike,
     Location,
     Plane,
     Vector,
@@ -234,11 +238,17 @@ class Builder(ABC, Generic[ShapeT]):
     ):
         self.mode = mode
         self._label = ""
+        self._color: Color | None = None
+        self._material: FinishedMaterial | None = None
         self.output_placements = _normalize_placements(placements)
         self.placements = self.output_placements
         self._scope_context: AbstractContextManager[BuildScope] | None = None
         self._placed_obj: Shape | None = None
         self._published_obj: Shape | None = None
+        # The placed output handed out while the context is open, and the
+        # local product it was placed from
+        self._open_output: Shape | None = None
+        self._open_output_source: Shape | None = None
         current_frame = inspect.currentframe()
         assert current_frame is not None
         assert current_frame.f_back is not None
@@ -273,6 +283,35 @@ class Builder(ABC, Generic[ShapeT]):
     def label(self, value: str) -> None:
         """Assign a label to the builder's output object."""
         self._label = value
+
+    @property
+    def color(self) -> Color | None:
+        """Color assigned to the builder's output object."""
+        return self._color
+
+    @color.setter
+    def color(self, value: ColorLike | None) -> None:
+        """Assign a color to the builder's output object."""
+        self._color = Color(value) if value is not None else None
+
+    @property
+    def material(self) -> FinishedMaterial | None:
+        """Material assigned to the builder's output object."""
+        return self._material
+
+    @material.setter
+    def material(self, value: FinishedMaterial | str | None) -> None:
+        """Assign a material to the builder's output object, by name or
+        as a FinishedMaterial."""
+        if value is None or isinstance(value, FinishedMaterial):
+            self._material = value
+        elif isinstance(value, str):
+            self._material = resolve_material(value)
+        else:
+            raise TypeError(
+                f"Non supported type {type(value).__name__}, "
+                "need FinishedMaterial, str or None"
+            )
 
     @property
     @deprecated("Builder.new_edges is deprecated; use edges(Select.NEW) instead.")
@@ -367,8 +406,21 @@ class Builder(ABC, Generic[ShapeT]):
             local_product = self._publication_product()
         except AttributeError:
             local_product = None
-        if local_product is not None and self._label:
-            local_product.label = self._label
+        if local_product is not None:
+            # A label, color or material assigned to the placed output as the
+            # last step before exit is kept: the copy it was set on is about to
+            # be discarded, so it moves onto the product that is placed here.
+            # The builder's own attributes then go onto the product before it
+            # is published or placed, so every copy made from it carries them.
+            # Material first: a material's own color must not override one
+            # the user assigned.
+            self._keep_open_output_attributes(local_product, construction_product)
+            if self._label:
+                local_product.label = self._label
+            if self._material is not None:
+                local_product.material = self._material
+            if self._color is not None:
+                local_product.color = self._color
         if self.builder_parent is not None and self.mode != Mode.PRIVATE:
             logger.debug(
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
@@ -395,7 +447,40 @@ class Builder(ABC, Generic[ShapeT]):
             )
         )
 
+        self._open_output = None
+        self._open_output_source = None
+
         logger.info("Exiting %s", type(self).__name__)
+
+    def _keep_open_output_attributes(
+        self, local_product: Shape, construction_product: Shape | None
+    ) -> None:
+        """Carry label, color and material assigned to the placed output while
+        the context was open onto the product(s) it was placed from, where they
+        are not already set. The copy is current only if the product it was
+        placed from is still the builder's product; an attribute set before a
+        later operation is not kept."""
+        carried = self._open_output
+        if (
+            carried is None
+            or carried is local_product
+            or self._open_output_source is not construction_product
+        ):
+            return
+        targets = [local_product]
+        if (
+            construction_product is not None
+            and construction_product is not local_product
+        ):
+            targets.append(construction_product)
+        for target in targets:
+            if carried.label and not target.label:
+                target.label = carried.label
+            # pylint: disable=protected-access
+            if carried._material is not None and target._material is None:
+                target._material = carried._material
+            if carried._color is not None and target._color is None:
+                target._color = carried._color
 
     def _place_output(self) -> Shape:
         """Apply publication locations and output placements to the local product."""
@@ -413,7 +498,12 @@ class Builder(ABC, Generic[ShapeT]):
             return self._placed_obj
         scope = _get_build_scope()
         if scope is not None and scope.owner is self:
-            return self._place_output()
+            # The same placed copy is handed out until the product changes, so
+            # an attribute assigned to it is still there at exit to be kept
+            if self._open_output is None or self._open_output_source is not self._obj:
+                self._open_output_source = self._obj
+                self._open_output = self._place_output()
+            return self._open_output
         return self._obj
 
     @abstractmethod
@@ -975,34 +1065,82 @@ def validate_inputs(
         context.validate_inputs(validating_class, objects)
 
 
-class LocationList:
+class LocationList(list[Location]):
     """Location Context
 
-    A stateful context of active locations. At least one must be active
-    at all times. Locations are expressed in the Builder's local Plane.XY
-    construction coordinates. Consequently, ordinary ``Vector`` and tuple
-    arithmetic is already local and no workplane-aware Vector monkeypatch is
-    required; output placements are applied only when the product is published.
+    A stateful context of active locations, and a ``list`` of them. At least
+    one must be active at all times. Locations are expressed in the Builder's
+    local Plane.XY construction coordinates. Consequently, ordinary ``Vector``
+    and tuple arithmetic is already local and no workplane-aware Vector
+    monkeypatch is required; output placements are applied only when the
+    product is published.
+
+    A list made inside another location context holds its own locations
+    composed with that context's. It is edited like any list - appended to,
+    sliced, sorted, concatenated with ``+`` - except while it is the active
+    context, whose locations were fixed on entry, or when the enclosing context
+    had several locations, since its entries are then a product and don't
+    stand for single own locations. ``*`` composes two lists; it doesn't
+    repeat one.
 
     Args:
-        locations (list[Location]): list of locations to add to the context
-
+        locations (Iterable[Location]): the locations, composed with the
+            enclosing context where there is one
+        own_locations (list[Location], optional): the locations before that
+            composition; needed when ``group`` has several locations, derived
+            otherwise
+        group (tuple[Location, ...], optional): the enclosing context's
+            locations the contents were composed with. Defaults to the active
+            location context's when ``own_locations`` is given, else to the
+            identity.
     """
+
+    def __init__(
+        self,
+        locations: Iterable[Location],
+        own_locations: list[Location] | None = None,
+        group: tuple[Location, ...] | None = None,
+    ):
+        super().__init__(locations)
+        self._scope_context: AbstractContextManager[BuildScope] | None = None
+        self._python_frame: FrameType | None = None
+        if group is None:
+            context = LocationList._get_context() if own_locations is not None else None
+            group = tuple(context) if context is not None else (Location(),)
+        self._group = group
+        # With one location in the group each entry stands for one own location
+        # and the own locations are derived from the entries; with several the
+        # entries are a product and the own locations are kept as given
+        self._frozen_own: list[Location] | None = None
+        if len(group) > 1:
+            if own_locations is None:
+                raise ValueError(
+                    "own_locations are needed for a group of several locations"
+                )
+            self._frozen_own = list(own_locations)
+        self._group_inverse: Location | None = (
+            group[0].inverse() if len(group) == 1 and group[0] != Location() else None
+        )
 
     @property
     def locations(self) -> list[Location]:
         """Current locations in local construction coordinates."""
-        return self.local_locations
+        return self
 
-    def __init__(
-        self, locations: list[Location], own_locations: list[Location] | None = None
-    ):
-        self._scope_context: AbstractContextManager[BuildScope] | None = None
-        self.local_locations = locations
-        # The locations before composition with the enclosing context, for a
-        # builder entered in another frame that must not inherit that context
-        self._own_locations = locations if own_locations is None else own_locations
-        self._python_frame: FrameType | None = None
+    @property
+    def local_locations(self) -> list[Location]:
+        """Current locations in local construction coordinates."""
+        return self
+
+    @property
+    def _own_locations(self) -> list[Location]:
+        """The locations before composition with the enclosing context, for a
+        builder entered in another frame that must not inherit that context"""
+        if self._frozen_own is not None:
+            return self._frozen_own
+        if self._group_inverse is None:
+            return list(self)
+        return [self._group_inverse * location for location in self]
 
     def __enter__(self):
         """Upon entering create a token to restore contextvars"""
@@ -1011,14 +1149,14 @@ class LocationList:
         active_scope = _get_build_scope()
         if active_scope is not None:
             location_scope = active_scope.derive(
-                operation_locations=tuple(self.locations),
+                operation_locations=tuple(self),
                 owner=self,
                 location_context=self,
                 object_context=_object_scope_for(active_scope),
             )
         else:
             location_scope = BuildScope(
-                operation_locations=tuple(self.locations),
+                operation_locations=tuple(self),
                 owner=self,
                 location_context=self,
             )
@@ -1026,10 +1164,7 @@ class LocationList:
         self._scope_context.__enter__()
 
         logger.info(
-            "%s is pushing %d points: %s",
-            type(self).__name__,
-            len(self.local_locations),
-            self.local_locations,
+            "%s is pushing %d points: %s", type(self).__name__, len(self), list(self)
         )
         return self
 
@@ -1037,12 +1172,149 @@ class LocationList:
         """Upon exiting restore context"""
         assert self._scope_context is not None
         self._scope_context.__exit__(exception_type, exception_value, traceback)
-        logger.info(
-            "%s is popping %d points", type(self).__name__, len(self.local_locations)
+        self._scope_context = None
+        logger.info("%s is popping %d points", type(self).__name__, len(self))
+
+    # Editing: the list contents are authoritative, so an edit needs nothing
+    # beyond the list's own behaviour, where an edit is meaningful at all
+
+    def _check_editable(self) -> None:
+        """Raise unless the entries can be changed or added to"""
+        if self._scope_context is not None:
+            raise RuntimeError(
+                f"{type(self).__name__} can't be changed while it is the active "
+                "location context"
+            )
+        self._check_entries_stand_alone()
+
+    def _check_entries_stand_alone(self) -> None:
+        """Raise unless each entry stands for one own location"""
+        if self._frozen_own is not None:
+            raise ValueError(
+                f"{type(self).__name__} was made inside a context of "
+                f"{len(self._group)} locations, so its entries are a product "
+                "that can't be changed or added to"
+            )
+
+    def append(self, location: Location) -> None:
+        self._check_editable()
+        super().append(location)
+
+    def extend(self, locations: Iterable[Location]) -> None:
+        self._check_editable()
+        super().extend(locations)
+
+    def insert(self, index: SupportsIndex, location: Location) -> None:
+        self._check_editable()
+        super().insert(index, location)
+
+    def remove(self, location: Location) -> None:
+        self._check_editable()
+        super().remove(location)
+
+    def pop(self, index: SupportsIndex = -1) -> Location:
+        self._check_editable()
+        return super().pop(index)
+
+    def clear(self) -> None:
+        self._check_editable()
+        super().clear()
+
+    def reverse(self) -> None:
+        self._check_editable()
+        super().reverse()
+
+    def sort(  # type: ignore[override]
+        self, *, key: Callable[[Location], Any] | None = None, reverse: bool = False
+    ) -> None:
+        self._check_editable()
+        super().sort(key=key, reverse=reverse)  # type: ignore[arg-type]
+
+    def __setitem__(self, index, value) -> None:
+        self._check_editable()
+        super().__setitem__(index, value)
+
+    def __delitem__(self, index: SupportsIndex | slice) -> None:
+        self._check_editable()
+        super().__delitem__(index)
+
+    def __iadd__(self, other: Iterable[Location]) -> Self:  # type: ignore[override,misc]
+        self._check_editable()
+        super().__iadd__(other)
+        return self
+
+    @overload
+    def __getitem__(self, key: SupportsIndex) -> Location: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> LocationList: ...
+
+    def __getitem__(self, key: SupportsIndex | slice) -> Location | LocationList:
+        """A slice is a LocationList. A slice of a list made inside a context of
+        several locations stands on its own, its entries being a product."""
+        if isinstance(key, slice):
+            return LocationList(
+                super().__getitem__(key),
+                group=self._group if self._frozen_own is None else None,
+            )
+        return super().__getitem__(key)
+
+    def copy(self) -> LocationList:
+        return LocationList(self, own_locations=self._frozen_own, group=self._group)
+
+    def __add__(self, other: Iterable[Location]) -> LocationList:  # type: ignore[override]
+        """Concatenate with locations into a LocationList"""
+        if not isinstance(other, Iterable):
+            return NotImplemented
+        self._check_entries_stand_alone()
+        return LocationList([*self, *other], group=self._group)
+
+    def __radd__(self, other: Iterable[Location]) -> LocationList:
+        """Concatenate locations and this list into a LocationList"""
+        if not isinstance(other, Iterable):
+            return NotImplemented
+        self._check_entries_stand_alone()
+        return LocationList([*other, *self], group=self._group)
+
+    def __mul__(self, other: LocationList) -> LocationList:  # type: ignore[override]
+        """Compose two location lists: every location of this list applied to
+        every location of ``other``, in the order nesting ``other`` inside this
+        list would place them. This list stands as it is, composed with any
+        enclosing context; ``other`` contributes its own locations, so that
+        context is not applied twice."""
+        if not isinstance(other, LocationList):
+            return NotImplemented
+        # pylint: disable=protected-access
+        return LocationList(
+            [outer * inner for outer in self for inner in other._own_locations],
+            own_locations=[
+                outer * inner
+                for outer in self._own_locations
+                for inner in other._own_locations
+            ],
+            group=self._group,
         )
 
-    def __iter__(self):
-        return iter(self.locations)
+    def moved(self, location: Location | Plane) -> LocationList:
+        """This list moved as a whole, each entry composed with ``location``:
+        what ``location * self`` and ``plane * self`` give. The result of a
+        list made inside a context of several locations stands on its own."""
+        placement = Location(location) if isinstance(location, Plane) else location
+        return LocationList(
+            [placement * entry for entry in self],
+            group=self._group if self._frozen_own is None else None,
+        )
+
+    def __rmul__(self, other: Location | Plane) -> LocationList:  # type: ignore[override,misc]
+        """A Location or Plane on the left moves the list as a whole; ``*``
+        never repeats a list"""
+        if isinstance(other, (Location, Plane)):
+            return self.moved(other)
+        return NotImplemented
+
+    def __imul__(self, other: Any) -> Any:  # type: ignore[override,misc]
+        """``*=`` composes, through ``__mul__``; it doesn't repeat"""
+        return NotImplemented
 
     @classmethod
     def _get_context(cls):
@@ -1153,11 +1425,9 @@ class HexLocations(LocationList):
         # Convert to locations and store the reference plane
         local_locations = [Location(point) for point in points]
 
-        self.local_locations = Locations._move_to_existing(
-            local_locations
-        )  #: values in local construction coordinates
-
-        super().__init__(self.local_locations, own_locations=local_locations)
+        super().__init__(
+            Locations._move_to_existing(local_locations), own_locations=local_locations
+        )
 
 
 class PolarLocations(LocationList):
@@ -1208,11 +1478,9 @@ class PolarLocations(LocationList):
                 )
             )
 
-        self.local_locations = Locations._move_to_existing(
-            local_locations
-        )  #: values independent of workplanes
-
-        super().__init__(self.local_locations, own_locations=local_locations)
+        super().__init__(
+            Locations._move_to_existing(local_locations), own_locations=local_locations
+        )
 
 
 class Locations(LocationList):
@@ -1260,10 +1528,9 @@ class Locations(LocationList):
             else:
                 raise ValueError(f"Locations doesn't accept type {type(point)}")
 
-        self.local_locations = Locations._move_to_existing(
-            local_locations
-        )  #: values independent of workplanes
-        super().__init__(self.local_locations, own_locations=local_locations)
+        super().__init__(
+            Locations._move_to_existing(local_locations), own_locations=local_locations
+        )
 
     @staticmethod
     def _move_to_existing(local_locations: list[Location]) -> list[Location]:
@@ -1351,11 +1618,10 @@ class GridLocations(LocationList):
             for i, j in product(range(x_count), range(y_count))
         ]
 
-        self.local_locations = Locations._move_to_existing(
-            local_locations
-        )  #: values independent of workplanes
         self.planes: list[Plane] = []
-        super().__init__(self.local_locations, own_locations=local_locations)
+        super().__init__(
+            Locations._move_to_existing(local_locations), own_locations=local_locations
+        )
 
 
 class _InheritedScopeValue:

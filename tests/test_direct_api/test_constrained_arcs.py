@@ -27,6 +27,7 @@ license:
 """
 
 import platform
+from itertools import permutations
 
 import pytest
 from OCP.BRep import BRep_Tool
@@ -504,6 +505,193 @@ def test_tan3_4():
     l3 = Line((-1, 0), (-0.75, 0))
     tan3 = Edge.make_constrained_arcs(l1, l2, l3)
     assert len(tan3) == 0
+
+
+@pytest.mark.parametrize("sagitta", [Sagitta.SHORT, Sagitta.LONG, Sagitta.BOTH])
+def test_arcs_run_from_first_to_second_tangency(sagitta):
+    """arcs start on the first tangency and end on the second, issue #1578"""
+    v1, v2 = Vertex(0, 0), Vertex(1, 0)
+    c5 = PolarLine((0, 0), 4, 60)
+    c6 = PolarLine((0, 0), 4, 40)
+    c7 = CenterArc((0, 0), 4, 0, 90)
+    cases = [
+        (v1, v2, Edge.make_constrained_arcs(v1, v2, radius=1, sagitta=sagitta)),
+        (
+            v1,
+            v2,
+            Edge.make_constrained_arcs(
+                v1, v2, center_on=Line((-5, 1), (5, 1)), sagitta=sagitta
+            ),
+        ),
+        (
+            v1,
+            v2,
+            Edge.make_constrained_arcs(
+                v1, v2, center_on=Line((-5, -1), (5, -1)), sagitta=sagitta
+            ),
+        ),
+        (c5, c6, Edge.make_constrained_arcs(c5, c6, c7, sagitta=sagitta)),
+    ]
+    for first, second, arcs in cases:
+        assert arcs
+        for arc in arcs:
+            assert first.distance_to(arc @ 0) < TOLERANCE
+            assert second.distance_to(arc @ 1) < TOLERANCE
+
+
+@pytest.mark.parametrize("sagitta", [Sagitta.SHORT, Sagitta.LONG, Sagitta.BOTH])
+@pytest.mark.parametrize("point", [(5, 3), Vector(5, 3), Vertex(5, 3)])
+@pytest.mark.parametrize("point_first", [True, False])
+@pytest.mark.parametrize(
+    "constraint", [{"radius": 4}, {"center_on": Line((-20, 5), (20, 5))}]
+)
+def test_arcs_run_from_first_to_second_tangency_mixed(
+    sagitta, point, point_first, constraint
+):
+    """a point given before an edge is still the start of the arc, issue #1578"""
+    edge = Line((0, 0), (10, 0))
+    first, second = (point, edge) if point_first else (edge, point)
+    arcs = Edge.make_constrained_arcs(first, second, sagitta=sagitta, **constraint)
+    assert arcs
+    position = Vector(5, 3)
+    for arc in arcs:
+        start, end = (arc @ 0, arc @ 1) if point_first else (arc @ 1, arc @ 0)
+        assert (start - position).length < TOLERANCE
+        assert edge.distance_to(end) < TOLERANCE
+
+
+def test_axis_with_tangency_qualifier():
+    """an Axis in a (Axis, Tangency) tuple acts as the Edge would"""
+    circle = CenterArc((0, 3), 1, 0, 360)
+    arcs = Edge.make_constrained_arcs(
+        (Axis.X, Tangency.UNQUALIFIED), circle, radius=1, sagitta=Sagitta.BOTH
+    )
+    expected = Edge.make_constrained_arcs(
+        (Edge(Axis.X), Tangency.UNQUALIFIED), circle, radius=1, sagitta=Sagitta.BOTH
+    )
+    assert len(arcs) == len(expected) == 2
+    for arc, expected_arc in zip(arcs, expected):
+        assert (arc @ 0 - expected_arc @ 0).length < TOLERANCE
+        assert (arc @ 1 - expected_arc @ 1).length < TOLERANCE
+        assert abs(arc.length - expected_arc.length) < TOLERANCE
+
+
+@pytest.mark.parametrize(
+    "tangencies, count",
+    [
+        ((Line((0, 0), (10, 0)), Line((0, 0), (0, 10)), Vector(3, 3)), 2),
+        ((Line((0, 0), (10, 0)), Vector(3, 3), Vector(5, 2)), 2),
+        ((Vector(0, 0), Vertex(2, 0), (1, 3)), 2),
+        ((CenterArc((0, 0), 5, 0, 360), Vector(1, 0), Vector(0, 1)), 4),
+        ((CenterArc((0, 0), 5, 0, 360), Line((-4, -1), (4, -1)), Vector(0, 1)), 4),
+        (
+            (
+                CenterArc((0, 0), 5, 0, 360),
+                CenterArc((1, 1), 1, 0, 360),
+                Vector(-1, -1),
+            ),
+            8,
+        ),
+    ],
+)
+def test_3tan_arcs_with_points(tangencies, count):
+    """three tangencies may include points, given in any order; the arcs still
+    run from the first tangency to the second"""
+
+    def distance(tangency, position: Vector) -> float:
+        if isinstance(tangency, Edge):
+            return tangency.distance_to(position)
+        return (Vector(tangency) - position).length
+
+    for ordered in permutations(tangencies):
+        arcs = Edge.make_constrained_arcs(*ordered, sagitta=Sagitta.BOTH)
+        assert len(arcs) == count
+        for arc in arcs:
+            assert distance(ordered[0], arc @ 0) < TOLERANCE
+            assert distance(ordered[1], arc @ 1) < TOLERANCE
+
+
+@pytest.mark.parametrize(
+    "tangencies",
+    [
+        (CenterArc((0, 0), 5, 0, 360), Vector(8, 1)),
+        (CenterArc((0, 0), 5, 0, 360), Vector(1, 0)),
+        (CenterArc((1, 1), 1, 0, 360), Vector(-1, -1)),
+        (CenterArc((0, 0), 5, 0, 360), Line((-10, -7), (10, -7))),
+        (CenterArc((0, 0), 5, 0, 360), Line((-4, -1), (4, -1))),
+    ],
+)
+@pytest.mark.parametrize(
+    "center_on", [Line((-20, 0.5), (20, 0.5)), Line((0.3, -20), (0.3, 20))]
+)
+def test_2tan_on_arcs_end_on_tangencies(tangencies, center_on):
+    """arcs with a center_on constraint end on their tangencies wherever the
+    solution circle lies relative to a tangent circle"""
+
+    def distance(tangency, position: Vector) -> float:
+        if isinstance(tangency, Edge):
+            return tangency.distance_to(position)
+        return (tangency - position).length
+
+    for ordered in permutations(tangencies):
+        arcs = Edge.make_constrained_arcs(
+            *ordered, center_on=center_on, sagitta=Sagitta.BOTH
+        )
+        assert arcs
+        for arc in arcs:
+            assert distance(ordered[0], arc @ 0) < TOLERANCE
+            assert distance(ordered[1], arc @ 1) < TOLERANCE
+
+
+@pytest.mark.parametrize(
+    "circle, point, center_on, count",
+    [
+        (CenterArc((0, 0), 5, 0, 360), Vector(8, 1), CenterArc((0, 0), 2, 0, 360), 4),
+        (CenterArc((0, 0), 5, 0, 360), Vector(1, 0), CenterArc((0, 0), 2, 0, 360), 2),
+        (
+            CenterArc((1, 1), 1, 0, 360),
+            Vector(-1, -1),
+            CenterArc((1, -1), 9, 0, 360),
+            4,
+        ),
+    ],
+)
+def test_2tan_on_arcs_pass_through_point(circle, point, center_on, count):
+    """with a circular center_on, circles the solver returns that miss the point
+    are not solutions"""
+    for ordered in ((circle, point), (point, circle)):
+        arcs = Edge.make_constrained_arcs(
+            *ordered, center_on=center_on, sagitta=Sagitta.BOTH
+        )
+        assert len(arcs) == count
+        for arc in arcs:
+            assert abs((arc.arc_center - point).length - arc.radius) < TOLERANCE
+            assert center_on.distance_to(arc.arc_center) < TOLERANCE
+            start, end = (
+                (arc @ 0, arc @ 1) if ordered[0] is circle else (arc @ 1, arc @ 0)
+            )
+            assert circle.distance_to(start) < TOLERANCE
+            assert (end - point).length < TOLERANCE
+
+
+def test_2tan_on_arcs_solver_failure():
+    """a failure inside the solver is reported as no arc being found"""
+    with pytest.raises(RuntimeError, match="Unable to find a tangent arc"):
+        Edge.make_constrained_arcs(
+            CenterArc((0, 0), 5, 0, 360),
+            CenterArc((1, 1), 1, 0, 360),
+            center_on=Line((-20, 0.5), (20, 0.5)),
+        )
+
+
+def test_2tan_rad_arcs_solver_failure():
+    """a failure inside the solver is reported as no arc being found"""
+    with pytest.raises(RuntimeError, match="Unable to find a tangent arc"):
+        Edge.make_constrained_arcs(
+            (Line((-5, 0), (5, 0)), Tangency.ENCLOSING),
+            CenterArc((0, 3), 1, 0, 360),
+            radius=1,
+        )
 
 
 def test_make_constrained_arcs_3tan():

@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="113.2mm" height="61.95mm" viewBox="-0.132 -1.107 2.264 1.239" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.0018" id="Given">
+      <line x1="0.0" y1="0.0" x2="2.0" y2="0.0" />
+    </g>
+    <g fill="none" stroke="rgb(30,78,163)" stroke-width="0.013999999999999999" id="Made">
+      <path d="M 0.0,0.0 A 1.0,1.0 -180.0 0,0 2.0,0.0" />
+    </g>
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.0018" id="Marks">
+      <circle cx="0.0" cy="0.0" r="0.025" />
+      <circle cx="2.0" cy="0.0" r="0.025" />
+    </g>
+  </g>
+</svg>

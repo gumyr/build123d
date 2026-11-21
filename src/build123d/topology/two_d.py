@@ -141,7 +141,6 @@ from build123d.build_enums import (
     GeomType,
     Hit,
     Keep,
-    SortBy,
     Transition,
     Unit,
 )
@@ -274,9 +273,25 @@ class Mixin2D(ABC, Shape[TOPODS]):
         if not all(summand._dim == 2 for summand in summands):
             raise ValueError("Only shapes with the same dimension can be added")
 
-        faces = list(self.faces()) + [f for s in summands for f in s.faces()]
+        own_faces = [f.wrapped for f in self.faces()]
+        brought_faces = [f.wrapped for s in summands for f in s.faces()]
+        all_faces = own_faces + brought_faces
         try:
-            sum_shape: Shape = Shell(faces)
+            if len(all_faces) == 1:
+                sum_shape: Shape = Shell(Face(all_faces[0]))
+                record = ShapeHistory()
+            else:
+                # sewn here rather than by Shell(faces) to keep the sewing's
+                # own account of what became of each face
+                sewing = BRepBuilderAPI_Sewing(TOLERANCE)
+                for face in all_faces:
+                    sewing.Add(face)
+                sewing.Perform()
+                sewn = downcast(sewing.SewedShape())
+                if not isinstance(sewn, TopoDS_Shell):
+                    raise ValueError("the faces do not sew into one connected shell")
+                sum_shape = Shell(sewn)
+                record = ShapeHistory.from_sewing(sewing, all_faces)
         except (
             TypeError,
             ValueError,
@@ -287,6 +302,8 @@ class Mixin2D(ABC, Shape[TOPODS]):
                 "Unable to sew faces into a single connected Shell - faces must "
                 "meet along shared edges, with at most two faces on an edge"
             ) from exc
+        # as for a fuse: what this shell had was there before, the rest brought in
+        sum_shape._made_by(record.with_inputs(own_faces, brought_faces))
 
         if SkipClean.clean:
             sum_shape = sum_shape.clean()
@@ -1193,7 +1210,7 @@ class Face(Mixin2D[TopoDS_Face]):
                         for edge_directions in edge_pair_directions
                     ):
                         result = "RECTANGLE"
-                        if len(flat_face_edges.group_by(SortBy.LENGTH)) == 1:
+                        if len(flat_face_edges.group_by(Edge.length)) == 1:
                             result = "SQUARE"
 
         return result
@@ -2545,7 +2562,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
             For example, make a series of slots on the curved walls of a cylinder.
 
-        .. image:: slotted_cylinder.png
+        .. image:: /reference/assets/api/slotted_cylinder.png
 
         Args:
           interior_wires: a list of hole outline wires
@@ -2753,7 +2770,7 @@ class Face(Mixin2D[TopoDS_Face]):
 
         A projection with no taper is illustrated below:
 
-        .. image:: /flatProjection.png
+        .. image:: /reference/assets/api/flatProjection.png
             :alt: flatProjection
 
         The projection meets every surface in its path, so a face cast onto a
@@ -3104,6 +3121,22 @@ class Shell(Mixin2D[TopoDS_Shell]):
 
     # ---- Instance Methods ----
 
+    def _split_parts(self, split_result: TopoDS_Shape) -> list[TopoDS_Shape]:
+        """A split shell is one connected shell, its halves sharing the section
+        edges, so the pieces to classify by side are its faces"""
+        return _topods_entities(split_result, "Face")
+
+    def _split_side(self, parts: list[TopoDS_Shape]) -> list[TopoDS_Shape]:
+        """The faces on one side of a split sewn into a shell per connected
+        group, a lone face held in a shell of its own"""
+        if not parts:
+            return parts
+        sewn = _sew_topods_faces([TopoDS.Face(part) for part in parts])
+        return [
+            _make_topods_shell([group]) if isinstance(group, TopoDS_Face) else group
+            for group in get_top_level_topods_shapes(sewn)
+        ]
+
     def bends(self) -> ShapeList[Face]:
         """The cylindrical faces of this Shell.
 
@@ -3150,7 +3183,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return rims
 
     @classmethod
-    def make_sheet(
+    def _make_sheet(
         cls, faces: Iterable[Face], merge_coplanar: bool | Iterable[Face] = False
     ) -> Shell:
         """Sew faces into a sheet metal reference shell.
@@ -3201,7 +3234,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         ]
         return cls._sewn_sheet(face_list, records)
 
-    def cut_sheet(self, *cutters: Shape) -> Shell:
+    def _cut_sheet(self, *cutters: Shape) -> Shell:
         """Trim this sheet with cutters, keeping its flats and bends.
 
         A ``Solid`` is a normal cut, the cut across a bend of sheet metal
@@ -3335,8 +3368,8 @@ class Shell(Mixin2D[TopoDS_Shell]):
         return Shell(TopoDS.Shell(_extrude_topods_shape(obj.wrapped, direction)))
 
     @classmethod
-    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Shell:
-        """make loft
+    def loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Shell:
+        """loft
 
         Makes a loft from a list of wires and vertices. Vertices can appear only at the
         beginning or end of the list, but cannot appear consecutively within the list nor
@@ -3353,6 +3386,16 @@ class Shell(Mixin2D[TopoDS_Shell]):
             Shell: Lofted object
         """
         return cls(TopoDS.Shell(_make_loft(objs, False, ruled)))
+
+    @classmethod
+    @deprecated("Shell.make_loft is deprecated; use Shell.loft instead.")
+    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Shell:
+        """make loft
+
+        .. deprecated::
+            Use :meth:`loft` instead.
+        """
+        return cls.loft(objs, ruled)
 
     @classmethod
     def revolve(
@@ -3428,9 +3471,7 @@ class Shell(Mixin2D[TopoDS_Shell]):
         """
         return tcast(Shell, super().__add__(other))
 
-    def unfold(
-        self, sheet_parameters: SheetMetalParameters | None = None
-    ) -> UnfoldOutput:
+    def unfold(self, sheet_parameters: SheetMetalParameters) -> UnfoldOutput:
         """Develop this planar/cylindrical shell onto ``Plane.XY``.
 
         Adjacent faces are placed by matching the developed representations of
@@ -3438,10 +3479,10 @@ class Shell(Mixin2D[TopoDS_Shell]):
         cylindrical faces have their angular UV direction scaled by the
         appropriate development radius.
 
-        When ``sheet_parameters`` is omitted, the geometric radius of every
-        cylindrical face is used. Supplying sheet parameters compensates each
-        bend to its neutral radius using the face orientation to distinguish
-        positive and negative bends.
+        The sheet parameters compensate each bend to its neutral radius, using
+        the face orientation to distinguish positive and negative bends. They
+        are required: a pattern developed without them, at the radius of the
+        shell's own surface, looks right and does not fold back to the part.
 
         The result unpacks as ``flat, face_map = shell.unfold(parameters)``:
         the flat pattern, and a :class:`~sheet_utils.FaceMap` that answers
@@ -3451,10 +3492,12 @@ class Shell(Mixin2D[TopoDS_Shell]):
         direction.
 
         Args:
-            sheet_parameters: Optional material and reference-surface parameters
+            sheet_parameters: material and reference-surface parameters
                 used to produce a neutral-axis flat pattern.
 
         Raises:
+            TypeError: If ``sheet_parameters`` is not a
+                :class:`~sheet_utils.SheetMetalParameters`.
             ValueError: If the shell is empty, disconnected, non-manifold,
                 contains unsupported surface types, or cannot be developed
                 consistently without a cut.
@@ -3463,6 +3506,8 @@ class Shell(Mixin2D[TopoDS_Shell]):
             UnfoldOutput: the developed shell on ``Plane.XY`` and the record
             of its faces
         """
+        if not isinstance(sheet_parameters, SheetMetalParameters):
+            raise TypeError("sheet_parameters must be a SheetMetalParameters")
         if not self:
             raise ValueError("unfold requires a non-empty Shell")
         flat, developments = _unfold_shell(self.wrapped, sheet_parameters)

@@ -2224,10 +2224,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         on this shape, by their x positions: the leftmost point of the set
         lands ``start`` of the way along the path and each face's centre as far
         beyond that as it is to the right of the leftmost point. Each face is
-        stood on the surface at its own point, x along the path's tangent and z
-        along the surface normal there, and projected onto the shape along that
-        normal with :meth:`~topology.Face.project_to_shape`. A line of text
-        follows the path this way.
+        stood above the surface at its own point, x along the path's tangent and
+        z along the surface normal there, and projected onto the shape along
+        that normal with :meth:`~topology.Face.project_to_shape`; the nearest
+        surface met is kept. A line of text follows the path this way.
 
         This is the tool for a target with several faces: a face that straddles
         the boundary between two faces of the target, a glyph running round a
@@ -2242,7 +2242,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         the surface along the whole path, and a face placed at a sharp corner
         of the target projects poorly.
 
-        .. image:: /projectText.png
+        .. image:: /reference/assets/api/projectText.png
 
         Args:
             faces (Union[list[Face], Compound]): planar faces on ``Plane.XY``
@@ -2283,8 +2283,15 @@ class Shape(NodeMixin, Generic[TOPODS]):
             surface_point, surface_normal = self.find_intersection_points(
                 projection_axis
             )[0]
+            # Stand the face clear of the surface before projecting it back. A
+            # face that touches the target leaves it to rounding whether the
+            # surface beneath it is in front of the face or behind, and so
+            # whether that surface or one further on is the first one met.
+            clearance = 0.5 * max(bbox.size.X, bbox.size.Y)
             surface_normal_plane = Plane(
-                origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
+                origin=surface_point + surface_normal * clearance,
+                x_dir=path_tangent,
+                z_dir=surface_normal,
             )
             projection_face: Face = surface_normal_plane.from_local_coords(
                 face.moved(Location((-face_center_x, 0, 0)))
@@ -2487,18 +2494,20 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @overload
     def split(
-        self, tool: TrimmingTool, keep: Literal[Keep.TOP, Keep.BOTTOM]
+        self, tool: Plane | Face | Shell, keep: Literal[Keep.TOP, Keep.BOTTOM]
     ) -> Self | list[Self]:
         """split and keep inside or outside"""
 
     @overload
     def split(
-        self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Literal[Keep.ALL]
+        self,
+        tool: Plane | Face | Shell | Iterable[Plane | Face | Shell],
+        keep: Literal[Keep.ALL],
     ) -> list[Self]:
         """split and return the unordered pieces"""
 
     @overload
-    def split(self, tool: TrimmingTool, keep: Literal[Keep.BOTH]) -> tuple[
+    def split(self, tool: Plane | Face | Shell, keep: Literal[Keep.BOTH]) -> tuple[
         Self | list[Self],
         Self | list[Self],
     ]:
@@ -2506,23 +2515,27 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @overload
     def split(
-        self, tool: TrimmingTool, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
+        self, tool: Plane | Face | Shell, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
     ) -> NoReturn:
         """invalid split"""
 
     @overload
     def split(
         self,
-        tool: Iterable[TrimmingTool],
+        tool: Iterable[Plane | Face | Shell],
         keep: Literal[Keep.TOP, Keep.BOTTOM, Keep.BOTH, Keep.INSIDE, Keep.OUTSIDE],
     ) -> NoReturn:
         """several tools leave no side to keep"""
 
     @overload
-    def split(self, tool: TrimmingTool) -> Self | list[Self]:
+    def split(self, tool: Plane | Face | Shell) -> Self | list[Self]:
         """split and keep inside (default)"""
 
-    def split(self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Keep = Keep.TOP):
+    def split(
+        self,
+        tool: Plane | Face | Shell | Iterable[Plane | Face | Shell],
+        keep: Keep = Keep.TOP,
+    ):
         """split
 
         Split this shape by the provided plane, face or shell, or by several of
@@ -2611,6 +2624,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         # Perform the splitting operation
         splitter.Build()
+        history = ShapeHistory.from_boolean(
+            splitter, before=[self.wrapped], brought=list(tool_list)
+        )
 
         split_result = downcast(splitter.Shape())
         # Remove unnecessary TopoDS_Compound around single shape
@@ -2620,13 +2636,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # For speed the user may just want all the objects which they
         # can sort more efficiently then the generic algorithm below
         if keep == Keep.ALL:
-            pieces = ShapeList(
-                self.__class__.cast(part)
-                for part in get_top_level_topods_shapes(split_result)
+            return ShapeList(
+                self._pieces(get_top_level_topods_shapes(split_result), history)
             )
-            for piece in pieces:
-                self.copy_attributes_to(piece, ["wrapped", "_NodeMixin__children"])
-            return pieces
 
         if not isinstance(tool, Plane):
             # Get a TopoDS_Face to work with from the tool
@@ -2656,22 +2668,19 @@ class Shape(NodeMixin, Generic[TOPODS]):
             # type: ignore
             tool_solid = half_space_maker.Solid()
 
-        tops: list[Shape] = []
-        bottoms: list[Shape] = []
+        tops: list[TopoDS_Shape] = []
+        bottoms: list[TopoDS_Shape] = []
         properties = GProp_GProps()
-        for part in get_top_level_topods_shapes(split_result):
-            sub_shape = self.__class__.cast(part)
+        for part in self._split_parts(split_result):
             if isinstance(tool, Plane):
                 # A piece lies wholly on one side of the plane and so does its
                 # centre of mass. The geometric centre need not: that of a curved
                 # face is the middle of its surface, whether trimmed away or not.
                 calc_function = Shape.shape_properties_LUT[shapetype(part)]
-                if calc_function is None:  # pragma: no cover
-                    piece_center = sub_shape.center()
-                else:
-                    piece_properties = GProp_GProps()
-                    calc_function(part, piece_properties)
-                    piece_center = Vector(piece_properties.CentreOfMass())
+                assert calc_function is not None  # a split never yields a vertex
+                piece_properties = GProp_GProps()
+                calc_function(part, piece_properties)
+                piece_center = Vector(piece_properties.CentreOfMass())
                 is_up = tool.to_local_coords(piece_center).Z >= 0
             else:
                 # Intersect self and the thickened tool
@@ -2682,15 +2691,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 BRepGProp.LinearProperties_s(is_up_obj, properties)
                 # Mass represents the total length for linear properties
                 is_up = properties.Mass() >= TOLERANCE
-            self.copy_attributes_to(sub_shape, ["wrapped", "_NodeMixin__children"])
-            (tops if is_up else bottoms).append(sub_shape)
+            (tops if is_up else bottoms).append(part)
 
-        # a side with nothing on it is the empty shape of self's class
-        nothing = self._zero_class()()
-        top = nothing if not tops else tops[0] if len(tops) == 1 else tops
-        bottom = (
-            nothing if not bottoms else bottoms[0] if len(bottoms) == 1 else bottoms
-        )
+        top = self._one_or_list(self._pieces(self._split_side(tops), history))
+        bottom = self._one_or_list(self._pieces(self._split_side(bottoms), history))
 
         if keep == Keep.BOTH:
             return (top, bottom)
@@ -2701,6 +2705,34 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # Keep.ALL returned earlier and INSIDE/OUTSIDE were rejected above, so
         # this is unreachable until a Keep value is added
         raise ValueError(f"Unsupported Keep value {keep}")  # pragma: no cover
+
+    def _split_parts(self, split_result: TopoDS_Shape) -> list[TopoDS_Shape]:
+        """The pieces of a split to classify by side: the kernel's top-level
+        shapes. A shape whose halves the kernel leaves joined, a shell or a
+        wire, overrides this to classify its faces or edges instead."""
+        return get_top_level_topods_shapes(split_result)
+
+    def _split_side(self, parts: list[TopoDS_Shape]) -> list[TopoDS_Shape]:
+        """The pieces on one side of a split, reassembled where ``_split_parts``
+        took them apart; as they are by default."""
+        return parts
+
+    def _pieces(
+        self, parts: Iterable[TopoDS_Shape], history: ShapeHistory
+    ) -> list[Shape]:
+        """Kernel shapes an operation on this shape made, as shapes of this
+        class that carry its attributes and the operation's history"""
+        pieces = [self.__class__.cast(part)._made_by(history) for part in parts]
+        for piece in pieces:
+            self.copy_attributes_to(piece, ["wrapped", "_NodeMixin__children"])
+        return pieces
+
+    def _one_or_list(self, pieces: list[Shape]) -> Shape | list[Shape]:
+        """A result of pieces: the empty shape of this class for none, the one
+        piece, or a list of them"""
+        if not pieces:
+            return self._zero_class()()
+        return pieces[0] if len(pieces) == 1 else pieces
 
     def tessellate(
         self, tolerance: float, angular_tolerance: float = 0.1
@@ -3729,6 +3761,41 @@ def topo_distance_to(
     return key_f
 
 
+# The class whose property stands in for a SortBy member when the list being
+# sorted is empty and so has no element to take the class from
+_SORT_BY_FALLBACK_CLASS = {
+    SortBy.LENGTH: "Edge",
+    SortBy.RADIUS: "Edge",
+    SortBy.AREA: "Face",
+    SortBy.VOLUME: "Solid",
+}
+
+
+def _warn_sort_by_deprecated(key: SortBy, shapes: list, method: str) -> None:
+    """Warn that a SortBy member is deprecated, naming the replacement for the
+    class of shape in ``shapes``: the property of the same name, or for DISTANCE
+    the method or key that measures from the origin. The warning is attributed
+    to the caller of the caller: the user's line, when called from ``_sort_by``
+    or ``_group_by``"""
+    if key is SortBy.DISTANCE:
+        exact = (
+            "or the key lambda s: s.center().length to keep the order by each "
+            "centre's distance from the origin"
+        )
+        if method == "sort_by":
+            advice = f"use sort_by_distance((0, 0, 0)) instead, {exact}"
+        else:
+            advice = f"use the key Vertex(0, 0, 0).distance_to instead, {exact}"
+    else:
+        cls = type(shapes[0]).__name__ if shapes else _SORT_BY_FALLBACK_CLASS[key]
+        advice = f"use {cls}.{key.name.lower()} instead"
+    warnings.warn(
+        f"SortBy.{key.name} is deprecated; {advice}.",
+        DeprecationWarning,
+        stacklevel=4,
+    )
+
+
 class ShapeList(list[T]):
     """Subclass of list with custom filter and sort methods appropriate to CAD"""
 
@@ -3797,15 +3864,15 @@ class ShapeList(list[T]):
 
     def __gt__(self, sort_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:  # type: ignore
         """Sort operator >"""
-        return self.sort_by(sort_by)
+        return self._sort_by(sort_by, reverse=False)
 
     def __lshift__(self, group_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:
         """Group and select smallest group operator <<"""
-        return self.group_by(group_by)[0]
+        return self._group_by(group_by)[0]
 
     def __lt__(self, sort_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:  # type: ignore
         """Reverse sort operator <"""
-        return self.sort_by(sort_by, reverse=True)
+        return self._sort_by(sort_by, reverse=True)
 
     # Normally implementing __eq__ is enough, but ShapeList subclasses list,
     # which already implements __ne__, so we need to override it, too
@@ -3821,7 +3888,7 @@ class ShapeList(list[T]):
 
     def __rshift__(self, group_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:
         """Group and select largest group operator >>"""
-        return self.group_by(group_by)[-1]
+        return self._group_by(group_by)[-1]
 
     def __sub__(self, other: ShapeList) -> ShapeList[T]:
         """Differences between two ShapeLists operator -"""
@@ -3904,8 +3971,10 @@ class ShapeList(list[T]):
         """filter by
 
         Either:
-        - filter objects of type planar Face or linear Edge by their normal or tangent
-        (respectively) and sort the results by the given axis, or
+        - filter objects of type planar Face, Face with an axis of rotation (cylinder,
+        cone, sphere, torus or surface of revolution) or linear Edge by their normal,
+        axis of rotation or tangent (respectively) and sort the results by the given
+        axis, or
         - filter the objects by the provided type. Note that not all types apply to all
         objects.
 
@@ -3944,6 +4013,8 @@ class ShapeList(list[T]):
                         surface_normal.X(), surface_normal.Y(), surface_normal.Z()
                     ).normalized()
                     shape_axis = Axis(shape.center(), normalized_surface_normal)
+                elif getattr(shape, "axis_of_rotation", None) is not None:
+                    shape_axis = getattr(shape, "axis_of_rotation")
                 elif (
                     isinstance(shape.wrapped, TopoDS_Edge)
                     and shape.geom_type == GeomType.LINE
@@ -4156,6 +4227,7 @@ class ShapeList(list[T]):
         Args:
             group_by (Callable | Axis | Edge | Wire | SortBy | property, optional):
                 group and sort criteria, or the ``Convexity`` enum itself.
+                ``SortBy`` is deprecated; pass the property instead.
                 Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
             tol_digits (int, optional): Tolerance for building the group keys by
@@ -4164,6 +4236,16 @@ class ShapeList(list[T]):
         Returns:
             GroupBy[T, K]: sorted groups of ShapeLists
         """
+        return self._group_by(group_by, reverse, tol_digits)
+
+    def _group_by(
+        self,
+        group_by: Callable[[T], K] | Axis | Edge | Wire | SortBy | property = Axis.Z,
+        reverse: bool = False,
+        tol_digits: int = 6,
+    ) -> GroupBy[T, K]:
+        """group_by, called directly by the public method and the operators so
+        a deprecation warning raised here points at the user's line either way"""
 
         if isinstance(group_by, type):
             # the enum itself, checked first because a class is also callable
@@ -4197,6 +4279,7 @@ class ShapeList(list[T]):
                 return round(group_by.param_at_point(pnt1), tol_digits)
 
         elif isinstance(group_by, SortBy):
+            _warn_sort_by_deprecated(group_by, self, "group_by")
             if group_by == SortBy.LENGTH:
 
                 def key_f(obj):
@@ -4282,7 +4365,8 @@ class ShapeList(list[T]):
 
         Args:
             sort_by (Callable | Axis | Edge | Wire | SortBy | property, optional):
-                sort criteria. Defaults to Axis.Z.
+                sort criteria. ``SortBy`` is deprecated; pass the property
+                instead. Defaults to Axis.Z.
             reverse (bool, optional): flip order of sort. Defaults to False.
 
         Raises:
@@ -4293,6 +4377,15 @@ class ShapeList(list[T]):
         Returns:
             ShapeList: sorted list of objects
         """
+        return self._sort_by(sort_by, reverse)
+
+    def _sort_by(
+        self,
+        sort_by: Callable[[T], K] | Axis | Edge | Wire | SortBy | property,
+        reverse: bool,
+    ) -> ShapeList[T]:
+        """sort_by, called directly by the public method and the operators so
+        a deprecation warning raised here points at the user's line either way"""
 
         if callable(sort_by):
             # If a callable is provided, use it directly as the key
@@ -4331,6 +4424,7 @@ class ShapeList(list[T]):
             )
 
         elif isinstance(sort_by, SortBy):
+            _warn_sort_by_deprecated(sort_by, self, "sort_by")
             if sort_by == SortBy.LENGTH:
                 objects = sorted(
                     self,

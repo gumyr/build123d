@@ -327,13 +327,13 @@ class BuildSheet(Builder[Shell]):
         # arriving in pieces is joined up; a replacement is a shell an
         # operation has already settled, so its coplanar seams are deliberate
         if mode == Mode.ADD:
-            new_shell = Shell.make_sheet(
+            new_shell = Shell._make_sheet(
                 existing_faces + incoming_faces, merge_coplanar=incoming_faces
             )
         elif mode == Mode.SUBTRACT:
             if not existing_faces:
                 raise RuntimeError("Nothing to subtract from")
-            new_shell = self._sheet.cut_sheet(*incoming_solids, *incoming_faces)
+            new_shell = self._sheet._cut_sheet(*incoming_solids, *incoming_faces)
         elif mode == Mode.REPLACE:
             # an operation hands over the sheet it has already sewn, record and
             # all; anything else is sewn here
@@ -344,7 +344,7 @@ class BuildSheet(Builder[Shell]):
             ):
                 new_shell = incoming_shells[0]
             else:
-                new_shell = Shell.make_sheet(incoming_faces)
+                new_shell = Shell._make_sheet(incoming_faces)
         elif mode == Mode.INTERSECT:
             raise ValueError("BuildSheet does not yet support Mode.INTERSECT")
         else:  # pragma: no cover - defensive for future Mode values

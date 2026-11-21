@@ -30,6 +30,7 @@ license:
 from __future__ import annotations
 
 from math import atan2, cos, isnan, sin, pi
+from collections.abc import Sequence
 from typing import overload, TYPE_CHECKING, Callable, TypeVar
 from typing import cast as tcast
 
@@ -74,7 +75,12 @@ from OCP.gp import (
     gp_Vec2d,
 )
 from OCP.IntAna2d import IntAna2d_AnaIntersection
-from OCP.Standard import Standard_ConstructionError, Standard_Failure
+from OCP.Standard import (
+    Standard_ConstructionError,
+    Standard_DomainError,
+    Standard_Failure,
+    Standard_OutOfRange,
+)
 from OCP.TopoDS import TopoDS_Edge
 
 from build123d.build_enums import Sagitta, Tangency
@@ -90,6 +96,16 @@ TWrap = TypeVar("TWrap")  # whatever the factory returns (Edge or a subclass)
 # Reuse a single XY plane for 3D->2D projection and for 2D-edge building
 _pln_xy = gp_Pln(gp_Ax3(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(0.0, 0.0, 1.0)))
 _surf_xy = Geom_Plane(_pln_xy)
+
+# The exceptions a tangency solver raises when it fails. OCP's exception classes
+# do not derive from one another and the class raised for the same failure
+# differs between platforms, so each has to be named.
+_SOLVER_ERRORS = (
+    Standard_ConstructionError,
+    Standard_DomainError,
+    Standard_Failure,
+    Standard_OutOfRange,
+)
 
 
 # ---------------------------
@@ -138,9 +154,14 @@ def _edge_to_qualified_2d(
     return qcurve, hcurve2d, first, last, adapt2d
 
 
-def _edge_from_circle(h2d_circle: Geom2d_Circle, u1: float, u2: float) -> TopoDS_Edge:
-    """Build a 3D edge on XY from a trimmed 2D circle segment [u1, u2]."""
+def _edge_from_circle(
+    h2d_circle: Geom2d_Circle, u1: float, u2: float, reverse: bool = False
+) -> TopoDS_Edge:
+    """Build a 3D edge on XY from a trimmed 2D circle segment [u1, u2].
+    With ``reverse`` the edge runs backwards from u2 to u1."""
     arc2d = Geom2d_TrimmedCurve(h2d_circle, u1, u2, True)  # sense=True
+    if reverse:
+        arc2d.Reverse()
     circle_edge = BRepBuilderAPI_MakeEdge(arc2d, _surf_xy).Edge()
     BRepLib.BuildCurves3d_s(circle_edge)
 
@@ -197,8 +218,8 @@ def _two_arc_edges_from_params(
 ) -> list[TopoDS_Edge]:
     """
     Given two parameters on a circle, return both the forward (minor)
-    and complementary (major) arcs as TopoDS_Edge(s).
-    Uses centralized normalization utilities.
+    and complementary (major) arcs as TopoDS_Edge(s). Both arcs start at u1
+    and end at u2. Uses centralized normalization utilities.
     """
     h2d_circle = Geom2d_Circle(circ)
     period = h2d_circle.Period()  # usually 2*pi
@@ -213,7 +234,7 @@ def _two_arc_edges_from_params(
         return ShapeList()
 
     minor = _edge_from_circle(h2d_circle, u1n, u1n + d)
-    major = _edge_from_circle(h2d_circle, u2n, u2n + (period - d))
+    major = _edge_from_circle(h2d_circle, u2n, u2n + (period - d), reverse=True)
     return [minor, major]
 
 
@@ -316,10 +337,33 @@ def _enclosed_circ_param_offset(
     return pars
 
 
+def _circ_params_on_curves(
+    circ: gp_Circ2d,
+    params: list[float],
+    curves: Sequence[Geom2d_Curve | None],
+) -> list[float]:
+    """
+    Corrects solution-circle parameters the solver reports half a turn away from
+    the tangency: a parameter whose point on the solution circle is not on its
+    tangent curve is moved by pi. Point inputs, which have no curve, are left
+    as they are.
+    """
+    h2d_circle = Geom2d_Circle(circ)
+    pars = list(params)
+    for i, (par, curve) in enumerate(zip(params, curves)):
+        if curve is None:
+            continue
+        proj = Geom2dAPI_ProjectPointOnCurve(h2d_circle.Value(par), curve)
+        if proj.NbPoints() == 0 or proj.LowerDistance() > TOLERANCE:
+            pars[i] = par + pi
+    return pars
+
+
 def _make_2tan_rad_arcs(
     *tangencies: tuple[Edge, Tangency] | Edge | Vector,  # 2
     radius: float,
     sagitta: Sagitta = Sagitta.SHORT,
+    arc_ends: tuple[int, int] = (0, 1),
     edge_factory: Callable[[TopoDS_Edge], Edge],
 ) -> ShapeList[Edge]:
     """
@@ -332,6 +376,8 @@ def _make_2tan_rad_arcs(
         tangencies (tuple[Edge, PositionConstraint] | Edge | Vertex | VectorLike:
             Curve tangency targets or point-incidence targets for the circle(s)
         radius (float): Circle radius for all candidate solutions.
+        arc_ends (tuple[int, int]): indices into ``tangencies`` of the tangency
+            each arc starts on and the one it ends on. Defaults to (0, 1).
 
     Raises:
         ValueError: Invalid input
@@ -355,9 +401,13 @@ def _make_2tan_rad_arcs(
     q_o: tuple[Geom2dGcc_QualifiedCurve, Geom2dGcc_QualifiedCurve]
     q_o, h_e, e_first, e_last, is_edge = map(tuple, zip(*results))
 
-    gcc = Geom2dGcc_Circ2d2TanRad(*q_o, radius, TOLERANCE)
+    msg = "Unable to find a tangent arc"
+    try:
+        gcc = Geom2dGcc_Circ2d2TanRad(*q_o, radius, TOLERANCE)
+    except _SOLVER_ERRORS as con_err:
+        raise RuntimeError(msg) from con_err
     if not gcc.IsDone() or gcc.NbSolutions() == 0:
-        raise RuntimeError("Unable to find a tangent arc")
+        raise RuntimeError(msg)
 
     def _ok(i: int, u: float) -> bool:
         """Does the given parameter value lie within the edge range?"""
@@ -444,8 +494,9 @@ def _make_2tan_rad_arcs(
         if not valid_solution:
             continue
 
-        u_circ1, _ = corrected_params[0]
-        u_circ2, _ = corrected_params[1]
+        # Each arc runs from the first of arc_ends to the second
+        u_circ1, _ = corrected_params[arc_ends[0]]
+        u_circ2, _ = corrected_params[arc_ends[1]]
 
         # Build BOTH sagitta arcs and select by LengthConstraint
         if sagitta == Sagitta.BOTH:
@@ -463,6 +514,7 @@ def _make_2tan_on_arcs(
     *tangencies: tuple[Edge, Tangency] | Edge | Vector,  # 2
     center_on: Edge,
     sagitta: Sagitta = Sagitta.SHORT,
+    arc_ends: tuple[int, int] = (0, 1),
     edge_factory: Callable[[TopoDS_Edge], Edge],
 ) -> ShapeList[Edge]:
     """
@@ -472,6 +524,8 @@ def _make_2tan_on_arcs(
     Notes
     -----
     - `center_on` is treated as a **center locus** (not a tangency target).
+    - `arc_ends` holds the indices into `tangencies` of the tangency each arc
+      starts on and the one it ends on.
     """
 
     # Unpack optional per-edge qualifiers (default UNQUALIFIED)
@@ -495,15 +549,19 @@ def _make_2tan_on_arcs(
         if is_edge[i]
     ]
 
-    if sum(is_edge) > 1:
-        gcc = Geom2dGcc_Circ2d2TanOn(q_o[0], q_o[1], adapt_on, TOLERANCE, *guesses)
-    else:
-        assert isinstance(q_o[0], Geom2d_Point)
-        assert isinstance(q_o[1], Geom2d_Point)
-        gcc = Geom2dGcc_Circ2d2TanOn(q_o[0], q_o[1], adapt_on, TOLERANCE)
+    msg = "Unable to find a tangent arc with center_on constraint"
+    try:
+        if sum(is_edge) > 1:
+            gcc = Geom2dGcc_Circ2d2TanOn(q_o[0], q_o[1], adapt_on, TOLERANCE, *guesses)
+        else:
+            assert isinstance(q_o[0], Geom2d_Point)
+            assert isinstance(q_o[1], Geom2d_Point)
+            gcc = Geom2dGcc_Circ2d2TanOn(q_o[0], q_o[1], adapt_on, TOLERANCE)
+    except _SOLVER_ERRORS as con_err:
+        raise RuntimeError(msg) from con_err
 
     if not gcc.IsDone() or gcc.NbSolutions() == 0:
-        raise RuntimeError("Unable to find a tangent arc with center_on constraint")
+        raise RuntimeError(msg)
 
     def _ok(i: int, u: float) -> bool:
         """Does the given parameter value lie within the edge range?"""
@@ -518,6 +576,16 @@ def _make_2tan_on_arcs(
     for i in range(1, gcc.NbSolutions() + 1):
         circ: gp_Circ2d = gcc.ThisSolution(i)
 
+        # With a circular center locus the solver can return circles that miss
+        # a point input, which are not solutions
+        center = circ.Location()
+        if any(
+            abs(center.Distance(gp_Pnt2d(t[0].X, t[0].Y)) - circ.Radius()) > TOLERANCE
+            for t in tangent_tuples[:2]
+            if isinstance(t[0], Vector)
+        ):
+            continue
+
         # Tangency on curve 1
         p1 = gp_Pnt2d()
         u_circ1, u_arg1 = gcc.Tangency1(i, p1)
@@ -530,9 +598,11 @@ def _make_2tan_on_arcs(
         if not _ok(1, u_arg2):
             continue
 
-        u_circ1, u_circ2 = _enclosed_circ_param_offset(
-            tangent_tuples, circ, [u_circ1, u_circ2]
-        )
+        # The solver can report a parameter half a turn from the tangency, so
+        # each one is checked against its curve
+        u_circs = _circ_params_on_curves(circ, [u_circ1, u_circ2], h_e)
+        # Each arc runs from the first of arc_ends to the second
+        u_circ1, u_circ2 = u_circs[arc_ends[0]], u_circs[arc_ends[1]]
 
         # Build sagitta arc(s) and select by LengthConstraint
         if sagitta == Sagitta.BOTH:
@@ -550,15 +620,17 @@ def _make_2tan_on_arcs(
 def _make_3tan_arcs(
     *tangencies: tuple[Edge, Tangency] | Edge | Vector,  # 3
     sagitta: Sagitta = Sagitta.SHORT,
+    arc_ends: tuple[int, int] = (0, 1),
     edge_factory: Callable[[TopoDS_Edge], Edge],
 ) -> ShapeList[Edge]:
     """
     Create planar circular arc(s) on XY tangent to three provided objects.
 
     The circle is determined by the three tangency constraints; the returned arc(s)
-    are trimmed between the two tangency points corresponding to `tangencies[0]` and
-    `tangencies[1]`. Use `sagitta` to select the shorter/longer (or both) arc.
-    Inputs must be representable on Plane.XY.
+    run from the tangency point on `tangencies[arc_ends[0]]` to the one on
+    `tangencies[arc_ends[1]]`, by default from `tangencies[0]` to `tangencies[1]`.
+    Use `sagitta` to select the shorter/longer (or both) arc.
+    Inputs must be representable on Plane.XY, with any points after the edges.
     """
 
     # Unpack optional per-edge qualifiers (default UNQUALIFIED)
@@ -573,16 +645,17 @@ def _make_3tan_arcs(
     ]
     q_o, h_e, e_first, e_last, is_edge = map(tuple, zip(*results))
 
-    # Provide initial middle guess parameters for all of the edges
-    guesses: tuple[float, float, float] = tuple(
-        (e_last[i] - e_first[i]) / 2 + e_first[i] for i in range(3)
-    )
+    # Provide initial middle guess parameters for all of the edges - points,
+    # which are always last, take none
+    guesses: list[float] = [
+        (e_last[i] - e_first[i]) / 2 + e_first[i] for i in range(3) if is_edge[i]
+    ]
 
     # Generate all valid circles tangent to the 3 inputs
     msg = "Unable to find a circle tangent to all three objects"
     try:
         gcc = Geom2dGcc_Circ2d3Tan(*q_o, TOLERANCE, *guesses)
-    except (Standard_ConstructionError, Standard_Failure) as con_err:
+    except _SOLVER_ERRORS as con_err:
         raise RuntimeError(msg) from con_err
     if not gcc.IsDone() or gcc.NbSolutions() == 0:
         raise RuntimeError(msg)
@@ -606,29 +679,36 @@ def _make_3tan_arcs(
         # out_topos.append(BRepBuilderAPI_MakeEdge(arc2d, _surf_xy).Edge())
         # continue
 
-        # Tangency on curve 1 (arc endpoint A)
+        # Tangency on curve 1
         p1 = gp_Pnt2d()
         u_circ1, u_arg1 = gcc.Tangency1(i, p1)
         if not _ok(0, u_arg1):
             continue
 
-        # Tangency on curve 2 (arc endpoint B)
+        # Tangency on curve 2
         p2 = gp_Pnt2d()
         u_circ2, u_arg2 = gcc.Tangency2(i, p2)
         if not _ok(1, u_arg2):
             continue
 
-        # Tangency on curve 3 (validates circle; does not define arc endpoints)
+        # Tangency on curve 3
         p3 = gp_Pnt2d()
-        _u_circ3, u_arg3 = gcc.Tangency3(i, p3)
+        u_circ3, u_arg3 = gcc.Tangency3(i, p3)
         if not _ok(2, u_arg3):
             continue
 
-        u_circ1, u_circ2, _u_circ3 = _enclosed_circ_param_offset(
-            tangent_tuples,
-            circ,
-            [u_circ1, u_circ2, _u_circ3],
-        )
+        # The solver can report a parameter half a turn from the tangency. With
+        # a point among the inputs when it does so depends on the order of the
+        # inputs, so each parameter is checked against its curve instead
+        u_circs = [u_circ1, u_circ2, u_circ3]
+        if all(is_edge):
+            u_circs = _enclosed_circ_param_offset(tangent_tuples, circ, u_circs)
+        else:
+            u_circs = _circ_params_on_curves(circ, u_circs, h_e)
+        # Each arc runs from the first of arc_ends to the second; the remaining
+        # tangency validates the circle without defining an arc endpoint
+        u_circ1, u_circ2 = u_circs[arc_ends[0]], u_circs[arc_ends[1]]
+
         # Build arc(s) between u_circ1 and u_circ2 per LengthConstraint
         if sagitta == Sagitta.BOTH:
             out_topos.extend(_two_arc_edges_from_params(circ, u_circ1, u_circ2))

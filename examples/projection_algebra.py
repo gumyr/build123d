@@ -1,5 +1,5 @@
 from build123d import *
-from ocp_vscode import show_object
+from ocp_viewer import show_object
 
 # A sphere used as a projection target
 sphere = Sphere(50)

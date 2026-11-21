@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="110.7mm" height="48.52313mm" viewBox="-3.057625 -1.482455 6.36525 2.79008" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.005175" id="Given">
+      <path d="M -1.825521,-0.729422 A 0.75,0.75 0.0 0,0 -2.252963,0.706052" />
+      <path d="M 1.652902,-0.937829 A 1.0,1.0 0.0 1,1 2.222098,0.975024" />
+    </g>
+    <g fill="none" stroke="rgb(30,78,163)" stroke-width="0.04025" id="Made">
+      <path d="M 1.652902,-0.937829 A 6.0,6.0 0.0 0,1 -1.825521,-0.729422" />
+      <path d="M 2.222098,0.975024 A 8.0,8.0 0.0 0,1 -2.252963,0.706052" />
+    </g>
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.005175" id="Construction" stroke-dasharray="0.0621 0.015525">
+      <path d="M -1.869764,0.738606 A 0.75,0.75 0.0 1,1 -1.425467,-0.482091" />
+      <path d="M 1.233956,-0.642788 A 1.0,1.0 0.0 1,1 1.65798,0.939693" />
+    </g>
+  </g>
+</svg>

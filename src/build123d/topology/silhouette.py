@@ -63,6 +63,7 @@ from build123d.build_enums import GeomType
 from build123d.geometry import (
     TOLERANCE,
     Axis,
+    BoundBox,
     Location,
     Matrix,
     Plane,
@@ -452,11 +453,16 @@ def _project_profile_by_extrusion(
         operation, before=[target.wrapped], brought=[extrusion]
     )
     trace = history.trace([target.wrapped])
+    # Whatever the column covers lies within it. A column too thin for the
+    # kernel, swept from a sliver lying nearly along the direction, can come
+    # back with a whole face of the target instead, which is no projection
+    column = BoundBox.from_topo_ds(extrusion, optimal=False)
     target_faces = [
         TopoDS.Face(face)
         for face in _topods_entities(result, "Face")
         if (trace.is_modified(face) or trace.is_untouched(face))
         and (keep_edge_on or not _edge_on(_as_face(TopoDS.Face(face)), direction))
+        and column.covers(BoundBox.from_topo_ds(face))
     ]
     if not target_faces:
         return ShapeList()

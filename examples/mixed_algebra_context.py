@@ -1,5 +1,5 @@
 from build123d import *
-from ocp_vscode import show_object
+from ocp_viewer import show_object
 
 # Mix context and algebra api for parts
 

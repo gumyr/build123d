@@ -28,7 +28,7 @@ license:
 # [Code]
 
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 exchanger_diameter = 10 * CM
 exchanger_length = 30 * CM
@@ -75,7 +75,7 @@ with BuildPart() as heat_exchanger:
     fillet(
         heat_exchanger.edges()
         .filter_by(GeomType.CIRCLE)
-        .sort_by(SortBy.RADIUS)
+        .sort_by(Edge.radius)
         .sort_by(Axis.Z, reverse=True)[2 * tube_count : 3 * tube_count],
         radius=fillet_radius,
     )

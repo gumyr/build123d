@@ -27,7 +27,7 @@ license:
 """
 
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 height, width, thickness, padding = 60, 80, 10, 12
 screw_shaft_radius, screw_head_radius, screw_head_height = 1.5, 3, 3

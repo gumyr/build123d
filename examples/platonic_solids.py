@@ -8,14 +8,14 @@ date: February 17, 2024
 desc:
     This example creates a custom Part object PlatonicSolid.
 
-    Platonic solids are five three-dimensional shapes that are highly symmetrical, 
-    known since antiquity and named after the ancient Greek philosopher Plato. 
-    These solids are unique because their faces are congruent regular polygons, 
-    with the same number of faces meeting at each vertex. The five Platonic solids 
-    are the tetrahedron (4 triangular faces), cube (6 square faces), octahedron 
-    (8 triangular faces), dodecahedron (12 pentagonal faces), and icosahedron 
-    (20 triangular faces). Each solid represents a unique way in which identical 
-    polygons can be arranged in three dimensions to form a convex polyhedron, 
+    Platonic solids are five three-dimensional shapes that are highly symmetrical,
+    known since antiquity and named after the ancient Greek philosopher Plato.
+    These solids are unique because their faces are congruent regular polygons,
+    with the same number of faces meeting at each vertex. The five Platonic solids
+    are the tetrahedron (4 triangular faces), cube (6 square faces), octahedron
+    (8 triangular faces), dodecahedron (12 pentagonal faces), and icosahedron
+    (20 triangular faces). Each solid represents a unique way in which identical
+    polygons can be arranged in three dimensions to form a convex polyhedron,
     embodying ideals of symmetry and balance.
 
 license:
@@ -42,7 +42,7 @@ from math import sqrt
 from typing import Union, Literal
 from scipy.spatial import ConvexHull
 
-from ocp_vscode import show
+from ocp_viewer import show
 
 PHI = (1 + sqrt(5)) / 2  # The Golden Ratio
 
@@ -129,10 +129,10 @@ class PlatonicSolid(BasePartObject):
         super().__init__(part=platonic_solid, rotation=rotation, align=align, mode=mode)
 
 
-solids = [
-    Rot(0, 0, 72 * i) * Pos(1, 0, 0) * PlatonicSolid(faces)
-    for i, faces in enumerate([4, 6, 8, 12, 20])
-]
+with BuildPart() as solids:
+    for i, faces in enumerate([4, 6, 8, 12, 20]):
+        with Locations(Rot(0, 0, 72 * i) * Pos(1, 0, 0)):
+            PlatonicSolid(faces)
 show(solids)
 
 # [End]

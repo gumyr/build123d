@@ -941,12 +941,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
         """Build a solid from an OCCT TopoDS_Shape/TopoDS_Solid
 
         Args:
-            obj (TopoDS_Shape | Shell, optional): OCCT Solid or Shell.
+            obj (TopoDS_Shape | Shell, optional): OCCT Solid or Shell. A Shell
+                must be closed, as a solid is the region it encloses.
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             material (str, optional): tag for external tools. Defaults to ''.
             joints (dict[str, Joint], optional): names joints. Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
+
+        Raises:
+            ValueError: the Shell is not closed
         """
 
         if isinstance(obj, Shell):
@@ -1191,6 +1195,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
     @classmethod
     def _make_solid(cls, shell: Shell) -> TopoDS_Solid:
         """Create a Solid object from the surface shell"""
+        if shell and not shell.is_manifold:
+            raise ValueError(
+                "the shell is not closed, so it does not enclose a solid: "
+                "check shell.is_manifold"
+            )
         return ShapeFix_Solid().SolidFromShell(shell.wrapped)
 
     @classmethod
@@ -1425,7 +1434,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
                     taper_wires.append(taper_wire)
 
                 solids = [
-                    Solid.make_loft([p, t]) for p, t in zip(profile_wires, taper_wires)
+                    Solid.loft([p, t]) for p, t in zip(profile_wires, taper_wires)
                 ]
             except (RuntimeError, Standard_Failure) as err:
                 raise RuntimeError(
@@ -1449,7 +1458,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         target: Compound | Solid,
         direction: VectorLike,
         until: Until = Until.NEXT,
-    ) -> Solid:
+    ) -> Solid | Compound:
         """extrude_until
 
         Extrude `profile` in the provided `direction` until it encounters a
@@ -1495,7 +1504,10 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 cuts the extrusion.
 
         Returns:
-            Solid: The extruded and limited solid.
+            Solid | Compound: The extruded and limited solid. A profile that
+            straddles a step in the target, part on a face and part inside the
+            material, stops each part at its own surface, and the parts come
+            back as a Compound when they do not join.
         """
         direction = Vector(direction)
         if until in [Until.PREVIOUS, Until.FIRST]:
@@ -1531,7 +1543,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         target: Compound | Solid,
         direction: Vector,
         reach: float,
-    ) -> Solid:
+    ) -> Solid | Compound:
         """The part of ``extrusion``, from its ``profile`` face along
         ``direction``, that lies before the first surface of ``target``"""
         # 1: The faces of the target, split where they turn away from the
@@ -1586,21 +1598,49 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 if piece
             )
 
-        # 3: Split the extrusion by the faces and walls together. The walls
-        #    run the whole way, so beyond the surface they cut the remainder
-        #    into pieces, which doesn't matter: only the piece holding the
-        #    profile is wanted
-        pieces = extrusion.split([*faces, *walls], keep=Keep.ALL)
+        # 3: Split the extrusion by the faces, then the pieces by the walls.
+        #    The walls run the whole way, so beyond the surface they cut the
+        #    remainder into pieces, which doesn't matter: only the pieces
+        #    holding the profile are wanted. Two passes, since a wall swept
+        #    from an edge often lies in the plane of another target face, and
+        #    the splitter fails when one pass is given coincident tools.
+        #    The profile is the extrusion's own base face. A target edge lying
+        #    in the profile's plane cuts it into sub-faces, so the profile is
+        #    followed through the splits' records to know what it became.
+        #    A piece without the profile is discarded whatever the walls would
+        #    make of it, so it is left whole: the kernel can hand back the
+        #    remainder beyond a free-form surface as a solid it then fails to
+        #    split
+        def holding(candidates: Iterable[Shape]) -> list[Shape]:
+            """The candidates with a face the profile is, or became"""
+            return [
+                piece
+                for piece in candidates
+                if any(
+                    face.wrapped.IsSame(base)
+                    for face in piece.faces()
+                    for base in base_faces
+                )
+            ]
 
-        # 4: The profile is the extrusion's own base face and survives the
-        #    split, so the piece to return is the one that holds it. A target
-        #    the extrusion never reaches leaves it in one piece; so does one
-        #    that only touches it
-        holders = [
-            piece
-            for piece in pieces
-            if any(face.wrapped.IsSame(profile.wrapped) for face in piece.faces())
-        ]
+        pieces = extrusion.split(list(faces), keep=Keep.ALL)
+        base_faces = cls._became(pieces, [profile.wrapped])
+        if walls:
+            with_profile = holding(pieces)
+            kept = {id(piece) for piece in with_profile}
+            without = [piece for piece in pieces if id(piece) not in kept]
+            cut = ShapeList(
+                piece
+                for whole in with_profile
+                for piece in whole.split(walls, keep=Keep.ALL)
+            )
+            base_faces = cls._became(cut, base_faces)
+            pieces = cut + ShapeList(without)
+
+        # 4: The pieces to return are those holding the profile, or what it
+        #    became. A target the extrusion never reaches leaves it in one
+        #    piece; so does one that only touches it
+        holders = holding(pieces)
         if len(pieces) == 1 and extrusion.distance(target) > TOLERANCE:
             raise ValueError("No intersection: extrusion does not contact target")
         if len(pieces) == 1 or not holders:
@@ -1608,7 +1648,27 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 "the surface reached does not cut the extrusion - the profile "
                 "lies in it, or only touches it"
             )
-        return holders[0]
+        if len(holders) == 1:
+            return holders[0]
+        # The profile straddles a step in the target, part on a face and part
+        # inside the material beyond the face's end: each part stopped at its
+        # own surface
+        return holders[0].fuse(*holders[1:])
+
+    @staticmethod
+    def _became(
+        pieces: Iterable[Shape], faces: list[TopoDS_Shape]
+    ) -> list[TopoDS_Shape]:
+        """What ``faces`` became in the split(s) that made ``pieces``: the
+        sub-faces a split cut a face into, or the face itself when left whole"""
+        records = {id(p._history): p._history for p in pieces if p._history is not None}
+        became: list[TopoDS_Shape] = []
+        for face in faces:
+            modified = [
+                sub for record in records.values() for sub in record.modified(face)
+            ]
+            became.extend(modified if modified else [face])
+        return became
 
     @classmethod
     def from_bounding_box(cls, bbox: BoundBox | OrientedBoundBox) -> Solid:
@@ -1714,8 +1774,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
         )
 
     @classmethod
-    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Solid:
-        """make loft
+    def loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Solid:
+        """loft
 
         Makes a loft from a list of wires and vertices. Vertices can appear only at the
         beginning or end of the list, but cannot appear consecutively within the list
@@ -1732,6 +1792,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
             Solid: Lofted object
         """
         return cls(TopoDS.Solid(_make_loft(objs, True, ruled)))
+
+    @classmethod
+    @deprecated("Solid.make_loft is deprecated; use Solid.loft instead.")
+    def make_loft(cls, objs: Iterable[Vertex | Wire], ruled: bool = False) -> Solid:
+        """make loft
+
+        .. deprecated::
+            Use :meth:`loft` instead.
+        """
+        return cls.loft(objs, ruled)
 
     @classmethod
     def make_sphere(
@@ -2060,7 +2130,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         Create a solid from a potentially non planar face or shell by thickening along
         the normals.
 
-        .. image:: thickenFace.png
+        .. image:: /reference/assets/api/thickenFace.png
 
         Non-planar faces are thickened both towards and away from the center of the sphere.
 

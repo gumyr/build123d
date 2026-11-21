@@ -928,7 +928,8 @@ class LocationTests(unittest.TestCase):
             p -= plane * loc * box
 
         front_faces = p.faces().sort_by(Axis.Y).first
-        wires = front_faces.wires().sort_by(SortBy.DISTANCE, 1)[1:]
+        # drop the outer wire, the one whose centre is farthest from the origin
+        wires = front_faces.wires().sort_by(lambda w: w.center().length)[:-1]
         centers = [wire.center(CenterOf.MASS) for wire in wires]
 
         self.assertEqual(len(p.edges()), 123)

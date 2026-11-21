@@ -235,6 +235,39 @@ class BuildLineTests(unittest.TestCase):
         self.assertLessEqual(bbox.max.Y, 5)
         self.assertTrue(isinstance(e1, Edge))
 
+    def test_elliptical_start_arc_limits(self):
+        # the lowest point of an ellipse 4 by 2, leaving along +X
+        stop = Line((3, -5), (3, 5))
+        arc = EllipticalStartArc((0, 0), (1, 0), 4, 2, stop, start_angle=270)
+        self.assertTrue(isinstance(arc, Edge))
+        self.assertAlmostEqual(arc @ 0, (0, 0, 0), 5)
+        self.assertAlmostEqual(arc @ 1, (3, 2 - 1.75**0.5, 0), 5)
+        self.assertAlmostEqual(arc % 0, (1, 0, 0), 5)
+
+        # it is the same ellipse an angle gives, stopped at the limit
+        by_angle = EllipticalStartArc((0, 0), (1, 0), 4, 2, 90, start_angle=270)
+        self.assertLess(by_angle.distance_to(arc @ 1), 1e-5)
+
+        # a limit behind the start is reached the other way round
+        behind = Line((-3, -5), (-3, 5))
+        arc = EllipticalStartArc((0, 0), (1, 0), 4, 2, behind, start_angle=270)
+        self.assertAlmostEqual(arc @ 1, (-3, 2 - 1.75**0.5, 0), 5)
+
+        # the other kinds of limit, and the other way to orient the ellipse
+        arc = EllipticalStartArc(
+            (0, 0), (1, 0), 4, 2, Axis((2, 0, 0), (0, 1, 0)), start_angle=270
+        )
+        self.assertAlmostEqual((arc @ 1).X, 2, 5)
+        arc = EllipticalStartArc((0, 0), (1, 0), 4, 2, (4, 2), start_angle=270)
+        self.assertAlmostEqual(arc @ 1, (4, 2, 0), 5)
+        arc = EllipticalStartArc((0, 0), (1, 0), 4, 2, stop, major_axis_dir=(1, 0))
+        self.assertAlmostEqual(arc @ 1, (3, 2 - 1.75**0.5, 0), 5)
+
+        with self.assertRaises(ValueError):
+            EllipticalStartArc(
+                (0, 0), (1, 0), 4, 2, Line((30, -5), (30, 5)), start_angle=270
+            )
+
     def test_elliptical_center_arc_limits(self):
         l1 = Line((0, 0), (0, 2))
         e1 = EllipticalCenterArc((0, 0), 2, 1, 0, arc_size=l1)
@@ -576,6 +609,15 @@ class BuildLineTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             IntersectingLine((0, 10), (1, 1), l3)
+
+    def test_intersecting_line_is_deprecated(self):
+        """IntersectingLine still works but warns; PolarLine makes the same line."""
+        other = Line((0, 0), (10, 10))
+        with self.assertWarnsRegex(DeprecationWarning, "use PolarLine"):
+            old = IntersectingLine((0, 10), (1, -1), other)
+        new = PolarLine((0, 10), other, direction=(1, -1))
+        self.assertAlmostEqual(old @ 0, new @ 0, 5)
+        self.assertAlmostEqual(old @ 1, new @ 1, 5)
 
     def test_jern_arc(self):
         with BuildLine() as jern:

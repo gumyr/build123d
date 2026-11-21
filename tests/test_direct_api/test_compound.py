@@ -249,6 +249,23 @@ class TestCompoundAccessors(unittest.TestCase):
         self.assertEqual(len(wrapped.compounds()), 1)
         self.assertIsInstance(wrapped.compound(), Compound)
 
+    def test_nesting_depth_does_not_matter(self):
+        """compounds, get_type, volume and mass reach a solid however many
+        compounds are wrapped round it"""
+        nested = Compound([Solid.make_box(1, 2, 3)])
+        for depth in range(1, 5):
+            with self.subTest(depth=depth):
+                self.assertEqual(len(nested.compounds()), depth)
+                self.assertIs(nested.compounds()[-1], nested)
+                self.assertEqual(len(nested.get_type(Solid)), 1)
+                self.assertAlmostEqual(nested.volume, 6, 5)
+            nested = Compound([nested])
+
+    def test_an_assembly_of_assemblies_has_the_volume_of_its_parts(self):
+        sub_assembly = Compound(children=[Box(1, 1, 1)])
+        assembly = Compound(children=[sub_assembly, Pos(3, 0, 0) * Box(1, 1, 1)])
+        self.assertAlmostEqual(assembly.volume, 2, 5)
+
     def test_no_compounds_when_not_wrapping_one(self):
         """A Part can wrap a bare Solid rather than a TopoDS_Compound."""
         part = Part(Solid.make_box(1, 1, 1).wrapped)

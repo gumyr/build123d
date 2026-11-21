@@ -1,5 +1,5 @@
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 with BuildPart() as blocks:
     with Locations((-1, -1, 0)):

@@ -1567,7 +1567,7 @@ class Color:
                                     alpha = int(hex_a, 16) / 0xFF
                             except ValueError as ex:
                                 raise ValueError(
-                                    f"Invald alpha hex string: {hex_a}"
+                                    f"Invalid alpha hex string: {hex_a}"
                                 ) from ex
                     case int():
                         color_code, alpha = fill_defaults(args, (color_code, alpha))
@@ -1627,6 +1627,20 @@ class Color:
     def __deepcopy__(self, _memo) -> Color:
         """Return deepcopy of self"""
         return Color(*tuple(self))
+
+    def __eq__(self, other: object) -> bool:
+        """Colors equal operator ==: the same red, green, blue and alpha"""
+        if not isinstance(other, Color):
+            return NotImplemented
+        return self._key() == other._key()
+
+    def __hash__(self) -> int:
+        """Hash of Color"""
+        return hash(self._key())
+
+    def _key(self) -> tuple[float, ...]:
+        """Canonical key used for equality and hashing."""
+        return tuple(self)
 
     def __str__(self) -> str:
         """Generate string"""
