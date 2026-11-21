@@ -4481,15 +4481,19 @@ class Wire(Mixin1D[TopoDS_Wire]):
         return Wire([circle_edge])
 
     @classmethod
-    def make_convex_hull(cls, edges: Iterable[Edge], tolerance: float = 1e-3) -> Wire:
+    def make_convex_hull(
+        cls, limits: Iterable[Edge | Vertex | VectorLike], tolerance: float = 1e-3
+    ) -> Wire:
         """make_convex_hull
 
-        Create a wire of minimum length enclosing all of the provided edges.
+        Create a wire of minimum length enclosing all of the provided edges and
+        points. A point on the hull becomes a sharp corner.
 
         Note that edges can't overlap each other.
 
         Args:
-            edges (Iterable[Edge]): edges defining the convex hull
+            limits (Iterable[Edge | Vertex | VectorLike]): edges and points, given
+                as vertices or as coordinates, defining the convex hull
             tolerance (float): allowable error as a fraction of each edge length.
                 Defaults to 1e-3.
 
@@ -4521,19 +4525,24 @@ class Wire(Mixin1D[TopoDS_Wire]):
         #     ]
         # ):
         #     raise ValueError("edges overlap")
-        edges = list(edges)
+        limits = list(limits)
         fragments_per_edge = int(2 / tolerance)
         points_lookup = {}  # lookup from point index to edge/position on edge
-        points = []  # convex hull point cloud
+        points: list[Vector] = []  # convex hull point cloud
 
         # Create points along each edge and the lookup structure
-        for edge_index, edge in enumerate(edges):
+        for edge_index, edge in enumerate(limits):
+            if not isinstance(edge, Edge):
+                # Never trimmed: both hull facets through a point share its index
+                points_lookup[len(points)] = (edge_index, 0.0)
+                points.append(Vector(edge))
+                continue
             for i in range(fragments_per_edge):
                 param = i / (fragments_per_edge - 1)
-                points.append(tuple(edge.position_at(param))[:2])
-                points_lookup[edge_index * fragments_per_edge + i] = (edge_index, param)
+                points_lookup[len(points)] = (edge_index, param)
+                points.append(edge.position_at(param))
 
-        convex_hull = ConvexHull(points)
+        convex_hull = ConvexHull([tuple(point)[:2] for point in points])
 
         # Filter the fragments
         connecting_edge_data = []
@@ -4582,13 +4591,11 @@ class Wire(Mixin1D[TopoDS_Wire]):
             trim_data[edge_index] = f_points
 
         connecting_edges = [
-            Edge.make_line(
-                edges[line[0][0]] @ line[0][1], edges[line[1][0]] @ line[1][1]
-            )
+            Edge.make_line(points[line[0][2]], points[line[1][2]])
             for line in connecting_edge_data
         ]
         trimmed_edges = [
-            edges[edge_index].trim(
+            tcast(Edge, limits[edge_index]).trim(
                 points_lookup[trim_pair[0]][1], points_lookup[trim_pair[1]][1]
             )
             for edge_index, trim_pairs in trim_data.items()

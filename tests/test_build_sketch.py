@@ -710,6 +710,21 @@ class TestBuildSketchObjects(unittest.TestCase):
                 Circle(7)
             make_hull(test.edges())
         self.assertAlmostEqual(test.sketch.area, 577.8808, 4)
+        with BuildSketch() as test:
+            Circle(1)
+            make_hull([Vertex(0, 3), *test.edges()])
+        self.assertAlmostEqual(test.sketch.area, 4.7391, 4)
+        teardrop = make_hull([Vertex(0, 3), CenterArc((0, 0), 1, 0, 360)])
+        self.assertAlmostEqual(teardrop.area, 4.7391, 4)
+        # points can be given as coordinates, alone or mixed with shapes
+        teardrop = make_hull([(0, 3), CenterArc((0, 0), 1, 0, 360)])
+        self.assertAlmostEqual(teardrop.area, 4.7391, 4)
+        with BuildSketch() as test:
+            Circle(1)
+            make_hull([Vector(0, 3), *test.edges()])
+        self.assertAlmostEqual(test.sketch.area, 4.7391, 4)
+        square = make_hull([(0, 0), (1, 0), Vertex(1, 1), Vector(0, 1)])
+        self.assertAlmostEqual(square.area, 1, 5)
         with self.assertRaises(ValueError):
             with BuildSketch():
                 make_hull()
