@@ -178,6 +178,15 @@ class TestWire(unittest.TestCase):
         self.assertEqual(len(square.edges()), 4)
         self.assertAlmostEqual(Face(square).area, 1, 5)
 
+        # points given as coordinates
+        diamond = Wire.make_convex_hull(
+            [(0, 3), Vector(0, -3), Vertex(2, 0), Edge.make_circle(1)]
+        )
+        # a triangle to the right of the Y axis, half of a two-pointed teardrop to the left
+        self.assertAlmostEqual(
+            Face(diamond).area, 6 + math.sqrt(8) + math.pi / 2 - math.acos(1 / 3), 4
+        )
+
     def test_fix_degenerate_edges(self):
         e0 = Edge.make_line((0, 0), (1, 0))
         e1 = Edge.make_line((2, 0), (1, 0))
