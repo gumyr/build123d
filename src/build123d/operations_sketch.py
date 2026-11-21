@@ -45,6 +45,7 @@ from build123d.topology import (
     ShapeList,
     Shell,
     Sketch,
+    Vertex,
     Wire,
     topo_explore_connected_edges,
 )
@@ -238,14 +239,16 @@ def make_face(
 
 
 def make_hull(
-    edges: Edge | Iterable[Edge] | None = None, mode: Mode = Mode.ADD
+    edges: Edge | Vertex | Iterable[Edge | Vertex] | None = None,
+    mode: Mode = Mode.ADD,
 ) -> Sketch:
     """Sketch Operation: make_hull
 
-    Create a face from the convex hull of the given edges
+    Create a face from the convex hull of the given edges and vertices
 
     Args:
-        edges (Edge, optional): sequence of edges to hull. Defaults to all
+        edges (Edge | Vertex, optional): sequence of edges and vertices to hull.
+            A vertex on the hull becomes a sharp corner. Defaults to all
             sketch pending edges.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
