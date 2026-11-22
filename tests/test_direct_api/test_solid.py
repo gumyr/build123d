@@ -366,6 +366,11 @@ class TestSolid(unittest.TestCase):
         with self.assertRaises(ValueError):
             Solid.sweep(Rot(0, 90, 0) * Solid.make_torus(3, 1), line)
 
+        # a solid can't be carried round a corner
+        corner = Wire.make_polygon([(0, 0, 0), (10, 0, 0), (10, 10, 0)], close=False)
+        with self.assertRaisesRegex(ValueError, "join tangentially"):
+            Solid.sweep(box, corner)
+
         # the arguments that shape the sweep of a cross section don't apply
         with self.assertRaises(ValueError):
             Solid.sweep(box, line, is_frenet=True)

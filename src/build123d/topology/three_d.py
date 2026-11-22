@@ -2013,6 +2013,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         Raises:
             ValueError: an argument other than path given with a Solid section
+            ValueError: the path has a corner and the section is a Solid
             ValueError: the silhouette of a Solid section along path is not one
                 closed loop
 
@@ -2090,6 +2091,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
             path (Wire | Edge): the path to follow
 
         Raises:
+            ValueError: the edges of path do not join tangentially
             ValueError: the silhouette of solid along path is not one closed loop
             RuntimeError: the swept faces do not close into a valid solid
 
@@ -2097,6 +2099,17 @@ class Solid(Mixin3D[TopoDS_Solid]):
             Solid: the swept solid
         """
         path = Wire([path]) if isinstance(path, Edge) else path
+        # At a corner the solid would have to turn on the spot, sweeping a
+        # volume this method doesn't build
+        edges = path.order_edges()
+        for before, after in zip(edges, edges[1:]):
+            arriving, leaving = before % 1, after % 0
+            if arriving.dot(leaving) < 0 or arriving.cross(leaving).length > 1e-6:
+                raise ValueError(
+                    "The edges of the path must join tangentially to sweep a "
+                    f"Solid, but there is a corner at {tuple(before @ 1)}: "
+                    "fillet the path there"
+                )
         viewer = Viewer.along(path % 0)
 
         # Viewed along the direction of travel, the faces toward the viewer are
