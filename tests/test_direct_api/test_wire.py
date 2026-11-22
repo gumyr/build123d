@@ -558,6 +558,33 @@ class TestWire(unittest.TestCase):
                 joint = min(Wire(edges).vertices(), key=lambda v: abs(v.Z - 10))
                 self.assertEqual(joint.X, x_value)
 
+    def test_constructor_near_coincident_vertices_stay_valid(self):
+        # Vertex tolerance is 1e-7. A join within it keeps the first vertex; a
+        # wider one, which the kernel closes with a vertex of larger tolerance,
+        # and an edge shorter than the tolerance are left to the kernel
+        arc = Edge.make_three_point_arc((0, 0, 10), (-3, 0, 13), (0, 0, 16))
+        for gap in (5e-8, 1.5e-7):
+            line = Edge.make_line((0, 0, 0), (gap, 0, 10))
+            for edges in ([line, arc], [arc, line]):
+                with self.subTest(gap=gap, first=edges[0].geom_type):
+                    wire = Wire(edges)
+                    self.assertTrue(wire.is_valid)
+                    self.assertEqual(len(wire.edges()), 2)
+        joint = min(Wire([line, arc]).vertices(), key=lambda v: abs(v.Z - 10))
+        self.assertAlmostEqual(joint.X, 7.5e-8, 12)  # the kernel's, in between
+
+        for short in (5e-8, 1.5e-7):
+            with self.subTest(short=short):
+                wire = Wire(
+                    [
+                        Edge.make_line((0, 0), (1, 0)),
+                        Edge.make_line((1, 0), (1 + short, 0)),
+                        Edge.make_line((1 + short, 0), (2, 0)),
+                    ]
+                )
+                self.assertTrue(wire.is_valid)
+                self.assertEqual(len(wire.edges()), 3)
+
 
 class TestWireFilletHelpers(unittest.TestCase):
 

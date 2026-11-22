@@ -3927,6 +3927,15 @@ class Wire(Mixin1D[TopoDS_Wire]):
         # The kernel merges end vertices that coincide within tolerance but are
         # not shared, and which vertex survives varies between runs and
         # platforms. Substitute the first in input order so the result repeats.
+        #
+        # A vertex is only substituted where the tolerance of the one kept
+        # reaches it, so that the kept vertex still lies on the end of each
+        # edge it now closes. The kernel also merges vertices further apart
+        # than that, up to the sum of their two tolerances, by making a new
+        # vertex of larger tolerance between them. Those joins, and an edge so
+        # short that its own two ends would merge, are left as they are: there
+        # the choice of vertex is back in the hands of the kernel and may still
+        # vary between runs and platforms.
         vertices = [
             vertex
             for edge in edges
@@ -3942,12 +3951,18 @@ class Wire(Mixin1D[TopoDS_Wire]):
         first = list(range(len(vertices)))
         # pairs come as (i, j) with i < j; give each j its earliest match
         for i, j in sorted(
-            tree.query_pairs(2 * max(tolerances, default=0.0)), key=lambda p: p[::-1]
+            tree.query_pairs(max(tolerances, default=0.0)), key=lambda p: p[::-1]
         ):
-            if first[j] == j and points[i].Distance(points[j]) <= (
-                tolerances[i] + tolerances[j]
+            kept = first[i]
+            other_end = j ^ 1  # the two ends of an edge are listed together
+            if (
+                first[j] == j
+                and points[kept].Distance(points[j]) <= tolerances[kept]
+                and (
+                    first[other_end] != kept or vertices[j].IsSame(vertices[other_end])
+                )
             ):
-                first[j] = first[i]
+                first[j] = kept
         reshaper = BRepTools_ReShape()
         for vertex, index in zip(vertices, first):
             if not vertex.IsSame(vertices[index]):
