@@ -644,15 +644,17 @@ class Compound(Mixin3D[TopoDS_Compound]):
         return shape_list[0]
 
     def compounds(self) -> ShapeList[Compound]:
-        """compounds - all the compounds in this Shape"""
+        """compounds - all the compounds in this Shape, however deeply nested,
+        each after the compounds it holds and this one last"""
         if self.is_empty:
             return ShapeList()
+        sub_compounds: list[Compound] = []
         if isinstance(self.wrapped, TopoDS_Compound):
             # pylint: disable=not-an-iterable
-            sub_compounds = [c for c in self if isinstance(c.wrapped, TopoDS_Compound)]
+            for member in self:
+                if isinstance(member.wrapped, TopoDS_Compound):
+                    sub_compounds.extend(member.compounds())
             sub_compounds.append(self)
-        else:
-            sub_compounds = []
         return ShapeList(sub_compounds)
 
     def do_children_intersect(
@@ -903,6 +905,16 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         The line drawing of this shape as seen from a viewpoint: its edges,
         split into visible and hidden by hidden-line removal.
+
+        Each line of the drawing is returned once. Edges that lie on another
+        visible edge are dropped, as are hidden edges that lie under a visible
+        one, and the remaining edges that lie on the same curve and touch or
+        overlap, such as the two copies of the join between unfused parts or
+        the pieces of an edge split by hidden-line removal, are merged into
+        one. Visible and hidden edges are merged separately.
+
+        Edges that the kernel returns as splines but which are straight,
+        circular or elliptical come back as lines, circles and ellipses.
 
         Args:
             viewpoint (VectorLike): where the view is taken from

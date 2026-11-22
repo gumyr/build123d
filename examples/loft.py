@@ -30,7 +30,7 @@ license:
 
 from math import pi, sin
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 with BuildPart() as art:
     slice_count = 10

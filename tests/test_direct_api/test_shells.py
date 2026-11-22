@@ -35,6 +35,7 @@ from build123d.objects_curve import JernArc, Polyline, Spline
 from build123d.objects_sketch import Circle, Rectangle
 from build123d.operations_generic import sweep
 from build123d.topology import Compound, Edge, Face, Shell, SkipClean, Solid, Wire
+from build123d.topology.history import ShapeHistory
 
 
 class TestShells(unittest.TestCase):
@@ -111,12 +112,18 @@ class TestShells(unittest.TestCase):
         self.assertEqual(len(sweep_w_w.faces()), 3)  # 3 with clean, 4 without
         self.assertEqual(len(sweep_c2_c2.faces()), 3)  # 3 with clean, 4 without
 
-    def test_make_loft(self):
+    def test_make_loft_is_deprecated(self):
+        """Shell.make_loft still works, as Shell.loft, but warns."""
+        sections = [Wire.make_circle(3, Plane((0, 0, 2))), Wire.make_circle(3)]
+        with self.assertWarnsRegex(DeprecationWarning, "use Shell.loft"):
+            old = Shell.make_loft(sections)
+        self.assertIsInstance(old, Shell)
+        self.assertAlmostEqual(old.area, Shell.loft(sections).area, 5)
+
+    def test_loft(self):
         r = 3
         h = 2
-        loft = Shell.make_loft(
-            [Wire.make_circle(r, Plane((0, 0, h))), Wire.make_circle(r)]
-        )
+        loft = Shell.loft([Wire.make_circle(r, Plane((0, 0, h))), Wire.make_circle(r)])
         self.assertEqual(loft.volume, 0, "A shell has no volume")
         cylinder_area = 2 * math.pi * r * h
         self.assertAlmostEqual(loft.area, cylinder_area)
@@ -241,6 +248,27 @@ class TestShellAdd(unittest.TestCase):
         result = shell + self.wall
         self.assertEqual(result.label, "sheet")
         self.assertIsNotNone(result.color)
+
+    def test_the_sewing_is_recorded(self):
+        """The result carries the record of the sewing, as a fuse does, so a
+        face the shell already had is not taken for a new one"""
+        shell = Shell([self.base])
+        for skip_clean in (False, True):
+            with self.subTest(skip_clean=skip_clean):
+                if skip_clean:
+                    with SkipClean():
+                        result = shell + self.wall
+                else:
+                    result = shell + self.wall
+                record = ShapeHistory.of(result)
+                self.assertIsNotNone(record)
+                self.assertEqual(len(result.faces()), 2)
+                # nothing is new: both faces were inputs
+                self.assertFalse(any(record.is_new(f.wrapped) for f in result.faces()))
+                # and only the face that was brought in is last
+                last = [f for f in result.faces() if record.is_last(f.wrapped)]
+                self.assertEqual(len(last), 1)
+                self.assertAlmostEqual(last[0].area, self.wall.area, 5)
 
     def test_mismatched_dimensions_raise(self):
         with self.assertRaises(ValueError):

@@ -64,7 +64,6 @@ from typing import (
     NoReturn,
     Protocol,
     SupportsIndex,
-    TypeVar,
     Union,
 )
 from typing import cast as tcast
@@ -138,7 +137,7 @@ from OCP.collections import (
 )
 from OCP.collections import List_TopoDS_Shape
 from OCP.TopTools import TopTools_ShapeMapHasher
-from typing_extensions import Self, deprecated
+from typing_extensions import Self, TypeVar, deprecated
 
 from bd_materials import FinishedMaterial, resolve as resolve_material
 
@@ -186,7 +185,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
 TrimmingTool = Union[Plane, "Shell", "Face"]
-TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape)
+TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape, default=Any)
 CalcFn = Callable[[TopoDS_Shape, GProp_GProps], None]
 CompositeFactory = Callable[[Iterable["Shape"]], "Shape"]
 ShapeConstructor = Callable[[Any], "Shape"]
@@ -2224,10 +2223,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         on this shape, by their x positions: the leftmost point of the set
         lands ``start`` of the way along the path and each face's centre as far
         beyond that as it is to the right of the leftmost point. Each face is
-        stood on the surface at its own point, x along the path's tangent and z
-        along the surface normal there, and projected onto the shape along that
-        normal with :meth:`~topology.Face.project_to_shape`. A line of text
-        follows the path this way.
+        stood above the surface at its own point, x along the path's tangent and
+        z along the surface normal there, and projected onto the shape along
+        that normal with :meth:`~topology.Face.project_to_shape`; the nearest
+        surface met is kept. A line of text follows the path this way.
 
         This is the tool for a target with several faces: a face that straddles
         the boundary between two faces of the target, a glyph running round a
@@ -2242,7 +2241,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         the surface along the whole path, and a face placed at a sharp corner
         of the target projects poorly.
 
-        .. image:: /projectText.png
+        .. image:: /reference/assets/api/projectText.png
 
         Args:
             faces (Union[list[Face], Compound]): planar faces on ``Plane.XY``
@@ -2283,8 +2282,15 @@ class Shape(NodeMixin, Generic[TOPODS]):
             surface_point, surface_normal = self.find_intersection_points(
                 projection_axis
             )[0]
+            # Stand the face clear of the surface before projecting it back. A
+            # face that touches the target leaves it to rounding whether the
+            # surface beneath it is in front of the face or behind, and so
+            # whether that surface or one further on is the first one met.
+            clearance = 0.5 * max(bbox.size.X, bbox.size.Y)
             surface_normal_plane = Plane(
-                origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
+                origin=surface_point + surface_normal * clearance,
+                x_dir=path_tangent,
+                z_dir=surface_normal,
             )
             projection_face: Face = surface_normal_plane.from_local_coords(
                 face.moved(Location((-face_center_x, 0, 0)))
@@ -2487,18 +2493,20 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @overload
     def split(
-        self, tool: TrimmingTool, keep: Literal[Keep.TOP, Keep.BOTTOM]
+        self, tool: Plane | Face | Shell, keep: Literal[Keep.TOP, Keep.BOTTOM]
     ) -> Self | list[Self]:
         """split and keep inside or outside"""
 
     @overload
     def split(
-        self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Literal[Keep.ALL]
+        self,
+        tool: Plane | Face | Shell | Iterable[Plane | Face | Shell],
+        keep: Literal[Keep.ALL],
     ) -> list[Self]:
         """split and return the unordered pieces"""
 
     @overload
-    def split(self, tool: TrimmingTool, keep: Literal[Keep.BOTH]) -> tuple[
+    def split(self, tool: Plane | Face | Shell, keep: Literal[Keep.BOTH]) -> tuple[
         Self | list[Self],
         Self | list[Self],
     ]:
@@ -2506,23 +2514,27 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @overload
     def split(
-        self, tool: TrimmingTool, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
+        self, tool: Plane | Face | Shell, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
     ) -> NoReturn:
         """invalid split"""
 
     @overload
     def split(
         self,
-        tool: Iterable[TrimmingTool],
+        tool: Iterable[Plane | Face | Shell],
         keep: Literal[Keep.TOP, Keep.BOTTOM, Keep.BOTH, Keep.INSIDE, Keep.OUTSIDE],
     ) -> NoReturn:
         """several tools leave no side to keep"""
 
     @overload
-    def split(self, tool: TrimmingTool) -> Self | list[Self]:
+    def split(self, tool: Plane | Face | Shell) -> Self | list[Self]:
         """split and keep inside (default)"""
 
-    def split(self, tool: TrimmingTool | Iterable[TrimmingTool], keep: Keep = Keep.TOP):
+    def split(
+        self,
+        tool: Plane | Face | Shell | Iterable[Plane | Face | Shell],
+        keep: Keep = Keep.TOP,
+    ):
         """split
 
         Split this shape by the provided plane, face or shell, or by several of

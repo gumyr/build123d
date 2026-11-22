@@ -441,7 +441,7 @@ def chamfer(
         if isinstance(context, BuildSheet):
             context._add_to_context(*new_faces, mode=Mode.REPLACE)
             return context.sheet_local
-        return Shell.make_sheet(new_faces)
+        return Shell._make_sheet(new_faces)
 
     if target._dim == 3:
         source = target
@@ -583,7 +583,7 @@ def fillet(
         if isinstance(context, BuildSheet):
             context._add_to_context(*new_faces, mode=Mode.REPLACE)
             return context.sheet_local
-        return Shell.make_sheet(new_faces)
+        return Shell._make_sheet(new_faces)
 
     if target._dim == 3:
         source = target
@@ -705,7 +705,7 @@ def mirror(
             -copy_module.deepcopy(face).mirror(about) for face in source_faces
         ]
         if mode == Mode.PRIVATE:
-            return Shell.make_sheet(mirrored_faces, merge_coplanar=True)
+            return Shell._make_sheet(mirrored_faces, merge_coplanar=True)
         context._add_to_context(*mirrored_faces, mode=mode)
         return context.sheet_local
 
@@ -714,7 +714,8 @@ def mirror(
     if context is not None:
         context._add_to_context(*mirrored, mode=mode)
 
-    mirrored_compound: Compound = Compound(mirrored)
+    # one object that is already a compound, a Box say, needs no second wrapper
+    mirrored_compound = cast(Compound, Compound(mirrored).unwrap(fully=False))
     if all([obj._dim == 3 for obj in object_list]):
         mirrored_compound = Part(mirrored_compound.wrapped)
     elif all([obj._dim == 2 for obj in object_list]):
@@ -900,14 +901,18 @@ def project_to_plane(
     side. The operation exists so that a 3D object can be brought into a
     sketch or line, enhanced there, and the result used to modify the object.
 
-    In BuildLine and BuildSketch the objects are projected onto the builder's
-    construction plane, ``Plane.XY``; ``workplane`` must not be given. A sketch
-    may be placed on many workplanes at once, so there is no one plane to
-    project onto: the projection is drawn in the builder's own coordinates
-    like any other content and placed with it on exit. With no ``objects``
-    the enclosing builder's object is projected, the part of a BuildPart the
-    sketch or line is nested in, so that it can be brought into the sketch,
-    enhanced there, and the result used to modify it.
+    The objects are projected onto ``workplane``, which must always be given,
+    and the result lies in that plane's local coordinates: a Curve of edges, a
+    Sketch of faces, or a list of points. A solid, shell or compound
+    contributes its silhouette.
+
+    In BuildLine and BuildSketch the projection is drawn in the builder's own
+    coordinates like any other content and placed with it on exit, so
+    projecting onto the plane the builder was created with puts the result
+    back where the objects are. With no ``objects`` the enclosing builder's
+    object is projected, the part of a BuildPart the sketch or line is nested
+    in, so that it can be brought into the sketch, enhanced there, and the
+    result used to modify it.
     What a builder can hold decides what is drawn: BuildLine takes edges, so
     a face or solid contributes its edges; BuildSketch takes faces, so a face
     casts its shadow, whichever way it curves or faces, a face edge-on to the
@@ -917,22 +922,17 @@ def project_to_plane(
     wires cannot be drawn into BuildSketch and raise unless ``mode`` is
     ``Mode.PRIVATE``.
 
-    In algebra mode ``workplane`` must be given and the result lies in that
-    plane's local coordinates: a Curve of edges, a Sketch of faces, or a list
-    of points. A solid, shell or compound contributes its silhouette.
-
     Args:
         objects (Shape | VectorLike or Iterable of, optional): objects or points
             to project. Points and shapes cannot be mixed in one call. Defaults
             to the object of the builder the sketch or line is nested in.
-        workplane (Plane, optional): plane to project onto in algebra mode.
-            Defaults to None.
+        workplane (Plane): plane to project onto. Required, in a builder
+            as well as in algebra mode.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
     Raises:
         ValueError: project_to_plane doesn't accept group_by
-        ValueError: A workplane is required outside a builder
-        ValueError: Inside a builder the plane is always Plane.XY
+        ValueError: A workplane is required
         RuntimeError: project_to_plane applies to BuildLine and BuildSketch
         ValueError: objects are required unless the builder is nested in another
         ValueError: Points and shapes cannot be projected together
@@ -944,22 +944,14 @@ def project_to_plane(
     if isinstance(objects, GroupBy):
         raise ValueError("project_to_plane doesn't accept group_by, did you miss [n]?")
 
-    if context is None:
-        if workplane is None:
-            raise ValueError("A workplane is required outside a builder")
-        plane = workplane
-    else:
-        if not isinstance(context, (BuildLine, BuildSketch)):
-            raise RuntimeError(
-                "project_to_plane applies to BuildLine and BuildSketch; "
-                "use project_to_shape in BuildPart"
-            )
-        if workplane is not None:
-            raise ValueError(
-                "Inside a builder objects are projected onto its construction "
-                "plane, Plane.XY; workplane must not be given"
-            )
-        plane = Plane.XY
+    if context is not None and not isinstance(context, (BuildLine, BuildSketch)):
+        raise RuntimeError(
+            "project_to_plane applies to BuildLine and BuildSketch; "
+            "use project_to_shape in BuildPart"
+        )
+    if workplane is None:
+        raise ValueError("project_to_plane requires a workplane to project onto")
+    plane = workplane
     validate_inputs(context, "project_to_plane")
 
     if objects is None:
@@ -1363,7 +1355,7 @@ def split(
                     split_faces.extend(piece.faces())
 
         untouched_faces = [face for face in current_faces if face not in selected_faces]
-        result = Shell.make_sheet(untouched_faces + split_faces)
+        result = Shell._make_sheet(untouched_faces + split_faces)
         if not result:
             raise ValueError("split removed the entire sheet")
         if mode == Mode.REPLACE:

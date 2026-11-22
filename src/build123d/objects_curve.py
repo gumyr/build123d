@@ -35,6 +35,7 @@ from typing import overload
 
 import numpy as np
 from scipy.optimize import minimize
+from typing_extensions import deprecated
 
 from build123d.build_common import BaseObject, flatten_sequence
 from build123d.build_enums import (
@@ -1231,7 +1232,14 @@ class EllipticalStartArc(BaseEdgeObject):
         start_tangent (VectorLike): tangent at start point
         x_radius (float): x radius of the ellipse (along the x-axis of plane)
         y_radius (float): y radius of the ellipse (along the y-axis of plane)
-        arc_size (float): angular size of arc (negative to change direction)
+        arc_size (float | Shape | Axis | Location | Plane | VectorLike): angular size
+            of arc (negative to change direction) or an arc limit.
+
+            When a limit object is provided instead of a numeric angular size,
+            EllipticalStartArc follows the ellipse from the start point in both
+            directions, trims each at its first intersection with the limit, and
+            returns the one requiring the shortest travel from the start. If
+            neither intersects the limit, a ValueError is raised.
         start_angle (float): angular position of the start point
         major_axis_dir (VectorLike): direction of ellipse x-axis
         mode (Mode, optional): combination mode. Defaults to Mode.ADD
@@ -1248,7 +1256,7 @@ class EllipticalStartArc(BaseEdgeObject):
         start_tangent: VectorLike,
         x_radius: float,
         y_radius: float,
-        arc_size: float,
+        arc_size: float | Shape | Axis | Location | Plane | VectorLike,
         *,
         start_angle: float | None = None,
         major_axis_dir: VectorLike | None = None,
@@ -1316,16 +1324,36 @@ class EllipticalStartArc(BaseEdgeObject):
             raise ValueError("Either start_angle or major_axis_dir must be provided")
 
         pln = Plane(pln_origin, x_dir=pln_x_dir, z_dir=pln_normal)
-        end_angle = start_angle + arc_size
+        arc_factor = Vector(arc_size) if isinstance(arc_size, Sequence) else arc_size
 
-        direction = (
-            AngularDirection.COUNTER_CLOCKWISE
-            if arc_size >= 0
-            else AngularDirection.CLOCKWISE
-        )
-        arc = Edge.make_ellipse(
-            x_radius, y_radius, pln, start_angle, end_angle, direction
-        )
+        if isinstance(arc_factor, (int, float)):
+            end_angle = start_angle + arc_factor
+
+            direction = (
+                AngularDirection.COUNTER_CLOCKWISE
+                if arc_factor >= 0
+                else AngularDirection.CLOCKWISE
+            )
+            arc = Edge.make_ellipse(
+                x_radius, y_radius, pln, start_angle, end_angle, direction
+            )
+        else:
+            # The whole ellipse, beginning and ending at the start of the arc
+            ellipse = Edge.make_ellipse(
+                x_radius, y_radius, pln, start_angle, start_angle + 360.0
+            )
+            trimmed_arc = ellipse.trim_to_other(arc_factor)
+            trimmed_arc2 = ellipse.reversed(reconstruct=True).trim_to_other(arc_factor)
+
+            if not trimmed_arc and not trimmed_arc2:
+                raise ValueError(
+                    f"EllipticalStartArc doesn't intersect arc limit {arc_size}"
+                )
+
+            arc = ShapeList(
+                [a for a in (trimmed_arc, trimmed_arc2) if a]
+            ).sort_by(Edge.length)[0]
+
         super().__init__(arc, mode=mode)
 
 
@@ -1806,6 +1834,8 @@ class JernArc(BaseEdgeObject):
                 z_dir=arc_normal,
             )
             arc = Edge.make_circle(radius, circle_plane)
+            if arc.tangent_at(0).dot(start_tangent) < 0:
+                arc = arc.reversed(reconstruct=True)
             center_point2 = start + start_tangent.rotate(
                 Axis(start, arc_normal), -arc_direction * 90
             ) * abs(radius)
@@ -1867,8 +1897,17 @@ class Line(BaseEdgeObject):
         super().__init__(new_edge, mode=mode)
 
 
+@deprecated(
+    "IntersectingLine is deprecated; use "
+    "PolarLine(start, other, direction=direction) instead."
+)
 class IntersectingLine(BaseEdgeObject):
     """Intersecting Line Object: Line
+
+    .. deprecated::
+        Use :class:`~objects_curve.PolarLine` instead, with the object to
+        intersect as its ``length``:
+        ``PolarLine(start, other, direction=direction)``.
 
     Create a straight line defined by a point/direction pair and another line to intersect.
 

@@ -479,6 +479,34 @@ class TestBallJoint(DirectApiTestCase):
     def test_no_to_part(self):
         self.assertIsNone(BallJoint("test").parent)
 
+    def test_angles_are_checked_as_given(self):
+        """An angle is compared with its range as the number that was asked
+        for, not as it reads back from the rotation, where Z returns within
+        +/-180 and Y within +/-90"""
+        rod = RigidJoint("rod", Box(1, 1, 1))
+        for angles in ((0, 0, 270), (350, 0, 0), (0, 100, 0), (0, 0, 0), (0, 0, 360)):
+            with self.subTest(angles=angles):
+                ball = BallJoint("ball", Box(1, 1, 1))  # 0 to 360 about each axis
+                placed = ball.relative_to(rod, angles=angles)
+                self.assertEqual(placed, Location(Rotation(*angles)))
+
+        ball = BallJoint("ball", Box(1, 1, 1))
+        for angles in ((0, 0, -10), (-10, 0, 0)):
+            with self.subTest(angles=angles), self.assertRaises(ValueError):
+                ball.relative_to(rod, angles=angles)
+
+    def test_a_rotation_is_checked_by_its_angles(self):
+        """A Rotation has only the angles it reads back as, so those are
+        compared, and rounding does not put zero outside a range from zero"""
+        rod = RigidJoint("rod", Box(1, 1, 1))
+        ball = BallJoint(
+            "ball", Box(1, 1, 1), angular_range=((-14, 14), (-14, 14), (0, 360))
+        )
+        ball.relative_to(rod, angles=Rotation(5, 10, 0))
+        ball.relative_to(rod, angles=Rotation(5, 10, -1e-12))
+        with self.assertRaises(ValueError):
+            ball.relative_to(rod, angles=Rotation(20, 0, 0))
+
     def test_error_handling(self):
         j1 = BallJoint("one", Box(1, 1, 1))
         with self.assertRaises(TypeError):

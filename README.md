@@ -19,29 +19,29 @@
 [![DOI](https://zenodo.org/badge/510925389.svg)](https://zenodo.org/badge/latestdoi/510925389)
 
 [Documentation](https://build123d.readthedocs.io/en/latest/index.html) |
-[Cheat Sheet](https://build123d.readthedocs.io/en/latest/cheat_sheet.html) |
+[Cheat Sheet](https://build123d.readthedocs.io/en/latest/reference/cheat_sheet.html) |
 [Discord](https://discord.com/invite/Bj9AQPsCfx) |
 [Discussions](https://github.com/gumyr/build123d/discussions) |
 [Issues](https://github.com/gumyr/build123d/issues ) |
 [Contributing](#contributing)
 
-build123d is a Python-based, parametric [boundary representation (BREP)][BREP] modeling framework for 2D and 3D CAD. Built on the [Open Cascade] geometric kernel, it provides a clean, fully Pythonic interface for creating precise models suitable for 3D printing, CNC machining, laser cutting, and other manufacturing processes.
+build123d is a Python-based, parametric [boundary representation (BREP)][BREP] modelling framework for 2D and 3D CAD. Built on the [Open Cascade] geometric kernel, it provides a clean, fully Pythonic interface for creating precise models suitable for 3D printing, CNC machining, laser cutting, and other manufacturing processes.
 
 <div align="left">
-    <img style="height:200px" alt="bracket" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/examples/toy_truck.png">
-    <img style="height:200px" alt="key cap" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/examples/key_cap.png">
+    <img style="height:200px" alt="bracket" src="https://github.com/gumyr/build123d/raw/dev/docs/examples/assets/toy_truck.png">
+    <img style="height:200px" alt="key cap" src="https://github.com/gumyr/build123d/raw/dev/docs/examples/assets/key_cap.png">
     <img style="height:200px" alt="hangar" src="https://github.com/gumyr/build123d/raw/dev/docs/assets/ttt/ttt-23-02-02-sm_hanger_object.png">
 </div>
 
 ## Features
 
-Designed for modern, maintainable CAD-as-code, build123d combines clear architecture with expressive, algebraic modeling. It offers:
+Designed for modern, maintainable CAD-as-code, build123d combines clear architecture with expressive, algebraic modelling. It offers:
 - Minimal or no internal state depending on mode,
 - Explicit 1D, 2D, and 3D geometry classes with well-defined operations,
 - Extensibility through subclassing and functional composition—no monkey patching,
 - Standards-compliant code (PEP 8, mypy, pylint) with rich pylance type hints,
 - Deep Python integration—selectors as lists, locations as iterables, and natural conversions (`Solid(shell)`, `tuple(Vector)`),
-- Operator-driven modeling (`obj += sub_obj`, `Plane.XZ * Pos(X=5) * Rectangle(1, 1)`) for algebraic, readable, and composable design logic,
+- Operator-driven modelling (`obj += sub_obj`, `Plane.XZ * Pos(X=5) * Rectangle(1, 1)`) for algebraic, readable, and composable design logic,
 - Export formats to popular CAD tools such as [FreeCAD] and SolidWorks.
 
 ## Usage
@@ -205,11 +205,11 @@ export_step(part_context.part, "bracket.step")
 
 ### Further reading
 
-More [Examples](https://build123d.readthedocs.io/en/latest/introductory_examples.html) and [Tutorials](https://build123d.readthedocs.io/en/latest/tutorials.html) are found in the documentation.
+More [Examples](https://build123d.readthedocs.io/en/latest/examples/index.html) and [Tutorials](https://build123d.readthedocs.io/en/latest/tutorials/index.html) are found in the documentation.
 
 ## Installation
 
-For additional installation options see [Installation](https://build123d.readthedocs.io/en/latest/installation.html)
+For additional installation options see [Installation](https://build123d.readthedocs.io/en/latest/getting_started/installation.html)
 
 ### Current release
 
@@ -236,7 +236,7 @@ pip install git+https://github.com/gumyr/build123d
 
 ### Viewers
 
-build123d is best used with a viewer. The most popular viewer is [ocp_vscode](https://github.com/bernhard-42/vscode-ocp-cad-viewer), a Python package with a standalone viewer and VS Code extension. Other [Editors & Viewers](https://build123d.readthedocs.io/en/latest/external.html#external) are found in the documentation.
+build123d is best used with a viewer. The simplest to set up is [OCP Viewer](https://github.com/bernhard-42/ocp_viewer), a Python package installed with `pip install ocp-viewer` that shows the model in a web browser. The same viewer is available inside VS Code as the [ocp_vscode](https://github.com/bernhard-42/vscode-ocp-cad-viewer) extension. Other [Editors & Viewers](https://build123d.readthedocs.io/en/latest/reference/external.html#external) are found in the documentation.
 
 ## Contributing
 

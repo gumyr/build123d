@@ -28,7 +28,7 @@ license:
 # [Code]
 
 from build123d import *
-from ocp_vscode import show_object
+from ocp_viewer import show_object
 
 segment_count = 6
 

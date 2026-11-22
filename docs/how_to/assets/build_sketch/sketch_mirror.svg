@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="110.5mm" height="62.673913mm" viewBox="-25.415 -14.415 50.83 28.83" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="rgb(214,225,244)" stroke="rgb(30,78,163)" stroke-width="0.23" id="Sketch">
+      <path d="M 7.583802,-3.0 A 8.0,8.0 -157.97568716295885 1,1 7.583802,3.0 L -7.583802,3.0 A 8.0,8.0 -22.02431283704117 1,1 -7.583802,-3.0 L 7.583802,-3.0 M 19.0,-0.0 A 4.0,4.0 0.0 0,0 11.0,0.0 A 4.0,4.0 0.0 0,0 19.0,0.0 M -19.0,0.0 A 4.0,4.0 180.0 0,0 -11.0,0.0 A 4.0,4.0 180.0 0,0 -19.0,-0.0" />
+    </g>
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.0414" id="Construction" stroke-dasharray="0.4968 0.1242">
+      <line x1="0.0" y1="-12.0" x2="0.0" y2="12.0" />
+    </g>
+  </g>
+</svg>

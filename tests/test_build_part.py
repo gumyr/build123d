@@ -33,6 +33,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 from build123d import *
 from build123d import LocationList
+from build123d.topology import Shape
 
 
 def _assertTupleAlmostEquals(self, expected, actual, places, msg=None):
@@ -691,6 +692,26 @@ class TestExtrude(unittest.TestCase):
         self.assertAlmostEqual(span.volume, 12 * 10 * 10, 4)
         self.assertAlmostEqual(span.bounding_box().min.X, -8, 5)
 
+    def test_extrude_until_splits_only_what_holds_the_profile(self):
+        """What lies beyond the surface reached is discarded, so it is never
+        split by the walls: the kernel can return it as a solid that it then
+        fails to split, as beyond the underside of a ramp swept along a helix"""
+        target = Pos(Z=10) * Box(10, 10, 4)
+        split = Shape.split
+
+        def split_near_the_profile(shape, *args, **kwargs):
+            if isinstance(shape, Solid) and shape.bounding_box().min.Z > 1:
+                raise ValueError("Null TopoDS_Shape object")
+            return split(shape, *args, **kwargs)
+
+        with patch.object(Shape, "split", split_near_the_profile):
+            column = extrude(
+                Rectangle(2, 2), until=Until.NEXT, dir=(0, 0, 1), target=target
+            )
+        self.assertTrue(column.is_valid)
+        self.assertAlmostEqual(column.volume, 4 * 8, 5)
+        self.assertAlmostEqual(column.bounding_box().max.Z, 8, 5)
+
     def test_extrude_until_a_hole_misses(self):
         """A profile inside a through hole reaches nothing"""
         plate = Pos(Z=10) * Box(20, 20, 2) - Pos(Z=10) * Cylinder(2, 2)
@@ -887,7 +908,7 @@ class TestLoft(unittest.TestCase):
     ):
         section = Face.make_rect(2, 2)
         fallback_solid = Solid.make_box(2, 2, 1)
-        mock_solid_class.make_loft.return_value = fallback_solid
+        mock_solid_class.loft.return_value = fallback_solid
         mock_solid_class.return_value = fallback_solid
 
         with patch.object(
@@ -1110,6 +1131,28 @@ class TestProjectToShape(unittest.TestCase):
         self.assertEqual(
             sorted(round(f.area, 6) for f in projection.faces()), [30, 30, 40]
         )
+
+    def test_sketch_and_curve_objects(self):
+        plate = Box(10, 10, 2)
+        # a Sketch stands for its faces, each projecting along its own normal
+        sketch = Plane((0, 0, 5), z_dir=(0, 0, -1)) * Sketch(
+            [Pos(X=-2) * Rectangle(1, 1).face(), Pos(X=2) * Circle(0.5).face()]
+        )
+        projection = project_to_shape(sketch, target=plate)
+        self.assertIsInstance(projection, Sketch)
+        self.assertEqual(len(projection.faces()), 4)
+        slot = Pos(Z=5) * SlotOverall(3, 1)
+        self.assertEqual(
+            len(project_to_shape(slot, plate, (0, 0, -1), hit=Hit.NEAREST).faces()), 1
+        )
+        # a Curve stands for its edges
+        curve = Pos(Z=5) * Curve([Line((-3, 0), (-1, 0)), Line((1, 1), (3, 1))])
+        projection = project_to_shape(curve, plate, (0, 0, -1), hit=Hit.NEAREST)
+        self.assertIsInstance(projection, Curve)
+        self.assertEqual(len(projection.edges()), 2)
+        # an empty one leaves nothing to project
+        with self.assertRaisesRegex(ValueError, "No object"):
+            project_to_shape(Sketch(), target=plate)
 
     def test_errors(self):
         with self.assertRaisesRegex(ValueError, "No object"):
@@ -1348,6 +1391,16 @@ class TestSplit(unittest.TestCase):
 
 
 class TestThicken(unittest.TestCase):
+    def test_several_faces_give_one_level_of_compound(self):
+        """The solids are direct members of the Part, not wrapped in a second
+        compound, so the part still counts once it is put in an assembly"""
+        faces = [Pos(X=3 * i) * Rectangle(1, 1).face() for i in range(2)]
+        unit = thicken(Sketch(faces), amount=1)
+        self.assertIsInstance(unit, Part)
+        self.assertEqual(len(unit.get_type(Solid)), 2)
+        self.assertEqual(len(unit.compounds()), 1)
+        self.assertAlmostEqual(Compound(children=[unit]).volume, 2, 5)
+
     def test_thicken(self):
         with BuildPart() as bp:
             with BuildSketch():

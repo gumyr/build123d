@@ -3,9 +3,11 @@ for details see `canadian_flag.py`
 """
 
 # [Imports]
+# [Code]
+
 from math import sin, cos, pi
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 # [Parameters]
 # Canadian Flags have a 2:1 aspect ratio
@@ -14,7 +16,6 @@ width = 2 * height
 wave_amplitude = 3
 
 
-# [Code]
 def surface(amplitude, u, v):
     """Calculate the surface displacement of the flag at a given position"""
     return v * amplitude / 20 * cos(3.5 * pi * u) + amplitude / 10 * v * sin(

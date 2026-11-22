@@ -1,5 +1,5 @@
 from build123d import *
-from ocp_vscode import show_object
+from ocp_viewer import show_object
 
 thru_hole = Cylinder(radius=3, height=2)
 thru_hole -= Hole(radius=1, depth=2)

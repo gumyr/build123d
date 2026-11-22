@@ -575,6 +575,18 @@ class LocationsTests(unittest.TestCase):
 
 
 class MirrorTests(unittest.TestCase):
+    def test_mirror_of_one_part_gives_one_level_of_compound(self):
+        """A mirrored Box is a Part holding a solid, not a Part holding the
+        Box's compound, and keeps the Box's attributes"""
+        box = Pos(3, 0, 0) * Box(1, 1, 1)
+        box.label = "box"
+        mirrored = mirror(box, Plane.YZ)
+        self.assertIsInstance(mirrored, Part)
+        self.assertEqual(len(mirrored.compounds()), 1)
+        self.assertEqual(len(mirrored.get_type(Solid)), 1)
+        self.assertEqual(mirrored.label, "box")
+        self.assertAlmostEqual(mirrored.center().X, -3, 5)
+
     def test_mirror_line(self):
         edge = Edge.make_line((1, 0, 0), (2, 0, 0))
         wire = Wire.make_circle(1, Plane((5, 0, 0)))
@@ -1229,7 +1241,7 @@ class TestProjectToPlane(unittest.TestCase):
     def test_sketch_from_part_modifies_part(self):
         # The primary use: bring a part into a sketch, enhance it, cut the part
         with BuildSketch() as groove:
-            project_to_plane(self.knob)
+            project_to_plane(self.knob, Plane.XY)
             Rectangle(2, 20, mode=Mode.SUBTRACT)
         expected = Circle(5) - Circle(2) - Rectangle(2, 20)
         self.assertAlmostEqual(groove.sketch.area, expected.area, 5)
@@ -1244,7 +1256,7 @@ class TestProjectToPlane(unittest.TestCase):
         with BuildPart() as grooved:
             add(self.knob)
             with BuildSketch() as groove:
-                project_to_plane()
+                project_to_plane(workplane=Plane.XY)
                 Rectangle(2, 20, mode=Mode.SUBTRACT)
             extrude(amount=50, mode=Mode.INTERSECT)
         expected = Circle(5) - Circle(2) - Rectangle(2, 20)
@@ -1254,7 +1266,7 @@ class TestProjectToPlane(unittest.TestCase):
         with BuildPart() as housed:
             add(self.housing)
             with BuildLine() as outline:
-                project_to_plane()
+                project_to_plane(workplane=Plane.XY)
         self.assertEqual(len(outline.line.edges()), 4)
         self.assertAlmostEqual(outline.line.bounding_box().size.X, 20, 5)
         self.assertAlmostEqual(outline.line.bounding_box().size.Y, 10, 5)
@@ -1263,25 +1275,44 @@ class TestProjectToPlane(unittest.TestCase):
     def test_no_objects_needs_an_enclosing_builder(self):
         with self.assertRaises(ValueError):
             with BuildSketch():
-                project_to_plane()
+                project_to_plane(workplane=Plane.XY)
         with self.assertRaises(ValueError):
             with BuildLine():
-                project_to_plane()
+                project_to_plane(workplane=Plane.XY)
         with self.assertRaises(ValueError):
             project_to_plane(workplane=Plane.XY)
 
-    def test_builder_plane_is_xy(self):
-        # The drawing is made on Plane.XY and placed with the sketch on exit
+    def test_builder_projects_onto_the_given_plane(self):
+        # Projected onto the sketch's own plane, the result is placed back
+        # where the object is
+        top = self.housing.faces().sort_by(Axis.X)[-1]
+        with BuildSketch(Plane(top)) as on_face:
+            project_to_plane(top, Plane(top))
+        self.assertAlmostEqual(on_face.sketch.area, top.area, 5)
+        self.assertAlmostEqual((on_face.sketch.center() - top.center()).length, 0, 5)
+        self.assertAlmostEqual(on_face.sketch_local.center().Z, 0, 5)
+
+        # Projected onto another plane, that view is laid on the sketch's plane
         with BuildSketch(Plane.XZ) as side:
-            project_to_plane(self.knob)
+            project_to_plane(self.knob, Plane.XY)
         local = side.sketch_local.faces()[0]
         self.assertAlmostEqual(local.center().Z, 0, 5)
         self.assertAlmostEqual(local.area, pi * 25 - pi * 4, 5)
         self.assertEqual(side.sketch.faces()[0].normal_at(), Vector(0, -1, 0))
 
+    def test_the_workplane_is_required(self):
+        with self.assertRaises(ValueError):
+            project_to_plane(self.knob)
+        with BuildSketch():
+            with self.assertRaises(ValueError):
+                project_to_plane(self.knob)
+        with BuildLine():
+            with self.assertRaises(ValueError):
+                project_to_plane(self.housing.edges())
+
     def test_points_into_build_line(self):
         with BuildLine() as outline:
-            points = project_to_plane(self.housing.vertices())
+            points = project_to_plane(self.housing.vertices(), Plane.XY)
             self.assertEqual(len(points), 8)
             self.assertTrue(all(pnt.Z == 0 for pnt in points))
             corners = [(0, -5), (20, -5), (20, 5), (0, 5)]
@@ -1291,7 +1322,7 @@ class TestProjectToPlane(unittest.TestCase):
 
     def test_face_into_build_line(self):
         with BuildLine() as outline:
-            project_to_plane(self.housing.faces().sort_by(Axis.Z)[-1])
+            project_to_plane(self.housing.faces().sort_by(Axis.Z)[-1], Plane.XY)
         self.assertEqual(len(outline.line.edges()), 4)
         self.assertEqual(outline.line.bounding_box().size, Vector(20, 10, 0))
 
@@ -1331,7 +1362,7 @@ class TestProjectToPlane(unittest.TestCase):
             project_to_plane(tube.shell(), workplane=Plane.XZ).area, 100, 5
         )
         with BuildSketch() as lying:
-            project_to_plane(Rot(90, 0, 0) * side)
+            project_to_plane(Rot(90, 0, 0) * side, Plane.XY)
         self.assertAlmostEqual(lying.sketch.area, 100, 5)
 
     def test_curves_cast_full_shadows(self):
@@ -1368,7 +1399,7 @@ class TestProjectToPlane(unittest.TestCase):
         self.assertAlmostEqual(sum(e.length for e in outline.edges()), 16, 5)
         tube = at * Cylinder(5, 10)
         with BuildLine() as rim:
-            project_to_plane(tube)
+            project_to_plane(tube, Plane.XY)
         self.assertEqual([e.geom_type for e in rim.line.edges()], [GeomType.CIRCLE])
 
     def test_box_faces_onto_a_plane(self):
@@ -1400,6 +1431,24 @@ class TestProjectToPlane(unittest.TestCase):
         # in the workplane's own coordinates, as every projection onto a plane
         self.assertAlmostEqual(projection.faces()[0].center().Z, 0, 5)
 
+    def test_free_form_walls_along_the_direction_cast_no_shadow(self):
+        # A sweep along a helix makes its upright walls as B-splines, which are
+        # only nearly edge-on to the plane; they must not cast the whole screen
+        profile = make_face(
+            offset(
+                Polyline((-0.5, 0.2), (-0.5, 0), (0.5, 0), (0.5, 0.2)),
+                0.1,
+                side=Side.RIGHT,
+            )
+        )
+        path = Helix(3, 3 * 0.75, 10)
+        ramp = Pos(Z=3) * sweep(path.location_at(0) * profile, path, is_frenet=True)
+        projection = project_to_plane(ramp, workplane=Plane.XY)
+        self.assertIsInstance(projection, Sketch)
+        self.assertEqual(len(projection.faces()), 1)
+        # three quarters of the ring between the ramp's inner and outer radii
+        self.assertAlmostEqual(projection.area, 0.75 * pi * (10.6**2 - 9.4**2), 1)
+
     def test_objects_far_from_the_plane_origin(self):
         far = Pos(1000, 1000, 50) * Box(10, 10, 10)
         projection = project_to_plane(
@@ -1413,8 +1462,8 @@ class TestProjectToPlane(unittest.TestCase):
     def test_edges_into_sketch_private_only(self):
         with BuildSketch():
             with self.assertRaises(ValueError):
-                project_to_plane(self.housing.edges())
-            curve = project_to_plane(self.housing.edges(), mode=Mode.PRIVATE)
+                project_to_plane(self.housing.edges(), Plane.XY)
+            curve = project_to_plane(self.housing.edges(), Plane.XY, mode=Mode.PRIVATE)
         self.assertIsInstance(curve, Curve)
 
     def test_errors(self):
@@ -1424,12 +1473,9 @@ class TestProjectToPlane(unittest.TestCase):
             project_to_plane([self.knob, (1, 2, 3)], workplane=Plane.XY)
         with self.assertRaises(ValueError):
             project_to_plane(self.knob.faces().group_by(Axis.Z), workplane=Plane.XY)
-        with BuildSketch():
-            with self.assertRaises(ValueError):
-                project_to_plane(self.knob, workplane=Plane.XZ)
         with BuildPart():
             with self.assertRaises(RuntimeError):
-                project_to_plane(self.knob)
+                project_to_plane(self.knob, Plane.XY)
 
 
 if __name__ == "__main__":

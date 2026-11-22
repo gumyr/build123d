@@ -30,10 +30,10 @@ import math
 import warnings
 from io import BytesIO, StringIO, TextIOBase
 from os import PathLike
+from collections.abc import Sequence
 from typing import BinaryIO, Callable, TextIO, cast
 
-import ezdxf
-from ezdxf.entities import DXFGraphic
+from ezdxf.entities.arc import Arc as DXFArc
 from ezdxf.entities.boundary_paths import (
     ArcEdge,
     EdgePath,
@@ -42,6 +42,20 @@ from ezdxf.entities.boundary_paths import (
     PolylinePath,
     SplineEdge,
 )
+from ezdxf.entities.circle import Circle as DXFCircle
+from ezdxf.entities.ellipse import Ellipse as DXFEllipse
+from ezdxf.entities.hatch import Hatch as DXFHatch
+from ezdxf.entities.line import Line as DXFLine
+from ezdxf.entities.lwpolyline import LWPolyline as DXFLWPolyline
+from ezdxf.entities.mtext import MText as DXFMText
+from ezdxf.entities.point import Point as DXFPoint
+from ezdxf.entities.polyline import Polyline as DXFPolyline
+from ezdxf.entities.solid import Face3d, Solid as DXFSolid, Trace
+from ezdxf.entities.spline import Spline as DXFSpline
+from ezdxf.entities.text import Text as DXFText
+from ezdxf.filemanagement import read as read_dxf
+from ezdxf.filemanagement import readfile as readfile_dxf
+from ezdxf.lldxf.const import DXFStructureError
 
 from build123d.build_enums import TextAlign
 from build123d.geometry import TOLERANCE, Axis, Pos, Vector, VectorLike
@@ -61,19 +75,19 @@ from build123d.topology import Edge, Shape, ShapeList, Vertex, Wire
 # mypy: disable-error-code="attr-defined"
 
 
-def process_arc(entity: DXFGraphic) -> CenterArc:
+def process_arc(entity: DXFArc) -> CenterArc:
     """Convert ARC"""
     start, _, end = entity.angles(3)
     arc_size = (end - start + 360.0) % 360.0
     return CenterArc(entity.dxf.center, entity.dxf.radius, start, arc_size)
 
 
-def process_circle(entity: DXFGraphic) -> Circle:
+def process_circle(entity: DXFCircle) -> Edge:
     """Convert CIRCLE"""
     return Circle(entity.dxf.radius).edge().moved(Pos(*entity.dxf.center))
 
 
-def process_ellipse(entity: DXFGraphic) -> EllipticalCenterArc:
+def process_ellipse(entity: DXFEllipse) -> EllipticalCenterArc:
     """Convert ELLIPSE"""
     center = entity.dxf.center
     major_axis = entity.dxf.major_axis
@@ -144,7 +158,7 @@ def process_insert(entity, doc):
     return ShapeList(transformed_entities)
 
 
-def process_line(entity: DXFGraphic) -> Line | None:
+def process_line(entity: DXFLine) -> Line | None:
     """Convert LINE"""
     start, end = Vector(*entity.dxf.start), Vector(*entity.dxf.end)
     if (start - end).length < TOLERANCE:
@@ -153,7 +167,7 @@ def process_line(entity: DXFGraphic) -> Line | None:
     return Line(start, end)
 
 
-def process_lwpolyline(entity: DXFGraphic) -> Edge | Wire | None:
+def process_lwpolyline(entity: DXFLWPolyline) -> Edge | Wire | None:
     """Convert LWPOLYLINE"""
     elevation = entity.dxf.elevation
     # elevation could be a vector or just a single value
@@ -169,13 +183,13 @@ def process_lwpolyline(entity: DXFGraphic) -> Edge | Wire | None:
     return _convert_bulge_polyline(points, entity.closed, z_value, "LWPOLYLINE")
 
 
-def process_point(entity: DXFGraphic) -> Vertex:
+def process_point(entity: DXFPoint) -> Vertex:
     """Convert POINT"""
     point = entity.dxf.location
     return Vertex(point[0], point[1], point[2])
 
 
-def process_polyline(entity: DXFGraphic) -> Edge | Wire | None:
+def process_polyline(entity: DXFPolyline) -> Edge | Wire | None:
     """Convert 2D POLYLINE - a collection of LINE and ARC segments."""
     if entity.get_mode() != "AcDb2dPolyline":
         raise ValueError(f"Unsupported POLYLINE mode: {entity.get_mode()}")
@@ -198,9 +212,12 @@ def process_polyline(entity: DXFGraphic) -> Edge | Wire | None:
 
 
 def _convert_bulge_polyline(
-    points: list[tuple[float, float, float]], closed: bool, z_value: float, label: str
+    points: Sequence[Sequence[float]], closed: bool, z_value: float, label: str
 ) -> Edge | Wire | None:
-    """Convert a 2D polyline described by vertices with optional bulge values."""
+    """Convert a 2D polyline described by vertices with optional bulge values.
+
+    Each point is (x, y) or (x, y, bulge).
+    """
     edges = []
     segment_count = len(points) if closed else len(points) - 1
 
@@ -271,7 +288,7 @@ def _convert_hatch_edge(edge, z_value: float) -> Edge:
     raise ValueError(f"Unsupported HATCH edge type: {type(edge).__name__}")
 
 
-def process_hatch(entity: DXFGraphic) -> ShapeList[Edge | Wire]:
+def process_hatch(entity: DXFHatch) -> ShapeList[Edge | Wire]:
     """Convert HATCH by importing only its perimeter boundary paths."""
     elevation = entity.dxf.elevation
     try:
@@ -302,7 +319,7 @@ def process_hatch(entity: DXFGraphic) -> ShapeList[Edge | Wire]:
     return boundaries
 
 
-def process_solid_trace_3dface(entity: DXFGraphic):
+def process_solid_trace_3dface(entity: DXFSolid | Trace | Face3d):
     """Convert filled objects - i.e. Faces"""
     # Gather vertices as a list of (x, y, z) tuples. ezdxf returns the WCS vertices in
     # outline order, i.e. it swaps the last two corners of SOLID and TRACE and drops the
@@ -314,7 +331,7 @@ def process_solid_trace_3dface(entity: DXFGraphic):
     return polygon_obj
 
 
-def process_spline(entity: DXFGraphic) -> Edge:
+def process_spline(entity: DXFSpline) -> Edge:
     """Convert SPLINE"""
     control_points = list(entity.control_points)
     fit_points = list(entity.fit_points)
@@ -343,7 +360,7 @@ def process_spline(entity: DXFGraphic) -> Edge:
     raise ValueError("Unsupported SPLINE entity: missing control points and knots")
 
 
-def process_text(entity: DXFGraphic) -> Text:
+def process_text(entity: DXFText) -> Text:
     """Convert TEXT."""
     v_alignment = {
         0: TextAlign.BOTTOM,  # baseline approximation
@@ -377,7 +394,7 @@ def process_text(entity: DXFGraphic) -> Text:
     ).moved(Pos(*position))
 
 
-def process_mtext(entity: DXFGraphic) -> Text:
+def process_mtext(entity: DXFMText) -> Text:
     """Convert MTEXT."""
     attachment_align = {
         1: (TextAlign.LEFT, TextAlign.TOPFIRSTLINE),
@@ -392,7 +409,8 @@ def process_mtext(entity: DXFGraphic) -> Text:
     }
 
     if hasattr(entity, "plain_text"):
-        content = entity.plain_text()
+        # plain_text returns a list of lines only when asked to split
+        content = cast(str, entity.plain_text())
     else:
         content = entity.text
 
@@ -466,16 +484,16 @@ def import_dxf(dxf_file: str | PathLike | TextIO | BinaryIO) -> ShapeList:
     """
     try:
         if isinstance(dxf_file, (str, PathLike)):
-            doc = ezdxf.readfile(dxf_file)
+            doc = readfile_dxf(dxf_file)
         elif isinstance(dxf_file, TextIOBase):
-            doc = ezdxf.read(dxf_file)
+            doc = read_dxf(cast(TextIO, dxf_file))
         elif isinstance(dxf_file, BytesIO) or hasattr(dxf_file, "read"):
             data = dxf_file.read()
             text = data.decode("latin1") if isinstance(data, bytes) else data
-            doc = ezdxf.read(StringIO(text))
+            doc = read_dxf(StringIO(text))
         else:
             raise TypeError(f"Unsupported DXF input type: {type(dxf_file).__name__}")
-    except ezdxf.DXFStructureError as exc:
+    except DXFStructureError as exc:
         raise ValueError(f"Failed to read {dxf_file}") from exc
     build123d_objects = []
 

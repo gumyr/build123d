@@ -31,7 +31,7 @@ def export_svg(parts, name):
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(hidden, layer="Hidden")
     if GEN_DOCS:
-        exporter.write(f"../docs/assets/{name}.svg")
+        exporter.write(f"../docs/how_to/assets/tips/{name}.svg")
 
 export_svg(test_boxes, "packed_boxes_input")
 export_svg(packed, "packed_boxes_output")

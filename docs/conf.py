@@ -43,6 +43,7 @@ extensions = [
     #    "sphinx_autodoc_typehints",
     "sphinx.ext.autodoc.typehints",
     "sphinx.ext.doctest",
+    "sphinx.ext.intersphinx",
     "sphinx.ext.graphviz",
     "sphinx.ext.inheritance_diagram",
     "sphinx.ext.viewcode",
@@ -81,6 +82,16 @@ napoleon_custom_sections = None
 # Move type annotations off the signature and into each parameter's entry
 autodoc_typehints = "description"
 
+# Show these type aliases by name in signatures instead of expanding them to
+# the union they stand for. Each is documented as a py:class entry in
+# reference/direct_api_reference.rst, which is what lets the name link there.
+# This takes effect in modules that use "from __future__ import annotations".
+autodoc_type_aliases = {
+    "ColorLike": "ColorLike",
+    "VectorLike": "VectorLike",
+    "RotationLike": "RotationLike",
+}
+
 autodoc_default_options = {
     "members": True,
     "undoc-members": True,
@@ -89,6 +100,11 @@ autodoc_default_options = {
 }
 
 # autodoc_mock_imports = ["OCP"]
+
+# Link the standard library's types in signatures (os.PathLike, Iterable,
+# Sequence and so on) to the Python documentation. The inventory is fetched
+# from docs.python.org when the docs are built.
+intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
 
 # Sphinx settings
 add_module_names = False

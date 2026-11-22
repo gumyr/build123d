@@ -31,7 +31,7 @@ license:
 # [Code]
 
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 with BuildPart() as key_cap:
     # Start with the plan of the key cap and extrude it

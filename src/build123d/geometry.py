@@ -209,6 +209,10 @@ class Vector:
         ...
 
     @overload
+    def __init__(self, v: Vertex):  # pragma: no cover
+        ...
+
+    @overload
     def __init__(self):  # pragma: no cover
         ...
 
@@ -1567,7 +1571,7 @@ class Color:
                                     alpha = int(hex_a, 16) / 0xFF
                             except ValueError as ex:
                                 raise ValueError(
-                                    f"Invald alpha hex string: {hex_a}"
+                                    f"Invalid alpha hex string: {hex_a}"
                                 ) from ex
                     case int():
                         color_code, alpha = fill_defaults(args, (color_code, alpha))

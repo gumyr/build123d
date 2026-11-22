@@ -163,6 +163,30 @@ class TestWire(unittest.TestCase):
         hull_wire = Wire.make_convex_hull(adjoining_edges)
         self.assertAlmostEqual(Face(hull_wire).area, 319.9612, 4)
 
+        # A vertex on the hull is a sharp corner
+        teardrop = Wire.make_convex_hull([Vertex(0, 3), Edge.make_circle(1)])
+        self.assertAlmostEqual(
+            Face(teardrop).area, math.sqrt(8) + math.pi - math.acos(1 / 3), 4
+        )
+        self.assertAlmostEqual(
+            Vector(teardrop.vertices().sort_by(Axis.Y)[-1]), (0, 3, 0), 5
+        )
+
+        square = Wire.make_convex_hull(
+            [Vertex(0, 0), Vertex(1, 0), Vertex(1, 1), Vertex(0, 1), Vertex(0.5, 0.5)]
+        )
+        self.assertEqual(len(square.edges()), 4)
+        self.assertAlmostEqual(Face(square).area, 1, 5)
+
+        # points given as coordinates
+        diamond = Wire.make_convex_hull(
+            [(0, 3), Vector(0, -3), Vertex(2, 0), Edge.make_circle(1)]
+        )
+        # a triangle to the right of the Y axis, half of a two-pointed teardrop to the left
+        self.assertAlmostEqual(
+            Face(diamond).area, 6 + math.sqrt(8) + math.pi / 2 - math.acos(1 / 3), 4
+        )
+
     def test_fix_degenerate_edges(self):
         e0 = Edge.make_line((0, 0), (1, 0))
         e1 = Edge.make_line((2, 0), (1, 0))
@@ -877,6 +901,24 @@ class TestWireValidation(unittest.TestCase):
     def test_fillet_2d_vertex_not_on_wire(self):
         with self.assertRaisesRegex(ValueError, "Could not find fillet vertex"):
             self.wire.fillet_2d(1, [Vertex(100, 100, 0)])
+
+    def test_fillet_2d_errors_name_the_original_vertex(self):
+        """A wire off Plane.XY is relocated to be filleted - failures name the
+        vertex that was passed in, not where the relocation put it"""
+        points = [(0, 0, 1), (2, 0, 1), (2, 0, 3), (0, 0, 3)]
+        closed = Wire.make_polygon(points, close=True)
+        corner = closed.vertices().sort_by_distance((2, 0, 1))[0]
+        with self.assertRaisesRegex(
+            ValueError, r"Fillet algorithm failed for Vertex\(2\.0, 0\.0, 1\.0\)"
+        ):
+            closed.fillet_2d(2.5, [corner])
+
+        opened = Wire.make_polygon(points, close=False)
+        end = opened.vertices().sort_by_distance((0, 0, 3))[0]
+        with self.assertRaisesRegex(
+            ValueError, r"exactly two edges: Vertex\(0\.0, 0\.0, 3\.0\)"
+        ):
+            opened.fillet_2d(0.2, [end])
 
     def test_param_at_point_no_extrema(self):
         extrema = MagicMock()
