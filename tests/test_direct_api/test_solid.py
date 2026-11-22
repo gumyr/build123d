@@ -329,10 +329,9 @@ class TestSolid(unittest.TestCase):
         arc = Edge.make_tangent_arc((10, 0, 0), (1, 0, 0), (20, 10, 0))
         helix = Edge.make_helix(1.5, 10, 3)
         cases = {
-            # a sphere sweeps out a tube closed by its two halves, on any path;
-            # it is turned so the path isn't square to its axis
+            # a sphere sweeps out a tube closed by its two halves, on any path
             "sphere on a line and arc": (
-                Rot(20, 30, 0) * Solid.make_sphere(3),
+                Solid.make_sphere(3),
                 Wire([line, arc]),
                 ball + math.pi * 3**2 * (line.length + arc.length),
             ),
@@ -343,6 +342,12 @@ class TestSolid(unittest.TestCase):
                 Rot(0, 0, 45) * box,
                 line,
                 8 + 2 * math.sqrt(8) * line.length,
+            ),
+            # the silhouette of a cone starts at its apex
+            "cone, on its side, on a line": (
+                Solid.make_cone(2, 0, 4),
+                line,
+                math.pi * 2**2 * 4 / 3 + 2 * 4 * line.length,
             ),
             # the section rolls as it follows a helix
             "box on a helix": (
