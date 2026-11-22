@@ -33,7 +33,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from build123d.build_enums import GeomType, Kind, Until
-from build123d.geometry import Axis, Location, Plane, Pos, Vector
+from build123d.geometry import Axis, Location, Plane, Pos, Rot, Vector
 from build123d.objects_curve import Spline
 from build123d.objects_part import Box, Torus
 from build123d.objects_sketch import Circle, Rectangle
@@ -321,6 +321,49 @@ class TestSolid(unittest.TestCase):
             [f0, f1], path, is_frenet=True, binormal=Vector(5, 0, 1)
         )
         self.assertAlmostEqual(swept.volume, 20.75, 2)
+
+    def test_sweep_solid(self):
+        ball = Solid.make_sphere(3).volume
+        box = Pos(-1, -1, -1) * Solid.make_box(2, 2, 2)
+        line = Edge.make_line((0, 0, 0), (10, 0, 0))
+        arc = Edge.make_tangent_arc((10, 0, 0), (1, 0, 0), (20, 10, 0))
+        helix = Edge.make_helix(1.5, 10, 3)
+        cases = {
+            # a sphere sweeps out a tube closed by its two halves, on any path;
+            # it is turned so the path isn't square to its axis
+            "sphere on a line and arc": (
+                Rot(20, 30, 0) * Solid.make_sphere(3),
+                Wire([line, arc]),
+                ball + math.pi * 3**2 * (line.length + arc.length),
+            ),
+            # the sides of an aligned box are parallel to the travel
+            "box on a line": (box, line, 8 + 4 * line.length),
+            # a turned box has a six sided silhouette that isn't flat
+            "turned box on a line": (
+                Rot(0, 0, 45) * box,
+                line,
+                8 + 2 * math.sqrt(8) * line.length,
+            ),
+            # the section rolls as it follows a helix
+            "box on a helix": (
+                helix.location_at(0) * Pos(-0.5, -0.5, -0.5) * Solid.make_box(1, 1, 1),
+                helix,
+                1 + helix.length,
+            ),
+        }
+        for name, (solid, path, volume) in cases.items():
+            with self.subTest(name):
+                swept = Solid.sweep(solid, path)
+                self.assertTrue(swept.is_valid)
+                self.assertAlmostEqual(swept.volume, volume, 2)
+
+        # seen edge on, a torus has two silhouettes
+        with self.assertRaises(ValueError):
+            Solid.sweep(Rot(0, 90, 0) * Solid.make_torus(3, 1), line)
+
+        # the arguments that shape the sweep of a cross section don't apply
+        with self.assertRaises(ValueError):
+            Solid.sweep(box, line, is_frenet=True)
 
     def test_sweep_warns_when_invalid(self):
         # The kernel reports success for a sweep that folds over itself
