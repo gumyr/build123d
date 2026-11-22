@@ -209,6 +209,10 @@ class Vector:
         ...
 
     @overload
+    def __init__(self, v: Vertex):  # pragma: no cover
+        ...
+
+    @overload
     def __init__(self):  # pragma: no cover
         ...
 

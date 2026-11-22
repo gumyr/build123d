@@ -42,10 +42,13 @@ from warnings import warn
 
 from collections.abc import Callable, Iterable
 
-import ezdxf
 import svgpathtools as PT
+from ezdxf import units as dxf_units
 from ezdxf import zoom
-from ezdxf.colors import RGB, aci2rgb
+from ezdxf.colors import RGB, aci2rgb, rgb2int
+from ezdxf.filemanagement import new as new_dxf
+from ezdxf.lldxf.const import DXF2004, DXF2013
+from ezdxf.math import BSpline as DXFBSpline
 from ezdxf.math import Vec2
 from OCP.BRepLib import BRepLib
 from OCP.BRepTools import BRepTools_WireExplorer
@@ -494,11 +497,11 @@ class ExportDXF(Export2D):
     # constants used by the ezdxf library for conversion.
     _UNITS_LOOKUP = {
         Unit.MC: 13,
-        Unit.MM: ezdxf.units.MM,
-        Unit.CM: ezdxf.units.CM,
-        Unit.M: ezdxf.units.M,
-        Unit.IN: ezdxf.units.IN,
-        Unit.FT: ezdxf.units.FT,
+        Unit.MM: dxf_units.MM,
+        Unit.CM: dxf_units.CM,
+        Unit.M: dxf_units.M,
+        Unit.IN: dxf_units.IN,
+        Unit.FT: dxf_units.FT,
     }
 
     #  A set containing the Unit enums that represent metric units
@@ -513,7 +516,7 @@ class ExportDXF(Export2D):
 
     def __init__(
         self,
-        version: str = ezdxf.DXF2013,
+        version: str = DXF2013,
         unit: Unit = Unit.MM,
         color: ColorLike | ColorIndex | None = None,
         line_weight: float | None = None,
@@ -526,7 +529,7 @@ class ExportDXF(Export2D):
             self._linetype_scale = Export2D.LTYPE_SCALE[Unit.MM]
         else:
             self._linetype_scale = 1
-        self._document = ezdxf.new(
+        self._document = new_dxf(
             dxfversion=version,
             units=self._UNITS_LOOKUP[unit],
             setup=False,
@@ -604,9 +607,9 @@ class ExportDXF(Export2D):
 
         red, green, blue, _ = tuple(Color(color))
         rgb = (round(red * 255), round(green * 255), round(blue * 255))
-        if self._document.dxfversion < ezdxf.DXF2004:
+        if self._document.dxfversion < DXF2004:
             return {"color": self._nearest_aci(rgb)}
-        return {"true_color": ezdxf.rgb2int(rgb)}
+        return {"true_color": rgb2int(rgb)}
 
     @staticmethod
     def _nearest_aci(rgb: tuple[int, int, int]) -> int:
@@ -853,7 +856,7 @@ class ExportDXF(Export2D):
             pad = spline.NbKnots() - spline.LastUKnotIndex()
             poles += poles[:pad]
 
-        dxf_spline = ezdxf.math.BSpline(poles, order, knots, weights)
+        dxf_spline = DXFBSpline(poles, order, knots, weights)
 
         self._modelspace.add_spline(dxfattribs=attribs).apply_construction_tool(
             dxf_spline
