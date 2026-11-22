@@ -97,7 +97,7 @@ from OCP.GProp import GProp_GProps
 from OCP.ShapeFix import ShapeFix_Solid
 from OCP.Standard import Standard_Failure, Standard_TypeMismatch
 from OCP.StdFail import StdFail_NotDone
-from OCP.TopExp import TopExp
+from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Compound,
@@ -887,6 +887,29 @@ def _fillet_failure_details(
     )
 
 
+def _check_sweep_profile(profile: Wire) -> None:
+    """Refuse a sweep profile that has a degenerate edge
+
+    A degenerate edge is a side of a surface collapsed to a point, at the pole
+    of a sphere face or the apex of a cone face. The kernel's pipe builder
+    cannot sweep a wire that holds one: depending on the face and the kind of
+    sweep it raises an error that says nothing useful, never returns, or
+    crashes the interpreter.
+
+    Raises:
+        ValueError: profile has a degenerate edge
+    """
+    explorer = TopExp_Explorer(profile.wrapped, ta.TopAbs_EDGE)
+    while explorer.More():
+        if BRep_Tool.Degenerated_s(TopoDS.Edge(explorer.Current())):
+            raise ValueError(
+                "A sweep profile can't have a degenerate edge, as the boundary "
+                "of a sphere or cone face has at its pole or apex. Sweep a "
+                "planar profile, or the Solid itself."
+            )
+        explorer.Next()
+
+
 def _forward_solid(solid: TopoDS_Solid) -> TopoDS_Solid:
     """The same solid with FORWARD flags on itself and its shells.
 
@@ -1300,6 +1323,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
             inner_wires = section.inner_wires()
         else:
             outer_wire = section
+        for wire in [outer_wire] + inner_wires:
+            _check_sweep_profile(wire)
 
         # make straight spine
         straight_spine_e = Edge.make_line(center, center.add(normal))
@@ -2012,6 +2037,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 discontinuities. Defaults to Transition.TRANSFORMED.
 
         Raises:
+            ValueError: the section has a degenerate edge, as the boundary of a
+                sphere or cone face has
             ValueError: an argument other than path given with a Solid section
             ValueError: the path has a corner and the section is a Solid
             ValueError: the silhouette of a Solid section along path is not one
@@ -2040,6 +2067,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         shapes: list[Mixin3D[TopoDS_Shape]] = []
         for wire in [outer_wire] + inner_wires:
+            _check_sweep_profile(wire)
             builder = BRepOffsetAPI_MakePipeShell(Wire(path).wrapped)
 
             rotate = False
@@ -2207,12 +2235,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
             builder.SetMode(is_frenet)
 
         for profile in profiles:
-            path_as_wire = (
-                profile.wrapped
-                if isinstance(profile, Wire)
-                else profile.outer_wire().wrapped
+            profile_wire = (
+                profile if isinstance(profile, Wire) else profile.outer_wire()
             )
-            builder.Add(path_as_wire, translate, rotate)
+            _check_sweep_profile(profile_wire)
+            builder.Add(profile_wire.wrapped, translate, rotate)
 
         builder.Build()
 
