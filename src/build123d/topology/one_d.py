@@ -90,7 +90,7 @@ from OCP.BRepLProp import BRepLProp
 from OCP.BRepOffset import BRepOffset_MakeOffset
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffset
 from OCP.BRepProj import BRepProj_Projection
-from OCP.BRepTools import BRepTools, BRepTools_WireExplorer
+from OCP.BRepTools import BRepTools, BRepTools_ReShape, BRepTools_WireExplorer
 from OCP.ElCLib import ElCLib
 from OCP.Extrema import Extrema_ExtPC
 from OCP.GC import (
@@ -198,7 +198,7 @@ from OCP.TopoDS import (
     TopoDS_Wire,
 )
 from scipy.optimize import minimize_scalar
-from scipy.spatial import ConvexHull
+from scipy.spatial import ConvexHull, cKDTree
 from typing_extensions import Self, deprecated
 
 from build123d.build_enums import (
@@ -4407,11 +4407,58 @@ class Wire(Mixin1D[TopoDS_Wire]):
 
             edges = placed_edges
 
+        # The kernel merges end vertices that coincide within tolerance but are
+        # not shared, and which vertex survives varies between runs and
+        # platforms. Substitute the first in input order so the result repeats.
+        #
+        # A vertex is only substituted where the tolerance of the one kept
+        # reaches it, so that the kept vertex still lies on the end of each
+        # edge it now closes. The kernel also merges vertices further apart
+        # than that, up to the sum of their two tolerances, by making a new
+        # vertex of larger tolerance between them. Those joins, and an edge so
+        # short that its own two ends would merge, are left as they are: there
+        # the choice of vertex is back in the hands of the kernel and may still
+        # vary between runs and platforms.
+        vertices = [
+            vertex
+            for edge in edges
+            if not edge.is_empty
+            for vertex in (
+                TopExp.FirstVertex_s(edge.wrapped),
+                TopExp.LastVertex_s(edge.wrapped),
+            )
+        ]
+        points = [BRep_Tool.Pnt_s(vertex) for vertex in vertices]
+        tolerances = [BRep_Tool.Tolerance_s(vertex) for vertex in vertices]
+        tree = cKDTree(np.reshape([point.Coord() for point in points], (-1, 3)))
+        first = list(range(len(vertices)))
+        # pairs come as (i, j) with i < j; give each j its earliest match
+        for i, j in sorted(
+            tree.query_pairs(max(tolerances, default=0.0)), key=lambda p: p[::-1]
+        ):
+            kept = first[i]
+            other_end = j ^ 1  # the two ends of an edge are listed together
+            if (
+                first[j] == j
+                and points[kept].Distance(points[j]) <= tolerances[kept]
+                and (
+                    first[other_end] != kept or vertices[j].IsSame(vertices[other_end])
+                )
+            ):
+                first[j] = kept
+        reshaper = BRepTools_ReShape()
+        for vertex, index in zip(vertices, first):
+            if not vertex.IsSame(vertices[index]):
+                reshaper.Replace(
+                    vertex.Oriented(ta.TopAbs_FORWARD),
+                    vertices[index].Oriented(ta.TopAbs_FORWARD),
+                )
+
         wire_builder = BRepBuilderAPI_MakeWire()
         combined_edges = List_TopoDS_Shape()
         for edge in edges:
             if not edge.is_empty:
-                combined_edges.Append(edge.wrapped)
+                combined_edges.Append(reshaper.Apply(edge.wrapped))
         wire_builder.Add(combined_edges)
 
         wire_builder.Build()
