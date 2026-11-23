@@ -141,6 +141,7 @@ from build123d.build_enums import (
     GeomType,
     Hit,
     Keep,
+    Kind,
     Transition,
     Unit,
 )
@@ -202,6 +203,7 @@ from .utils import (
     _topods_face_position,
     _topods_point_on_face,
 )
+from .uv_offset import offset_face_2d
 from .uv_write import UVFrame
 from .zero_d import Vertex
 
@@ -2695,6 +2697,57 @@ class Face(Mixin2D[TopoDS_Face]):
         BRepGProp_Face(self.wrapped).Normal(u_val, v_val, gp_pnt, normal)
 
         return Vector(normal).normalized()
+
+    def offset_2d(
+        self, amount: float, kind: Kind = Kind.ARC, tolerance: float = 1e-4
+    ) -> ShapeList[Face]:
+        """offset_2d
+
+        Grow or shrink this face within its own surface.
+
+        The boundary moves ``amount`` along the surface, square to itself:
+        outwards for a positive amount, which grows the face and shrinks its
+        holes, and inwards for a negative one. The result lies on the same
+        surface, with the face's normal. This is the companion of
+        :meth:`Wire.offset_2d <topology.Wire.offset_2d>` for a face, and is
+        not :meth:`Face.offset <topology.Face.offset>`, which moves the whole
+        face along its normals onto another surface.
+
+        A planar, cylindrical or conical face is laid out flat, offset there
+        and written back, so the offset is exact and ``kind`` shapes its
+        corners as it does those of a planar offset. A face grown until it
+        meets itself round a cylinder or a cone comes back as one face all
+        the way round, and one that goes all the way round stays so.
+
+        A cone has an apex, which no face written this way can include: a
+        face that reaches it, or an offset that would, is refused. So is the
+        offset of a face that goes round a cone when the cone is too nearly
+        flat, or the face too near the apex, for it to be laid out.
+
+        Shrinking can part a face, so a list is returned: every face of the
+        result.
+
+        Args:
+            amount (float): how far the boundary moves along the surface;
+                positive grows the face, negative shrinks it
+            kind (Kind, optional): offset corner transition. Defaults to
+                Kind.ARC.
+            tolerance (float, optional): largest 3D error allowed where a
+                curve has to be interpolated. Defaults to 1e-4.
+
+        Raises:
+            ValueError: empty face, or one on a surface that is not handled
+            ValueError: nothing is left of the face
+            ValueError: the face or its offset reaches the apex of a cone, or
+                cannot be laid out about it
+            RuntimeError: the planar offset failed
+
+        Returns:
+            ShapeList[Face]: the faces of the result
+        """
+        if self.is_empty:
+            raise ValueError("Can't offset an empty face")
+        return offset_face_2d(self, amount, kind, tolerance)
 
     def outer_wire(self) -> Wire:
         """Extract the perimeter wire from this Face"""
