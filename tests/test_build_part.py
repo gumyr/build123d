@@ -692,6 +692,18 @@ class TestExtrude(unittest.TestCase):
         self.assertAlmostEqual(span.volume, 12 * 10 * 10, 4)
         self.assertAlmostEqual(span.bounding_box().min.X, -8, 5)
 
+    def test_extrude_until_a_ramp_crossing_the_plane_of_the_profile(self):
+        """A ramp that starts behind the profile and rises ahead of it stops
+        the extrusion, whichever way along an axis the extrusion runs"""
+        for sign in (1, -1):
+            with self.subTest(sign=sign):
+                ramp = Pos(Z=sign * 6) * Rot(Y=sign * 30) * Box(30, 10, 4)
+                column = extrude(
+                    Rectangle(2, 2), until=Until.NEXT, dir=(0, 0, sign), target=ramp
+                )
+                self.assertTrue(column.is_valid)
+                self.assertAlmostEqual(column.volume, 4 * (6 - 4 / sqrt(3)), 4)
+
     def test_extrude_until_splits_only_what_holds_the_profile(self):
         """What lies beyond the surface reached is discarded, so it is never
         split by the walls: the kernel can return it as a solid that it then
