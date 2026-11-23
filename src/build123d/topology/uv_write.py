@@ -36,18 +36,32 @@ desc:
       3D error is under a tolerance.
 
     The mapped shape is first laid out on the uv plane, Plane.XY with x as u
-    and y as v, as a planar shape in its own right. There it is split along
-    the seams of a periodic surface, which are known exactly as parameter
-    lines: the kernel's own faces stop at a seam and continue on the other
-    side as another face, and the frame does the same. Each piece is moved by
-    whole periods into the surface's own range and then written, its edges
-    given the piece's curves as pcurves. So write_face returns one face per
-    period the shape reaches into, and a wire gets a vertex where it
-    crosses. A shape may span more than a whole turn when it is sheared
-    along the surface, as a helical band is; one that would overlap itself
-    once wrapped, or one surrounding a pole, is refused.
-    Pieces from one shape meet along the seam, so once thickened they are
-    best joined into one tool before a boolean with the target solid.
+    and y as v, as a planar shape in its own right, and its edges are written
+    with their curves there as pcurves. On a periodic surface a shape may
+    lie across the seam, which is known exactly as a parameter line.
+
+    A face across the seam is written the way the kernel leaves one after a
+    boolean: as one face whose parameters start inside the surface's own
+    range and run on past its end, on the surface trimmed to that range.
+    The trimming matters. The bare surface says its parameter stops at the
+    end of the period, and the kernel's booleans go wrong on a face that
+    runs past it; the trimmed surface's bounds are the face's own.
+
+    A face that goes exactly once round the surface, a band about a
+    cylinder, meets itself along its two sides. It is written as the
+    kernel's own whole-turn faces are: over the surface's own range, with
+    the line where it meets itself moved onto the seam and written once, as
+    a seam edge - one edge carrying two pcurves, at the start and at the end
+    of the period, used forward and reversed in the same wire.
+
+    A face spanning more than a whole turn may do so without meeting itself
+    when it is sheared along the surface, as a helical band is, and is then
+    cut along the seam into one face per period it reaches into, each moved
+    into the surface's own range; the pieces meet along the seam, so once
+    thickened they are best joined into one tool before a boolean with the
+    target solid. A wire standing alone is cut at the seam too and gets a
+    vertex where it crosses. A shape that would overlap itself once wrapped,
+    or one surrounding a pole, is refused.
 
     The frame writes edges, wires and faces, and can punch an outline into
     the face it sits on.
@@ -75,15 +89,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import cache
 from math import asin, atan2, ceil, cos, floor, hypot, pi, sin
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, NamedTuple, TypeVar, cast
 
 from scipy.integrate import solve_ivp
 
 from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
+from OCP.BRepBuilderAPI import (
+    BRepBuilderAPI_MakeEdge,
+    BRepBuilderAPI_MakeFace,
+    BRepBuilderAPI_MakeVertex,
+)
 from OCP.BRepLib import BRepLib
-from OCP.Geom import Geom_Surface
+from OCP.Geom import Geom_RectangularTrimmedSurface, Geom_Surface
 from OCP.Geom2d import (
     Geom2d_BSplineCurve,
     Geom2d_Circle,
@@ -96,10 +114,10 @@ from OCP.Geom2dConvert import Geom2dConvert
 from OCP.GeomAbs import GeomAbs_Shape
 from OCP.GeomAPI import GeomAPI
 from OCP.IntTools import IntTools_FClass2d
-from OCP.gp import gp_Ax22d, gp_Dir2d, gp_Pln, gp_Pnt2d
+from OCP.gp import gp_Ax22d, gp_Dir2d, gp_Pln, gp_Pnt, gp_Pnt2d
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_State
 from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS, TopoDS_Face
+from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Vertex, TopoDS_Wire
 
 from build123d.build_enums import GeomType, Keep
 from build123d.geometry import TOLERANCE, Location, Matrix, Plane, Vector, VectorLike
@@ -123,6 +141,57 @@ where the surface's own range starts along it, and the period"""
 
 Piece = TypeVar("Piece", Edge, "Face")
 """An edge or a face of a mapped shape on the uv plane"""
+
+_ON_LINE = 1e-7
+"""How close, in parameter, a mapped edge lies to a parameter line to be on it"""
+
+_SAME_POINT = 1e-6
+"""How close two ends of written edges are to share a vertex"""
+
+_TOO_THIN = 2 * _SAME_POINT
+"""How narrow a strip of a mapped face is, in parameter or on the surface, to
+be too thin to cut off as a part of its own: its ends would share vertices"""
+
+
+class _Run(NamedTuple):
+    """An edge of a mapped outline, the way the outline runs along it"""
+
+    edge: Edge
+    backwards: bool
+    """Whether the outline runs against the edge's own curve"""
+    start: Vector
+    end: Vector
+
+
+class _VertexPool:
+    """The vertices of a wire being written, one per point however many
+    edges end there
+
+    Edges written one by one each bring their own vertices, to be matched up
+    by position afterwards. A seam edge is used twice in one wire and must
+    stay the same edge, so the wire it is in is built with its vertices
+    shared from the start.
+    """
+
+    def __init__(self) -> None:
+        self._vertices: list[TopoDS_Vertex] = []
+
+    def at(self, point: gp_Pnt) -> TopoDS_Vertex:
+        """The vertex at a point, made if there is none there yet"""
+        for vertex in self._vertices:
+            if BRep_Tool.Pnt_s(vertex).Distance(point) < _SAME_POINT:
+                self.cover(vertex, point)
+                return vertex
+        self._vertices.append(BRepBuilderAPI_MakeVertex(point).Vertex())
+        return self._vertices[-1]
+
+    @staticmethod
+    def cover(vertex: TopoDS_Vertex, point: gp_Pnt) -> None:
+        """Widen a vertex's tolerance to reach the end of an edge that ends
+        a little off it"""
+        distance = BRep_Tool.Pnt_s(vertex).Distance(point)
+        if distance > 0.0:
+            BRep_Builder().UpdateVertex(vertex, distance + TOLERANCE)
 
 
 def _as_face(obj: TopoDS_Face) -> Face:
@@ -280,9 +349,11 @@ class UVFrame:
 
         The result is on the target's own surface with the target's normal,
         so it combines with the target in booleans and thickens along the
-        target's normal. A shape that crosses the surface's seam is split
-        there, so the list holds one face per period the shape reaches into;
-        otherwise it holds one face.
+        target's normal. The list holds one face - across the seam of a
+        periodic surface or not, and all the way round one, where its two
+        sides meet in a seam edge - unless the shape spans more than a whole
+        turn, as a helical band can; that is cut along the seam into one
+        face per period it reaches into.
 
         Args:
             planar (Face): a planar face on ``Plane.XY``
@@ -290,14 +361,34 @@ class UVFrame:
         Raises:
             ValueError: the shape would overlap itself wrapped around the
                 surface, or surrounds a pole
+            ValueError: the shape goes once round the surface but its two
+                sides do not meet along their whole length, or it also lies
+                across the surface's other seam
 
         Returns:
             ShapeList[Face]: faces on the target's surface
         """
-        return ShapeList(
-            self._write_face(self._in_range(piece))
-            for piece in self._pieces(self._lift_face(planar))
-        )
+        lifted = self._lift_face(planar)
+        around = self._whole_turns(lifted)
+        if around:
+            lifted = self._fitted(planar, lifted, around[0])
+            return ShapeList([self._write_around(lifted, around)])
+        cutters = self._seam_cutters(lifted)  # refuses a shape that overlaps
+        box = lifted.bounding_box()
+        if any(
+            (box.max - box.min).dot(axis) >= period - 1e-9
+            for axis, _, period in self._periods
+        ):
+            pieces = [lifted]
+            for cutter in cutters:
+                pieces = [
+                    part for piece in pieces for part in _split_all(piece, cutter)
+                ]
+            return ShapeList(
+                self._write_face(self._in_range(piece)) for piece in pieces
+            )
+        lifted = self._from_range_start(lifted)
+        return ShapeList([self._write_face(lifted, self._trimmed_to(lifted))])
 
     def punch(self, planar: Face) -> ShapeList[Face]:
         """The frame's face with a planar face's outline cut out of it
@@ -471,18 +562,423 @@ class UVFrame:
             shift += axis * (floor((centre.dot(axis) - start) / period) * period)
         return piece.moved(Location(-shift)) if shift.length else piece
 
+    def _from_range_start(self, lifted: Face) -> Face:
+        """A mapped face moved by whole periods so that it starts inside the
+        surface's own parameter range
+
+        Where the kernel puts a face that lies across a seam: its low side
+        within the range, the rest running on past the end of it.
+        """
+        low = lifted.bounding_box().min
+        shift = Vector()
+        for axis, start, period in self._periods:
+            # a face starting on the seam starts there: the box is a little
+            # loose, and would otherwise put it a whole period away
+            turns = floor((low.dot(axis) - start + _SAME_POINT) / period)
+            shift += axis * (turns * period)
+        return lifted.moved(Location(-shift)) if shift.length else lifted
+
+    def _trimmed_to(self, lifted: Face) -> Geom_Surface:
+        """The surface a mapped face is written on: the face's own, trimmed
+        to the face's parameters in each direction the face runs past the
+        end of the period, and untouched where it does not
+
+        Trimmed, the surface's bounds reach as far as the face does. Left
+        bare they stop at the end of the period, and a face written past
+        them is valid but comes out of the kernel's booleans wrong.
+        """
+        box = lifted.bounding_box()
+        past = {
+            axis.X > 0.5: (box.min.dot(axis), box.max.dot(axis))
+            for axis, start, period in self._periods
+            if box.max.dot(axis) > start + period + 1e-9
+        }
+        if not past:
+            return self._surface
+        if len(past) == 2:
+            return Geom_RectangularTrimmedSurface(
+                self._surface, *past[True], *past[False]
+            )
+        ((along_u, (low, high)),) = past.items()
+        return Geom_RectangularTrimmedSurface(self._surface, low, high, along_u)
+
+    # ---- all the way round ----
+
+    def _whole_turns(self, lifted: Face) -> list[Period]:
+        """The periods a mapped face spans exactly: where it goes once round
+        the surface and its two sides, a period apart, are the same curve
+
+        Measured between the face's vertices, which the ends of two straight
+        sides are, with the face's box - a little loose - to rule out an
+        outline that bulges past them. A period apart means on the surface:
+        the ends of the sides come near enough there to share the seam's
+        vertices. In parameter that is nearer on a large surface than on a
+        small one, where :meth:`_fitted` makes up the difference.
+
+        The sides must share some length once one is moved a period onto the
+        other. A face that only reaches the two lines, a helical band a
+        period long or a diamond whose tips touch, or one whose sides lie
+        apart along them, does not meet itself and is written like any other
+        shape.
+        """
+        box = lifted.bounding_box()
+        around = []
+        for period in self._periods:
+            axis, _, length = period
+            along = [Vector(vertex).dot(axis) for vertex in lifted.vertices()]
+            width = max(along) - min(along)
+            if (
+                # a whole period more or less is the same place on the surface
+                abs(width - length) < length / 2
+                and (box.max - box.min).dot(axis) <= width + _SAME_POINT
+                and self._moved_on_surface(lifted, axis, max(along), width - length)
+                < _SAME_POINT
+                and any(
+                    min(high, other_high) - max(low, other_low) > TOLERANCE
+                    for low, high in _spans_on_line(lifted, axis, min(along))
+                    for other_low, other_high in _spans_on_line(
+                        lifted, axis, max(along)
+                    )
+                )
+            ):
+                around.append(period)
+        return around
+
+    def _fitted(self, planar: Face, lifted: Face, turn: Period) -> Face:
+        """A mapped face that goes once round the surface, with its sides a
+        period apart exactly
+
+        Sides that meet on the surface can be further from a period apart in
+        parameter than edges are told to lie along a line by, and on a small
+        surface they are. The planar face is then lifted again through the
+        map scaled along the turn about the face's low side, which moves
+        nothing further on the surface than the sides were apart.
+        """
+        axis, _, length = turn
+        along = [Vector(vertex).dot(axis) for vertex in lifted.vertices()]
+        low, width = min(along), max(along) - min(along)
+        if abs(width - length) <= _ON_LINE:
+            return lifted
+        scale = length / width
+        scales = Vector(1, 1, 0) + axis * (scale - 1)
+        offset = axis * (low * (1 - scale))
+        fit = Matrix(
+            [[scales.X, 0, 0, offset.X], [0, scales.Y, 0, offset.Y], [0, 0, 1, 0]]
+        )
+        fitted: Matrix | PointMap
+        if isinstance(self.mapping, Matrix):
+            fitted = fit.multiply(self.mapping)
+        else:
+            unfitted = self.mapping
+
+            def fitted(x: float, y: float) -> tuple[float, float]:
+                uv = fit.multiply(Vector(*unfitted(x, y), 0))
+                return uv.X, uv.Y
+
+        return UVFrame(self.face, fitted, self.tolerance)._lift_face(planar)
+
+    def _write_around(self, lifted: Face, around: list[Period]) -> Face:
+        """A mapped face that goes once round the surface, written as one
+        face with a seam edge where its two sides meet
+
+        The face is laid over the surface's own range: cut along the seam
+        line, the part beyond it moved back a period. Its own two sides now
+        lie on one line inside the range, where the face simply carries on,
+        and the cut has become its sides, on the seam lines. The outlines of
+        the parts are run together into the face's wires without their edges
+        on that inner line, so nothing is fused and no curve is rebuilt.
+
+        A face whose sides are already on the seam needs no cut, and nor does
+        one whose sides are so nearly there that the part beyond the seam
+        would be too thin to stand as one; that face is moved the last of
+        the way, so that its sides are on the seam exactly.
+
+        Raises:
+            ValueError: the face goes round both ways, lies across the other
+                seam, or its two sides do not meet along their whole length
+        """
+        if len(around) > 1:
+            raise ValueError(
+                "a shape going all the way round the face both ways cannot be written"
+            )
+        axis, start, period = around[0]
+        sides = min(Vector(vertex).dot(axis) for vertex in lifted.vertices())
+        # how far the sides are past the seam line nearest them
+        past = sides - start - round((sides - start) / period) * period
+        sides_on_seam = self._as_good_as_on_seam(lifted, axis, sides, past)
+        if sides_on_seam:
+            shift = axis * (sides - start)
+        else:
+            shift = axis * (floor((sides - start) / period) * period)
+        box = lifted.bounding_box()
+        for other, other_start, other_period in self._periods:
+            if other.X == axis.X:
+                continue
+            low = box.min.dot(other)
+            turns = floor((low - other_start + _SAME_POINT) / other_period)
+            shift += other * (turns * other_period)
+            if box.max.dot(other) - turns * other_period > (
+                other_start + other_period + _SAME_POINT
+            ):
+                raise ValueError(
+                    "a shape going all the way round the face one way and "
+                    "lying across its seam the other cannot be written"
+                )
+        if shift.length:
+            lifted = lifted.moved(Location(-shift))
+            sides -= shift.dot(axis)
+
+        seam_lines = (start, start + period)
+        parts = [lifted]
+        inner_line = None
+        if not sides_on_seam:
+            inner_line = sides
+            cutter = Plane(axis * (start + period), z_dir=axis)
+            parts = [
+                (
+                    part.moved(Location(-axis * period))
+                    if part.center().dot(axis) > start + period
+                    else part
+                )
+                for part in _split_all(lifted, cutter)
+            ]
+
+        # the outlines of the parts, each run anticlockwise, less the edges
+        # on the line where the face carries on
+        runs: list[_Run] = []
+        dropped: dict[bool, list[tuple[float, float]]] = {True: [], False: []}
+        across = Vector(axis.Y, axis.X, 0)  # the other parameter's direction
+        for part in parts:
+            for run in _outline_runs(part.outer_wire()):
+                if inner_line is not None and _on_line(run.edge, axis, inner_line):
+                    low, high = sorted((run.start.dot(across), run.end.dot(across)))
+                    rising = run.end.dot(across) > run.start.dot(across)
+                    dropped[rising].append((low, high))
+                else:
+                    runs.append(run)
+        if not _same_spans(dropped[True], dropped[False]):
+            raise ValueError(
+                "the shape goes once round the face but its two sides do not "
+                "meet along their whole length"
+            )
+
+        loops = _chained(runs)
+        on_seam = [
+            [
+                next(
+                    (line for line in seam_lines if _on_line(run.edge, axis, line)),
+                    None,
+                )
+                for run in loop
+            ]
+            for loop in loops
+        ]
+        outer = [
+            i for i, lines in enumerate(on_seam) if any(x is not None for x in lines)
+        ]
+        if len(outer) != 1 or any(
+            _signed_area(loop) > 0 for i, loop in enumerate(loops) if i not in outer
+        ):
+            raise ValueError(
+                "the shape goes once round the face but its two sides do not "
+                "meet along their whole length"
+            )
+
+        pool = _VertexPool()
+        seam = self._seam_edges(loops[outer[0]], on_seam[outer[0]], around[0], pool)
+        maker = None
+        for index, loop in sorted(
+            enumerate(loops), key=lambda item: item[0] not in outer
+        ):
+            wire = self._write_loop(loop, on_seam[index], seam, pool)
+            if maker is None:
+                maker = BRepBuilderAPI_MakeFace(self._surface, wire, True)
+            else:
+                maker.Add(wire)
+        assert maker is not None
+        for part in parts:
+            for inner in part.inner_wires():
+                # a hole runs clockwise; one that touches the outline or
+                # another hole shares the vertex there, as the pool sees to
+                hole = [
+                    _Run(run.edge, not run.backwards, run.end, run.start)
+                    for run in reversed(_outline_runs(inner))
+                ]
+                off_seam: list[float | None] = [None] * len(hole)
+                maker.Add(self._write_loop(hole, off_seam, seam, pool))
+        if not maker.IsDone():
+            raise RuntimeError("could not build the written face")
+        face = TopoDS.Face(maker.Face().Oriented(self.face.wrapped.Orientation()))
+        return _as_face(face).moved(self._placement)
+
+    def _as_good_as_on_seam(
+        self, lifted: Face, axis: Vector, sides: float, past: float
+    ) -> bool:
+        """Whether the sides of a face that goes once round the surface,
+        ``past`` a seam line, are as good as on it: whether the strip between
+        them and the seam is too thin to be cut off as a part of its own
+
+        Too thin in parameter, where the cut is made, or on the surface,
+        where the strip's corners would share vertices - and there at every
+        end of a side, so that a face is never moved further on the surface
+        than that to bring its sides onto the seam.
+        """
+        return (
+            abs(past) <= _TOO_THIN
+            or self._moved_on_surface(lifted, axis, sides, past) <= _TOO_THIN
+        )
+
+    def _moved_on_surface(
+        self, lifted: Face, axis: Vector, line: float, distance: float
+    ) -> float:
+        """How far on the surface a move of ``distance`` in the parameter
+        along ``axis`` takes the vertices of a mapped face on the line where
+        that parameter is ``line``: the furthest any of them goes"""
+        return max(
+            (self._point(uv) - self._point(uv - axis * distance)).length
+            for uv in map(Vector, lifted.vertices())
+            if abs(uv.dot(axis) - line) <= _ON_LINE
+        )
+
+    def _seam_edges(
+        self,
+        loop: list[_Run],
+        on_seam: list[float | None],
+        turn: Period,
+        pool: _VertexPool,
+    ) -> list[tuple[float, float, TopoDS_Edge]]:
+        """The seam edges of an outline whose sides lie on the seam lines,
+        each with the span of the other parameter it covers
+
+        A seam edge is one of the surface's iso-curves along the seam, built
+        in the direction the other parameter increases, with two pcurves:
+        first that of the side the outline runs up, where the edge is used
+        forward, then that of the side it runs down, where it is reversed.
+        The two sides need not be divided into edges alike, so the seam is
+        divided wherever either is.
+
+        Raises:
+            ValueError: the two sides do not cover the same spans
+        """
+        axis, start, _ = turn
+        along_u = axis.X > 0.5  # the seam is a line of constant u
+        across = Vector(axis.Y, axis.X, 0)
+        spans: dict[bool, list[tuple[float, float]]] = {True: [], False: []}
+        side: dict[bool, set[float]] = {True: set(), False: set()}
+        for run, line in zip(loop, on_seam):
+            if line is None:
+                continue
+            low, high = sorted((run.start.dot(across), run.end.dot(across)))
+            rising = run.end.dot(across) > run.start.dot(across)
+            spans[rising].append((low, high))
+            side[rising].add(line)
+        if (
+            not _same_spans(spans[True], spans[False])
+            or len(side[True]) != 1
+            or len(side[False]) != 1
+        ):
+            raise ValueError(
+                "the shape goes once round the face but its two sides do not "
+                "meet along their whole length"
+            )
+        (forward_line,), (reversed_line,) = side[True], side[False]
+        breaks: list[float] = []
+        for value in sorted(x for span in spans[True] + spans[False] for x in span):
+            if not breaks or value - breaks[-1] > _ON_LINE:
+                breaks.append(value)
+        covered = _merged(spans[True])
+        iso = self._surface.UIso(start) if along_u else self._surface.VIso(start)
+        edges = []
+        for low, high in zip(breaks, breaks[1:]):
+            if not any(
+                a - _ON_LINE <= low and high <= b + _ON_LINE for a, b in covered
+            ):
+                continue  # a gap in the sides, where the outline leaves the seam
+            ends = [
+                pool.at(
+                    self._surface.Value(start, x)
+                    if along_u
+                    else self._surface.Value(x, start)
+                )
+                for x in (low, high)
+            ]
+            edge = BRepBuilderAPI_MakeEdge(iso, ends[0], ends[1], low, high).Edge()
+            moved = BRep_Tool.Range_s(edge)[0] - low
+            pcurves = [
+                (
+                    Geom2d_Line(gp_Pnt2d(line, -moved), gp_Dir2d(0.0, 1.0))
+                    if along_u
+                    else Geom2d_Line(gp_Pnt2d(-moved, line), gp_Dir2d(1.0, 0.0))
+                )
+                for line in (forward_line, reversed_line)
+            ]
+            BRep_Builder().UpdateEdge(
+                edge,
+                pcurves[0],
+                pcurves[1],
+                self._surface,
+                TopLoc_Location(),
+                TOLERANCE,
+            )
+            edges.append((low, high, edge))
+        return edges
+
+    def _write_loop(
+        self,
+        loop: list[_Run],
+        on_seam: list[float | None],
+        seam: list[tuple[float, float, TopoDS_Edge]],
+        pool: _VertexPool,
+    ) -> TopoDS_Wire:
+        """A closed outline written as a wire with shared vertices, its runs
+        along the seam lines taken from the seam edges"""
+        builder = BRep_Builder()
+        wire = TopoDS_Wire()
+        builder.MakeWire(wire)
+        for run, line in zip(loop, on_seam):
+            if line is None:
+                written = self._write_edge(run.edge, vertices=pool).wrapped
+                builder.Add(wire, written.Reversed() if run.backwards else written)
+                continue
+            # the seam runs along the other parameter, whichever one that is
+            first, last = (
+                (run.start.Y, run.end.Y)
+                if abs(run.start.X - run.end.X) < abs(run.start.Y - run.end.Y)
+                else (run.start.X, run.end.X)
+            )
+            rising = last > first
+            low, high = min(first, last), max(first, last)
+            within = [
+                edge
+                for a, b, edge in seam
+                if a >= low - _ON_LINE and b <= high + _ON_LINE
+            ]
+            for edge in within if rising else reversed(within):
+                builder.Add(wire, edge if rising else edge.Reversed())
+        wire.Closed(True)
+        return wire
+
     # ---- the surface ----
     #
     # Written in the surface's own frame; the public methods place the
     # result with the face.
 
-    def _write_edge(self, lifted: Edge) -> Edge:
+    def _write_edge(
+        self,
+        lifted: Edge,
+        surface: Geom_Surface | None = None,
+        vertices: _VertexPool | None = None,
+    ) -> Edge:
         """A uv-plane edge written onto the surface, its curve the pcurve
 
         A span along one parameter is one of the surface's own iso-curves, a
         line along a cylinder's axis or a circle about it, and is built from
         that exactly; any other curve gets its 3D form from the kernel.
+        ``surface`` is the face's surface trimmed, for a face across a seam.
+        With ``vertices`` the edge ends on vertices from the pool, shared
+        with the other edges that end there, rather than on its own.
         """
+        surface = self._surface if surface is None else surface
         first, last = BRep_Tool.Range_s(lifted.wrapped)
         curve = BRep_Tool.Curve_s(lifted.wrapped, first, last)
         pcurve = GeomAPI.To2d_s(curve, gp_Pln())
@@ -492,12 +988,26 @@ class UVFrame:
         if along_v or along_u:
             u, v = points[0].X(), points[0].Y()
             if along_v:
-                iso = self._surface.UIso(u)
+                iso = surface.UIso(u)
                 start, end = points[0].Y(), points[-1].Y()
             else:
-                iso = self._surface.VIso(v)
+                iso = surface.VIso(v)
                 start, end = points[0].X(), points[-1].X()
-            edge = BRepBuilderAPI_MakeEdge(iso, min(start, end), max(start, end)).Edge()
+            low, high = min(start, end), max(start, end)
+            # a span a hair over a whole turn is the whole turn; the kernel
+            # would wrap it back and leave an edge the length of the hair
+            if iso.IsPeriodic() and 0 < high - low - iso.Period() <= _ON_LINE:
+                high = low + iso.Period()
+            if vertices is None:
+                edge = BRepBuilderAPI_MakeEdge(iso, low, high).Edge()
+            else:
+                edge = BRepBuilderAPI_MakeEdge(
+                    iso,
+                    vertices.at(iso.Value(low)),
+                    vertices.at(iso.Value(high)),
+                    low,
+                    high,
+                ).Edge()
             # the iso-curve's parameter is the surface's other parameter, but
             # a periodic one may have been moved by whole periods into the
             # curve's own range; the pcurve follows the range the edge got
@@ -507,24 +1017,46 @@ class UVFrame:
             else:
                 pcurve = Geom2d_Line(gp_Pnt2d(-shift, v), gp_Dir2d(1.0, 0.0))
             BRep_Builder().UpdateEdge(
-                edge, pcurve, self._surface, TopLoc_Location(), TOLERANCE
+                edge, pcurve, surface, TopLoc_Location(), TOLERANCE
             )
             # built from low to high parameter, which may be against the lifted
             # edge's own direction
             return Edge(TopoDS.Edge(edge.Reversed()) if start > end else edge)
-        edge = BRepBuilderAPI_MakeEdge(pcurve, self._surface, first, last).Edge()
+        if vertices is None:
+            edge = BRepBuilderAPI_MakeEdge(pcurve, surface, first, last).Edge()
+        else:
+            ends = [
+                vertices.at(surface.Value(point.X(), point.Y()))
+                for point in (points[0], points[-1])
+            ]
+            edge = BRepBuilderAPI_MakeEdge(
+                pcurve, surface, ends[0], ends[1], first, last
+            ).Edge()
         if not BRepLib.BuildCurves3d_s(
             edge, min(self.tolerance, 1e-5), GeomAbs_Shape.GeomAbs_C1, 14, 0
         ):
             raise RuntimeError("could not build the 3D curve of a written edge")
+        if vertices is not None:
+            # the 3D curve is fitted, and ends within its tolerance of them;
+            # over the range the edge got, which for a periodic pcurve the
+            # kernel may have moved by whole periods
+            first, last = BRep_Tool.Range_s(edge)
+            fitted = BRep_Tool.Curve_s(edge, first, last)
+            for vertex, parameter in zip(ends, (first, last)):
+                vertices.cover(vertex, fitted.Value(parameter))
         return Edge(edge)
 
-    def _write_wire(self, lifted: Wire, cutters: list[Plane] | None = None) -> Wire:
+    def _write_wire(
+        self,
+        lifted: Wire,
+        cutters: list[Plane] | None = None,
+        surface: Geom_Surface | None = None,
+    ) -> Wire:
         """A uv-plane wire written along its traversal
 
         With ``cutters`` the edges are cut along the seams and each piece is
         moved into the surface's own range, which a wire standing alone
-        wants; a face's wires come already cut and moved.
+        wants; a face's wires are written where they lie, on its ``surface``.
         """
         edges = []
         for edge in lifted.order_edges():
@@ -532,29 +1064,36 @@ class UVFrame:
             pieces = [edge] if cutters is None else _edge_pieces(edge, cutters)
             for piece in reversed(pieces) if backwards else pieces:
                 written = self._write_edge(
-                    piece if cutters is None else self._in_range(piece)
+                    piece if cutters is None else self._in_range(piece), surface
                 )
                 if backwards:
                     written = Edge(TopoDS.Edge(written.wrapped.Reversed()))
                 edges.append(written)
         return Wire(edges)
 
-    def _oriented(self, lifted: Wire, clockwise: bool) -> Wire:
+    def _oriented(
+        self, lifted: Wire, clockwise: bool, surface: Geom_Surface | None = None
+    ) -> Wire:
         """The wire written and turned to run the required way about the
         FORWARD face normal, whichever way the planar wire and the map run"""
-        written = self._write_wire(lifted)
+        written = self._write_wire(lifted, surface=surface)
         if _is_clockwise(lifted) != clockwise:
             written = Wire(TopoDS.Wire(written.wrapped.Reversed()))
         return written
 
-    def _write_face(self, lifted: Face) -> Face:
+    def _write_face(self, lifted: Face, surface: Geom_Surface | None = None) -> Face:
         """A uv-plane face written onto the surface and placed with the
         target face, carrying its orientation so that its normal is the
-        target's"""
-        outer = self._oriented(lifted.outer_wire(), clockwise=False)
-        maker = BRepBuilderAPI_MakeFace(self._surface, outer.wrapped, True)
+        target's
+
+        ``surface`` is the face's surface trimmed, for a face across a seam;
+        the pcurves of its edges have to be on the surface it is built on.
+        """
+        surface = self._surface if surface is None else surface
+        outer = self._oriented(lifted.outer_wire(), False, surface)
+        maker = BRepBuilderAPI_MakeFace(surface, outer.wrapped, True)
         for inner in lifted.inner_wires():
-            maker.Add(self._oriented(inner, clockwise=True).wrapped)
+            maker.Add(self._oriented(inner, True, surface).wrapped)
         if not maker.IsDone():
             raise RuntimeError("could not build the written face")
         face = TopoDS.Face(maker.Face().Oriented(self.face.wrapped.Orientation()))
@@ -576,6 +1115,111 @@ def _is_clockwise(wire: Wire) -> bool:
     face = BRepBuilderAPI_MakeFace(gp_Pln(), wire.wrapped, False).Face()
     classifier = IntTools_FClass2d(face, TOLERANCE)
     return classifier.PerformInfinitePoint() == TopAbs_State.TopAbs_IN
+
+
+def _outline_runs(outline: Wire) -> list[_Run]:
+    """A closed uv-plane wire as runs along its edges, anticlockwise"""
+    runs = [
+        _Run(
+            edge,
+            edge.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED,
+            edge.position_at(0),
+            edge.position_at(1),
+        )
+        for edge in outline.order_edges()
+    ]
+    if _is_clockwise(outline):
+        runs = [
+            _Run(run.edge, not run.backwards, run.end, run.start) for run in runs[::-1]
+        ]
+    return runs
+
+
+def _on_line(edge: Edge, axis: Vector, value: float) -> bool:
+    """Whether a uv-plane edge lies along the line where the parameter along
+    ``axis`` is ``value``"""
+    return all(
+        abs(edge.position_at(i / 4).dot(axis) - value) < _ON_LINE for i in range(5)
+    )
+
+
+def _spans_on_line(
+    shape: Shape, axis: Vector, value: float
+) -> list[tuple[float, float]]:
+    """The spans of the other parameter covered by a uv-plane shape's edges
+    along the line where the parameter along ``axis`` is ``value``"""
+    across = Vector(axis.Y, axis.X, 0)  # the other parameter's direction
+    spans = []
+    for edge in shape.edges():
+        if _on_line(edge, axis, value):
+            ends = edge.position_at(0).dot(across), edge.position_at(1).dot(across)
+            spans.append((min(ends), max(ends)))
+    return spans
+
+
+def _merged(spans: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Spans of a parameter joined where they touch"""
+    merged: list[list[float]] = []
+    for low, high in sorted(spans):
+        if merged and low - merged[-1][1] <= _ON_LINE:
+            merged[-1][1] = max(merged[-1][1], high)
+        else:
+            merged.append([low, high])
+    return [(span[0], span[1]) for span in merged]
+
+
+def _same_spans(
+    one: list[tuple[float, float]], other: list[tuple[float, float]]
+) -> bool:
+    """Whether two sets of spans cover the same stretches of a parameter"""
+    one, other = _merged(one), _merged(other)
+    return len(one) == len(other) and all(
+        abs(a - c) <= _SAME_POINT and abs(b - d) <= _SAME_POINT
+        for (a, b), (c, d) in zip(one, other)
+    )
+
+
+def _chained(runs: list[_Run]) -> list[list[_Run]]:
+    """Runs joined end to start into closed loops
+
+    Raises:
+        ValueError: a run has nothing to carry on to
+    """
+    remaining = list(runs)
+    loops = []
+    while remaining:
+        loop = [remaining.pop(0)]
+        while (loop[-1].end - loop[0].start).length > _SAME_POINT:
+            following = next(
+                (
+                    run
+                    for run in remaining
+                    if (run.start - loop[-1].end).length <= _SAME_POINT
+                ),
+                None,
+            )
+            if following is None:
+                raise ValueError(
+                    "the shape goes once round the face but its two sides do "
+                    "not meet along their whole length"
+                )
+            remaining.remove(following)
+            loop.append(following)
+        loops.append(loop)
+    return loops
+
+
+def _signed_area(loop: list[_Run]) -> float:
+    """Twice the area a loop of runs encloses on the uv plane, positive when
+    it runs anticlockwise; sampled, which is enough to tell which way"""
+    points = [
+        run.edge.position_at(
+            1 - i / 8 if run.edge.position_at(0) != run.start else i / 8
+        )
+        for run in loop
+        for i in range(8)
+    ]
+    return sum(a.X * b.Y - b.X * a.Y for a, b in zip(points, points[1:] + points[:1]))
 
 
 def _surface_periods(surface: Geom_Surface) -> list[Period]:
@@ -772,8 +1416,9 @@ def _affine_map(face: Face, location: Location) -> Matrix:
     )
 
 
-def _cone_map(face: Face, location: Location) -> PointMap:
-    """The exact unrolling of a cone: a sector about the apex
+class _ConeSector(NamedTuple):
+    """A cone unrolled into a sector about its apex, with a frame's flat axes
+    laid in the sector's plane
 
     In OCCT's cone, u is the angle about the axis and v the distance along
     a generatrix from the reference circle of radius R at half-angle a. The
@@ -783,11 +1428,30 @@ def _cone_map(face: Face, location: Location) -> PointMap:
     when the cone narrows with increasing v, and then the apex lies at
     larger v.
     """
+
+    scale: float
+    """Sector angle per radian of u"""
+    sign: float
+    """+1 when the cone widens with increasing v, -1 when it narrows"""
+    v_apex: float
+    """The apex's v"""
+    phi0: float
+    """The sector angle of the frame's origin"""
+    base: Vector
+    """The frame's origin in the sector's plane, the apex at its centre"""
+    sector_x: Vector
+    """Flat x in the sector's plane"""
+    sector_y: Vector
+    """Flat y in the sector's plane"""
+
+
+def _cone_sector(face: Face, location: Location) -> _ConeSector:
+    """The sector a cone unrolls into, for the frame at a location"""
     cone = BRepAdaptor_Surface(face.wrapped).Cone()
     s = sin(cone.SemiAngle())
     sign = 1.0 if s > 0 else -1.0
     v_apex = -cone.RefRadius() / s
-    scale = abs(s)  # sector angle per radian of u
+    scale = abs(s)
 
     origin, x_dir, y_dir = _frame_directions(face, location)
     u0, v0 = face.param_at_point(origin, normalize=False)
@@ -801,18 +1465,54 @@ def _cone_map(face: Face, location: Location) -> PointMap:
     e_u, e_v = d_u.normalized(), d_v.normalized()
     around = Vector(-sin(phi0), cos(phi0), 0)  # increasing u
     radial = Vector(cos(phi0), sin(phi0), 0) * sign  # increasing v
-    sector_x = around * x_dir.dot(e_u) + radial * x_dir.dot(e_v)
-    sector_y = around * y_dir.dot(e_u) + radial * y_dir.dot(e_v)
-    base = Vector(cos(phi0), sin(phi0), 0) * rho0
+    return _ConeSector(
+        scale,
+        sign,
+        v_apex,
+        phi0,
+        Vector(cos(phi0), sin(phi0), 0) * rho0,
+        around * x_dir.dot(e_u) + radial * x_dir.dot(e_v),
+        around * y_dir.dot(e_u) + radial * y_dir.dot(e_v),
+    )
+
+
+def _cone_map(face: Face, location: Location) -> PointMap:
+    """The exact unrolling of a cone: a sector about the apex
+
+    A flat point is placed in the sector's plane and read back as its angle
+    about the apex, which gives u, and its distance from it, which gives v.
+    """
+    sector = _cone_sector(face, location)
 
     def to_uv(x: float, y: float) -> tuple[float, float]:
-        q = base + sector_x * x + sector_y * y
+        q = sector.base + sector.sector_x * x + sector.sector_y * y
         # sector angle, continuous with the origin's
         phi = atan2(q.Y, q.X)
-        phi += 2 * pi * round((phi0 - phi) / (2 * pi))
-        return phi / scale, v_apex + sign * q.length
+        phi += 2 * pi * round((sector.phi0 - phi) / (2 * pi))
+        return phi / sector.scale, sector.v_apex + sector.sign * q.length
 
     return to_uv
+
+
+def _cone_inverse_map(face: Face, location: Location) -> PointMap:
+    """:func:`_cone_map` run backwards: (u, v) to the flat (x, y) of the
+    frame at a location
+
+    The unrolling is an isometry, so this lays the cone out flat exactly.
+    A circle about the axis becomes an arc about the image of the apex,
+    which is the image of any u at the apex's v, and a generatrix a line
+    through it. u is taken as given rather than brought into one turn, so
+    parameters a period apart land a sector apart, as successive turns of the
+    cone rolled along the plane do.
+    """
+    sector = _cone_sector(face, location)
+
+    def to_flat(u: float, v: float) -> tuple[float, float]:
+        rho, phi = (v - sector.v_apex) * sector.sign, u * sector.scale
+        q = Vector(cos(phi), sin(phi), 0) * rho - sector.base
+        return q.dot(sector.sector_x), q.dot(sector.sector_y)
+
+    return to_flat
 
 
 def _sphere_map(face: Face, location: Location) -> PointMap:

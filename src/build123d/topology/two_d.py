@@ -2946,13 +2946,17 @@ class Face(Mixin2D[TopoDS_Face]):
         shape is distorted increasingly with distance from the origin, so
         place the origin near the middle of the shape.
 
-        A shape crossing the seam of a periodic surface is split there, as
-        the kernel's own faces are: a wire gets a vertex at the seam, and a
-        face comes back as a Shell of one face per period it reaches into,
-        which thickens and fuses as one. A shape may span more than a whole
-        turn when it is sheared along the surface, as a helical band is; one
-        that would overlap itself once wrapped, or one surrounding a pole of
-        the surface, is refused.
+        A face may lie across the seam of a periodic surface and comes back
+        as one face, as the kernel's own faces there are; a wire gets a
+        vertex at the seam. A band that goes exactly once round the surface,
+        its two sides meeting, comes back as one face too, closed along a
+        seam edge. A shape may span more than a whole turn when it is sheared
+        along the surface, as a helical band is, and a face that does comes
+        back as a Shell of one face per period it reaches into, which
+        thickens and fuses as one. A shape that would overlap itself once
+        wrapped, or one surrounding a pole of the surface, is refused, as is
+        a band going once round whose sides meet along only part of their
+        length.
 
         :meth:`uv_frame` gives the frame behind this, which can also punch an
         outline into the face.
@@ -2967,6 +2971,9 @@ class Face(Mixin2D[TopoDS_Face]):
         Raises:
             ValueError: empty face, or the shape would overlap itself wrapped
                 around the surface or surrounds a pole
+            ValueError: the shape goes once round the surface but its two
+                sides do not meet along their whole length, or it also lies
+                across the surface's other seam
             TypeError: planar_shape is not an Edge, Wire or Face
 
         Returns:
@@ -3006,9 +3013,10 @@ class Face(Mixin2D[TopoDS_Face]):
         with flat x running along the path's tangent there, so a line of
         text follows the path. The faces themselves are left as they are.
 
-        A face that crosses the seam of a periodic surface comes back as one
-        face per period it reaches into, as :meth:`wrap` describes, so the
-        result can hold more faces than were given.
+        A face that spans more than a whole turn of a periodic surface comes
+        back as one face per period it reaches into, as :meth:`wrap`
+        describes, so the result can hold more faces than were given. One
+        that lies across a seam, or goes exactly once round, stays one face.
 
         The path must lie on this one face. For a path that runs over several
         faces of a shape, a label round a filleted corner, use
