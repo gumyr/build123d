@@ -1107,9 +1107,38 @@ class TestFace(unittest.TestCase):
 
         self.assertAlmostEqual(patch4.area, 164.618, 3)
 
+    def test_make_surface_patch_interior_edges(self):
+        corners = [(0, 0), (10, 0), (10, 10), (0, 10)]
+        perimeter = [
+            Edge.make_line(a, b) for a, b in zip(corners, corners[1:] + corners[:1])
+        ]
+        crest = Edge.make_three_point_arc((2, 5), (5, 5, 3), (8, 5))
+        spine = Edge.make_three_point_arc((0, 5), (5, 5, 3), (10, 5))
+        for interior_edge in (crest, spine):
+            patch = Face.make_surface_patch(
+                edge_constraints=perimeter, interior_edges=[interior_edge]
+            )
+            self.assertEqual(len(patch.edges()), 4)
+            self.assertAlmostEqual(patch.distance_to(interior_edge @ 0.5), 0, 3)
+
+        # Ends on the circle's seam vertex; as a perimeter edge it would be
+        # chained into the boundary and cut the patch in half
+        circle = Edge.make_circle(5)
+        arc = Edge.make_three_point_arc((-5, 0), (0, 0, 3), (5, 0))
+        patch = Face.make_surface_patch(edge_constraints=[circle], interior_edges=[arc])
+        self.assertEqual(len(patch.edges()), 1)
+        self.assertAlmostEqual(patch.distance_to(arc @ 0.5), 0, 3)
+        self.assertGreater(patch.area, math.pi * 5**2)
+
     def test_make_surface_patch_error_checking(self):
         with self.assertRaises(RuntimeError):
             Face.make_surface_patch(edge_constraints=[Edge.make_line((0, 0), (1, 0))])
+
+        # Interior edges alone don't bound anything
+        with self.assertRaises(RuntimeError):
+            Face.make_surface_patch(
+                interior_edges=[Edge.make_three_point_arc((0, 0), (1, 1, 1), (2, 0))]
+            )
 
         with self.assertRaises(RuntimeError):
             Face.make_surface_patch(edge_constraints=[])
