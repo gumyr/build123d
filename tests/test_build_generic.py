@@ -28,7 +28,7 @@ license:
 
 import unittest
 import warnings
-from math import pi, sqrt
+from math import cos, pi, sqrt
 from unittest.mock import patch
 
 from build123d import *
@@ -711,6 +711,56 @@ class OffsetTests(unittest.TestCase):
         self.assertTrue(sk2.face().is_valid)
         self.assertLess(sk2.area, sk.area)
         self.assertEqual(len(sk2), 1)
+
+    def test_curved_face_offset(self):
+        """A face that is not planar is offset within its own surface"""
+        barrel = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        label = barrel.wrap(Rectangle(6, 3).face(), barrel.location_at(0.25, 0.5))
+        rounded = offset(label, 0.5)
+        self.assertIsInstance(rounded, Sketch)
+        self.assertEqual(rounded.face().geom_type, GeomType.CYLINDER)
+        self.assertAlmostEqual(rounded.area, 18 + 9 + pi * 0.25, 5)
+        self.assertAlmostEqual(
+            offset(label, 0.5, kind=Kind.INTERSECTION).area, 7 * 4, 5
+        )
+        # the whole side of the cylinder keeps its seam, and only its rims move
+        self.assertAlmostEqual(offset(barrel, -1).area, 10 * pi * 8, 5)
+        # with a planar face in the same call, each on its own surface
+        both = offset([Rectangle(6, 3).face(), label], 0.5)
+        self.assertEqual(
+            sorted(face.geom_type.name for face in both.faces()), ["CYLINDER", "PLANE"]
+        )
+        # a shrink that parts a curved face returns its parts
+        bar = Pos(-3, 0) * Circle(1.5) + Rectangle(6, 0.6) + Pos(3, 0) * Circle(1.5)
+        parted = offset(barrel.wrap(bar.face(), barrel.location_at(0.25, 0.5)), -0.4)
+        self.assertEqual(len(parted.faces()), 2)
+        # a sphere does not unroll: its corners are rounded or it is refused
+        ball = Sphere(5).face()
+        cap = ball.wrap(Circle(2).face(), ball.location_at(0.25, 0.5))
+        grown = offset(cap, 0.5)
+        self.assertEqual(grown.face().geom_type, GeomType.SPHERE)
+        self.assertAlmostEqual(grown.area / (50 * pi * (1 - cos(0.5))), 1, 4)
+        with self.assertRaisesRegex(ValueError, "Kind.ARC"):
+            offset(cap, 0.5, kind=Kind.INTERSECTION)
+
+    def test_curved_face_offset_in_builders(self):
+        """In a builder a curved face is handled as a planar one is: pending
+        in a part, where it can be thickened, and the sketch in a sketch"""
+        barrel = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        label = barrel.wrap(Rectangle(6, 3).face(), barrel.location_at(0.25, 0.5))
+        with BuildPart() as embossed:
+            Cylinder(5, 10)
+            offset(label, amount=0.5)
+            self.assertEqual(len(embossed.pending_faces), 1)
+            thicken(amount=0.4)
+        self.assertTrue(embossed.part.is_valid)
+        # a layer 0.4 thick on a radius 5 cylinder is wider outside than in
+        raised = (18 + 9 + pi * 0.25) * (5.4**2 - 5**2) / 10
+        self.assertAlmostEqual(embossed.part.volume, pi * 250 + raised, 3)
+        with BuildSketch() as on_the_barrel:
+            offset(label, amount=0.5)
+        self.assertEqual(on_the_barrel.sketch.face().geom_type, GeomType.CYLINDER)
+        self.assertAlmostEqual(on_the_barrel.sketch.area, 18 + 9 + pi * 0.25, 5)
 
     def test_box_offset(self):
         with BuildPart() as test:
