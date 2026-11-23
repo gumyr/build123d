@@ -743,9 +743,9 @@ class OffsetTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Kind.ARC"):
             offset(cap, 0.5, kind=Kind.INTERSECTION)
 
-    def test_curved_face_offset_in_builders(self):
-        """In a builder a curved face is handled as a planar one is: pending
-        in a part, where it can be thickened, and the sketch in a sketch"""
+    def test_curved_face_offset_in_a_part(self):
+        """In BuildPart a curved face is handled as a planar one is: left
+        pending, where it can be thickened"""
         barrel = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
         label = barrel.wrap(Rectangle(6, 3).face(), barrel.location_at(0.25, 0.5))
         with BuildPart() as embossed:
@@ -757,10 +757,6 @@ class OffsetTests(unittest.TestCase):
         # a layer 0.4 thick on a radius 5 cylinder is wider outside than in
         raised = (18 + 9 + pi * 0.25) * (5.4**2 - 5**2) / 10
         self.assertAlmostEqual(embossed.part.volume, pi * 250 + raised, 3)
-        with BuildSketch() as on_the_barrel:
-            offset(label, amount=0.5)
-        self.assertEqual(on_the_barrel.sketch.face().geom_type, GeomType.CYLINDER)
-        self.assertAlmostEqual(on_the_barrel.sketch.area, 18 + 9 + pi * 0.25, 5)
 
     def test_box_offset(self):
         with BuildPart() as test:

@@ -33,9 +33,16 @@ from build123d.build_enums import Align, GeomType, Kind
 from build123d.geometry import Axis, Plane, Pos, Rot
 from build123d.objects_curve import Polyline
 from build123d.objects_part import Box, Cone, Cylinder, Sphere, Torus
-from build123d.objects_sketch import Circle, Ellipse, Rectangle, RectangleRounded
-from build123d.operations_generic import offset
+from build123d.objects_sketch import (
+    Circle,
+    Ellipse,
+    Rectangle,
+    RectangleRounded,
+    Text,
+)
+from build123d.operations_generic import fillet, offset
 from build123d.topology import Edge, Face, Solid, UVFrame, Vertex, Wire
+from build123d.topology.uv_offset import _boundary, _prove
 
 from OCP.BRep import BRep_Tool
 
@@ -679,6 +686,21 @@ class TestGeodesicOffset2d(unittest.TestCase):
                     self.assertEqual(seam_edges(result), 1)
                     self.assertGreater(result.area * amount, band.area * amount)
 
+    def test_a_result_that_is_not_the_offset_is_refused(self):
+        """The planar booleans behind an offset on such a surface can fail
+        without saying so. What they leave is checked: the face handed back
+        as it was, or two faces lying over each other, is an error"""
+        disc = self.ball.wrap(Circle(2).face(), self.ball.location_at(0.25, 0.5))
+        (grown,) = disc.offset_2d(0.5)
+        boundary, _ = _boundary(disc)
+        _prove(boundary, [grown], 0.5, False)  # the real offset passes
+        with self.assertRaisesRegex(RuntimeError, "could not be built"):
+            _prove(boundary, [disc], 0.5, False)
+        with self.assertRaisesRegex(RuntimeError, "could not be built"):
+            _prove(boundary, [grown, disc], 0.5, False)
+        with self.assertRaisesRegex(RuntimeError, "could not be built"):
+            _prove(boundary, [grown], 0.2, False)  # further than was asked
+
     def test_walls_and_moved_spheres(self):
         """The inside of a hollow ball faces inwards, in a ball that has been
         moved and turned"""
@@ -700,6 +722,74 @@ class TestGeodesicOffset2d(unittest.TestCase):
         removed = solid.volume - sunk.volume
         self.assertLess(removed, grown.area * 0.5)
         self.assertGreater(removed, grown.area * 0.5 * 0.85)
+
+
+class TestFacesOfSolids(unittest.TestCase):
+    """Faces as the kernel leaves them on a solid, and outlines as the planar
+    offset leaves them, rather than shapes wrapped on for the purpose"""
+
+    def test_a_letter_keeps_its_counters(self):
+        """The offset of a glyph has dozens of short edges whose ends the
+        kernel leaves a little apart; the outline is made good before it is
+        written"""
+        letter = max(Text("B", 4).faces(), key=lambda face: face.area)
+        barrel = Cylinder(6, 12).faces().filter_by(GeomType.CYLINDER)[0]
+        for name, face in (
+            ("flat", letter),
+            ("on a cylinder", barrel.wrap(letter, barrel.location_at(0.3, 0.5))),
+        ):
+            for amount in (0.05, 0.3, -0.05):
+                with self.subTest(where=name, amount=amount):
+                    (result,) = face.offset_2d(amount)
+                    self.assertTrue(result.is_valid)
+                    self.assertEqual(len(result.inner_wires()), 2)
+                    self.assertAlmostEqual(
+                        result.area, flat_area(letter, amount), delta=2e-3
+                    )
+
+    def test_the_wall_of_a_drilled_hole(self):
+        """A hole drilled across a cylinder leaves a wall that goes all the
+        way round, with a saddle-shaped rim at each end"""
+        drilled = Cylinder(6, 20) - Rot(Y=90) * Cylinder(2, 20)
+        wall = sorted(
+            drilled.faces().filter_by(GeomType.CYLINDER), key=lambda face: face.area
+        )[0]
+        (inset,) = wall.offset_2d(-1)
+        self.assertTrue(inset.is_valid)
+        self.assertEqual(seam_edges(inset), 1)
+        self.assertLess(inset.area, wall.area - 2 * 4 * math.pi * 0.9)
+
+    def test_a_rim_along_the_seam_is_still_a_rim(self):
+        """Half a torus ends in two circles, one of them along the line where
+        a whole torus meets itself. That one is boundary too, and both move"""
+        half = (Torus(12, 4) & Pos(0, 20, 0) * Box(60, 40, 40)).faces()[0]
+        (inset,) = half.offset_2d(-0.3)
+        self.assertTrue(inset.is_valid)
+        # a strip 0.3 wide along each rim, a circle of radius 4
+        self.assertAlmostEqual(inset.area, half.area - 2 * 0.3 * 8 * math.pi, 2)
+
+    def test_a_fillet_grown_across_the_other_seam(self):
+        """The fillet round the end of a cylinder is a quarter of a torus all
+        the way round, starting at the torus's other seam: grown past it, it
+        comes back as a face either side"""
+        rounded = fillet(Cylinder(8, 12).edges(), 2)
+        quarter = rounded.faces().filter_by(GeomType.TORUS)[0]
+        (inset,) = quarter.offset_2d(-0.3)
+        self.assertTrue(inset.is_valid)
+        self.assertEqual(seam_edges(inset), 1)
+        grown = quarter.offset_2d(0.3)
+        self.assertEqual(len(grown), 2)
+        self.assertTrue(all(face.is_valid for face in grown))
+        self.assertGreater(sum(face.area for face in grown), quarter.area)
+
+    def test_a_kernel_offset_that_comes_back_in_pieces(self):
+        """Mitred corners on the splines a wrapped letter unrolls into are
+        more than the kernel's offset manages: an error, not a broken face"""
+        letter = max(Text("B", 4).faces(), key=lambda face: face.area)
+        cone = Cone(7, 4, 12).faces().filter_by(GeomType.CONE)[0]
+        on_the_cone = cone.wrap(letter, cone.location_at(0.3, 0.5))
+        with self.assertRaisesRegex(RuntimeError, "2D offset failed"):
+            on_the_cone.offset_2d(-1, Kind.INTERSECTION)
 
 
 if __name__ == "__main__":

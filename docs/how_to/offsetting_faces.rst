@@ -229,6 +229,12 @@ What cannot be offset
   closes on itself, as the letter C does, raises ``RuntimeError``, and so
   can an outline with curved edges that are not arcs. ``Kind.ARC`` handles
   both.
+* On a sphere or any other surface that does not unroll, the result is
+  checked before it is returned, and ``RuntimeError`` is raised if it is
+  not the offset that was asked for. That is most likely with an intricate
+  outline, a letter, offset by more than the radius of its tightest curve.
+* The rounded corner of a filleted box is a piece of a sphere with a pole
+  at one of its corners, so it is one of the faces that cannot be offset.
 
 ********
 See also

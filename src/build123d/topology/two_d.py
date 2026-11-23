@@ -923,9 +923,9 @@ class Face(Mixin2D[TopoDS_Face]):
             elif isinstance(args[0], TopoDS_Shape):
                 obj, label, color, parent = args[:4] + (None,) * (4 - l_a)
             elif isinstance(args[0], Wire):
-                outer_wire, inner_wires, label, color, parent, surface = args[
-                    :6
-                ] + (None,) * (6 - l_a)
+                outer_wire, inner_wires, label, color, parent, surface = args[:6] + (
+                    None,
+                ) * (6 - l_a)
 
         unknown_args = ", ".join(
             set(kwargs.keys()).difference(
@@ -2185,7 +2185,9 @@ class Face(Mixin2D[TopoDS_Face]):
 
         chamfered_face = self.__class__(chamfered_wires[0], chamfered_wires[1:])
         if self.normal_at() != chamfered_face.normal_at():
-            chamfered_face = -chamfered_face  # pylint: disable=invalid-unary-operand-type
+            chamfered_face = (
+                -chamfered_face
+            )  # pylint: disable=invalid-unary-operand-type
         chamfered_face._made_by(
             record.add_modified(self.wrapped, chamfered_face.wrapped)
         )
@@ -2754,7 +2756,8 @@ class Face(Mixin2D[TopoDS_Face]):
                 available
             ValueError: the face or its offset reaches the apex of a cone or
                 a pole of its surface
-            RuntimeError: the planar offset failed
+            RuntimeError: the planar offset failed, or on a surface that
+                does not unroll the offset could not be built
 
         Returns:
             ShapeList[Face]: the faces of the result

@@ -83,10 +83,11 @@ license:
 
 from __future__ import annotations
 
+import warnings
 from math import asin, atan2, ceil, cos, degrees, hypot, pi, sin
 from typing import TYPE_CHECKING, NamedTuple
 
-from OCP.BRep import BRep_Tool
+from OCP.BRep import BRep_Builder, BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Curve2d, BRepAdaptor_Surface
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffset
@@ -95,11 +96,11 @@ from OCP.GeomAbs import GeomAbs_JoinType
 from OCP.GeomConvert import GeomConvert
 from OCP.Standard import Standard_ConstructionError, Standard_Failure
 from OCP.StdFail import StdFail_NotDone
-from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
+from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
 from OCP.gp import gp_Pnt, gp_Pnt2d, gp_Vec, gp_Vec2d
-from OCP.TopoDS import TopoDS, TopoDS_Edge
+from OCP.TopoDS import TopoDS, TopoDS_Compound, TopoDS_Edge
 
 from build123d.build_enums import GeomType, Kind
 from build123d.geometry import (
@@ -165,6 +166,16 @@ where the offsets from them cross"""
 _MOST_SAMPLES = 512
 """The most intervals an edge or the rim of a disc is sampled at"""
 
+_MEETING = 1e-9
+"""How near the end of one edge of a flat outline is to the start of the
+next for the two to meet as they are"""
+
+_TOO_SHORT = 1e-5
+"""The length under which an edge of a flat outline is left out when the
+outline is made again, or a millionth of the outline's size if that is
+more: written, an edge much shorter is lost anyway, its ends sharing a
+vertex"""
+
 
 def offset_face_2d(
     face: Face, amount: float, kind: Kind = Kind.ARC, tolerance: float = 1e-4
@@ -188,7 +199,8 @@ def offset_face_2d(
             surface, or its offset would
         ValueError: the face goes round a cone too nearly flat, or too near
             the apex, for its offset to be laid out with those corners
-        RuntimeError: the planar offset failed
+        RuntimeError: the planar offset failed, or on a surface that does
+            not unroll the offset could not be built
 
     Returns:
         ShapeList[Face]: the faces of the result, more than one where
@@ -196,11 +208,28 @@ def offset_face_2d(
     """
     if amount == 0:
         return ShapeList([face])
+    with warnings.catch_warnings():
+        # The flat work is a string of booleans, whose results are tidied by
+        # merging faces that lie together. Where that fails the result is
+        # the same shape with more edges than it needs, which is nothing to
+        # warn about here.
+        warnings.filterwarnings(
+            "ignore", message="Boolean operation unable to clean", category=UserWarning
+        )
+        faces = _by_surface(face, amount, kind, tolerance)
+    if not faces:
+        raise ValueError("nothing is left of the face")
+    return ShapeList(faces)
+
+
+def _by_surface(face: Face, amount: float, kind: Kind, tolerance: float) -> list[Face]:
+    """A face offset the way its surface allows: laid out flat where it
+    unrolls, along geodesics where it does not"""
     if face.geom_type in (GeomType.PLANE, GeomType.CYLINDER):
-        faces = _offset_affine(face, amount, kind, tolerance)
-    elif face.geom_type == GeomType.CONE:
+        return _offset_affine(face, amount, kind, tolerance)
+    if face.geom_type == GeomType.CONE:
         try:
-            faces = _offset_cone(face, amount, kind, tolerance)
+            return _offset_cone(face, amount, kind, tolerance)
         except _NoRoom as no_room:
             # round its apex there is not the room to lay the cone out flat,
             # but it can still be followed as any surface is, short of the
@@ -209,12 +238,7 @@ def offset_face_2d(
                 raise
             if amount >= no_room.nearest - tolerance:
                 raise ValueError("the offset reaches the apex of the cone") from None
-            faces = _offset_geodesic(face, amount, kind, tolerance)
-    else:
-        faces = _offset_geodesic(face, amount, kind, tolerance)
-    if not faces:
-        raise ValueError("nothing is left of the face")
-    return ShapeList(faces)
+    return _offset_geodesic(face, amount, kind, tolerance)
 
 
 class _NoRoom(ValueError):
@@ -228,8 +252,9 @@ class _NoRoom(ValueError):
 
 
 def _written(pieces: list[Face], frame: UVFrame) -> list[Face]:
-    """Flat faces written onto the surface through a frame"""
-    return [written for piece in pieces for written in frame.write_face(piece)]
+    """Flat faces written onto the surface through a frame, their outlines
+    made fit to write first"""
+    return [written for piece in pieces for written in frame.write_face(_mended(piece))]
 
 
 def _offset_affine(
@@ -783,6 +808,48 @@ def _offset_geodesic(
                 for tool in tools
                 for k in range(-reach, reach + 1)
             ]
+    # The kernel's booleans and the writing of their results fail in many
+    # ways when there is a great deal to join, each with an error of its
+    # own; OCP gives those no common base class, and what matters to the
+    # caller is the same in every case
+    try:
+        regions = _reshaped(flat, tools, amount, turns, round_it)
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        raise _not_built() from error
+    ended = False
+    if amount > 0:
+        covered = _within_the_surface(regions, chart, middle)
+        ended = abs(sum(r.area for r in regions) - sum(r.area for r in covered)) > (
+            _NO_AREA
+        )
+        regions = covered
+    try:
+        faces = _written(regions, UVFrame(carrier, to_uv, tolerance))
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        raise _not_built() from error
+    _prove(edges, faces, amount, ended)
+    return faces
+
+
+def _not_built() -> RuntimeError:
+    """The error for an offset that could not be built by joining bands and
+    discs, or that came out wrong"""
+    return RuntimeError(
+        "the offset could not be built on this surface; an amount larger than "
+        "the tightest curve of the boundary is the usual cause"
+    )
+
+
+def _reshaped(
+    flat: Face,
+    tools: list[Face],
+    amount: float,
+    turns: list[Period],
+    round_it: list[bool],
+) -> list[Face]:
+    """A flat face with the margin of its boundary joined to it, or cut from
+    it for a negative amount, and one period kept of what repeats round a
+    surface that closes on itself"""
     margin = _joined(tools)
     if amount > 0:
         regions = _joined([flat, *margin])
@@ -800,25 +867,114 @@ def _offset_geodesic(
                 ]
             )
         regions = _one_period(regions, turn)
-    if amount > 0:
-        regions = _within_the_surface(regions, chart, middle)
-    frame = UVFrame(carrier, to_uv, tolerance)
-    return _written([_mended(region, tolerance) for region in regions], frame)
+    if len(turns) == 2:
+        regions = _cut_at_the_other_seam(regions, turns)
+    return regions
 
 
-def _mended(flat: Face, tolerance: float) -> Face:
-    """A flat face left by booleans with its outlines made fit to write
+def _prove(
+    boundary: list[TopoDS_Edge], faces: list[Face], amount: float, ended: bool
+) -> None:
+    """Check that the faces written are the offset of a boundary
 
-    Where a band meets the disc about a corner the two touch, and the
-    boolean that joins them leaves the ends of their edges a little apart,
-    within the tolerance of the vertex between them, and sometimes an edge
-    too short to see as well. Written edge by edge those ends no longer
-    meet and the outline does not close. Each outline is made again with
-    such edges left out and the ends of neighbours brought to one point.
+    The bands and discs are joined by planar booleans, a great many of them
+    where the boundary curves tightly, and the kernel's booleans can fail
+    without saying so and leave a face that was never offset, or one with
+    scraps for holes. An offset has its whole outline the amount from the
+    boundary it came from, so points of the outline are measured against
+    that, loosely: straight across, which is a little under the distance
+    along the surface. ``ended`` says the result was cut off where the
+    surface ends, and may lie nearer.
+
+    Raises:
+        RuntimeError: the faces are not the offset
     """
-    outlines = [
-        _closed_up(wire, tolerance) for wire in (flat.outer_wire(), *flat.inner_wires())
-    ]
+    if not all(face.is_valid for face in faces):
+        raise _not_built()
+    rim = TopoDS_Compound()
+    builder = BRep_Builder()
+    builder.MakeCompound(rim)
+    for edge in boundary:
+        builder.Add(rim, edge)
+    points = []
+    for face in faces:
+        for edge in _boundary(face)[0]:
+            point = Edge(edge).position_at(0.5)
+            touched = [
+                other
+                for other in faces
+                if other is not face and other.distance_to(point) < TOLERANCE
+            ]
+            if not touched:
+                points.append(point)
+            elif any(
+                all(wire.distance_to(point) > TOLERANCE for wire in other.wires())
+                for other in touched
+            ):
+                # inside another of the faces: they overlap, which the
+                # faces of a result never do
+                raise _not_built()
+            # otherwise an edge two faces share, where one was cut in two
+    distance = abs(amount)
+    for point in points[:: max(1, len(points) // 48)]:
+        away = Shape.cast(rim).distance_to(point)
+        if away > 1.2 * distance + TOLERANCE or (not ended and away < distance / 2):
+            raise _not_built()
+
+
+def _cut_at_the_other_seam(regions: list[Face], turns: list[Period]) -> list[Face]:
+    """Flat regions on a surface that closes on itself both ways, a torus,
+    with each one that goes all the way round one way cut where it crosses
+    the seam of the other
+
+    A face written all the way round one way cannot lie across the other
+    seam as well, so such a region is written as a face either side of it.
+    """
+    pieces: list[Face] = []
+    for region in regions:
+        parts = [region]
+        box = region.bounding_box()
+        for (axis, _, length), (other, start, period) in (turns, turns[::-1]):
+            if (box.max - box.min).dot(axis) < length - _AT_START:
+                continue
+            low, high = box.min.dot(other), box.max.dot(other)
+            crossed = [
+                k
+                for k in range(
+                    ceil((low - start) / period), ceil((high - start) / period)
+                )
+                if low + _AT_START < start + k * period < high - _AT_START
+            ]
+            if crossed:
+                parts = [
+                    part
+                    for k in (crossed[0] - 1, *crossed)
+                    for part in _faces(
+                        region.intersect(
+                            _window([region], other, start + k * period, period)
+                        )
+                    )
+                ]
+        pieces += parts
+    return pieces
+
+
+def _mended(flat: Face) -> Face:
+    """A flat face left by an offset or by booleans with its outlines made
+    fit to write
+
+    Where two curves of an outline were found to meet - an offset edge and
+    the arc round a corner, a band and the disc beside it - their ends are
+    left a little apart, within the tolerance of the vertex between them,
+    and sometimes with an edge too short to see between them as well.
+    Written edge by edge those ends no longer meet and the outline does not
+    close. Such an outline is made again with those edges left out and the
+    ends of neighbours brought to one point; one that is sound is left alone.
+    """
+    wires = [flat.outer_wire(), *flat.inner_wires()]
+    outlines = [_closed_up(wire) for wire in wires]
+    if all(outline is wire for outline, wire in zip(outlines, wires)):
+        return flat
     return _upward(
         _as_face(
             _make_topods_face_from_wires(
@@ -828,37 +984,79 @@ def _mended(flat: Face, tolerance: float) -> Face:
     )
 
 
-def _closed_up(wire: Wire, tolerance: float) -> Wire:
-    """A closed flat wire made again so that each edge ends exactly where
-    the next begins, without its edges shorter than the tolerance
+def _closed_up(wire: Wire) -> Wire:
+    """A closed flat wire in which each edge ends exactly where the next
+    begins and none is too short to write: the wire itself when that is so
+    already, otherwise made again
 
-    Lines are made again between the new ends; any other edge becomes a
-    B-spline whose end poles are moved to them, which moves the curve less
-    than its ends were apart.
+    Two edges are brought together at the end of whichever is a line, a
+    line being exact - the side of a period, where a face meets itself, is
+    one, and must stay where it is - and otherwise half way between their
+    ends. Lines are made again between the new ends and arcs through them
+    and their own middles; any other edge becomes a B-spline whose end poles
+    are moved to the new ends.
     """
-    edges = [edge for edge in wire.order_edges() if edge.length > tolerance]
+    ordered = list(wire.order_edges())
+    # too short to write, for the size of the outline as well as outright
+    too_short = max(_TOO_SHORT, 1e-6 * wire.bounding_box().diagonal)
+    edges = [edge for edge in ordered if edge.length > too_short]
     if len(edges) < 2:
         return wire
-    # each edge's curve as a B-spline running the way the wire does
-    splines = []
+    # each edge's curve as a B-spline, with what kind of curve it was
+    loose = []
     for edge in edges:
         first, last = BRep_Tool.Range_s(edge.wrapped)
         curve = BRep_Tool.Curve_s(edge.wrapped, first, last)
         spline = GeomConvert.CurveToBSplineCurve_s(
             Geom_TrimmedCurve(curve, first, last)
         )
-        if edge.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
+        loose.append((edge.geom_type, spline))
+    # run end to end by where the curves are: after a boolean neither the
+    # order of a wire's edges nor which way each is marked as running can be
+    # relied on to say
+    chain = [loose.pop(0)]
+    while loose:
+        here = Vector(chain[-1][1].EndPoint())
+        nearest = min(
+            range(len(loose)),
+            key=lambda index: min(
+                (Vector(loose[index][1].StartPoint()) - here).length,
+                (Vector(loose[index][1].EndPoint()) - here).length,
+            ),
+        )
+        kind, spline = loose.pop(nearest)
+        if (Vector(spline.EndPoint()) - here).length < (
+            Vector(spline.StartPoint()) - here
+        ).length:
             spline.Reverse()
-        splines.append(spline)
+        chain.append((kind, spline))
+    ends = [
+        (Vector(here.EndPoint()), Vector(there.StartPoint()))
+        for (_, here), (_, there) in zip(chain, chain[1:] + chain[:1])
+    ]
+    if len(edges) == len(ordered) and all(
+        (end - start).length <= _MEETING for end, start in ends
+    ):
+        return wire
+    kinds = [kind for kind, _ in chain]
     joints = [
-        (Vector(here.EndPoint()) + Vector(there.StartPoint())) / 2
-        for here, there in zip(splines, splines[1:] + splines[:1])
+        (
+            end
+            if before == GeomType.LINE
+            else start if after == GeomType.LINE else (end + start) / 2
+        )
+        for (end, start), before, after in zip(ends, kinds, kinds[1:] + kinds[:1])
     ]
     closed_up = []
-    for index, (edge, spline) in enumerate(zip(edges, splines)):
+    for index, (kind, spline) in enumerate(chain):
         start, end = joints[index - 1], joints[index]
-        if edge.geom_type == GeomType.LINE:
+        if kind == GeomType.LINE:
             closed_up.append(Edge.make_line(start, end))
+        elif kind == GeomType.CIRCLE:
+            middle = Vector(
+                spline.Value((spline.FirstParameter() + spline.LastParameter()) / 2)
+            )
+            closed_up.append(Edge.make_three_point_arc(start, middle, end))
         else:
             spline.SetPole(1, start.to_pnt())
             spline.SetPole(spline.NbPoles(), end.to_pnt())
@@ -871,9 +1069,12 @@ def _boundary(face: Face) -> tuple[list[TopoDS_Edge], bool]:
     a pole of its surface
 
     A seam edge is where the face meets itself and a degenerate edge is a
-    pole, a point; neither is boundary.
+    pole, a point; neither is boundary. A seam edge is in its face twice,
+    once each way. That is the test, and not whether an edge carries a
+    seam's two pcurves: the rim of half a torus that lies along the seam
+    line carries them too, and is boundary.
     """
-    edges = []
+    found: list[TopoDS_Edge] = []
     at_pole = False
     explorer = TopExp_Explorer(face.wrapped, TopAbs_ShapeEnum.TopAbs_EDGE)
     while explorer.More():
@@ -881,8 +1082,9 @@ def _boundary(face: Face) -> tuple[list[TopoDS_Edge], bool]:
         explorer.Next()
         if BRep_Tool.Degenerated_s(edge):
             at_pole = True
-        elif not BRep_Tool.IsClosed_s(edge, face.wrapped):
-            edges.append(edge)
+        else:
+            found.append(edge)
+    edges = [edge for edge in found if sum(other.IsSame(edge) for other in found) == 1]
     return edges, at_pole
 
 
@@ -1094,15 +1296,32 @@ def _beside_edge(
         ]
         loops.sort(key=lambda loop: loop.area)
         return _faces(loops[1].cut(loops[0]))
+    # Each end of the edge is closed by way of a point past it, inside the
+    # disc about the vertex there or the band of the edge that carries on
+    # from it. A square end would lie along the square end of that
+    # neighbour, all but exactly, and planar booleans do badly with
+    # boundaries that nearly coincide; ends that reach past each other cross
+    # cleanly instead.
+    last = len(samples) - 1
+    tips: dict[int, list[Vector]] = {}
+    if not closed:
+        for index, way in ((0, -1.0), (last, 1.0)):
+            tips[index] = [
+                samples[index].on_edge + samples[index].tangent * (way * distance / 2)
+            ]
     for regular, start, end in runs:
         if regular:
             outline = [_offset_curve(samples[start : end + 1])]
-            outline.append(Edge.make_line(samples[end].offset, behind[end]))
-            outline += [
-                Edge.make_line(behind[i + 1], behind[i])
-                for i in range(end - 1, start - 1, -1)
+            corners = [
+                samples[end].offset,
+                *tips.get(end, []),
+                *behind[start : end + 1][::-1],
+                *tips.get(start, []),
+                samples[start].offset,
             ]
-            outline.append(Edge.make_line(behind[start], samples[start].offset))
+            outline += [
+                Edge.make_line(here, there) for here, there in zip(corners, corners[1:])
+            ]
             faces.append(_region(Wire(outline)))
         else:
             # a fan to each offset from the far side of the edge, as much of
@@ -1114,15 +1333,14 @@ def _beside_edge(
                     samples[there + 1].tangent
                 ) >= cos(_FAN):
                     there += 1
-                for apex in (samples[here].offset, samples[there].offset):
-                    faces += _polygons([apex, *behind[here : there + 1]])
+                far_side = behind[here : there + 1]
+                faces += _polygons(
+                    [samples[here].offset, *tips.get(here, []), *far_side]
+                )
+                faces += _polygons(
+                    [samples[there].offset, *far_side, *tips.get(there, [])]
+                )
                 here = there
-    if not closed:
-        # past each end, inside the disc about the vertex there or the band
-        # of the edge that carries on from it
-        for index, way in ((0, -1.0), (-1, 1.0)):
-            tip = samples[index].on_edge + samples[index].tangent * (way * distance / 2)
-            faces += _polygons([samples[index].offset, tip, behind[index]])
     return faces
 
 
@@ -1419,8 +1637,13 @@ def _kernel_try(wire: Wire, distance: float, kind: Kind) -> list[Wire] | None:
     explorer = TopExp_Explorer(builder.Shape(), TopAbs_ShapeEnum.TopAbs_WIRE)
     while explorer.More():
         offset_wire = Wire(TopoDS.Wire(explorer.Current()))
-        offset_wires.append(_offset_curves_to_bsplines(offset_wire))
         explorer.Next()
+        # the kernel can report success and hand back a wire in pieces
+        try:
+            offset_wire = _offset_curves_to_bsplines(offset_wire)
+        except ValueError:
+            return None
+        offset_wires.append(offset_wire)
     return offset_wires
 
 
