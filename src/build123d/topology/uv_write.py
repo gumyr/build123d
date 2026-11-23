@@ -355,6 +355,9 @@ class UVFrame:
         turn, as a helical band can; that is cut along the seam into one
         face per period it reaches into.
 
+        In a face across the seam of a cone, a closed edge such as a circle
+        is written as two edges; the kernel's booleans go wrong on one.
+
         Args:
             planar (Face): a planar face on ``Plane.XY``
 
@@ -1057,11 +1060,29 @@ class UVFrame:
         With ``cutters`` the edges are cut along the seams and each piece is
         moved into the surface's own range, which a wire standing alone
         wants; a face's wires are written where they lie, on its ``surface``.
+
+        In a face across the seam of a cone a closed edge, a circle, is
+        written as two. The kernel projects a closed curve that crosses a
+        cone's seam onto the cone wrongly, which it has to do in a boolean
+        with another face of the cone: the boolean comes out wrong and the
+        face is left damaged. Curves that are not closed are projected
+        correctly.
         """
+        in_two = (
+            cutters is None
+            and surface is not None
+            and surface is not self._surface
+            and self.face.geom_type == GeomType.CONE
+        )
         edges = []
         for edge in lifted.order_edges():
             backwards = edge.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED
-            pieces = [edge] if cutters is None else _edge_pieces(edge, cutters)
+            if cutters is not None:
+                pieces = _edge_pieces(edge, cutters)
+            elif in_two and _meets_itself(edge):
+                pieces = _halves(edge)
+            else:
+                pieces = [edge]
             for piece in reversed(pieces) if backwards else pieces:
                 written = self._write_edge(
                     piece if cutters is None else self._in_range(piece), surface
@@ -1265,6 +1286,25 @@ def _split_all(shape: Piece, cutter: Plane) -> list[Piece]:
     the cutter misses it"""
     pieces = shape.split(cutter, keep=Keep.ALL)
     return list(pieces) if pieces else [shape]
+
+
+def _meets_itself(edge: Edge) -> bool:
+    """Whether a uv-plane edge is closed: it ends where it starts"""
+    first, last = BRep_Tool.Range_s(edge.wrapped)
+    curve = BRep_Tool.Curve_s(edge.wrapped, first, last)
+    return curve.Value(first).Distance(curve.Value(last)) < 1e-9
+
+
+def _halves(edge: Edge) -> list[Edge]:
+    """An edge as two, each half its parameter range, in the direction of
+    its curve"""
+    first, last = BRep_Tool.Range_s(edge.wrapped)
+    curve = BRep_Tool.Curve_s(edge.wrapped, first, last)
+    middle = (first + last) / 2
+    return [
+        Edge(BRepBuilderAPI_MakeEdge(curve, low, high).Edge())
+        for low, high in ((first, middle), (middle, last))
+    ]
 
 
 def _edge_pieces(edge: Edge, cutters: list[Plane]) -> list[Edge]:

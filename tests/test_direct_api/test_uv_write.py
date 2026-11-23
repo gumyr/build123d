@@ -658,6 +658,37 @@ class TestConeFrame(unittest.TestCase):
         self.assertGreater(written._uv_bounds()[1], 2 * math.pi)
         self.assertTrue(Solid.thicken(written, 0.3).is_valid)
 
+    def test_a_closed_edge_across_the_seam_is_written_as_two(self):
+        """The kernel projects a closed curve that crosses a cone's seam
+        onto the cone wrongly, which a boolean between two faces of the cone
+        has to do. Written as two edges, a round face or a round hole takes
+        part in one correctly; at 135 and 315 degrees one edge does not"""
+        frame = self.surface.uv_frame(
+            self.surface.location_at(0.0, 0.5, x_dir=(0, 1, 0))
+        )
+        square = Rectangle(4, 4).face().outer_wire()
+        for turn in (0, 135, 315):
+            with self.subTest(turn=turn):
+                round_wire = Rot(Z=turn) * Circle(0.8).face().outer_wire()
+                (big,) = frame.write_face(Rot(Z=turn) * Circle(1.0).face())
+                (small,) = frame.write_face(Face(round_wire))
+                (plate,) = frame.write_face(Face(square, [round_wire]))
+                self.assertEqual(len(big.edges()), 2)
+                self.assertEqual(len(plate.edges()), 6)
+                self.assertTrue(big.is_valid and plate.is_valid)
+                self.assertAlmostEqual(big.area, math.pi, 3)
+                ring_area, big_area = big.area - small.area, big.area
+                self.assertAlmostEqual(big.cut(small).area, ring_area, 3)
+                self.assertAlmostEqual(plate.cut(big).area, 16 - big_area, 3)
+        # clear of the seam a circle stays one edge, and so it does across
+        # the seam of a cylinder, where the kernel has no such trouble
+        (clear,) = self.frame.write_face(Circle(1.0).face())
+        self.assertEqual(len(clear.edges()), 1)
+        cylinder = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        across = cylinder.uv_frame(cylinder.location_at(0.0, 0.5, x_dir=(0, 1, 0)))
+        (on_cylinder,) = across.write_face(Circle(1.0).face())
+        self.assertEqual(len(on_cylinder.edges()), 1)
+
     def test_the_whole_face_goes_flat_and_back(self):
         """The cone's own face, unrolled into its sector by the inverse map,
         is written back all the way round as one face with a seam edge"""
