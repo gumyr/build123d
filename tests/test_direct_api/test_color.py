@@ -90,6 +90,13 @@ def test_overload_rgba(color, expected):
             (153 / 255, 102 / 255, 146 / 255, 204 / 255),
             id="kw color_code + alpha",
         ),
+        pytest.param(Color(0x000000), (0, 0, 0, 1), id="black color_code"),
+        pytest.param(
+            Color(0x000000, 0x80), (0, 0, 0, 0x80 / 0xFF), id="black color_code + alpha"
+        ),
+        pytest.param(
+            Color(color_code=0x000000), (0, 0, 0, 1), id="kw black color_code"
+        ),
     ],
 )
 def test_overload_hex(color, expected):

@@ -1591,7 +1591,7 @@ class Color:
 
         if name:
             color_format = (name, alpha)
-        elif color_code:
+        elif color_code is not None:
             color_format = (color_code, alpha)
         else:
             color_format = (red, green, blue, alpha)
