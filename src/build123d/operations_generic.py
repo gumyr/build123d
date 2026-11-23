@@ -801,7 +801,7 @@ def offset(
         else:
             raise TypeError(f"Unsupported type {type(obj)} for {obj}")
 
-    new_faces = []
+    new_faces: list[Face] = []
     for face in faces:
         outer_wire = face.outer_wire().offset_2d(amount, kind=kind)
         if min_edge_length is not None:
@@ -832,7 +832,7 @@ def offset(
             inner_faces = [Face(w) for w in inner_wires]
             subtraction = new_face.cut(*inner_faces)
             if isinstance(subtraction, Compound):
-                new_faces.append(new_face.unwrap(fully=True))
+                new_faces.extend(subtraction.faces())
             elif isinstance(subtraction, ShapeList):
                 new_faces.extend(subtraction)
             else:
