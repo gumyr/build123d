@@ -29,13 +29,13 @@ license:
 import math
 import unittest
 
-from build123d.build_enums import GeomType, Kind
+from build123d.build_enums import Align, GeomType, Kind
 from build123d.geometry import Axis, Plane, Pos, Rot
 from build123d.objects_curve import Polyline
-from build123d.objects_part import Box, Cone, Cylinder
-from build123d.objects_sketch import Circle, Ellipse, Rectangle
+from build123d.objects_part import Box, Cone, Cylinder, Sphere, Torus
+from build123d.objects_sketch import Circle, Ellipse, Rectangle, RectangleRounded
 from build123d.operations_generic import offset
-from build123d.topology import Edge, Face, Solid, Vertex, Wire
+from build123d.topology import Edge, Face, Solid, UVFrame, Vertex, Wire
 
 from OCP.BRep import BRep_Tool
 
@@ -449,32 +449,257 @@ class TestConeOffset2d(unittest.TestCase):
     def test_the_apex_is_out_of_reach(self):
         with self.assertRaisesRegex(ValueError, "reaches the apex of its cone"):
             self.side(Cone(5, 0, 10)).offset_2d(-0.5)
-        # a narrow rim 0.7 from the apex leaves no room beside a face that
-        # goes round, grown or shrunk
-        blunt = self.side(Cone(5, 0.3, 10))
-        for amount in (0.5, -0.5):
-            with self.assertRaisesRegex(ValueError, "too near the apex"):
-                blunt.offset_2d(amount)
-        patch = blunt.wrap(Rectangle(1, 1).face(), blunt.location_at(0.25, 0.9))
+        patch_cone = self.side(Cone(5, 0.3, 10))
+        patch = patch_cone.wrap(
+            Rectangle(1, 1).face(), patch_cone.location_at(0.25, 0.9)
+        )
         (grown,) = patch.offset_2d(0.3)
         self.assertAlmostEqual(grown.area, 1 + 4 * 0.3 + math.pi * 0.09, 3)
         with self.assertRaisesRegex(ValueError, "reaches the apex of the cone"):
             patch.offset_2d(3)
 
-    def test_a_cone_too_nearly_flat(self):
-        """Within ten degrees of flat, a face that goes round leaves almost
-        none of the circle about the apex to lay its neighbours out in"""
+    def test_no_room_to_lay_the_cone_out(self):
+        """A face that goes round a cone needs some of the turns beside it
+        laid out flat, and about the apex there is not always the room: with
+        a narrow rim 0.7 from the apex, or a cone within ten degrees of flat.
+        The face is then offset along geodesics, as on any surface, which
+        rounds its corners; mitred ones are refused"""
+        for sizes, amounts in (
+            ((5, 0.3, 10), (0.5, -0.5)),
+            ((10, 1, 1.6), (0.3, -0.05)),
+        ):
+            surface = self.side(Cone(*sizes))
+            for amount in amounts:
+                with self.subTest(cone=sizes, amount=amount):
+                    (result,) = surface.offset_2d(amount)
+                    self.assertTrue(result.is_valid)
+                    self.assertEqual(seam_edges(result), 1)
+                    self.assertAlmostEqual(
+                        result.area, self.frustum_area(*sizes, amount), 4
+                    )
+                    with self.assertRaisesRegex(ValueError, "apex|nearly flat"):
+                        surface.offset_2d(amount, Kind.INTERSECTION)
+        # past the apex is refused either way
+        with self.assertRaisesRegex(ValueError, "reaches the apex of the cone"):
+            self.side(Cone(5, 0.3, 10)).offset_2d(1.2)
+        # a little way off flat there is room, and a patch needs none
         nearly_flat = self.side(Cone(10, 1, 1.6))
-        (slightly,) = nearly_flat.offset_2d(-0.01)
-        self.assertAlmostEqual(slightly.area, self.frustum_area(10, 1, 1.6, -0.01), 4)
-        with self.assertRaisesRegex(ValueError, "too nearly flat"):
-            nearly_flat.offset_2d(-0.05)
-        # a patch needs no neighbours
+        (mitred,) = nearly_flat.offset_2d(-0.01, Kind.INTERSECTION)
+        self.assertAlmostEqual(mitred.area, self.frustum_area(10, 1, 1.6, -0.01), 4)
         patch = nearly_flat.wrap(
             Rectangle(3, 1.5).face(), nearly_flat.location_at(0.25, 0.5)
         )
-        (grown,) = patch.offset_2d(0.3)
-        self.assertAlmostEqual(grown.area, 4.5 + 9 * 0.3 + math.pi * 0.09, 3)
+        (grown,) = patch.offset_2d(0.3, Kind.INTERSECTION)
+        self.assertAlmostEqual(grown.area, (3 + 0.6) * (1.5 + 0.6), 3)
+
+
+def wavy() -> Face:
+    """A spline surface 12 square, with gentle hills"""
+    return Face.make_surface_from_array_of_points(
+        [
+            [(x, y, 0.6 * math.sin(x / 2) * math.cos(y / 2)) for y in range(-6, 7, 2)]
+            for x in range(-6, 7, 2)
+        ]
+    )
+
+
+def vase() -> Face:
+    """A surface of revolution with a waist"""
+    profile = Edge.make_spline([(4, 0, 0), (6, 0, 3), (3, 0, 7), (5, 0, 10)])
+    return Face.revolve(profile, 360, Axis.Z)
+
+
+class TestGeodesicOffset2d(unittest.TestCase):
+    """A surface that does not unroll: the boundary is moved along the
+    geodesics that leave it square to itself, and its corners are rounded"""
+
+    def setUp(self):
+        self.ball = Sphere(5).face()
+
+    @staticmethod
+    def cap(reach: float) -> float:
+        """The area of a radius 5 sphere within ``reach`` of a point of it"""
+        return 2 * math.pi * 25 * (1 - math.cos(reach / 5))
+
+    @staticmethod
+    def zone(latitude: float) -> float:
+        """The area of a radius 5 sphere between a latitude and its opposite"""
+        return 4 * math.pi * 25 * math.sin(latitude)
+
+    def assert_on(self, surface: Face, face: Face):
+        """Valid, on the surface, and facing as the surface does"""
+        self.assertTrue(face.is_valid)
+        middle = face.position_at(0.5, 0.5)
+        self.assertLess(surface.distance_to(middle), 1e-6)
+        normal = face.normal_at(middle)
+        self.assertAlmostEqual((normal - surface.normal_at(middle)).length, 0, 4)
+
+    def assert_moved(self, result: Face, original: Face, amount: float):
+        """Every point of the result's outline is the amount from the
+        original's, measured straight across, which over so short a way is
+        within a part in a hundred of the way along the surface"""
+        outline = original.outer_wire()
+        distances = [
+            outline.distance_to(edge.position_at(i / 8))
+            for edge in result.outer_wire().edges()
+            for i in range(8)
+        ]
+        self.assertAlmostEqual(min(distances), abs(amount), delta=0.01 * abs(amount))
+        self.assertAlmostEqual(max(distances), abs(amount), delta=0.01 * abs(amount))
+
+    def test_a_disc_on_a_sphere_stays_a_disc(self):
+        """Wherever it is: clear of the seam, across it, or far up the sphere
+        where a degree of longitude is short"""
+        places = {
+            "clear of the seam": self.ball.location_at(0.25, 0.5),
+            "across the seam": self.ball.location_at(0.0, 0.5, x_dir=(0, 1, 0)),
+            "far up": self.ball.location_at(0.3, 0.8),
+        }
+        for place, location in places.items():
+            disc = self.ball.wrap(Circle(2).face(), location)
+            for amount in (0.5, -0.5):
+                with self.subTest(place=place, amount=amount):
+                    (result,) = disc.offset_2d(amount)
+                    self.assert_on(self.ball, result)
+                    self.assertAlmostEqual(result.area / self.cap(2 + amount), 1, 4)
+        with self.assertRaisesRegex(ValueError, "nothing is left"):
+            disc.offset_2d(-2.5)
+
+    def test_a_band_round_a_sphere(self):
+        """All the way round the equator: only its rims move, and it comes
+        back with its seam edge"""
+        equator = Rectangle(10 * math.pi, 3, align=(Align.MIN, Align.CENTER)).face()
+        (band,) = UVFrame(self.ball, lambda x, y: (x / 5 + 1.0, y / 5)).write_face(
+            equator
+        )
+        self.assertAlmostEqual(band.area, self.zone(0.3), 5)
+        for amount in (0.5, -0.5):
+            with self.subTest(amount=amount):
+                (result,) = band.offset_2d(amount)
+                self.assertTrue(result.is_valid)
+                self.assertEqual(seam_edges(result), 1)
+                self.assertAlmostEqual(result.area, self.zone(0.3 + amount / 5), 4)
+        with self.assertRaisesRegex(ValueError, "nothing is left"):
+            band.offset_2d(-1.6)
+        with self.assertRaisesRegex(ValueError, "pole"):
+            band.offset_2d(8)  # the poles are 7.1 from its rims
+
+    def test_a_patch_on_each_kind_of_surface(self):
+        surfaces = {
+            "sphere": (self.ball, self.ball.location_at(0.25, 0.5)),
+            "torus": (Torus(10, 3).face(), None),
+            "spline": (wavy(), None),
+            "revolution": (vase(), None),
+        }
+        for name, (surface, location) in surfaces.items():
+            if name == "torus":
+                location = surface.location_at(0.3, 0.0, x_dir=(0, 0, 1))
+            elif location is None:
+                location = surface.location_at(0.3, 0.5)
+            patch = surface.wrap(Rectangle(4, 3).face(), location)
+            for amount in (0.4, -0.4):
+                with self.subTest(surface=name, amount=amount):
+                    (result,) = patch.offset_2d(amount)
+                    self.assert_on(surface, result)
+                    self.assert_moved(result, patch, amount)
+
+    def test_holes_parts_and_tight_corners(self):
+        location = self.ball.location_at(0.25, 0.5)
+        holed = self.ball.wrap((Rectangle(5, 4) - Circle(1)).face(), location)
+        (closed,) = holed.offset_2d(1.2)  # past the middle of the hole
+        self.assert_on(self.ball, closed)
+        self.assertEqual(len(closed.inner_wires()), 0)
+        (open_still,) = holed.offset_2d(0.3)
+        self.assertEqual(len(open_still.inner_wires()), 1)
+        # shrunk by more than the radius of its corners, whose offsets turn
+        # back on themselves
+        rounded = self.ball.wrap(RectangleRounded(5, 3, 0.4).face(), location)
+        (shrunk,) = rounded.offset_2d(-0.6)
+        self.assert_on(self.ball, shrunk)
+        self.assert_moved(shrunk, rounded, -0.6)
+        bar = (
+            Pos(-1.5, 0) * Circle(0.75) + Rectangle(3, 0.3) + Pos(1.5, 0) * Circle(0.75)
+        )
+        parts = self.ball.wrap(bar.face(), location).offset_2d(-0.2)
+        self.assertEqual(len(parts), 2)
+        for part in parts:
+            self.assert_on(self.ball, part)
+
+    def test_a_surface_without_a_boundary_is_left_alone(self):
+        for whole in (self.ball, Torus(10, 3).face()):
+            self.assertEqual(whole.offset_2d(1), [whole])
+
+    def test_only_rounded_corners(self):
+        patch = self.ball.wrap(Rectangle(4, 3).face(), self.ball.location_at(0.25, 0.5))
+        for kind in (Kind.INTERSECTION, Kind.TANGENT):
+            with self.assertRaisesRegex(ValueError, "Kind.ARC"):
+                patch.offset_2d(0.5, kind)
+
+    def test_the_poles_are_out_of_reach(self):
+        hemisphere = Sphere(5).split(Plane.XY).faces().filter_by(GeomType.SPHERE)[0]
+        with self.assertRaisesRegex(ValueError, "reaches a pole of its surface"):
+            hemisphere.offset_2d(-1)
+        near = self.ball.wrap(Circle(1.5).face(), self.ball.location_at(0.3, 0.85))
+        (short,) = near.offset_2d(0.5)  # the pole is 2.4 from its middle
+        self.assertAlmostEqual(short.area / self.cap(2), 1, 4)
+        with self.assertRaisesRegex(ValueError, "pole"):
+            near.offset_2d(2)
+
+    def test_the_end_of_a_spline_surface(self):
+        """A face grown past the edge of its surface ends there"""
+        surface = wavy()
+        (whole,) = surface.offset_2d(1)
+        self.assertTrue(whole.is_valid)
+        self.assertAlmostEqual(whole.area, surface.area, 4)
+        (inset,) = surface.offset_2d(-1)
+        self.assert_moved(inset, surface, -1)
+        by_the_edge = surface.wrap(
+            Rectangle(4, 3).face(), surface.location_at(0.85, 0.5)
+        )
+        (clipped,) = by_the_edge.offset_2d(1)
+        self.assertTrue(clipped.is_valid)
+        self.assertLess(clipped.bounding_box().max.X, 6 + 1e-6)
+        self.assertGreater(clipped.area, by_the_edge.area)
+
+    def test_bands_round_a_torus(self):
+        """The long way round and the short: a seam edge either way"""
+        ring = Torus(10, 3).face()
+        long_way = Rectangle(26 * math.pi, 3, align=(Align.MIN, Align.CENTER)).face()
+        short_way = Rectangle(4, 6 * math.pi, align=(Align.CENTER, Align.MIN)).face()
+        bands = {
+            "long": (lambda x, y: (x / 13 + 0.7, y / 3 + 2.0), long_way),
+            "short": (lambda x, y: (x / 13 + 2.0, y / 3 + 0.7), short_way),
+        }
+        for name, (mapping, planar) in bands.items():
+            (band,) = UVFrame(ring, mapping).write_face(planar)
+            for amount in (0.5, -0.5):
+                with self.subTest(way=name, amount=amount):
+                    (result,) = band.offset_2d(amount)
+                    self.assertTrue(result.is_valid)
+                    self.assertEqual(seam_edges(result), 1)
+                    self.assertGreater(result.area * amount, band.area * amount)
+
+    def test_walls_and_moved_spheres(self):
+        """The inside of a hollow ball faces inwards, in a ball that has been
+        moved and turned"""
+        hollow = Pos(3, -2, 4) * Rot(20, 30, 40) * (Sphere(6) - Sphere(5))
+        for wall in hollow.faces():
+            with self.subTest(radius=wall.radius):
+                patch = wall.wrap(Rectangle(4, 3).face(), wall.location_at(0.3, 0.5))
+                (grown,) = patch.offset_2d(0.4)
+                self.assert_on(wall, grown)
+                self.assert_moved(grown, patch, 0.4)
+
+    def test_the_result_cuts_into_the_sphere(self):
+        solid = Sphere(5)
+        disc = self.ball.wrap(Circle(2).face(), self.ball.location_at(0.25, 0.5))
+        (grown,) = disc.offset_2d(0.5)
+        sunk = solid.cut(Solid.thicken(grown, -0.5))
+        self.assertTrue(sunk.is_valid)
+        # a layer 0.5 deep under a sphere narrows towards the centre
+        removed = solid.volume - sunk.volume
+        self.assertLess(removed, grown.area * 0.5)
+        self.assertGreater(removed, grown.area * 0.5 * 0.85)
 
 
 if __name__ == "__main__":

@@ -2719,10 +2719,18 @@ class Face(Mixin2D[TopoDS_Face]):
         meets itself round a cylinder or a cone comes back as one face all
         the way round, and one that goes all the way round stays so.
 
-        A cone has an apex, which no face written this way can include: a
-        face that reaches it, or an offset that would, is refused. So is the
-        offset of a face that goes round a cone when the cone is too nearly
-        flat, or the face too near the apex, for it to be laid out.
+        A face on any other surface is offset by following geodesics: the
+        boundary moves the distance along the geodesics that leave it square
+        to itself, and its corners are rounded by geodesic circles, so only
+        ``Kind.ARC`` is available there. A face grown past the end of its
+        surface, the edge of a spline patch, ends there.
+
+        The apex of a cone and the pole of a sphere or of any surface of
+        revolution that closes at its axis are points no face written this
+        way can include: a face that reaches one, or an offset that would,
+        is refused. A face that goes round a cone too nearly flat, or too
+        near its apex, to be laid out is followed along geodesics instead,
+        and so with ``Kind.ARC`` only.
 
         Shrinking can part a face, so a list is returned: every face of the
         result.
@@ -2736,10 +2744,12 @@ class Face(Mixin2D[TopoDS_Face]):
                 curve has to be interpolated. Defaults to 1e-4.
 
         Raises:
-            ValueError: empty face, or one on a surface that is not handled
+            ValueError: empty face
             ValueError: nothing is left of the face
-            ValueError: the face or its offset reaches the apex of a cone, or
-                cannot be laid out about it
+            ValueError: ``kind`` is not ``Kind.ARC`` where only that is
+                available
+            ValueError: the face or its offset reaches the apex of a cone or
+                a pole of its surface
             RuntimeError: the planar offset failed
 
         Returns:

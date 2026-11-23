@@ -45,6 +45,21 @@ desc:
     The apex itself has no place in a face written through a UVFrame, and a
     face that reaches it, or an offset that would, is refused as well.
 
+    Any other surface does not unroll, and there the offset is found by
+    following geodesics instead. From points along each edge of the boundary
+    the geodesic that leaves the edge square to it is followed for the
+    distance, on the side the boundary is to move to; the ground between the
+    edge and where those geodesics end is a band, and about each corner of
+    the boundary the points within the distance are a disc. Laid on the
+    surface's parameters, scaled to its lengths, the bands and discs are
+    joined to the face's outline to grow it or cut from it to shrink it, so
+    the planar booleans decide where outlines meet and which holes close.
+    The corners are arcs, as the discs are round. A surface that closes on
+    itself repeats what is done near its seam a period away, as the cylinder
+    does, and one that ends, a spline patch at its edges, ends the result
+    there. A pole has no place in a face written through a UVFrame, as the
+    apex of a cone has none.
+
     The result is written onto the whole of the surface the face lies on, not
     the face's own, which may be trimmed to the face.
 
@@ -72,17 +87,19 @@ from math import asin, atan2, ceil, cos, degrees, hypot, pi, sin
 from typing import TYPE_CHECKING, NamedTuple
 
 from OCP.BRep import BRep_Tool
-from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+from OCP.BRepAdaptor import BRepAdaptor_Curve2d, BRepAdaptor_Surface
+from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
 from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffset
-from OCP.Geom import Geom_RectangularTrimmedSurface
+from OCP.Geom import Geom_RectangularTrimmedSurface, Geom_Surface, Geom_TrimmedCurve
 from OCP.GeomAbs import GeomAbs_JoinType
+from OCP.GeomConvert import GeomConvert
 from OCP.Standard import Standard_ConstructionError, Standard_Failure
 from OCP.StdFail import StdFail_NotDone
-from OCP.TopAbs import TopAbs_ShapeEnum
+from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS
+from OCP.gp import gp_Pnt, gp_Pnt2d, gp_Vec, gp_Vec2d
+from OCP.TopoDS import TopoDS, TopoDS_Edge
 
 from build123d.build_enums import GeomType, Kind
 from build123d.geometry import (
@@ -103,9 +120,11 @@ from .uv_write import (
     PointMap,
     UVFrame,
     _as_face,
+    _components,
     _cone_inverse_map,
     _cone_map,
     _cone_sector,
+    _geodesic_end,
     _surface_periods,
 )
 
@@ -135,6 +154,17 @@ _NEIGHBOUR = 0.05
 """The least of a neighbouring turn, in radians about the apex, laid out
 beside a face that goes round a cone"""
 
+_SMOOTH = 0.02
+"""The angle, in radians, under which two edges meet smoothly enough to need
+no disc about the vertex between them"""
+
+_FAN = 0.5
+"""The most, in radians, an edge may turn between two of its sample points
+where the offsets from them cross"""
+
+_MOST_SAMPLES = 512
+"""The most intervals an edge or the rim of a disc is sampled at"""
+
 
 def offset_face_2d(
     face: Face, amount: float, kind: Kind = Kind.ARC, tolerance: float = 1e-4
@@ -142,48 +172,70 @@ def offset_face_2d(
     """A face grown or shrunk within its own surface
 
     Args:
-        face (Face): a planar, cylindrical or conical face
+        face (Face): a face on any surface
         amount (float): how far the boundary moves along the surface;
             positive grows the face, negative shrinks it
-        kind (Kind, optional): the corners of the offset boundary. Defaults
-            to Kind.ARC.
+        kind (Kind, optional): the corners of the offset boundary; only
+            Kind.ARC on a surface that does not unroll. Defaults to Kind.ARC.
         tolerance (float, optional): largest 3D error allowed where a curve
             has to be interpolated. Defaults to 1e-4.
 
     Raises:
-        ValueError: the face is on a surface that is not handled
         ValueError: nothing is left of the face
-        ValueError: the face reaches the apex of its cone, or its offset
-            would; or it goes round a cone too nearly flat, or too near the
-            apex, for its offset to be laid out
+        ValueError: the corners asked for are not arcs, on a surface that
+            does not unroll
+        ValueError: the face reaches the apex of its cone or a pole of its
+            surface, or its offset would
+        ValueError: the face goes round a cone too nearly flat, or too near
+            the apex, for its offset to be laid out with those corners
         RuntimeError: the planar offset failed
 
     Returns:
         ShapeList[Face]: the faces of the result, more than one where
         shrinking parts the face
     """
-    if face.geom_type in (GeomType.PLANE, GeomType.CYLINDER):
-        route = _offset_affine
-    elif face.geom_type == GeomType.CONE:
-        route = _offset_cone
-    else:
-        raise ValueError(
-            "only a planar, cylindrical or conical face can be offset within "
-            "its surface"
-        )
     if amount == 0:
         return ShapeList([face])
-    pieces, frame = route(face, amount, kind, tolerance)
-    if not pieces:
+    if face.geom_type in (GeomType.PLANE, GeomType.CYLINDER):
+        faces = _offset_affine(face, amount, kind, tolerance)
+    elif face.geom_type == GeomType.CONE:
+        try:
+            faces = _offset_cone(face, amount, kind, tolerance)
+        except _NoRoom as no_room:
+            # round its apex there is not the room to lay the cone out flat,
+            # but it can still be followed as any surface is, short of the
+            # apex: a geodesic steps over that without noticing
+            if kind != Kind.ARC:
+                raise
+            if amount >= no_room.nearest - tolerance:
+                raise ValueError("the offset reaches the apex of the cone") from None
+            faces = _offset_geodesic(face, amount, kind, tolerance)
+    else:
+        faces = _offset_geodesic(face, amount, kind, tolerance)
+    if not faces:
         raise ValueError("nothing is left of the face")
-    return ShapeList(written for piece in pieces for written in frame.write_face(piece))
+    return ShapeList(faces)
+
+
+class _NoRoom(ValueError):
+    """A face that goes round a cone cannot be laid out flat with enough of
+    the turns beside it for its offset; ``nearest`` is how near the apex the
+    face comes"""
+
+    def __init__(self, message: str, nearest: float):
+        super().__init__(message)
+        self.nearest = nearest
+
+
+def _written(pieces: list[Face], frame: UVFrame) -> list[Face]:
+    """Flat faces written onto the surface through a frame"""
+    return [written for piece in pieces for written in frame.write_face(piece)]
 
 
 def _offset_affine(
     face: Face, amount: float, kind: Kind, tolerance: float
-) -> tuple[list[Face], UVFrame]:
-    """A planar or cylindrical face offset on its flat pattern: the flat
-    faces of the result and the frame that writes them back
+) -> list[Face]:
+    """A planar or cylindrical face offset on its flat pattern
 
     The pattern is the face's outline in its parameters, scaled to lengths.
     """
@@ -207,7 +259,7 @@ def _offset_affine(
         )
     else:
         pieces = _offset_flat(flat, amount, kind)
-    return pieces, UVFrame(carrier, to_uv, tolerance)
+    return _written(pieces, UVFrame(carrier, to_uv, tolerance))
 
 
 def _carrier(face: Face) -> tuple[Face, list[Period]]:
@@ -236,7 +288,7 @@ def _offset_round(flat: Face, amount: float, kind: Kind, turn: Period) -> list[F
     """A flat face offset as the unrolling of a face on a surface that closes
     on itself along ``turn``, a period given in flat lengths: one period's
     worth of the result"""
-    axis, start, length = turn
+    axis, _, length = turn
     reach = 1 + ceil(abs(amount) / length)
     turns = [Location(axis * (k * length)) for k in range(-reach, reach + 1)]
 
@@ -254,6 +306,13 @@ def _offset_round(flat: Face, amount: float, kind: Kind, turn: Period) -> list[F
         # grown into them
         regions = _joined([part.moved(turn) for part in parts for turn in turns])
 
+    return _one_period(regions, turn)
+
+
+def _one_period(regions: list[Face], turn: Period) -> list[Face]:
+    """One period's worth of flat regions that repeat every period along
+    ``turn``: a period of each strip, and one copy of anything else"""
+    axis, start, length = turn
     window = _window(regions, axis, start, length) if regions else None
     pieces: list[Face] = []
     for region in regions:
@@ -329,11 +388,8 @@ class _Sector(NamedTuple):
         return flat.rotate(Axis(self.apex, (0, 0, 1)), degrees(turns * self.turn))
 
 
-def _offset_cone(
-    face: Face, amount: float, kind: Kind, tolerance: float
-) -> tuple[list[Face], UVFrame]:
-    """A conical face offset on its flat pattern: the flat faces of the
-    result and the frame that writes them back
+def _offset_cone(face: Face, amount: float, kind: Kind, tolerance: float) -> list[Face]:
+    """A conical face offset on its flat pattern
 
     The pattern is the cone unrolled about its apex, with the middle of the
     face at the flat origin.
@@ -390,7 +446,7 @@ def _offset_cone(
             pieces = _into_one_turn(pieces, sector)
     if at_the_apex(pieces):
         raise ValueError("the offset reaches the apex of the cone")
-    return pieces, UVFrame(carrier, _cone_map(face, location), tolerance)
+    return _written(pieces, UVFrame(carrier, _cone_map(face, location), tolerance))
 
 
 def _offset_round_cone(
@@ -413,13 +469,14 @@ def _offset_round_cone(
     # it; half as much again is allowed for
     ratio = 1.5 * abs(amount) / nearest
     if ratio >= 1:
-        raise ValueError("the offset reaches too near the apex of the cone")
+        raise _NoRoom("the offset reaches too near the apex of the cone", nearest)
     spare = (2 * pi - _SHORT_OF_A_CIRCLE - sector.turn) / 2
     beside = max(asin(ratio), min(_NEIGHBOUR, spare))
     if beside > spare:
-        raise ValueError(
+        raise _NoRoom(
             "the cone is too nearly flat for a face that goes round it to be "
-            "offset by this much"
+            "offset by this much",
+            nearest,
         )
     radius = _reach(sector.apex, [flat])
     half = sector.turn / 2
@@ -595,6 +652,609 @@ def _circle(
         0,
     )
     return centre, (centre - first).length
+
+
+# ---------------------------------------------------------------------------
+# on a surface that does not unroll
+# ---------------------------------------------------------------------------
+
+
+class _Chart(NamedTuple):
+    """A surface's parameters stretched to its own lengths: the work plane
+
+    Planar booleans measure in the coordinates they are given, and a radian
+    of a sphere or a unit of a spline surface's parameter is many
+    millimetres. The parameters are therefore scaled by the lengths of the
+    surface's derivatives at the middle of the face, so that a length on the
+    work plane is near enough the length on the surface.
+    """
+
+    surface: Geom_Surface
+    stretch: Vector
+    """Work-plane lengths per unit of u and of v"""
+
+    def derivatives(self, u: float, v: float) -> tuple[Vector, ...]:
+        """S_u, S_v, S_uu, S_vv and S_uv at (u, v)"""
+        point = gp_Pnt()
+        vectors = [gp_Vec() for _ in range(5)]
+        self.surface.D2(u, v, point, *vectors)
+        return tuple(Vector(vector) for vector in vectors)
+
+    def work(self, u: float, v: float) -> Vector:
+        """The work-plane point of the parameters (u, v)"""
+        return Vector(u * self.stretch.X, v * self.stretch.Y, 0)
+
+    def walk(
+        self, u: float, v: float, heading: Vector, length: float, tolerance: float
+    ) -> Vector:
+        """Where the geodesic leaving (u, v) along the unit tangent
+        ``heading`` is after ``length``, on the work plane
+
+        Raises:
+            ValueError: the geodesic runs into a pole of the surface
+        """
+        s_u, s_v, *_ = self.derivatives(u, v)
+        try:
+            end = _geodesic_end(
+                self.derivatives,
+                (u, v),
+                _components(s_u, s_v, heading),
+                length,
+                tolerance / 10 / max(self.stretch.X, self.stretch.Y),
+            )
+        except ValueError as error:
+            raise ValueError("the offset reaches a pole of the surface") from error
+        return self.work(*end)
+
+
+class _Sample(NamedTuple):
+    """A point of a boundary edge and its offset, on the work plane"""
+
+    parameter: float
+    """The edge's own parameter here"""
+    on_edge: Vector
+    offset: Vector
+    """Where the geodesic leaving the edge square to it is after the amount"""
+    tangent: Vector
+    """The unit direction of the edge"""
+
+
+def _offset_geodesic(
+    face: Face, amount: float, kind: Kind, tolerance: float
+) -> list[Face]:
+    """A face on any surface offset by following geodesics
+
+    The points of the surface within ``amount`` of the face's boundary are
+    found on the work plane - a band beside each edge, reached by walking
+    that far along the geodesics that leave the edge square to it, and a disc
+    about each corner - and joined to the face's outline there to grow it, or
+    cut from it to shrink it. The corners this makes are arcs.
+
+    A surface that closes on itself is handled as a cylinder is: what is
+    done near the seam is repeated a period away, and one period is kept.
+    A surface that ends, as a spline patch does at its edges, ends the
+    result there.
+
+    Raises:
+        ValueError: the corners asked for are not arcs
+        ValueError: the face reaches a pole of its surface, or its offset
+            would
+    """
+    if kind != Kind.ARC:
+        raise ValueError(
+            "only Kind.ARC corners can be made on a surface that does not unroll"
+        )
+    edges, at_pole = _boundary(face)
+    if not edges:
+        return [face]  # a whole sphere or torus has no boundary to move
+    if at_pole:
+        raise ValueError(
+            "a face that reaches a pole of its surface cannot be offset within it"
+        )
+    carrier, periods = _carrier(face)
+    surface = BRep_Tool.Surface_s(carrier.wrapped, TopLoc_Location())
+    developed = face.uv_face
+    middle = developed.bounding_box().center()
+    stretch = Vector(1, 1, 1)
+    chart = _Chart(surface, stretch)
+    s_u, s_v, *_ = chart.derivatives(middle.X, middle.Y)
+    chart = _Chart(surface, Vector(s_u.length, s_v.length, 1))
+    scales = (chart.stretch.X, chart.stretch.Y)
+    to_work = Matrix([[scales[0], 0, 0, 0], [0, scales[1], 0, 0], [0, 0, 1, 0]])
+    to_uv = Matrix([[1 / scales[0], 0, 0, 0], [0, 1 / scales[1], 0, 0], [0, 0, 1, 0]])
+    flat = _upward(UVFrame(carrier, to_work).lift(developed))
+
+    tools = _margin(chart, flat, face, edges, amount, tolerance)
+    turns: list[Period] = [
+        (axis, start * axis.dot(chart.stretch), period * axis.dot(chart.stretch))
+        for axis, start, period in periods
+    ]
+    box = flat.bounding_box()
+    round_it = [
+        (box.max - box.min).dot(axis) >= length - _AT_START for axis, _, length in turns
+    ]
+    # round a turn the face goes all the way round, the margin of its
+    # boundary beyond the seam is that of the turn before and after
+    for (axis, _, length), whole in zip(turns, round_it):
+        if whole:
+            reach = 1 + ceil(abs(amount) / length)
+            tools = [
+                tool.moved(Location(axis * (k * length)))
+                for tool in tools
+                for k in range(-reach, reach + 1)
+            ]
+    margin = _joined(tools)
+    if amount > 0:
+        regions = _joined([flat, *margin])
+    else:
+        regions = _faces(flat.cut(*margin))
+    for turn, whole in zip(turns, round_it):
+        if not whole:
+            axis, _, length = turn
+            reach = 1 + ceil(abs(amount) / length)
+            regions = _joined(
+                [
+                    region.moved(Location(axis * (k * length)))
+                    for region in regions
+                    for k in range(-reach, reach + 1)
+                ]
+            )
+        regions = _one_period(regions, turn)
+    if amount > 0:
+        regions = _within_the_surface(regions, chart, middle)
+    frame = UVFrame(carrier, to_uv, tolerance)
+    return _written([_mended(region, tolerance) for region in regions], frame)
+
+
+def _mended(flat: Face, tolerance: float) -> Face:
+    """A flat face left by booleans with its outlines made fit to write
+
+    Where a band meets the disc about a corner the two touch, and the
+    boolean that joins them leaves the ends of their edges a little apart,
+    within the tolerance of the vertex between them, and sometimes an edge
+    too short to see as well. Written edge by edge those ends no longer
+    meet and the outline does not close. Each outline is made again with
+    such edges left out and the ends of neighbours brought to one point.
+    """
+    outlines = [
+        _closed_up(wire, tolerance) for wire in (flat.outer_wire(), *flat.inner_wires())
+    ]
+    return _upward(
+        _as_face(
+            _make_topods_face_from_wires(
+                outlines[0].wrapped, [wire.wrapped for wire in outlines[1:]]
+            )
+        )
+    )
+
+
+def _closed_up(wire: Wire, tolerance: float) -> Wire:
+    """A closed flat wire made again so that each edge ends exactly where
+    the next begins, without its edges shorter than the tolerance
+
+    Lines are made again between the new ends; any other edge becomes a
+    B-spline whose end poles are moved to them, which moves the curve less
+    than its ends were apart.
+    """
+    edges = [edge for edge in wire.order_edges() if edge.length > tolerance]
+    if len(edges) < 2:
+        return wire
+    # each edge's curve as a B-spline running the way the wire does
+    splines = []
+    for edge in edges:
+        first, last = BRep_Tool.Range_s(edge.wrapped)
+        curve = BRep_Tool.Curve_s(edge.wrapped, first, last)
+        spline = GeomConvert.CurveToBSplineCurve_s(
+            Geom_TrimmedCurve(curve, first, last)
+        )
+        if edge.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED:
+            spline.Reverse()
+        splines.append(spline)
+    joints = [
+        (Vector(here.EndPoint()) + Vector(there.StartPoint())) / 2
+        for here, there in zip(splines, splines[1:] + splines[:1])
+    ]
+    closed_up = []
+    for index, (edge, spline) in enumerate(zip(edges, splines)):
+        start, end = joints[index - 1], joints[index]
+        if edge.geom_type == GeomType.LINE:
+            closed_up.append(Edge.make_line(start, end))
+        else:
+            spline.SetPole(1, start.to_pnt())
+            spline.SetPole(spline.NbPoles(), end.to_pnt())
+            closed_up.append(Edge(BRepBuilderAPI_MakeEdge(spline).Edge()))
+    return Wire(closed_up)
+
+
+def _boundary(face: Face) -> tuple[list[TopoDS_Edge], bool]:
+    """The edges that bound a face's material, and whether the face reaches
+    a pole of its surface
+
+    A seam edge is where the face meets itself and a degenerate edge is a
+    pole, a point; neither is boundary.
+    """
+    edges = []
+    at_pole = False
+    explorer = TopExp_Explorer(face.wrapped, TopAbs_ShapeEnum.TopAbs_EDGE)
+    while explorer.More():
+        edge = TopoDS.Edge(explorer.Current())
+        explorer.Next()
+        if BRep_Tool.Degenerated_s(edge):
+            at_pole = True
+        elif not BRep_Tool.IsClosed_s(edge, face.wrapped):
+            edges.append(edge)
+    return edges, at_pole
+
+
+def _within_the_surface(
+    regions: list[Face], chart: _Chart, middle: Vector
+) -> list[Face]:
+    """Flat regions kept to the part of the work plane the surface covers
+
+    A surface that ends in a direction it does not close in ends the regions
+    there, unless it ends in a pole, which no region may reach.
+
+    Raises:
+        ValueError: a region reaches a pole
+    """
+    bounds = chart.surface.Bounds()
+    periodic = (chart.surface.IsUPeriodic(), chart.surface.IsVPeriodic())
+    for index, axis in enumerate((Vector(1, 0, 0), Vector(0, 1, 0))):
+        if periodic[index] or not regions:
+            continue
+        across = Vector(axis.Y, axis.X, 0)
+        scale = axis.dot(chart.stretch)
+        for limit, inwards in ((bounds[2 * index], 1.0), (bounds[2 * index + 1], -1.0)):
+            if abs(limit) > 1e99:
+                continue  # the surface carries on for ever
+            boxes = [region.bounding_box() for region in regions]
+            reached = any(
+                (box.min.dot(axis) - limit * scale) * inwards <= _AT_START
+                or (box.max.dot(axis) - limit * scale) * inwards <= _AT_START
+                for box in boxes
+            )
+            if not reached:
+                continue
+            # a pole is where the surface has no length across this direction
+            at = (limit, middle.Y) if index == 0 else (middle.X, limit)
+            lengths = chart.derivatives(*at)[:2]
+            if lengths[1 - index].length <= 1e-9 * across.dot(chart.stretch):
+                raise ValueError("the offset reaches a pole of the surface")
+            low = min(box.min.dot(across) for box in boxes) - 1.0
+            high = max(box.max.dot(across) for box in boxes) + 1.0
+            far = max((box.max - box.min).dot(axis) for box in boxes) + 1.0
+            near = axis * (limit * scale)
+            corners = [
+                near + across * low,
+                near + across * high,
+                near + axis * (inwards * 3 * far) + across * high,
+                near + axis * (inwards * 3 * far) + across * low,
+            ]
+            covered = _region(Wire.make_polygon(corners, close=True))
+            regions = [
+                piece
+                for region in regions
+                for piece in _faces(region.intersect(covered))
+            ]
+    return regions
+
+
+def _margin(
+    chart: _Chart,
+    flat: Face,
+    face: Face,
+    edges: list[TopoDS_Edge],
+    amount: float,
+    tolerance: float,
+) -> list[Face]:
+    """The work-plane faces that cover the surface within ``amount`` of a
+    face's boundary, on the side the offset moves it to: bands along the
+    edges and discs about the corners between them"""
+    distance = abs(amount)
+    tools: list[Face] = []
+    # each end of each edge: where it is, the way the edge leaves it, and
+    # its parameters
+    ends: list[tuple[Vector, Vector, tuple[float, float]]] = []
+    for edge in edges:
+        curve = BRepAdaptor_Curve2d(edge, face.wrapped)
+        first, last = curve.FirstParameter(), curve.LastParameter()
+        side = _outwards(chart, flat, curve, distance) * (1.0 if amount > 0 else -1.0)
+        tools += _beside_edge(chart, curve, side, distance, tolerance)
+        for parameter, leaving in ((first, 1.0), (last, -1.0)):
+            point, tangent = gp_Pnt2d(), gp_Vec2d()
+            curve.D1(parameter, point, tangent)
+            s_u, s_v, *_ = chart.derivatives(point.X(), point.Y())
+            along = (s_u * tangent.X() + s_v * tangent.Y()).normalized() * leaving
+            place = Vector(chart.surface.Value(point.X(), point.Y()))
+            ends.append((place, along, (point.X(), point.Y())))
+    while ends:
+        place, along, parameters = ends.pop()
+        here = [end for end in ends if (end[0] - place).length <= _AT_START]
+        ends = [end for end in ends if (end[0] - place).length > _AT_START]
+        # two edges that carry straight on through a vertex leave no gap
+        # between their bands for a disc to fill
+        if len(here) != 1 or along.dot(here[0][1]) > -cos(_SMOOTH):
+            tools.append(_disc(chart, parameters, distance, tolerance))
+    return tools
+
+
+def _outwards(
+    chart: _Chart, flat: Face, curve: BRepAdaptor_Curve2d, distance: float
+) -> float:
+    """Which way round the face lies from one of its edges: 1.0 when the
+    edge's direction crossed with the surface's normal points out of the
+    face, -1.0 when it points into it"""
+    parameter = (curve.FirstParameter() + curve.LastParameter()) / 2
+    point, tangent = gp_Pnt2d(), gp_Vec2d()
+    curve.D1(parameter, point, tangent)
+    s_u, s_v, *_ = chart.derivatives(point.X(), point.Y())
+    along = (s_u * tangent.X() + s_v * tangent.Y()).normalized()
+    across = along.cross(s_u.cross(s_v).normalized())
+    step = _components(s_u, s_v, across)
+    way = Vector(step[0] * chart.stretch.X, step[1] * chart.stretch.Y, 0).normalized()
+    on_edge = chart.work(point.X(), point.Y())
+    reach = distance / 10
+    for _ in range(8):
+        beyond = flat.is_inside(on_edge + way * reach)
+        behind = flat.is_inside(on_edge - way * reach)
+        if beyond != behind:
+            return -1.0 if beyond else 1.0
+        reach /= 4  # the face is thinner here than the step
+    raise RuntimeError("could not tell which side of an edge its face is on")
+
+
+def _beside_edge(
+    chart: _Chart,
+    curve: BRepAdaptor_Curve2d,
+    side: float,
+    distance: float,
+    tolerance: float,
+) -> list[Face]:
+    """The work-plane faces that cover the surface within ``distance`` of
+    one edge on one side of it
+
+    The edge is sampled, more finely until the result settles, and from each
+    sample the geodesic that leaves the edge square to it is followed for the
+    distance. Where the offsets of neighbouring samples run on beside each
+    other they are joined by a spline, the offset of the edge, and the band
+    between it and the edge is one face. Where they cross, the edge curves
+    towards that side more tightly than the distance: its offset there has
+    turned back on itself and is no part of the result, and the ground
+    between the two samples is covered by a triangle to each offset instead.
+
+    Every face reaches a little way past the edge on its other side as well,
+    so that none has a side lying along the edge itself.
+
+    Raises:
+        ValueError: the offset cannot be followed to within the tolerance
+    """
+    first, last = curve.FirstParameter(), curve.LastParameter()
+    known: dict[float, _Sample] = {}
+
+    def sample(parameter: float) -> _Sample:
+        if parameter not in known:
+            point, tangent = gp_Pnt2d(), gp_Vec2d()
+            curve.D1(parameter, point, tangent)
+            u, v = point.X(), point.Y()
+            s_u, s_v, *_ = chart.derivatives(u, v)
+            along = (s_u * tangent.X() + s_v * tangent.Y()).normalized()
+            heading = along.cross(s_u.cross(s_v).normalized()) * side
+            known[parameter] = _Sample(
+                parameter,
+                chart.work(u, v),
+                chart.walk(u, v, heading, distance, tolerance),
+                Vector(
+                    tangent.X() * chart.stretch.X, tangent.Y() * chart.stretch.Y, 0
+                ).normalized(),
+            )
+        return known[parameter]
+
+    def sampled(count: int) -> list[_Sample]:
+        return [sample(first + (last - first) * i / count) for i in range(count + 1)]
+
+    count = 8
+    samples = sampled(count)
+    while True:
+        finer = sampled(2 * count)
+        if _settled(samples, finer, tolerance):
+            break
+        if 2 * count >= _MOST_SAMPLES:
+            raise ValueError(
+                "the offset of an edge could not be followed to within the "
+                f"tolerance of {tolerance}; it turns too sharply, as it does "
+                "round a pole of the surface"
+            )
+        count *= 2
+        samples = finer
+    samples = finer
+
+    # the other side of the edge, a fraction of the way, short enough that
+    # these do not cross
+    fraction = 0.25
+    while fraction > 1e-3 and any(
+        _crossing(
+            here.on_edge,
+            here.on_edge - (here.offset - here.on_edge) * fraction,
+            there.on_edge,
+            there.on_edge - (there.offset - there.on_edge) * fraction,
+        )
+        for here, there in zip(samples, samples[1:])
+    ):
+        fraction /= 2
+    behind = [s.on_edge - (s.offset - s.on_edge) * fraction for s in samples]
+
+    faces: list[Face] = []
+    closed = (samples[0].on_edge - samples[-1].on_edge).length <= _AT_START
+    runs = _runs(samples)
+    if closed and len(runs) == 1 and runs[0][0]:
+        # a ring: all the way round a loop that its offset never crosses
+        loops = [
+            _region(Wire([_through([s.offset for s in samples[:-1]])])),
+            _polygon(behind[:-1]),
+        ]
+        loops.sort(key=lambda loop: loop.area)
+        return _faces(loops[1].cut(loops[0]))
+    for regular, start, end in runs:
+        if regular:
+            outline = [_offset_curve(samples[start : end + 1])]
+            outline.append(Edge.make_line(samples[end].offset, behind[end]))
+            outline += [
+                Edge.make_line(behind[i + 1], behind[i])
+                for i in range(end - 1, start - 1, -1)
+            ]
+            outline.append(Edge.make_line(behind[start], samples[start].offset))
+            faces.append(_region(Wire(outline)))
+        else:
+            # a fan to each offset from the far side of the edge, as much of
+            # the edge at a time as turns no more than a fan may
+            here = start
+            while here < end:
+                there = here + 1
+                while there < end and samples[here].tangent.dot(
+                    samples[there + 1].tangent
+                ) >= cos(_FAN):
+                    there += 1
+                for apex in (samples[here].offset, samples[there].offset):
+                    faces += _polygons([apex, *behind[here : there + 1]])
+                here = there
+    if not closed:
+        # past each end, inside the disc about the vertex there or the band
+        # of the edge that carries on from it
+        for index, way in ((0, -1.0), (-1, 1.0)):
+            tip = samples[index].on_edge + samples[index].tangent * (way * distance / 2)
+            faces += _polygons([samples[index].offset, tip, behind[index]])
+    return faces
+
+
+def _settled(coarse: list[_Sample], fine: list[_Sample], tolerance: float) -> bool:
+    """Whether an edge sampled twice as finely says the same as it did: the
+    new offsets lie on the splines through the old ones, and where offsets
+    cross the edge turns little between samples"""
+    for regular, start, end in _runs(coarse):
+        if regular:
+            curve = _offset_curve(coarse[start : end + 1])
+            if any(
+                curve.distance_to(fine[2 * i + 1].offset) > tolerance
+                for i in range(start, end)
+            ):
+                return False
+        elif any(
+            coarse[i].tangent.dot(coarse[i + 1].tangent) < cos(_FAN)
+            for i in range(start, end)
+        ):
+            return False
+    return True
+
+
+def _runs(samples: list[_Sample]) -> list[tuple[bool, int, int]]:
+    """The samples of an edge in runs: (regular, first, last), where regular
+    says that the offsets of each pair of neighbours in the run lie beside
+    each other, and not that they cross"""
+    runs: list[tuple[bool, int, int]] = []
+    for i, (here, there) in enumerate(zip(samples, samples[1:])):
+        # beside each other: the offset runs on the way the edge does, and
+        # the ways to the two offsets do not cross
+        regular = (there.offset - here.offset).dot(
+            here.tangent + there.tangent
+        ) > 1e-9 and not _crossing(
+            here.on_edge, here.offset, there.on_edge, there.offset
+        )
+        if runs and runs[-1][0] == regular:
+            runs[-1] = (regular, runs[-1][1], i + 1)
+        else:
+            runs.append((regular, i, i + 1))
+    return runs
+
+
+def _crossing(first: Vector, second: Vector, third: Vector, fourth: Vector) -> bool:
+    """Whether the flat segment from the first point to the second crosses
+    the one from the third to the fourth"""
+
+    def side(start: Vector, end: Vector, point: Vector) -> float:
+        return (end - start).cross(point - start).Z
+
+    return (
+        side(first, second, third) * side(first, second, fourth) < 0
+        and side(third, fourth, first) * side(third, fourth, second) < 0
+    )
+
+
+def _offset_curve(samples: list[_Sample]) -> Edge:
+    """The flat curve through the offsets of a run of samples: a line
+    through two, otherwise a spline with the edge's own parameter
+
+    The offset of an edge slows to a stop where it is about to turn back on
+    itself, and as a function of the edge's parameter it is smooth there,
+    which as a function of its own length it is not.
+    """
+    if len(samples) == 2:
+        return Edge.make_line(samples[0].offset, samples[1].offset)
+    return Edge.make_spline(
+        list[VectorLike](s.offset for s in samples),
+        parameters=[s.parameter for s in samples],
+    )
+
+
+def _through(points: list[Vector]) -> Edge:
+    """A closed flat spline through points"""
+    return Edge.make_spline(list[VectorLike](points), periodic=True)
+
+
+def _polygon(points: list[Vector]) -> Face:
+    """The flat face inside a polygon"""
+    return _region(Wire.make_polygon(list[VectorLike](points), close=True))
+
+
+def _polygons(points: list[Vector]) -> list[Face]:
+    """The flat face inside a polygon, none when it has no area"""
+    twice_area = sum(
+        here.cross(there).Z for here, there in zip(points, points[1:] + points[:1])
+    )
+    return [_polygon(points)] if abs(twice_area) > 2 * _NO_AREA else []
+
+
+def _disc(
+    chart: _Chart, parameters: tuple[float, float], distance: float, tolerance: float
+) -> Face:
+    """The work-plane face of the geodesic disc of radius ``distance`` about
+    a point of the surface
+
+    Its rim is where the geodesics leaving the point every way are after the
+    distance, sampled more finely until it settles.
+
+    Raises:
+        ValueError: the rim cannot be followed to within the tolerance
+    """
+    s_u, s_v, *_ = chart.derivatives(*parameters)
+    x_dir = s_u.normalized()
+    y_dir = s_u.cross(s_v).normalized().cross(x_dir)
+    known: dict[float, Vector] = {}
+
+    def rim(count: int) -> list[Vector]:
+        points = []
+        for i in range(count):
+            turn = i / count
+            if turn not in known:
+                heading = x_dir * cos(2 * pi * turn) + y_dir * sin(2 * pi * turn)
+                known[turn] = chart.walk(*parameters, heading, distance, tolerance)
+            points.append(known[turn])
+        return points
+
+    count = 16
+    points = rim(count)
+    while True:
+        finer = rim(2 * count)
+        curve = _through(points)
+        if all(curve.distance_to(point) <= tolerance for point in finer[1::2]):
+            break
+        if 2 * count >= _MOST_SAMPLES:
+            raise ValueError(
+                "the rim of a disc about a corner could not be followed to "
+                f"within the tolerance of {tolerance}"
+            )
+        count *= 2
+        points = finer
+    return _region(Wire([_through(finer)]))
 
 
 # ---------------------------------------------------------------------------

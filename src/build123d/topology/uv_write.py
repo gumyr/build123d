@@ -1578,15 +1578,10 @@ def _geodesic_map(face: Face, location: Location, tolerance: float) -> PointMap:
     # the tolerance is in 3D; the integrator's in parameters
     parameter_tolerance = tolerance / 10 / max(s_u0.length, s_v0.length)
 
-    def geodesic(_: float, state) -> list[float]:
-        """The geodesic equation as a first order system in (u, v, u', v')"""
-        u, v, d_u, d_v = state
-        s_u, s_v, s_uu, s_vv, s_uv = (
+    def derivatives(u: float, v: float) -> tuple[Vector, ...]:
+        return tuple(
             face.derivative_at(u, v, *order, normalize=False) for order in _ORDERS
         )
-        w = s_uu * (d_u * d_u) + s_uv * (2 * d_u * d_v) + s_vv * (d_v * d_v)
-        acceleration = _components(s_u, s_v, w)
-        return [d_u, d_v, -acceleration[0], -acceleration[1]]
 
     @cache
     def to_uv(x: float, y: float) -> tuple[float, float]:
@@ -1594,20 +1589,55 @@ def _geodesic_map(face: Face, location: Location, tolerance: float) -> PointMap:
         if length < 1e-15:
             return u0, v0
         heading = (x_dir * x + y_dir * y) / length
-        solution = solve_ivp(
-            geodesic,
-            (0.0, length),
-            [u0, v0, *_components(s_u0, s_v0, heading)],
-            method="RK45",
-            rtol=1e-9,
-            atol=parameter_tolerance,
-            max_step=length / 8,
+        return _geodesic_end(
+            derivatives,
+            (u0, v0),
+            _components(s_u0, s_v0, heading),
+            length,
+            parameter_tolerance,
         )
-        if not solution.success:
-            raise ValueError("a geodesic from the frame's origin runs into a pole")
-        return solution.y[0, -1], solution.y[1, -1]
 
     return to_uv
+
+
+def _geodesic_end(
+    derivatives: Callable[[float, float], tuple[Vector, ...]],
+    start: tuple[float, float],
+    velocity: tuple[float, float],
+    length: float,
+    tolerance: float,
+) -> tuple[float, float]:
+    """The parameters a geodesic reaches after ``length`` along a surface
+
+    It leaves the parameters ``start`` with the parameter ``velocity`` of a
+    unit tangent, on the surface whose ``derivatives`` at (u, v) are S_u,
+    S_v, S_uu, S_vv and S_uv; :func:`_geodesic_map` has the equation.
+    ``tolerance`` is the integrator's, in parameters.
+
+    Raises:
+        ValueError: the geodesic runs into a pole
+    """
+
+    def geodesic(_: float, state) -> list[float]:
+        """The geodesic equation as a first order system in (u, v, u', v')"""
+        u, v, d_u, d_v = state
+        s_u, s_v, s_uu, s_vv, s_uv = derivatives(u, v)
+        w = s_uu * (d_u * d_u) + s_uv * (2 * d_u * d_v) + s_vv * (d_v * d_v)
+        acceleration = _components(s_u, s_v, w)
+        return [d_u, d_v, -acceleration[0], -acceleration[1]]
+
+    solution = solve_ivp(
+        geodesic,
+        (0.0, length),
+        [*start, *velocity],
+        method="RK45",
+        rtol=1e-9,
+        atol=tolerance,
+        max_step=length / 8,
+    )
+    if not solution.success:
+        raise ValueError("a geodesic from the frame's origin runs into a pole")
+    return solution.y[0, -1], solution.y[1, -1]
 
 
 def _components(s_u: Vector, s_v: Vector, vector: Vector) -> tuple[float, float]:
