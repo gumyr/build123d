@@ -2186,8 +2186,8 @@ class Face(Mixin2D[TopoDS_Face]):
         chamfered_face = self.__class__(chamfered_wires[0], chamfered_wires[1:])
         if self.normal_at() != chamfered_face.normal_at():
             chamfered_face = (
-                -chamfered_face
-            )  # pylint: disable=invalid-unary-operand-type
+                -chamfered_face  # pylint: disable=invalid-unary-operand-type
+            )
         chamfered_face._made_by(
             record.add_modified(self.wrapped, chamfered_face.wrapped)
         )
@@ -2756,8 +2756,8 @@ class Face(Mixin2D[TopoDS_Face]):
                 available
             ValueError: the face or its offset reaches the apex of a cone or
                 a pole of its surface
-            RuntimeError: the planar offset failed, or on a surface that
-                does not unroll the offset could not be built
+            RuntimeError: the planar offset failed with corners that are
+                not arcs, or the offset could not be built along geodesics
 
         Returns:
             ShapeList[Face]: the faces of the result

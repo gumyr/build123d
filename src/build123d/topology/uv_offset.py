@@ -199,8 +199,8 @@ def offset_face_2d(
             surface, or its offset would
         ValueError: the face goes round a cone too nearly flat, or too near
             the apex, for its offset to be laid out with those corners
-        RuntimeError: the planar offset failed, or on a surface that does
-            not unroll the offset could not be built
+        RuntimeError: the planar offset failed with corners that are not
+            arcs, or the offset could not be built along geodesics
 
     Returns:
         ShapeList[Face]: the faces of the result, more than one where
@@ -224,31 +224,54 @@ def offset_face_2d(
 
 def _by_surface(face: Face, amount: float, kind: Kind, tolerance: float) -> list[Face]:
     """A face offset the way its surface allows: laid out flat where it
-    unrolls, along geodesics where it does not"""
-    if face.geom_type in (GeomType.PLANE, GeomType.CYLINDER):
-        return _offset_affine(face, amount, kind, tolerance)
-    if face.geom_type == GeomType.CONE:
-        try:
-            return _offset_cone(face, amount, kind, tolerance)
-        except _NoRoom as no_room:
-            # round its apex there is not the room to lay the cone out flat,
-            # but it can still be followed as any surface is, short of the
-            # apex: a geodesic steps over that without noticing
-            if kind != Kind.ARC:
-                raise
-            if amount >= no_room.nearest - tolerance:
-                raise ValueError("the offset reaches the apex of the cone") from None
+    unrolls, along geodesics where it does not
+
+    A face that unrolls is followed along geodesics too where laying it out
+    flat does not work and the corners asked for are arcs, the only ones
+    geodesics make. Round the apex of a cone there may not be the room to
+    lay it out. And the kernel's planar offset, which the flat pattern is
+    given to, fails on some outlines, differently from one platform to
+    another: it raises, or it hands back nothing where something must be
+    left.
+    """
+    surface = face.geom_type
+    if surface not in (GeomType.PLANE, GeomType.CYLINDER, GeomType.CONE):
+        return _offset_geodesic(face, amount, kind, tolerance)
+    try:
+        if surface == GeomType.CONE:
+            faces = _offset_cone(face, amount, kind, tolerance)
+        else:
+            faces = _offset_affine(face, amount, kind, tolerance)
+    except (_NoRoom, RuntimeError):
+        if kind != Kind.ARC:
+            raise
+    else:
+        if faces or kind != Kind.ARC or not _something_is_left(face, amount):
+            return faces
+    if surface == GeomType.CONE:
+        # a geodesic steps over the apex without noticing
+        apex = Vector(BRepAdaptor_Surface(face.wrapped).Cone().Apex())
+        if amount >= face.distance_to(apex) - tolerance:
+            raise ValueError("the offset reaches the apex of the cone")
     return _offset_geodesic(face, amount, kind, tolerance)
+
+
+def _something_is_left(face: Face, amount: float) -> bool:
+    """Whether the offset of a face is sure to leave something
+
+    Growing always does. Shrinking does when it is by less than the face's
+    area over the length of its boundary: what a boundary encloses reaches
+    at least that far from it.
+    """
+    if amount > 0:
+        return True
+    boundary = sum(Edge(edge).length for edge in _boundary(face)[0])
+    return face.area > -amount * boundary
 
 
 class _NoRoom(ValueError):
     """A face that goes round a cone cannot be laid out flat with enough of
-    the turns beside it for its offset; ``nearest`` is how near the apex the
-    face comes"""
-
-    def __init__(self, message: str, nearest: float):
-        super().__init__(message)
-        self.nearest = nearest
+    the turns beside it for its offset"""
 
 
 def _written(pieces: list[Face], frame: UVFrame) -> list[Face]:
@@ -494,14 +517,13 @@ def _offset_round_cone(
     # it; half as much again is allowed for
     ratio = 1.5 * abs(amount) / nearest
     if ratio >= 1:
-        raise _NoRoom("the offset reaches too near the apex of the cone", nearest)
+        raise _NoRoom("the offset reaches too near the apex of the cone")
     spare = (2 * pi - _SHORT_OF_A_CIRCLE - sector.turn) / 2
     beside = max(asin(ratio), min(_NEIGHBOUR, spare))
     if beside > spare:
         raise _NoRoom(
             "the cone is too nearly flat for a face that goes round it to be "
-            "offset by this much",
-            nearest,
+            "offset by this much"
         )
     radius = _reach(sector.apex, [flat])
     half = sector.turn / 2

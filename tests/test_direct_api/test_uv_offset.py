@@ -28,6 +28,7 @@ license:
 
 import math
 import unittest
+from unittest import mock
 
 from build123d.build_enums import Align, GeomType, Kind
 from build123d.geometry import Axis, Plane, Pos, Rot
@@ -41,7 +42,7 @@ from build123d.objects_sketch import (
     Text,
 )
 from build123d.operations_generic import fillet, offset
-from build123d.topology import Edge, Face, Solid, UVFrame, Vertex, Wire
+from build123d.topology import Edge, Face, Solid, UVFrame, Vertex, Wire, uv_offset
 from build123d.topology.uv_offset import _boundary, _prove
 
 from OCP.BRep import BRep_Tool
@@ -782,13 +783,62 @@ class TestFacesOfSolids(unittest.TestCase):
         self.assertTrue(all(face.is_valid for face in grown))
         self.assertGreater(sum(face.area for face in grown), quarter.area)
 
+    def test_a_failed_kernel_offset_is_followed_along_geodesics(self):
+        """The kernel's planar offset fails on some outlines, and on which
+        depends on the platform: it raises, or it hands back nothing. With
+        arcs for corners the face is then offset as one on any surface is,
+        along geodesics, on a plane, a cylinder and a cone alike"""
+        drilled = Cylinder(6, 20) - Rot(Y=90) * Cylinder(2, 20)
+        wall = sorted(
+            drilled.faces().filter_by(GeomType.CYLINDER), key=lambda face: face.area
+        )[0]
+        plate = (Rectangle(8, 5) - Circle(1)).face()
+        cone = Cone(7, 4, 12).faces().filter_by(GeomType.CONE)[0]
+        on_the_cone = cone.wrap(plate, cone.location_at(0.3, 0.5))
+        # by 0.4 the flat plate keeps 7.2 by 4.2 less a hole of radius 1.4
+        left_of_plate = 7.2 * 4.2 - math.pi * 1.4**2
+        for failure in (None, []):  # it raises; it hands back nothing
+            with (
+                self.subTest(failure=failure),
+                mock.patch.object(uv_offset, "_kernel_try", return_value=failure),
+            ):
+                (inset,) = wall.offset_2d(-1)
+                self.assertTrue(inset.is_valid)
+                self.assertEqual(seam_edges(inset), 1)
+                self.assertLess(inset.area, wall.area - 2 * 4 * math.pi * 0.9)
+                for face in (plate, on_the_cone):
+                    (inset,) = face.offset_2d(-0.4)
+                    self.assertTrue(inset.is_valid)
+                    self.assertAlmostEqual(inset.area, left_of_plate, 3)
+                # square corners are not made along geodesics: an error,
+                # and which one depends on how the kernel failed
+                with self.assertRaisesRegex(
+                    (RuntimeError, ValueError), "2D offset failed|nothing is left"
+                ):
+                    plate.offset_2d(0.4, Kind.INTERSECTION)
+                # and a face that has gone is not looked for
+                with self.assertRaisesRegex(ValueError, "nothing is left"):
+                    plate.offset_2d(-3)
+                # nor is the apex of a cone stepped over
+                pointed = Cone(4, 0.5, 6).faces().filter_by(GeomType.CONE)[0]
+                with self.assertRaisesRegex(ValueError, "apex"):
+                    pointed.offset_2d(2.0)
+
     def test_a_kernel_offset_that_comes_back_in_pieces(self):
         """Mitred corners on the splines a wrapped letter unrolls into are
-        more than the kernel's offset manages: an error, not a broken face"""
+        more than the kernel's offset manages: an error, not a broken face
+
+        Which error depends on the platform. Where the kernel hands back a
+        wire in pieces the offset has failed; where it hands back nothing,
+        nothing is left, which is true of a letter shrunk by more than the
+        width of its strokes.
+        """
         letter = max(Text("B", 4).faces(), key=lambda face: face.area)
         cone = Cone(7, 4, 12).faces().filter_by(GeomType.CONE)[0]
         on_the_cone = cone.wrap(letter, cone.location_at(0.3, 0.5))
-        with self.assertRaisesRegex(RuntimeError, "2D offset failed"):
+        with self.assertRaisesRegex(
+            (RuntimeError, ValueError), "2D offset failed|nothing is left"
+        ):
             on_the_cone.offset_2d(-1, Kind.INTERSECTION)
 
 
