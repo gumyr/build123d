@@ -28,6 +28,7 @@ the reasoning behind how build123d works see the
     topology_selection.rst
     sheet_metal/index.rst
     projection/index.rst
+    offsetting_faces.rst
     assemblies.rst
     joints.rst
     packing.rst

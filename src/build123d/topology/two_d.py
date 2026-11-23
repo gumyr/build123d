@@ -752,6 +752,10 @@ class Mixin2D(ABC, Shape[TOPODS]):
         out, which OpenCascade reports as success and this method does not
         detect: offsetting a radius 5 cylinder by 6 yields a radius 1 cylinder.
 
+        To grow or shrink a face within its own surface, moving its boundary
+        and not the face, use
+        :meth:`Face.offset_2d <topology.Face.offset_2d>`.
+
         Args:
             amount (float): distance to offset, positive along the normal
 
