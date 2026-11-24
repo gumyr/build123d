@@ -1,8 +1,4 @@
-"""
-Section drawings for the Holes page: the three kinds of hole side by side in one
-plate, then each one alone, then a counter drill made from a countersink, dimensioned with the arguments that set it, then a
-blind hole with a drill point.
-"""
+"""Generate the dimensioned section drawings for the Holes reference page."""
 
 from math import radians, sin, tan
 
@@ -172,8 +168,6 @@ write_section(
 # [Counter drill]
 with BuildPart() as counter_drill:
     Box(60, 60, 42, align=(Align.CENTER, Align.CENTER, Align.MAX))
-    # The countersink's mouth sits at the counter drill's depth, and its
-    # counter_sink_radius cylinder runs on up to the surface
     with Locations((0, 0, -16)):
         CounterSinkHole(
             radius=5, counter_sink_radius=10, depth=16, counter_sink_angle=118

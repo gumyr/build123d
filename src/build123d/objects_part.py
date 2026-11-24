@@ -303,10 +303,12 @@ class CounterBoreHole(_BaseHole):
         radius (float): hole radius
         counter_bore_radius (float): counter bore radius
         counter_bore_depth (float): counter bore depth
-        depth (float, optional): hole depth, through part if None. Defaults to None
-        point_angle (float, optional): included angle of the drill point at the bottom
-            of a blind hole, whose depth is then measured to the end of the full
-            diameter; flat bottom if None. Defaults to None
+        depth (float, optional): distance from the location to the end of the
+            cylindrical bore. Defaults to None for an automatically sized through hole
+            in Builder mode.
+        point_angle (float, optional): included angle of the drill point in degrees,
+            strictly between 0 and 180. Requires an explicit depth. Defaults to None
+            for a flat-bottomed blind hole.
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT
     """
 
@@ -360,11 +362,14 @@ class CounterSinkHole(_BaseHole):
     Args:
         radius (float): hole radius
         counter_sink_radius (float): countersink radius
-        depth (float, optional): hole depth, through part if None. Defaults to None
-        counter_sink_angle (float, optional): cone angle. Defaults to 82
-        point_angle (float, optional): included angle of the drill point at the bottom
-            of a blind hole, whose depth is then measured to the end of the full
-            diameter; flat bottom if None. Defaults to None
+        depth (float, optional): distance from the location to the end of the
+            cylindrical bore. Defaults to None for an automatically sized through hole
+            in Builder mode.
+        counter_sink_angle (float, optional): included angle of the countersink in degrees.
+            Defaults to 82.
+        point_angle (float, optional): included angle of the drill point in degrees,
+            strictly between 0 and 180. Requires an explicit depth. Defaults to None
+            for a flat-bottomed blind hole.
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT
     """
 
@@ -466,10 +471,12 @@ class Hole(_BaseHole):
 
     Args:
         radius (float): hole radius
-        depth (float, optional): hole depth, through part if None. Defaults to None
-        point_angle (float, optional): included angle of the drill point at the bottom
-            of a blind hole, whose depth is then measured to the end of the full
-            diameter; flat bottom if None. Defaults to None
+        depth (float, optional): distance from the location to the end of the
+            cylindrical bore. Defaults to None for an automatically sized through hole
+            in Builder mode.
+        point_angle (float, optional): included angle of the drill point in degrees,
+            strictly between 0 and 180. Requires an explicit depth. Defaults to None
+            for a flat-bottomed blind hole.
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT
     """
 

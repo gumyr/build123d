@@ -2,33 +2,29 @@
 Holes
 #####
 
-build123d has three hole objects, one for each common way of drilling a hole for
-a fastener. Each one is a part object whose ``mode`` defaults to
-``Mode.SUBTRACT``: it removes a solid of revolution from the part at every active
-location.
+build123d provides three hole objects. Each uses ``Mode.SUBTRACT`` by default
+to cut a hole at every active location.
+
+* :class:`~objects_part.Hole` cuts a cylindrical bore.
+* :class:`~objects_part.CounterSinkHole` adds a conical recess for a flat-head screw.
+* :class:`~objects_part.CounterBoreHole` adds a flat-bottomed recess for a
+  socket-head screw.
 
 .. image:: assets/holes/hole_types.svg
     :align: center
-
-The section above is of this plate:
+    :alt: Cross section of a plate with a plain hole, a countersink, and a counterbore.
 
 .. literalinclude:: holes.py
     :language: build123d
     :start-after: [Hole types]
     :end-before: [Hole types]
 
-* :class:`~objects_part.Hole`: a plain cylindrical hole, as a twist drill leaves it.
-* :class:`~objects_part.CounterSinkHole`: a hole whose mouth is opened into a cone,
-  so a flat-head screw sits flush with the surface.
-* :class:`~objects_part.CounterBoreHole`: a hole under a wider, flat-bottomed bore,
-  so a socket-head screw sits below the surface.
-
 Placing holes
 -------------
 
-A hole is drilled along the negative Z axis of each location, starting at the
-location's origin. A face used as a location has its Z axis along the face's
-normal, so a hole placed on a face goes into the part:
+A hole runs from its location's origin along the local negative Z axis. When
+you use a planar face as the location, positive Z follows the face normal and
+the hole cuts into the part.
 
 .. code-block:: build123d
 
@@ -38,11 +34,9 @@ normal, so a hole placed on a face goes into the part:
             with GridLocations(60, 20, 2, 2):
                 CounterBoreHole(radius=3, counter_bore_radius=5.5, counter_bore_depth=3)
 
-``depth`` is measured from the location along the hole's axis. Without a
-``depth`` the hole goes through the part: its length is worked out from the size
-of the builder's part, so a through hole needs a builder. In Algebra mode, give
-the depth and subtract the hole from a part placed with its top face on the XY
-plane:
+In Builder mode, omit ``depth`` to size a through hole from the existing part.
+In Algebra mode, set ``depth`` explicitly and subtract the cutter. Here the top
+face is at Z = 0, so a depth of 10 cuts through the block.
 
 .. code-block:: build123d
 
@@ -52,8 +46,7 @@ plane:
 Dimensions
 ----------
 
-The sections below are of a single blind hole of each kind, dimensioned with the
-arguments that set it.
+The drawings show how each argument sets the dimensions of a blind hole.
 
 Hole
 ^^^^
@@ -61,6 +54,7 @@ Hole
 .. image:: assets/holes/hole_section.svg
     :align: center
     :width: 60%
+    :alt: Plain hole labeled with its diameter and depth.
 
 .. literalinclude:: holes.py
     :language: build123d
@@ -70,13 +64,15 @@ Hole
 CounterSinkHole
 ^^^^^^^^^^^^^^^
 
-``counter_sink_radius`` is the radius of the cone where it meets the surface, and
-``counter_sink_angle`` its included angle, 82° by default as for an inch flat-head
-screw; metric (ISO) heads take 90°. ``depth`` is measured from the surface, through the cone.
+``counter_sink_radius`` sets the opening radius. Set ``counter_sink_angle`` to
+the screw head's included angle. The default is 82°, common for inch flat-head
+screws. Many metric flat-head screws use 90°. ``depth`` starts at the surface
+and includes the recess.
 
 .. image:: assets/holes/counter_sink_hole_section.svg
     :align: center
     :width: 60%
+    :alt: Countersunk hole with both diameters, the included angle, and the depth from the surface.
 
 .. literalinclude:: holes.py
     :language: build123d
@@ -86,33 +82,51 @@ screw; metric (ISO) heads take 90°. ``depth`` is measured from the surface, thr
 CounterBoreHole
 ^^^^^^^^^^^^^^^
 
-Both ``counter_bore_depth`` and ``depth`` are measured from the surface.
+Measure ``counter_bore_depth`` from the surface to the flat shoulder. Measure
+``depth`` from the same surface to the bottom of the bore.
 
 .. image:: assets/holes/counter_bore_hole_section.svg
     :align: center
     :width: 60%
+    :alt: Counterbored hole with both diameters and both depths measured from the surface.
 
 .. literalinclude:: holes.py
     :language: build123d
     :start-after: [CounterBoreHole]
     :end-before: [CounterBoreHole]
 
-Counter drill
-^^^^^^^^^^^^^
+Counterdrill
+------------
 
-A counter drill is a counterbore made with a drill instead of a flat-bottomed
-cutter, so the step down to the hole is the cone left by the larger drill's
-point. It is a :class:`~objects_part.CounterSinkHole` placed at the counter
-drill's depth: the countersink's cone becomes the step, and the cylinder of
-``counter_sink_radius`` it carries above its mouth runs up to the surface. The
-location's depth is then the counter drill's depth, measured to the end of the
-larger drill's full diameter as a ``C'DRILL ⌀ ↧ × angle`` callout gives it, and
-``counter_sink_angle`` is that drill's point angle, 118° for a standard twist
-drill. ``depth`` is measured from the location.
+build123d has no dedicated counterdrill object. To model one, place a
+:class:`~objects_part.CounterSinkHole` below the surface where the wider bore
+ends. The countersink cone forms the shoulder between the two bore diameters.
+Set ``counter_sink_radius`` to the wider bore's radius and ``counter_sink_angle``
+to the larger drill's included point angle.
+
+On the left, the cutter starts at the surface and forms a countersink. On the
+right, the same cutter starts 10 units below the surface, so the counterdrill's
+shoulder begins at that depth.
+
+.. code-block:: build123d
+
+    with BuildPart() as block:
+        Box(100, 100, 40, align=(Align.CENTER, Align.CENTER, Align.MAX))
+        with Locations((-20, 0, 0)):
+            CounterSinkHole(radius=5, counter_sink_radius=8, counter_sink_angle=118)
+        with Locations((20, 0, -10)):
+            CounterSinkHole(radius=5, counter_sink_radius=8, counter_sink_angle=118)
+        # Expose both profiles in section.
+        split(bisect_by=Plane.XZ, keep=Keep.BOTTOM)
+
+For a blind counterdrill, measure ``depth`` from the cutter location to the end
+of the narrow bore's full diameter. The wider cylinder extends the same distance
+back toward the surface, so set ``depth`` at least as large as the offset.
 
 .. image:: assets/holes/counter_drill_hole_section.svg
     :align: center
     :width: 60%
+    :alt: Blind counterdrill with the offset measured to the shoulder and depth measured from there.
 
 .. literalinclude:: holes.py
     :language: build123d
@@ -122,27 +136,22 @@ drill. ``depth`` is measured from the location.
 Drill points
 ------------
 
-A blind hole made by a twist drill ends in a cone whose included angle is the
-drill's point angle, 118° for a standard drill. Giving ``point_angle`` to any of
-the three holes adds that cone below the hole; without it, the bottom stays flat.
-As on a drawing, ``depth`` is measured to the end of the full diameter, so the
-cone adds ``radius / tan(point_angle / 2)`` below it. A drill point needs a
-``depth``, because a through hole has no bottom.
+Set ``point_angle`` on any of the three hole objects to give a blind hole a
+conical bottom. Use an included angle in degrees, strictly between 0° and 180°.
+Omit ``point_angle`` for a flat bottom.
+
+Give an explicit ``depth`` from the location to where the cylindrical bore
+ends. The tip extends another ``radius / tan(point_angle / 2)`` beyond that
+depth. The example uses a common twist-drill angle of 118°.
 
 .. image:: assets/holes/hole_drill_point.svg
     :align: center
     :width: 60%
+    :alt: Blind hole with depth to the end of the cylindrical bore and a conical point beyond it.
 
 .. literalinclude:: holes.py
     :language: build123d
     :start-after: [Drill point]
     :end-before: [Drill point]
 
-The drawings on this page are made by ``docs/reference/holes.py``.
-
-Reference
----------
-
-* :class:`~objects_part.Hole`
-* :class:`~objects_part.CounterSinkHole`
-* :class:`~objects_part.CounterBoreHole`
+``docs/reference/holes.py`` generates the drawings on this page.

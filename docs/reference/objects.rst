@@ -519,9 +519,8 @@ Reference
 Holes
 ^^^^^
 
-:class:`~objects_part.Hole`, :class:`~objects_part.CounterSinkHole` and
-:class:`~objects_part.CounterBoreHole` have a page of their own, :doc:`holes`,
-with a dimensioned section of each, a counter drill and their drill points.
+See :doc:`holes` for dimensioned cross sections, drill points, and an example
+of modeling a counterdrill.
 
 
 Reference
