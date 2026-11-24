@@ -24,7 +24,7 @@ desc:
 
 # [Code]
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 # Define input parameters
 # - radii: ellipse radii (X, Y) controlling the bracelet centerline shape
@@ -35,6 +35,9 @@ from ocp_vscode import show
 # - Define input parameters
 # radii, width, thickness, opening_angle, label_str = (45, 30), 25, 5, 80, "build123d"
 radii, width, thickness, opening_angle, label_str = (45, 30), 25, 5, 80, ""
+
+# Steps 1 to 5 make the curves and surfaces of the tip one at a time, each
+# from the last, so they are written as plain objects and not in a builder.
 
 # Step 1: Create an elliptical arc defining the *centerline* of the bracelet.
 # The arc is truncated to leave an opening (the "gap" where the bracelet goes on).
@@ -101,39 +104,38 @@ tip_surface = Face.make_gordon_surface(
 tip_side = Face(tip_surface.wire())
 tip = Solid(Shell([tip_side, tip_surface]))
 
-# Step 6: Sweep the *flat end face* of the tip around the center arc.
-# This is the trick that makes the center section compatible with the freeform tip:
-# the sweep profile is the same face that bounds the tip, so the join is naturally aligned.
-center_section = sweep(tip_side, center_arc).solid()
+# Steps 6 to 9 are done in a builder, which collects each piece into one part.
+with BuildPart() as bracelet:
+    # Step 6: Sweep the *flat end face* of the tip around the center arc.
+    # This is the trick that makes the center section compatible with the freeform tip:
+    # the sweep profile is the same face that bounds the tip, so the join is naturally aligned.
+    sweep(tip_side, path=center_arc)
 
-# Step 7: Assemble the bracelet from the center and two mirrored tips.
-# Mirror across YZ to create the opposite end cap.
-bracelet = Solid() + [tip, center_section, tip.mirror(Plane.YZ)]
+    # Step 7: Add the tip, and its mirror image across YZ as the opposite end cap.
+    insert(tip)
+    mirror(tip, about=Plane.YZ)
 
-# Step 8: Add an embossed label.
-# This is often the hardest operation for OCCT in this model:
-# projecting text onto a doubly-curved surface can create many small faces/edges,
-# and thickening them adds even more boolean complexity.
-if label_str:
-    label = Text(label_str, font_size=width * 0.8, align=Align.CENTER)
+    # Step 8: Add an embossed label.
+    # This is often the hardest operation for OCCT in this model:
+    # projecting text onto a doubly-curved surface can create many small faces/edges,
+    # and thickening them adds even more boolean complexity.
+    if label_str:
+        with BuildSketch(mode=Mode.PRIVATE) as label:
+            Text(label_str, font_size=width * 0.8, align=Align.CENTER)
+        # Project the text onto the bracelet using a path-based placement along center_arc.
+        # The parameter offsets the label so it sits centered along arc-length.
+        label_width = label.sketch.bounding_box().size.X
+        p_labels = bracelet.part.project_faces(
+            label.sketch, center_arc, 0.5 - 0.5 * label_width / center_arc.length
+        )
+        # Turn the projected faces into solids via thickening (embossing).
+        insert([Solid.thicken(f, 0.5) for f in p_labels.faces()])
 
-    # Project the text onto the bracelet using a path-based placement along center_arc.
-    # The parameter offsets the label so it sits centered along arc-length.
-    p_labels = bracelet.project_faces(
-        label, center_arc, 0.5 - 0.5 * (label.bounding_box().size.X) / center_arc.length
-    )
-    # Turn the projected faces into solids via thickening (embossing).
-    embossed_label = [Solid.thicken(f, 0.5) for f in p_labels.faces()]
-    bracelet += embossed_label
-
-# Step 9: Add alignment holes to aid assembly after 3D printing in two halves.
-# These are placed at evenly spaced locations along the arc (including both ends).
-# A small clearance (+0.15) is included for typical FDM tolerances.
-alignment_holes = [
-    Pos(p) * Cylinder(1.75 / 2 + 0.15, 8)
-    for p in [center_arc.position_at(i / 4) for i in range(5)]
-]
-bracelet -= alignment_holes
+    # Step 9: Add alignment holes to aid assembly after 3D printing in two halves.
+    # These are placed at evenly spaced locations along the arc (including both ends).
+    # A small clearance (+0.15) is included for typical FDM tolerances.
+    with Locations(*[center_arc.position_at(i / 4) for i in range(5)]):
+        Cylinder(1.75 / 2 + 0.15, 8, mode=Mode.SUBTRACT)
 
 show(bracelet)
 # [End]

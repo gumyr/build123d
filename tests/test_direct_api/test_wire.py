@@ -37,7 +37,7 @@ import numpy as np
 from build123d.topology.shape_core import TOLERANCE
 import build123d.topology.one_d as one_d
 
-from build123d.build_enums import GeomType, PositionMode, Side
+from build123d.build_enums import FrameMethod, GeomType, PositionMode, Side
 from build123d.build_line import BuildLine
 from build123d.geometry import Axis, Color, Location, Plane, Pos, Rot, Vector
 from build123d.objects_curve import Curve, Line, JernArc, PolarLine, Polyline, Spline
@@ -163,6 +163,30 @@ class TestWire(unittest.TestCase):
         hull_wire = Wire.make_convex_hull(adjoining_edges)
         self.assertAlmostEqual(Face(hull_wire).area, 319.9612, 4)
 
+        # A vertex on the hull is a sharp corner
+        teardrop = Wire.make_convex_hull([Vertex(0, 3), Edge.make_circle(1)])
+        self.assertAlmostEqual(
+            Face(teardrop).area, math.sqrt(8) + math.pi - math.acos(1 / 3), 4
+        )
+        self.assertAlmostEqual(
+            Vector(teardrop.vertices().sort_by(Axis.Y)[-1]), (0, 3, 0), 5
+        )
+
+        square = Wire.make_convex_hull(
+            [Vertex(0, 0), Vertex(1, 0), Vertex(1, 1), Vertex(0, 1), Vertex(0.5, 0.5)]
+        )
+        self.assertEqual(len(square.edges()), 4)
+        self.assertAlmostEqual(Face(square).area, 1, 5)
+
+        # points given as coordinates
+        diamond = Wire.make_convex_hull(
+            [(0, 3), Vector(0, -3), Vertex(2, 0), Edge.make_circle(1)]
+        )
+        # a triangle to the right of the Y axis, half of a two-pointed teardrop to the left
+        self.assertAlmostEqual(
+            Face(diamond).area, 6 + math.sqrt(8) + math.pi / 2 - math.acos(1 / 3), 4
+        )
+
     def test_fix_degenerate_edges(self):
         e0 = Edge.make_line((0, 0), (1, 0))
         e1 = Edge.make_line((2, 0), (1, 0))
@@ -269,6 +293,78 @@ class TestWire(unittest.TestCase):
         w1.wrapped = None
         with self.assertRaises(ValueError):
             w1.param_at_point((0, 0))
+
+    def test_param_at_point_native_parameter_on_multiedge_and_reversed_wires(self):
+        """Check native parameters on forward and reversed multi-edge wires."""
+        wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (10, 0, 0)),
+                Edge.make_line((10, 0, 0), (10, 10, 0)),
+            ],
+            sequenced=True,
+        )
+        reversed_wire = Wire(TopoDS.Wire(wire.wrapped.Reversed()))
+
+        for candidate in (wire, reversed_wire):
+            for position in (0.25, 0.5, 0.6):
+                point = candidate.position_at(position)
+                with self.subTest(forward=candidate.is_forward, position=position):
+                    default = candidate.param_at_point(point)
+                    normalized = candidate.param_at_point(point, normalize=True)
+                    native = candidate.param_at_point(point, normalize=False)
+                    evaluated = Vector(candidate.geom_adaptor().Value(native))
+
+                    self.assertEqual(default, normalized)
+                    self.assertLess((evaluated - point).length, 1e-6)
+
+    def test_param_at_point_normalize_preserves_errors(self):
+        """Check off-curve and empty-wire errors in both modes."""
+        wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (10, 0, 0)),
+                Edge.make_line((10, 0, 0), (10, 10, 0)),
+            ]
+        )
+        for normalize in (True, False):
+            with self.subTest(normalize=normalize):
+                with self.assertRaisesRegex(ValueError, "is .* from wire"):
+                    wire.param_at_point((20, 20, 20), normalize=normalize)
+
+        wire.wrapped = None
+        for normalize in (True, False):
+            with self.subTest(normalize=normalize):
+                with self.assertRaisesRegex(
+                    ValueError, "Can't find point on empty wire"
+                ):
+                    wire.param_at_point((0, 0, 0), normalize=normalize)
+
+    def test_location_at_reversed_wire(self):
+        """location_at agrees with position_at on a reversed wire"""
+        wire = Wire(
+            [
+                Edge.make_line((0, 0, 0), (10, 0, 0)),
+                Edge.make_circle(5, Plane((10, 5, 0)), start_angle=270, end_angle=360),
+            ],
+            sequenced=True,
+        )
+        reversed_wire = Wire(TopoDS.Wire(wire.wrapped.Reversed()))
+        self.assertFalse(reversed_wire.is_forward)
+        for position in (0.0, 0.25, 0.6, 1.0):
+            for mode in (PositionMode.PARAMETER, PositionMode.LENGTH):
+                value = (
+                    position
+                    if mode == PositionMode.PARAMETER
+                    else (position * reversed_wire.length)
+                )
+                expected = reversed_wire.position_at(value, mode)
+                with self.subTest(position=position, mode=mode):
+                    location = reversed_wire.location_at(value, mode)
+                    self.assertAlmostEqual(location.position, expected, 5)
+                    if mode == PositionMode.LENGTH:
+                        corrected = reversed_wire.location_at(
+                            value, mode, FrameMethod.CORRECTED
+                        )
+                        self.assertAlmostEqual(corrected.position, expected, 5)
 
     def test_param_at_point_reversed_edges(self):
         with BuildLine(Plane.YZ) as wing_line:
@@ -475,6 +571,43 @@ class TestWire(unittest.TestCase):
         self.assertTrue(w9.is_valid)
         with self.assertRaises(ValueError):
             Wire(bob="fred")
+
+    def test_constructor_keeps_first_of_near_coincident_vertices(self):
+        # Issue #1492: a join whose end vertices differ by less than their
+        # tolerance keeps the vertex of the edge listed first, in either order
+        line = Edge.make_line((0, 0, 0), (1e-12, 0, 10))
+        arc = Edge.make_three_point_arc((0, 0, 10), (-3, 0, 13), (0, 0, 16))
+        for edges, x_value in (([line, arc], 1e-12), ([arc, line], 0.0)):
+            with self.subTest(first=edges[0].geom_type):
+                joint = min(Wire(edges).vertices(), key=lambda v: abs(v.Z - 10))
+                self.assertEqual(joint.X, x_value)
+
+    def test_constructor_near_coincident_vertices_stay_valid(self):
+        # Vertex tolerance is 1e-7. A join within it keeps the first vertex; a
+        # wider one, which the kernel closes with a vertex of larger tolerance,
+        # and an edge shorter than the tolerance are left to the kernel
+        arc = Edge.make_three_point_arc((0, 0, 10), (-3, 0, 13), (0, 0, 16))
+        for gap in (5e-8, 1.5e-7):
+            line = Edge.make_line((0, 0, 0), (gap, 0, 10))
+            for edges in ([line, arc], [arc, line]):
+                with self.subTest(gap=gap, first=edges[0].geom_type):
+                    wire = Wire(edges)
+                    self.assertTrue(wire.is_valid)
+                    self.assertEqual(len(wire.edges()), 2)
+        joint = min(Wire([line, arc]).vertices(), key=lambda v: abs(v.Z - 10))
+        self.assertAlmostEqual(joint.X, 7.5e-8, 12)  # the kernel's, in between
+
+        for short in (5e-8, 1.5e-7):
+            with self.subTest(short=short):
+                wire = Wire(
+                    [
+                        Edge.make_line((0, 0), (1, 0)),
+                        Edge.make_line((1, 0), (1 + short, 0)),
+                        Edge.make_line((1 + short, 0), (2, 0)),
+                    ]
+                )
+                self.assertTrue(wire.is_valid)
+                self.assertEqual(len(wire.edges()), 3)
 
 
 class TestWireFilletHelpers(unittest.TestCase):
@@ -768,6 +901,24 @@ class TestWireValidation(unittest.TestCase):
     def test_fillet_2d_vertex_not_on_wire(self):
         with self.assertRaisesRegex(ValueError, "Could not find fillet vertex"):
             self.wire.fillet_2d(1, [Vertex(100, 100, 0)])
+
+    def test_fillet_2d_errors_name_the_original_vertex(self):
+        """A wire off Plane.XY is relocated to be filleted - failures name the
+        vertex that was passed in, not where the relocation put it"""
+        points = [(0, 0, 1), (2, 0, 1), (2, 0, 3), (0, 0, 3)]
+        closed = Wire.make_polygon(points, close=True)
+        corner = closed.vertices().sort_by_distance((2, 0, 1))[0]
+        with self.assertRaisesRegex(
+            ValueError, r"Fillet algorithm failed for Vertex\(2\.0, 0\.0, 1\.0\)"
+        ):
+            closed.fillet_2d(2.5, [corner])
+
+        opened = Wire.make_polygon(points, close=False)
+        end = opened.vertices().sort_by_distance((0, 0, 3))[0]
+        with self.assertRaisesRegex(
+            ValueError, r"exactly two edges: Vertex\(0\.0, 0\.0, 3\.0\)"
+        ):
+            opened.fillet_2d(0.2, [end])
 
     def test_param_at_point_no_extrema(self):
         extrema = MagicMock()

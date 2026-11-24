@@ -31,10 +31,10 @@ license:
 
 """
 
-from build123d import *
-from ocp_vscode import *
-
 # [Code]
+from build123d import *
+from ocp_viewer import *
+
 # Coin Parameters
 diameter, thickness = 50 * MM, 10 * MM
 
@@ -61,7 +61,7 @@ with BuildPart() as maker_coin:
     # Add an embossed label
     with BuildSketch(Plane.XY.offset(thickness)) as label:  # above coin
         Text("OS", font_size=15)
-    project()  # label on top of coin
+    project_to_shape(direction=(0, 0, -1), hit=Hit.NEAREST)  # label on top of coin
     extrude(amount=-thickness / 5, mode=Mode.SUBTRACT)  # emboss label
 
 show(maker_coin)

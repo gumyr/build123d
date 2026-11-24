@@ -29,7 +29,7 @@ license:
 
 import logging
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 logging.basicConfig(
     filename="din_rail.log",

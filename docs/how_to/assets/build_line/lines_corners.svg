@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="110.7mm" height="60.7mm" viewBox="-2.14 -22.14 44.28 24.28" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.036" id="Given">
+      <line x1="0.0" y1="20.0" x2="0.0" y2="6.0" />
+      <line x1="6.0" y1="0.0" x2="34.0" y2="0.0" />
+      <line x1="40.0" y1="6.0" x2="40.0" y2="20.0" />
+    </g>
+    <g fill="none" stroke="rgb(30,78,163)" stroke-width="0.27999999999999997" id="Made">
+      <path d="M 6.0,0.0 A 6.0,6.0 180.0 0,0 0.0,6.0" />
+      <path d="M 40.0,6.0 A 6.0,6.0 180.0 0,0 34.0,0.0" />
+    </g>
+  </g>
+</svg>

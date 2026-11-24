@@ -1,0 +1,66 @@
+"""
+Too Tall Toby Party Pack 01-09 Corner Tie
+"""
+
+from math import sqrt
+
+from build123d import *
+from bd_materials.materials.metals import aluminum
+from ocp_viewer import show
+
+# The base plate, rounded at one end, with a counterbored hole at the centre
+# of each rounded corner
+plate = Rectangle(69, 75, align=(Align.MAX, Align.CENTER))
+plate = fillet(plate.vertices().group_by(Axis.X)[0], 17)
+corner_tie = extrude(plate, amount=13)
+centers = [
+    arc.arc_center
+    for arc in corner_tie.edges().filter_by(GeomType.CIRCLE).group_by(Axis.Z)[-1]
+]
+corner_tie -= [
+    Pos(center)
+    * CounterBoreHole(
+        radius=8 / 2, counter_bore_radius=15 / 2, counter_bore_depth=4, depth=13
+    )
+    for center in centers
+]
+
+# The upright: an eye, with sides that leave it at a tangent and run down to
+# the full width of the plate
+eye_disc = Pos(0, 45) * Circle(15)
+eye = eye_disc.edge()
+side = Axis((75 / 2, 0), (0, 1))  # the edge of the plate
+u = eye.find_tangent(75 / 2 + 90)[0]  # where the eye has that slope
+l1 = PolarLine(eye.position_at(u), side, direction=-eye.tangent_at(u))
+half_web = make_face(
+    [Line((0, 45), l1 @ 0), l1, Polyline(l1 @ 1, (75 / 2, 0), (0, 0), (0, 45))]
+)
+upright = half_web + mirror(half_web, about=Plane.YZ) + eye_disc
+upright -= Pos(0, 45) * Circle(12 / 2)
+corner_tie += extrude(Plane.YZ * upright, amount=-13)
+
+# The brace, on a plane at 45 degrees through the corner
+brace_length = 45 * 2 / sqrt(2) - 37.5
+brace = Rectangle(brace_length, 75, align=(Align.MIN, Align.CENTER))
+brace += Pos(brace_length, 0) * Circle(37.5)
+brace -= Pos(brace_length, 0) * Circle(33 / 2)
+brace = split(brace, bisect_by=Plane.YZ)
+brace_plane = Plane((0, 0, 0), x_dir=(1, 0, 0), z_dir=(1, 0, 1))
+corner_tie += extrude(brace_plane * brace, amount=6)
+
+# Carry the underside of the brace on to meet the plate and the upright
+underside = corner_tie.faces().filter_by(Axis((0, 0, 0), (-1, 0, 1)))[0]
+corner_tie += extrude(underside, until=Until.NEXT, target=corner_tie)
+corner_tie = fillet(corner_tie.edges().filter_by(Axis.Y).sort_by(Axis.Z)[2], 16)
+
+part = corner_tie
+part.material = aluminum()  # 2700 kg/m^3, as on the drawing
+
+show(part)
+
+got_mass = part.mass()
+want_mass = 307.23
+tolerance = 1
+delta = abs(got_mass - want_mass)
+print(f"Mass: {got_mass:0.2f} g")
+assert delta < tolerance, f"{got_mass=}, {want_mass=}, {delta=}, {tolerance=}"

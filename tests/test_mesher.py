@@ -254,7 +254,7 @@ class TestAddShape(DirectApiTestCase):
             RigidJoint("out", box, Location((2, 0, 0)))
             RigidJoint("in", box, Location())
         for box, following in zip(boxes, boxes[1:]):
-            box.joints["out"].connect_to(following.joints["in"])
+            box.joints["out"].attach(following.joints["in"])
         exporter = Mesher()
         exporter.add_shape(Compound(children=boxes))
         self.assertEqual(exporter.mesh_count, 200)
@@ -340,9 +340,9 @@ class TestDuplicateVertices(unittest.TestCase):
 class TestHollowImport(unittest.TestCase):
     def test_hollow_import(self):
         test_shape = Cylinder(5, 10) - Box(5, 5, 5)
-        export_stl(test_shape, "test.stl")
+        export_stl(test_shape, self.tmp_path / "test.stl")
         importer = Mesher()
-        stl = importer.read("test.stl")
+        stl = importer.read(self.tmp_path / "test.stl")
         self.assertTrue(stl[0].is_valid)
         self.assertAlmostEqual(test_shape.volume, stl[0].volume, 0)
 

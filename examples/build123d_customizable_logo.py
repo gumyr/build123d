@@ -27,7 +27,7 @@ license:
 
 # [Imports]
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 # [Parameters]
 # - none
@@ -100,7 +100,7 @@ cmpd = Compound(
     [three_d.part, two.sketch, one.line, build.sketch, extension_lines.line]
 )
 
-visible, _hidden = cmpd.project_to_viewport((10, -10, 60))
+visible, _hidden = cmpd.drawing_view((10, -10, 60))
 max_dimension = max(*Compound(children=visible).bounding_box().size)
 exporter = ExportSVG(scale=100 / max_dimension)
 exporter.add_shape(visible)

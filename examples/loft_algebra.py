@@ -2,7 +2,7 @@
 
 from math import pi, sin
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 slice_count = 10
 

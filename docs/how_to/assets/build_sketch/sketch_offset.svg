@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="110.5mm" height="50.5mm" viewBox="-27.625 -12.625 55.25 25.25" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="rgb(214,225,244)" stroke="rgb(30,78,163)" stroke-width="0.25" id="Sketch">
+      <path d="M -15.0,10.0 A 10.0,10.0 0.0 0,1 -15.0,-10.0 L 15.0,-10.0 A 10.0,10.0 180.0 0,1 15.0,10.0 L -15.0,10.0 M 15.0,-6.0 L -15.0,-6.0 A 6.0,6.0 0.0 0,0 -15.0,6.0 L 15.0,6.0 A 6.0,6.0 180.0 0,0 15.0,-6.0" />
+    </g>
+  </g>
+</svg>

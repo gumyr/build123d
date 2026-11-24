@@ -205,7 +205,7 @@ class TestPlane(unittest.TestCase):
 
         # can be instantiated from planar faces of surface types other than Geom_Plane
         # this loft creates the trapezoid faces of type Geom_BSplineSurface
-        lofted_solid = Solid.make_loft(
+        lofted_solid = Solid.loft(
             [
                 Rectangle(3, 1).wire(),
                 Pos(0, 0, 1) * Rectangle(1, 1).wire(),
@@ -450,6 +450,19 @@ class TestPlane(unittest.TestCase):
         self.assertAlmostEqual(
             Vector(Plane.YZ.to_local_coords(vertex)), (v_y, v_z, v_x), 5
         )
+
+    def test_localize_bound_box(self):
+        """A box is its own bounding box, so its bounding box moved to a plane
+        is the bounding box of the box moved to that plane"""
+        box = Solid.make_box(1, 2, 3)
+        for plane in (Plane.XZ, Plane((1, 2, 3), x_dir=(1, 1, 0), z_dir=(1, -1, 1))):
+            with self.subTest(plane=plane):
+                local = plane.to_local_coords(box.bounding_box())
+                expected = plane.to_local_coords(box).bounding_box()
+                self.assertAlmostEqual(local.min, expected.min, 5)
+                self.assertAlmostEqual(local.max, expected.max, 5)
+                empty = plane.to_local_coords(Solid().bounding_box())
+                self.assertTrue(empty.is_empty)
 
     def test_repr(self):
         # note that input directions are not orthogonal so x_dir won't show up as-is.

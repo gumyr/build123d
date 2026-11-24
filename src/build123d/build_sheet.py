@@ -28,6 +28,7 @@ license:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import cast
 
 from build123d.build_common import BaseObject, Builder
@@ -38,6 +39,7 @@ from build123d.topology import (
     Compound,
     Edge,
     Face,
+    JointDict,
     Shape,
     ShapeHistory,
     ShapeList,
@@ -53,7 +55,8 @@ class BuildSheet(Builder[Shell]):
     Builder context for constant-thickness sheet-metal parts. Construction is
     performed on a connected reference ``Shell`` containing planar and
     cylindrical faces. When nested in ``BuildPart``, the shell and its sheet
-    parameters are published as pending input for the ``thicken`` operation.
+    parameters are published as pending input for the ``thicken`` operation,
+    and joints made in the sheet, placed with it, become the part's.
 
     Args:
         placements (Plane, optional): output placement(s). Defaults to Plane.XY.
@@ -88,12 +91,20 @@ class BuildSheet(Builder[Shell]):
             sheet_surface=sheet_surface,
         )
         self._sheet = Shell()
+        self._joints: JointDict = JointDict(self)
         super().__init__(*placements, mode=mode)
 
     @property
     def sheet_parameters(self) -> SheetMetalParameters:
         """Parameters relating the reference shell to its material."""
         return self._sheet_parameters
+
+    @property
+    def joints(self) -> JointDict:
+        """The joints made in the sheet, in its local frame. A shell holds no
+        joints, so on exit they pass to the enclosing BuildPart, placed as the
+        shell is, and this is empty."""
+        return self._joints
 
     @property
     def thickness(self) -> float:
@@ -225,7 +236,11 @@ class BuildSheet(Builder[Shell]):
         raise NotImplementedError("_add_to_pending doesn't apply to BuildSheet")
 
     def _accept_publication(
-        self, build_product: Shape, source: Builder | None, mode: Mode
+        self,
+        build_product: Shape,
+        source: Builder | None,
+        mode: Mode,
+        placements: Sequence[Location] = (Location(),),
     ) -> None:
         """Receive a nested Builder's product, or an object drawn in this context.
 
@@ -312,13 +327,13 @@ class BuildSheet(Builder[Shell]):
         # arriving in pieces is joined up; a replacement is a shell an
         # operation has already settled, so its coplanar seams are deliberate
         if mode == Mode.ADD:
-            new_shell = Shell.make_sheet(
+            new_shell = Shell._make_sheet(
                 existing_faces + incoming_faces, merge_coplanar=incoming_faces
             )
         elif mode == Mode.SUBTRACT:
             if not existing_faces:
                 raise RuntimeError("Nothing to subtract from")
-            new_shell = self._sheet.cut_sheet(*incoming_solids, *incoming_faces)
+            new_shell = self._sheet._cut_sheet(*incoming_solids, *incoming_faces)
         elif mode == Mode.REPLACE:
             # an operation hands over the sheet it has already sewn, record and
             # all; anything else is sewn here
@@ -329,7 +344,7 @@ class BuildSheet(Builder[Shell]):
             ):
                 new_shell = incoming_shells[0]
             else:
-                new_shell = Shell.make_sheet(incoming_faces)
+                new_shell = Shell._make_sheet(incoming_faces)
         elif mode == Mode.INTERSECT:
             raise ValueError("BuildSheet does not yet support Mode.INTERSECT")
         else:  # pragma: no cover - defensive for future Mode values

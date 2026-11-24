@@ -252,7 +252,9 @@ def _make_loft(
     nor between wires.
 
     Args:
-        wires (list[Wire]): section perimeters
+        objs (Iterable[Vertex | Wire]): section perimeters, optionally starting or
+            ending with a vertex
+        filled (bool): make a Solid rather than a Shell
         ruled (bool, optional): stepped or smooth. Defaults to False (smooth).
 
     Raises:

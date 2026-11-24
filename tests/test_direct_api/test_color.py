@@ -325,3 +325,22 @@ class TestColorCategoricalSet:
 def test_unsupported_color_definition():
     with pytest.raises(TypeError, match="Unsupported color definition"):
         Color(object())
+
+
+class TestColorEquality:
+    def test_equal_by_value(self):
+        assert Color("red") == Color(1, 0, 0)
+        assert Color("red") == Color(0xFF0000)
+        assert Color("red", 0.5) == Color(1, 0, 0, 0.5)
+        assert Color("steelblue") == copy.deepcopy(Color("steelblue"))
+
+    def test_not_equal(self):
+        assert Color("red") != Color("blue")
+        assert Color("red") != Color("red", 0.5)
+        assert Color("red") != (1.0, 0.0, 0.0, 1.0)
+        assert Color("red") != "red"
+
+    def test_hash_matches_equality(self):
+        assert hash(Color("red")) == hash(Color(1, 0, 0))
+        assert len({Color("red"), Color(1, 0, 0), Color("blue")}) == 2
+        assert Color(0, 0, 1) in {Color("blue"): "b"}

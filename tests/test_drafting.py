@@ -62,11 +62,12 @@ from build123d.drafting import (
     ArrowHead,
     DimensionLine,
     Draft,
+    Drafting,
     ExtensionLine,
     TechnicalDrawing,
 )
 
-metric = Draft(
+metric = Drafting(
     font_size=3.0,
     font="Arial",
     font_style=FontStyle.REGULAR,
@@ -80,7 +81,7 @@ metric = Draft(
     fractional_precision=64,
     extension_gap=2.0,
 )
-imperial = Draft(
+imperial = Drafting(
     font_size=5.0,
     font="Arial",
     font_style=FontStyle.REGULAR,
@@ -108,19 +109,28 @@ def create_test_sketch() -> tuple[Sketch, Sketch, Sketch]:
 
 
 class TestClassInstantiation(unittest.TestCase):
-    """Test Draft class instantiation"""
+    """Test Drafting class instantiation"""
 
     def test_draft_instantiation(self):
         """Parameter parsing"""
         with self.assertRaises(ValueError):
-            Draft(fractional_precision=37)
+            Drafting(fractional_precision=37)
+
+    def test_draft_is_deprecated(self):
+        """Draft still works, as a Drafting, but warns."""
+        with self.assertWarnsRegex(DeprecationWarning, "use Drafting"):
+            old = Draft(font_size=3.0, decimal_precision=1)
+        self.assertIsInstance(old, Drafting)
+        self.assertEqual(old.font_size, 3.0)
+        d_line = DimensionLine([(0, 0), (0, 100)], old)
+        self.assertEqual(d_line.dimension, 100)
 
 
 class TestDraftFunctionality(unittest.TestCase):
     """Test core drafting functionality"""
 
     def test_number_with_units(self):
-        metric_drawing = Draft(decimal_precision=2)
+        metric_drawing = Drafting(decimal_precision=2)
         self.assertEqual(metric_drawing._number_with_units(3.141), "3.14mm")
         self.assertEqual(metric_drawing._number_with_units(3.149), "3.15mm")
         self.assertEqual(metric_drawing._number_with_units(0), "0.00mm")
@@ -131,12 +141,12 @@ class TestDraftFunctionality(unittest.TestCase):
             metric_drawing._number_with_units(3.14, tolerance=(0.01, 0)),
             "3.14 +0.01 -0.00mm",
         )
-        whole_number_drawing = Draft(decimal_precision=-1)
+        whole_number_drawing = Drafting(decimal_precision=-1)
         self.assertEqual(whole_number_drawing._number_with_units(314.1), "310mm")
 
-        imperial_drawing = Draft(unit=Unit.IN)
+        imperial_drawing = Drafting(unit=Unit.IN)
         self.assertEqual(imperial_drawing._number_with_units((5 / 8) * IN), '0.62"')
-        imperial_fractional_drawing = Draft(
+        imperial_fractional_drawing = Drafting(
             unit=Unit.IN, number_display=NumberDisplay.FRACTION, fractional_precision=64
         )
         self.assertEqual(
@@ -150,8 +160,18 @@ class TestDraftFunctionality(unittest.TestCase):
             imperial_fractional_drawing._number_with_units(math.pi * IN), '3 1/8"'
         )
 
+    def test_number_with_units_whole_fraction(self):
+        drawing = Draft(
+            unit=Unit.IN, number_display=NumberDisplay.FRACTION, fractional_precision=64
+        )
+        self.assertEqual(drawing._number_with_units(18 * IN), '18"')
+        self.assertEqual(drawing._number_with_units(17.999 * IN), '18"')
+        self.assertEqual(drawing._number_with_units(0.999 * IN), '1"')
+        self.assertEqual(drawing._number_with_units(0.001 * IN), '0"')
+        self.assertEqual(drawing._number_with_units(0), '0"')
+
     def test_label_to_str(self):
-        metric_drawing = Draft(decimal_precision=0)
+        metric_drawing = Drafting(decimal_precision=0)
         line = Edge.make_line((0, 0, 0), (100, 0, 0))
         with self.assertRaises(ValueError):
             metric_drawing._label_to_str(
@@ -273,7 +293,7 @@ class DimensionLineTestCase(unittest.TestCase):
             DimensionLine([(0, 0, 0), (5, 0, 0)], draft=metric, arrows=(False, False))
 
     def test_vertical(self):
-        d_line = DimensionLine([(0, 0), (0, 100)], Draft())
+        d_line = DimensionLine([(0, 0), (0, 100)], Drafting())
         bbox = d_line.bounding_box()
         self.assertAlmostEqual(bbox.size.Y, 100, 5)  # numbers within
 

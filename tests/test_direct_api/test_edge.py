@@ -41,7 +41,7 @@ from build123d.build_enums import (
     PositionMode,
     Transition,
 )
-from build123d.geometry import Axis, Plane, Location, Pos, Vector
+from build123d.geometry import Axis, Color, Plane, Location, Pos, Rot, Vector
 from build123d.objects_curve import CenterArc, EllipticalCenterArc, Line, Spline
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.objects_part import Box, Cylinder
@@ -49,7 +49,7 @@ from build123d.operations_generic import sweep
 from build123d.operations_generic import fillet
 from build123d.operations_part import extrude
 from build123d.topology import Curve, Edge, Face, Shell, Wire, Vertex
-from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
+from OCP.BRepBuilderAPI import BRepBuilderAPI_NurbsConvert, BRepBuilderAPI_Sewing
 
 
 class TestEdge(unittest.TestCase):
@@ -300,6 +300,23 @@ class TestEdge(unittest.TestCase):
         e1.wrapped = None
         with self.assertRaises(ValueError):
             e1.trim_to_length(0.1, 2)
+
+    def test_trim_to_length_reversed_edge(self):
+        """A reversed edge is trimmed from its own start, in its own direction"""
+        line = Edge.make_line((0, 0, 0), (10, 0, 0)).reversed()
+        for start in (0.2, line.position_at(0.2)):
+            with self.subTest(start=start):
+                trimmed = line.trim_to_length(start, 3)
+                self.assertAlmostEqual(trimmed.length, 3, 5)
+                self.assertAlmostEqual(trimmed @ 0, (8, 0, 0), 5)
+                self.assertAlmostEqual(trimmed @ 1, (5, 0, 0), 5)
+                self.assertAlmostEqual(trimmed % 0, (-1, 0, 0), 5)
+
+        arc = Edge.make_circle(10, start_angle=0, end_angle=90).reversed()
+        trimmed = arc.trim_to_length(0.25, 5)
+        self.assertAlmostEqual(trimmed.length, 5, 5)
+        self.assertAlmostEqual(trimmed @ 0, arc.position_at(0.25), 5)
+        self.assertAlmostEqual(trimmed % 0, arc.tangent_at(0.25), 5)
 
     def test_trim_to_other(self):
         """Test trimming open and closed edges to all other objects"""
@@ -634,8 +651,570 @@ class TestEdge(unittest.TestCase):
             line.geom_adaptor()
 
 
+class TestEdgeToAnalytic(unittest.TestCase):
+    """Edge.to_analytic: a BSPLINE that is a line, circle or ellipse becomes one"""
+
+    @staticmethod
+    def as_bspline(edge: Edge) -> Edge:
+        """The same curve described as a BSPLINE, as the kernel often leaves it"""
+        return Edge(BRepBuilderAPI_NurbsConvert(edge.wrapped, True).Shape())
+
+    def assert_same_curve(self, analytic: Edge, edge: Edge, tolerance: float = 1e-9):
+        """Same ends, same direction and no point of one off the other"""
+        for u in (0, 1):
+            self.assertLess((analytic @ u - edge @ u).length, tolerance)
+        self.assertGreater((analytic % 0).dot(edge % 0), 0.99)
+        for i in range(21):
+            point = edge.position_at(i / 20, position_mode=PositionMode.PARAMETER)
+            self.assertLess(analytic.distance_to(point), tolerance)
+
+    def test_line(self):
+        for edge in (
+            self.as_bspline(Edge.make_line((0, 0, 1), (3, 4, 5))),
+            Edge.make_spline([(0, 0), (1, 0), (3, 0)]),
+            Edge.make_bezier((0, 0), (1, 0), (2, 0)),
+        ):
+            with self.subTest(geom_type=edge.geom_type):
+                analytic = edge.to_analytic()
+                self.assertEqual(analytic.geom_type, GeomType.LINE)
+                self.assert_same_curve(analytic, edge)
+
+    def test_circular_arc(self):
+        # Angles chosen to cross zero, to exceed a half turn and to be short
+        for start, end in ((20, 200), (300, 400), (0, 350), (10, 15)):
+            arc = (
+                Pos(3, 4, 5)
+                * Rot(30, 40, 50)
+                * Edge.make_circle(5, Plane.XY, start, end)
+            )
+            for edge in (self.as_bspline(arc), self.as_bspline(arc).reversed()):
+                with self.subTest(start=start, end=end, forward=edge.is_forward):
+                    analytic = edge.to_analytic()
+                    self.assertEqual(analytic.geom_type, GeomType.CIRCLE)
+                    self.assertAlmostEqual(analytic.radius, 5, 9)
+                    self.assertAlmostEqual(analytic.length, arc.length, 9)
+                    self.assert_same_curve(analytic, edge)
+
+    def test_closed(self):
+        for closed, geom_type in (
+            (Edge.make_circle(5), GeomType.CIRCLE),
+            (Edge.make_ellipse(5, 3), GeomType.ELLIPSE),
+        ):
+            for edge in (self.as_bspline(closed), self.as_bspline(closed).reversed()):
+                with self.subTest(geom_type=geom_type, forward=edge.is_forward):
+                    analytic = edge.to_analytic()
+                    self.assertEqual(analytic.geom_type, geom_type)
+                    self.assertTrue(analytic.is_closed)
+                    self.assertAlmostEqual(analytic.length, closed.length, 9)
+                    self.assert_same_curve(analytic, edge)
+                    # A quarter of the way round tells the two directions apart;
+                    # the other direction would be a whole diameter away
+                    quarter = closed @ (0.25 if edge.is_forward else 0.75)
+                    self.assertLess((analytic @ 0.25 - quarter).length, 0.1)
+
+    def test_elliptical_arc(self):
+        """Wherever the ellipse lies: the kernel's own recognition finds few that
+        are not flat on Plane.XY"""
+        tilted = Plane((7, 2, 3)).rotated((30, 40, 50))
+        for plane in (Plane.XY, Plane.XZ, tilted):
+            for start, end in ((10, 120), (200, 460)):
+                arc = Edge.make_ellipse(5, 3, plane, start, end)
+                for edge in (self.as_bspline(arc), self.as_bspline(arc).reversed()):
+                    with self.subTest(
+                        plane=plane, start=start, end=end, forward=edge.is_forward
+                    ):
+                        analytic = edge.to_analytic()
+                        self.assertEqual(analytic.geom_type, GeomType.ELLIPSE)
+                        self.assertAlmostEqual(analytic.length, arc.length, 6)
+                        self.assert_same_curve(analytic, edge)
+
+    def test_tolerance(self):
+        """A spline through points of an arc is an arc only at a loose tolerance"""
+        points = [(5 * math.cos(0.2 * i), 5 * math.sin(0.2 * i)) for i in range(8)]
+        spline = Edge.make_spline(points)
+        self.assertIs(spline.to_analytic(), spline)
+        analytic = spline.to_analytic(tolerance=1e-3)
+        self.assertEqual(analytic.geom_type, GeomType.CIRCLE)
+        self.assert_same_curve(analytic, spline, 1e-3)
+
+        points = [(5 * math.cos(0.2 * i), 3 * math.sin(0.2 * i)) for i in range(12)]
+        spline = Edge.make_spline(points)
+        self.assertIs(spline.to_analytic(), spline)
+        analytic = spline.to_analytic(tolerance=1e-2)
+        self.assertEqual(analytic.geom_type, GeomType.ELLIPSE)
+        self.assert_same_curve(analytic, spline, 1e-2)
+
+    def test_returned_unchanged(self):
+        for edge in (
+            Edge.make_spline([(0, 0), (1, 1), (3, 0), (4, 2)]),
+            Edge.make_bezier((0, 0), (1, 2), (2, 0)),  # a parabola
+            Edge.make_helix(2, 5, 3),  # not planar
+            Edge.make_line((0, 0), (1, 1)),
+            Edge.make_circle(2),
+        ):
+            with self.subTest(geom_type=edge.geom_type):
+                self.assertIs(edge.to_analytic(), edge)
+
+    def test_attributes_kept(self):
+        edge = self.as_bspline(Edge.make_circle(5, Plane.XY, 20, 200))
+        edge.label = "arc"
+        edge.color = Color("red")
+        analytic = edge.to_analytic()
+        self.assertEqual(analytic.label, "arc")
+        self.assertEqual(analytic.color, Color("red"))
+
+    def test_empty(self):
+        with self.assertRaises(ValueError):
+            Edge().to_analytic()
+
+
+class TestEdgeIsSubsetOf(unittest.TestCase):
+    """Edge.is_subset_of: does one edge lie entirely on another?"""
+
+    @staticmethod
+    def as_bspline(edge: Edge) -> Edge:
+        return Edge(BRepBuilderAPI_NurbsConvert(edge.wrapped, True).Shape())
+
+    def check(self, cases):
+        for name, (inner, outer, expected) in cases.items():
+            with self.subTest(name):
+                self.assertEqual(inner.is_subset_of(outer), expected)
+
+    def test_lines(self):
+        line = Edge.make_line
+        base = line((0, 0), (4, 0))
+        self.check(
+            {
+                "inside": (line((1, 0), (3, 0)), base, True),
+                "a copy": (line((0, 0), (4, 0)), base, True),
+                "the same edge": (base, base, True),
+                "reversed": (line((3, 0), (1, 0)), base, True),
+                "sharing an end": (line((2, 0), (4, 0)), base, True),
+                "beyond the end": (line((2, 0), (5, 0)), base, False),
+                "containing": (line((-1, 0), (5, 0)), base, False),
+                "collinear, apart": (line((5, 0), (6, 0)), base, False),
+                "parallel": (line((1, 0.1), (3, 0.1)), base, False),
+                "crossing": (line((2, -1), (2, 1)), base, False),
+                "skew": (line((1, 0, 0), (3, 0, 1)), base, False),
+                "a straight spline": (
+                    self.as_bspline(line((1, 0), (3, 0))),
+                    base,
+                    True,
+                ),
+                "in a straight spline": (
+                    line((1, 0), (3, 0)),
+                    self.as_bspline(base),
+                    True,
+                ),
+            }
+        )
+
+    def test_circular_arcs(self):
+        def arc(start, end, radius=5, plane=Plane.XY):
+            return Edge.make_circle(radius, plane, start, end)
+
+        quarter, circle = arc(0, 90), Edge.make_circle(5)
+        turned = Edge.make_circle(5, Plane.XY.rotated((0, 0, 77)))
+        flipped = Edge.make_circle(5, -Plane.XY, -90, 0)  # quarter, other normal
+        self.check(
+            {
+                "inside": (arc(30, 60), quarter, True),
+                "a copy": (arc(0, 90), quarter, True),
+                "reversed": (arc(30, 60).reversed(), quarter, True),
+                "beyond the end": (arc(30, 120), quarter, False),
+                "the rest of the circle": (arc(90, 360), quarter, False),
+                "in a full circle": (arc(30, 120), circle, True),
+                "a full circle in an arc": (circle, arc(0, 350), False),
+                "full circles, seams apart": (circle, turned, True),
+                "across zero, in one across zero": (arc(350, 370), arc(300, 400), True),
+                "across zero, in one that is not": (arc(350, 370), quarter, False),
+                "past zero, in one across zero": (arc(10, 20), arc(300, 400), True),
+                "before one across zero": (arc(280, 290), arc(300, 400), False),
+                "normals opposed": (arc(30, 60), flipped, True),
+                "normals opposed, outside": (arc(100, 120), flipped, False),
+                "another radius": (arc(30, 60, 4), quarter, False),
+                "another circle through the same ends": (
+                    Edge.make_three_point_arc(quarter @ 0, (4, 4), quarter @ 1),
+                    quarter,
+                    False,
+                ),
+                "starting a hair before": (arc(-1e-9, 30), quarter, True),
+                "another centre": (Pos(0.1) * arc(30, 60), quarter, False),
+                "another plane": (Rot(X=5) * arc(30, 60), quarter, False),
+                "a spline of an arc": (self.as_bspline(arc(30, 60)), quarter, True),
+                "in a spline of an arc": (arc(30, 60), self.as_bspline(quarter), True),
+                "moved together": (
+                    Pos(3, 4, 5) * Rot(30, 40, 50) * arc(30, 60),
+                    Pos(3, 4, 5) * Rot(30, 40, 50) * quarter,
+                    True,
+                ),
+            }
+        )
+
+    def test_elliptical_arcs(self):
+        def arc(start, end, minor=3):
+            return Edge.make_ellipse(5, minor, Plane.XZ, start, end)
+
+        quarter = arc(0, 90)
+        whole = self.as_bspline(Edge.make_ellipse(5, 3, Plane.XZ))
+        self.check(
+            {
+                "inside": (arc(30, 60), quarter, True),
+                "reversed": (arc(30, 60).reversed(), quarter, True),
+                "beyond the end": (arc(30, 120), quarter, False),
+                "a spline of an arc": (self.as_bspline(arc(30, 60)), quarter, True),
+                "in a spline of the ellipse": (arc(30, 60), whole, True),
+                "another ellipse": (arc(30, 60, 2.9), quarter, False),
+                "a circle": (Edge.make_circle(5, Plane.XZ, 30, 60), quarter, False),
+            }
+        )
+
+    def test_sampled(self):
+        """Pairs that are not both lines or both conics are compared by sampling"""
+        points = [(0, 0), (1, 1), (3, 0), (4, 2), (6, 1)]
+        spline = Edge.make_spline(points)
+        piece = spline.trim(0.2, 0.7)
+        quarter = Edge.make_circle(5, Plane.XY, 0, 90)
+        helix = Edge.make_helix(2, 5, 3)
+        self.check(
+            {
+                "a piece": (piece, spline, True),
+                "a piece reversed": (piece.reversed(), spline, True),
+                "a copy": (Edge.make_spline(points), spline, True),
+                "the whole in a piece": (spline, piece, False),
+                "pieces that overlap": (piece, spline.trim(0.5, 0.9), False),
+                "another spline with the same ends": (
+                    Edge.make_spline([(0, 0), (1, 1.2), (3, 0), (4, 2), (6, 1)]),
+                    spline,
+                    False,
+                ),
+                "a piece of a helix": (helix.trim(0.1, 0.4), helix, True),
+                # Both ends of a chord lie on the curve, the rest of it does not
+                "a chord of a spline": (
+                    Edge.make_line(spline @ 0.2, spline @ 0.3),
+                    spline,
+                    False,
+                ),
+                "a chord of an arc": (
+                    Edge.make_line(quarter @ 0, quarter @ 1),
+                    quarter,
+                    False,
+                ),
+            }
+        )
+
+    def test_tolerance(self):
+        base = Edge.make_line((0, 0), (4, 0))
+        near = Edge.make_line((1, 0.01), (3, 0.01))
+        self.assertFalse(near.is_subset_of(base))
+        self.assertTrue(near.is_subset_of(base, tolerance=0.02))
+
+        spline = Edge.make_spline([(0, 0), (1, 1), (3, 0), (4, 2), (6, 1)])
+        near = Pos(Y=0.001) * spline.trim(0.2, 0.7)
+        self.assertFalse(near.is_subset_of(spline))
+        self.assertTrue(near.is_subset_of(spline, tolerance=0.01))
+
+    def test_other_bends_where_this_does_not(self):
+        """A line through the ends and the middle of a wavy spline: sampling the
+        line alone would find it on the spline"""
+        wavy = Edge.make_spline([(0, 0), (0.5, 0.05), (1, 0), (1.5, -0.05), (2, 0)])
+        line = Edge.make_line((0, 0), (2, 0))
+        self.assertFalse(line.is_subset_of(wavy))
+        self.assertFalse(line.is_subset_of(wavy, deflection=0.01))
+
+    def test_closed_spline(self):
+        points = [(0, 0), (2, 1), (3, 3), (0, 4), (-2, 2)]
+        loop = Edge.make_spline(points, periodic=True)
+        self.assertTrue(Edge.make_spline(points, periodic=True).is_subset_of(loop))
+        self.assertTrue(loop.trim(0.2, 0.5).is_subset_of(loop))
+        self.assertFalse(loop.is_subset_of(loop.trim(0.2, 0.5)))
+
+    def test_empty(self):
+        with self.assertRaises(ValueError):
+            Edge().is_subset_of(Edge.make_line((0, 0), (1, 0)))
+        with self.assertRaises(ValueError):
+            Edge.make_line((0, 0), (1, 0)).is_subset_of(Edge())
+
+
+class TestEdgeMerge(unittest.TestCase):
+    """Edge.merge: one edge in place of two on the same curve that touch"""
+
+    @staticmethod
+    def as_bspline(edge: Edge) -> Edge:
+        return Edge(BRepBuilderAPI_NurbsConvert(edge.wrapped, True).Shape())
+
+    def assert_merged(self, first: Edge, second: Edge, expected: Edge):
+        """The merge is the expected edge: its kind, where it lies and its direction"""
+        merged = first.merge(second)
+        self.assertIsNotNone(merged)
+        self.assertEqual(merged.geom_type, expected.geom_type)
+        self.assertTrue(merged.is_valid)
+        self.assertTrue(merged.is_subset_of(expected))
+        self.assertTrue(expected.is_subset_of(merged))
+        # It runs as the first edge does, where the first edge is
+        along = merged.tangent_at(merged.param_at_point(first @ 0.5))
+        self.assertGreater(along.dot(first % 0.5), 0.99)
+        if not expected.is_closed:
+            self.assertLess((merged @ 0 - expected @ 0).length, 1e-6)
+            self.assertLess((merged @ 1 - expected @ 1).length, 1e-6)
+
+    def test_lines(self):
+        line = Edge.make_line
+        base, whole = line((0, 0), (4, 0)), line((0, 0), (6, 0))
+        cases = {
+            "end to end": (base, line((4, 0), (6, 0)), whole),
+            "the other reversed": (base, line((6, 0), (4, 0)), whole),
+            "overlapping": (base, line((2, 0), (6, 0)), whole),
+            "the other first": (line((4, 0), (6, 0)), base, whole),
+            "this one reversed": (
+                line((4, 0), (0, 0)),
+                line((4, 0), (6, 0)),
+                whole.reversed(),
+            ),
+            "a straight spline": (base, self.as_bspline(line((4, 0), (6, 0))), whole),
+        }
+        for name, (first, second, expected) in cases.items():
+            with self.subTest(name):
+                self.assert_merged(first, second, expected)
+
+    def test_circular_arcs(self):
+        def arc(start, end, plane=Plane.XY):
+            return Edge.make_circle(5, plane, start, end)
+
+        circle = Edge.make_circle(5)
+        cases = {
+            "end to end": (arc(0, 90), arc(90, 150), arc(0, 150)),
+            "the other reversed": (arc(0, 90), arc(90, 150).reversed(), arc(0, 150)),
+            "this one reversed": (
+                arc(0, 90).reversed(),
+                arc(90, 150),
+                arc(0, 150).reversed(),
+            ),
+            "the other first": (arc(90, 150), arc(0, 90), arc(0, 150)),
+            "overlapping": (arc(0, 90), arc(60, 150), arc(0, 150)),
+            "across zero": (arc(300, 360), arc(0, 40), arc(300, 400)),
+            "across zero, the other first": (arc(0, 40), arc(300, 360), arc(300, 400)),
+            "one across zero": (arc(330, 390), arc(30, 80), arc(330, 440)),
+            "normals opposed": (arc(0, 90), arc(-150, -90, -Plane.XY), arc(0, 150)),
+            "a spline of an arc": (
+                self.as_bspline(arc(0, 90)),
+                arc(90, 150),
+                arc(0, 150),
+            ),
+            "halves of a circle": (arc(0, 180), arc(180, 360), circle),
+            "arcs through three points": (
+                Edge.make_three_point_arc((5, 0), arc(0, 90) @ 0.5, (0, 5)),
+                Edge.make_three_point_arc((0, 5), arc(90, 150) @ 0.5, arc(90, 150) @ 1),
+                arc(0, 150),
+            ),
+            "overlapping round a circle": (arc(0, 200), arc(180, 380), circle),
+        }
+        for name, (first, second, expected) in cases.items():
+            with self.subTest(name):
+                self.assert_merged(first, second, expected)
+
+    def test_elliptical_arcs(self):
+        def arc(start, end):
+            return Edge.make_ellipse(5, 3, Plane.XZ, start, end)
+
+        self.assert_merged(arc(0, 90), arc(90, 150), arc(0, 150))
+        self.assert_merged(self.as_bspline(arc(300, 360)), arc(0, 40), arc(300, 400))
+        self.assert_merged(
+            arc(0, 180), arc(180, 360), Edge.make_ellipse(5, 3, Plane.XZ)
+        )
+
+    def test_splines(self):
+        spline = Edge.make_spline([(0, 0), (1, 1), (3, 0), (4, 2), (6, 1)])
+        whole = spline.trim(0.1, 0.8)
+        self.assert_merged(spline.trim(0.1, 0.5), spline.trim(0.5, 0.8), whole)
+        self.assert_merged(spline.trim(0.1, 0.6), spline.trim(0.4, 0.8), whole)
+        self.assert_merged(
+            spline.trim(0.1, 0.5).reversed(), spline.trim(0.5, 0.8), whole.reversed()
+        )
+
+        loop = Edge.make_spline(
+            [(0, 0), (2, 1), (3, 3), (0, 4), (-2, 2)], periodic=True
+        )
+        self.assert_merged(
+            loop.trim(0.1, 0.5), loop.trim(0.5, 0.8), loop.trim(0.1, 0.8)
+        )
+        # Pieces either side of where the closed spline starts and ends
+        merged = loop.trim(0.7, 1.0).merge(loop.trim(0.0, 0.2))
+        self.assertAlmostEqual(merged.length, loop.length / 2, 6)
+        self.assertLess((merged @ 0 - loop @ 0.7).length, 1e-6)
+        self.assertLess((merged @ 1 - loop @ 0.2).length, 1e-6)
+
+    def test_one_contains_the_other(self):
+        """The larger edge is the result, turned round if it runs the other way"""
+        base = Edge.make_line((0, 0), (4, 0))
+        inside = Edge.make_line((1, 0), (3, 0))
+        self.assertIs(base.merge(inside), base)
+        self.assertIs(inside.merge(base), base)
+        self.assertIs(base.merge(Edge.make_line((0, 0), (4, 0))), base)
+
+        merged = Edge.make_line((3, 0), (1, 0)).merge(base)
+        self.assertIsNot(merged, base)
+        self.assertLess((merged @ 0 - Vector(4, 0)).length, 1e-6)
+        self.assertLess((merged @ 1 - Vector(0, 0)).length, 1e-6)
+
+        circle = Edge.make_circle(5)
+        self.assertIs(Edge.make_circle(5, Plane.XY, 30, 60).merge(circle), circle)
+
+    def test_not_merged(self):
+        line = Edge.make_line
+        base = line((0, 0), (4, 0))
+        quarter = Edge.make_circle(5, Plane.XY, 0, 90)
+        spline = Edge.make_spline([(0, 0), (1, 1), (3, 0), (4, 2), (6, 1)])
+        cases = {
+            "collinear lines apart": (base, line((5, 0), (6, 0))),
+            "parallel lines": (base, line((0, 1), (4, 1))),
+            "lines at a corner": (base, line((4, 0), (4, 2))),
+            "lines that cross": (base, line((2, -1), (2, 1))),
+            "arcs apart": (quarter, Edge.make_circle(5, Plane.XY, 100, 150)),
+            "arcs of circles that touch": (
+                quarter,
+                Pos(10) * Edge.make_circle(5, Plane.XY, 180, 270),
+            ),
+            "an arc of a circle and of an ellipse": (
+                Edge.make_ellipse(5, 3, Plane.XZ, 0, 90),
+                Edge.make_circle(5, Plane.XZ, 90, 150),
+            ),
+            "spline pieces apart": (spline.trim(0.1, 0.4), spline.trim(0.5, 0.8)),
+            # One curve, and they touch, but where it crosses itself
+            "pieces of a spline that cross": (
+                Edge.make_spline([(0, 0), (4, 4), (0, 4), (4, 0)]).trim(0.1, 0.3),
+                Edge.make_spline([(0, 0), (4, 4), (0, 4), (4, 0)]).trim(0.7, 0.9),
+            ),
+            "a spline and a line leaving it": (
+                spline,
+                line(spline @ 1, (spline @ 1) + (spline % 1) * 2),
+            ),
+        }
+        for name, (first, second) in cases.items():
+            with self.subTest(name):
+                self.assertIsNone(first.merge(second))
+
+    def test_tolerance(self):
+        base = Edge.make_line((0, 0), (4, 0))
+        near = Edge.make_line((4.005, 0), (6, 0))
+        self.assertIsNone(base.merge(near))
+        merged = base.merge(near, tolerance=0.01)
+        self.assertAlmostEqual(merged.length, 6, 5)
+
+    def test_attributes_kept(self):
+        arc = Edge.make_circle(5, Plane.XY, 0, 90)
+        arc.label = "arc"
+        arc.color = Color("red")
+        merged = arc.merge(Edge.make_circle(5, Plane.XY, 90, 150))
+        self.assertEqual(merged.label, "arc")
+        self.assertEqual(merged.color, Color("red"))
+
+    def test_empty(self):
+        with self.assertRaises(ValueError):
+            Edge().merge(Edge.make_line((0, 0), (1, 0)))
+        with self.assertRaises(ValueError):
+            Edge.make_line((0, 0), (1, 0)).merge(Edge())
+
+
 class TestEdgeParamAt(unittest.TestCase):
     """Edge.param_at regression tests (Issue #1095)."""
+
+    def test_param_at_point_normalized_modes_match_and_raw_is_native(self):
+        """Check normalized and native parameters on common curve types."""
+        edges = {
+            "line": Edge.make_line((0, 0, 0), (10, 0, 0)),
+            "circle": Edge.make_circle(2),
+            "ellipse": Edge.make_ellipse(5, 2, start_angle=30, end_angle=220),
+            "spline": Edge.make_spline([(0, 0, 0), (2, 3, 0), (5, 1, 0), (7, 4, 0)]),
+        }
+        for name, edge in edges.items():
+            point = edge.position_at(0.37)
+            with self.subTest(edge=name):
+                default = edge.param_at_point(point)
+                normalized = edge.param_at_point(point, normalize=True)
+                native = edge.param_at_point(point, normalize=False)
+                evaluated = Vector(edge.geom_adaptor().Value(native))
+
+                self.assertEqual(default, normalized)
+                self.assertLess((evaluated - point).length, 1e-6)
+
+    def test_param_at_point_native_endpoints_on_reversed_edges(self):
+        """Check native parameters at both endpoints and edge orientations."""
+        line = Edge.make_line((0, 0, 0), (10, 0, 0))
+        for edge in (line, line.reversed()):
+            for point in (edge.start_point(), edge.end_point()):
+                with self.subTest(edge_forward=edge.is_forward, point=point):
+                    default = edge.param_at_point(point)
+                    normalized = edge.param_at_point(point, normalize=True)
+                    native = edge.param_at_point(point, normalize=False)
+
+                    self.assertEqual(default, normalized)
+                    self.assertLess(
+                        (Vector(edge.geom_adaptor().Value(native)) - point).length,
+                        1e-6,
+                    )
+
+    def test_param_at_point_periodic_endpoint_uses_native_point(self):
+        """Check a closed curve endpoint by its evaluated native point."""
+        circle = Edge.make_circle(2)
+        point = circle.start_point()
+
+        native = circle.param_at_point(point, normalize=False)
+
+        self.assertLess(
+            (Vector(circle.geom_adaptor().Value(native)) - point).length, 1e-6
+        )
+
+    def test_param_at_point_projected_point_returns_native_parameter(self):
+        """Check projection returns the native line parameter."""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        point = Vector(7, 1e-8, 0)
+
+        normalized = edge.param_at_point(point, normalize=True)
+        native = edge.param_at_point(point, normalize=False)
+
+        self.assertAlmostEqual(normalized, 0.7, places=6)
+        self.assertAlmostEqual(native, 7.0, places=6)
+        self.assertLess(
+            (Vector(edge.geom_adaptor().Value(native)) - point).length, 1e-6
+        )
+
+    def test_param_at_point_fallback_returns_native_parameter_in_both_modes(self):
+        """Check fallback conversion after rejecting a plausible bad projection."""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0)).reversed()
+        point = edge.position_at(0.7)
+        projector = MagicMock()
+        projector.LowerDistanceParameter.return_value = 9.0
+
+        with patch(
+            "build123d.topology.one_d.GeomAPI_ProjectPointOnCurve",
+            return_value=projector,
+        ):
+            normalized = edge.param_at_point(point, normalize=True)
+            native = edge.param_at_point(point, normalize=False)
+
+        self.assertEqual(normalized, 0.7)
+        self.assertAlmostEqual(native, 3.0, places=6)
+        self.assertLess(
+            (Vector(edge.geom_adaptor().Value(native)) - point).length, 1e-6
+        )
+
+    def test_param_at_point_normalize_preserves_errors(self):
+        """Check empty-edge and off-curve errors in both modes."""
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        edge.wrapped = None
+        for normalize in (True, False):
+            with self.subTest(normalize=normalize):
+                with self.assertRaisesRegex(
+                    ValueError, "Can't find param on empty edge"
+                ):
+                    edge.param_at_point((0, 0, 0), normalize=normalize)
+
+        edge = Edge.make_line((0, 0, 0), (10, 0, 0))
+        for normalize in (True, False):
+            with self.subTest(normalize=normalize):
+                with self.assertRaisesRegex(ValueError, "is .* from edge"):
+                    edge.param_at_point((7, 1, 0), normalize=normalize)
 
     def test_param_at_point_search_fallback(self):
         """When the OCCT projection returns a bad parameter the minimization
@@ -665,6 +1244,33 @@ class TestEdgeParamAt(unittest.TestCase):
         ):
             with self.assertRaisesRegex(RuntimeError, "Edge is too complex"):
                 edge.param_at_point((7, 0, 0))
+
+    def test_param_at_reversed_edge(self):
+        """param_at measures a reversed edge from its own start, like position_at"""
+        for edge in (
+            Edge.make_line((0, 0, 0), (10, 0, 0)),
+            Edge.make_circle(10, start_angle=0, end_angle=90),
+            Edge.make_spline([(0, 0, 0), (2, 3, 0), (5, 1, 0), (7, 4, 0)]),
+        ):
+            reversed_edge = edge.reversed()
+            for position in (0.0, 0.25, 0.7, 1.0):
+                with self.subTest(edge=edge.geom_type, position=position):
+                    param = reversed_edge.param_at(position)
+                    evaluated = Vector(reversed_edge.geom_adaptor().Value(param))
+                    self.assertAlmostEqual(
+                        evaluated, reversed_edge.position_at(position), 5
+                    )
+                    self.assertAlmostEqual(
+                        param,
+                        reversed_edge.param_at_point(
+                            reversed_edge.position_at(position), normalize=False
+                        ),
+                        5,
+                    )
+        # The oriented ends are the curve's range the other way round
+        line = Edge.make_line((0, 0, 0), (10, 0, 0)).reversed()
+        self.assertAlmostEqual(line.param_at(0), 10, 5)
+        self.assertAlmostEqual(line.param_at(1), 0, 5)
 
     def test_param_at_line_midpoint(self):
         """

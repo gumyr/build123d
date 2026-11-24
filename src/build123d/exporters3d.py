@@ -42,6 +42,7 @@ import OCP.TopAbs as ta
 import requests
 from anytree import PreOrderIter
 from OCP.APIHeaderSection import APIHeaderSection_MakeHeader
+from OCP.BinTools import BinTools, BinTools_FormatVersion
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
 from OCP.IFSelect import IFSelect_ReturnStatus
@@ -64,6 +65,7 @@ from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label
 from OCP.TDocStd import TDocStd_Document
 from OCP.TopExp import TopExp_Explorer
+from OCP.TopTools import TopTools_FormatVersion
 from OCP.XCAFApp import XCAFApp_Application
 from OCP.XCAFDoc import XCAFDoc_ColorType, XCAFDoc_DocumentTool, XCAFDoc_ShapeTool
 from OCP.XSControl import XSControl_WorkSession
@@ -274,12 +276,27 @@ def _nothing_to_export(shape: Shape) -> None:
 def export_brep(
     to_export: Shape,
     file_path: PathLike | str | bytes | BytesIO | BinaryIO,
+    binary: bool = False,
+    version: int | None = None,
+    triangulation: bool = True,
 ) -> bool:
     """Export this shape to a BREP file
+
+    Older OCCT versions can't read newer BREP format versions; ``version=1`` with
+    ``triangulation=False`` writes a file that any OCCT version can read.
 
     Args:
         to_export (Shape): object or assembly
         file_path: Union[PathLike, str, bytes, BytesIO]: brep file path or memory buffer
+        binary (bool, optional): write the binary BREP format instead of text.
+            Defaults to False.
+        version (int, optional): BREP format version, 1 to 3 for text and 1 to 4
+            for binary. Defaults to None, the latest version.
+        triangulation (bool, optional): include the shape's triangulation.
+            Defaults to True.
+
+    Raises:
+        ValueError: unsupported format version
 
     Returns:
         bool: write status
@@ -289,7 +306,20 @@ def export_brep(
         file_path = fsdecode(file_path)
     else:
         file_path = cast(BytesIO, file_path)
-    return_value = BRepTools.Write_s(to_export.wrapped, file_path)
+
+    writer, versions = (
+        (BinTools, BinTools_FormatVersion)
+        if binary
+        else (BRepTools, TopTools_FormatVersion)
+    )
+    suffix = "CURRENT" if version is None else f"VERSION_{version}"
+    format_version = versions.__members__.get(f"{versions.__name__}_{suffix}")
+    if format_version is None:
+        kind = "binary" if binary else "text"
+        raise ValueError(f"Unsupported {kind} BREP version {version}")
+    return_value = writer.Write_s(
+        to_export.wrapped, file_path, triangulation, False, format_version
+    )
 
     return True if return_value is None else return_value
 

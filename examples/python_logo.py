@@ -26,7 +26,7 @@ license:
 
 """
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 
 class PythonLogo(BaseSketchObject):

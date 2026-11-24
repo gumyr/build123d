@@ -48,10 +48,18 @@ from build123d.build_line import BuildLine
 from build123d.build_part import BuildPart
 from build123d.build_sheet import BuildSheet
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Plane, Rotation, RotationLike, Vector, VectorLike
+from build123d.geometry import (
+    Axis,
+    Plane,
+    Rotation,
+    RotationLike,
+    Vector,
+    VectorLike,
+)
 from build123d.objects_curve import BaseLineObject
 from build123d.objects_part import BasePartObject
 from build123d.objects_sketch import BaseSketchObject
+from build123d.topology.silhouette import curve_shadow, face_shadow
 from build123d.topology import (
     Compound,
     ShapeHistory,
@@ -433,9 +441,10 @@ def chamfer(
         if isinstance(context, BuildSheet):
             context._add_to_context(*new_faces, mode=Mode.REPLACE)
             return context.sheet_local
-        return Shell.make_sheet(new_faces)
+        return Shell._make_sheet(new_faces)
 
     if target._dim == 3:
+        source = target
         # Convert BasePartObject into Part so casting into Part during construction works
         target = Part(target.wrapped) if isinstance(target, BasePartObject) else target
 
@@ -445,7 +454,9 @@ def chamfer(
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
-        return Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
+        result = Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
+        source.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return result
 
     if target._dim == 2:
         # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
@@ -572,9 +583,10 @@ def fillet(
         if isinstance(context, BuildSheet):
             context._add_to_context(*new_faces, mode=Mode.REPLACE)
             return context.sheet_local
-        return Shell.make_sheet(new_faces)
+        return Shell._make_sheet(new_faces)
 
     if target._dim == 3:
+        source = target
         # Convert BasePartObject in Part so casting into Part during construction works
         target = Part(target.wrapped) if isinstance(target, BasePartObject) else target
 
@@ -584,7 +596,9 @@ def fillet(
 
         if context is not None:
             context._add_to_context(new_part, mode=Mode.REPLACE)
-        return Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
+        result = Part(Compound([new_part]).wrapped)._made_by(ShapeHistory.of(new_part))
+        source.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return result
 
     if target._dim == 2:
         # Convert BaseSketchObject into Sketch so casting into Sketch during construction works
@@ -691,7 +705,7 @@ def mirror(
             -copy_module.deepcopy(face).mirror(about) for face in source_faces
         ]
         if mode == Mode.PRIVATE:
-            return Shell.make_sheet(mirrored_faces, merge_coplanar=True)
+            return Shell._make_sheet(mirrored_faces, merge_coplanar=True)
         context._add_to_context(*mirrored_faces, mode=mode)
         return context.sheet_local
 
@@ -700,13 +714,19 @@ def mirror(
     if context is not None:
         context._add_to_context(*mirrored, mode=mode)
 
-    mirrored_compound = Compound(mirrored)
+    # one object that is already a compound, a Box say, needs no second wrapper
+    mirrored_compound = cast(Compound, Compound(mirrored).unwrap(fully=False))
     if all([obj._dim == 3 for obj in object_list]):
-        return Part(mirrored_compound.wrapped)
-    if all([obj._dim == 2 for obj in object_list]):
-        return Sketch(mirrored_compound.wrapped)
-    if all([obj._dim == 1 for obj in object_list]):
-        return Curve(mirrored_compound.wrapped)
+        mirrored_compound = Part(mirrored_compound.wrapped)
+    elif all([obj._dim == 2 for obj in object_list]):
+        mirrored_compound = Sketch(mirrored_compound.wrapped)
+    elif all([obj._dim == 1 for obj in object_list]):
+        mirrored_compound = Curve(mirrored_compound.wrapped)
+    # The first object's attributes, its mirrored joints among them, carry over
+    # as they do through + and -
+    mirrored[0].copy_attributes_to(
+        mirrored_compound, ["wrapped", "_NodeMixin__children"]
+    )
     return mirrored_compound
 
 
@@ -854,7 +874,9 @@ def offset(
 
     offset_compound = Compound(new_objects)
     if all([obj._dim == 3 for obj in object_list]):
-        return Part(offset_compound.wrapped)
+        result = Part(offset_compound.wrapped)
+        object_list[0].copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return result
     if all([obj._dim == 2 for obj in object_list]):
         return Sketch(offset_compound.wrapped)
     if all([obj._dim == 1 for obj in object_list]):
@@ -866,6 +888,179 @@ ProjectType: TypeAlias = Edge | Face | Wire | Vector | Vertex
 """Type of objects which can be projected"""
 
 
+def project_to_plane(
+    objects: Shape | VectorLike | Iterable[Shape | VectorLike] | None = None,
+    workplane: Plane | None = None,
+    mode: Mode = Mode.ADD,
+) -> Curve | Sketch | Compound | ShapeList[Vector]:
+    """Generic Operation: project_to_plane
+
+    Applies to 0, 1, and 2 dimensional objects.
+
+    Project objects or points onto a plane along its normal, each from its own
+    side. The operation exists so that a 3D object can be brought into a
+    sketch or line, enhanced there, and the result used to modify the object.
+
+    The objects are projected onto ``workplane``, which must always be given,
+    and the result lies in that plane's local coordinates: a Curve of edges, a
+    Sketch of faces, or a list of points. A solid, shell or compound
+    contributes its silhouette.
+
+    In BuildLine and BuildSketch the projection is drawn in the builder's own
+    coordinates like any other content and placed with it on exit, so
+    projecting onto the plane the builder was created with puts the result
+    back where the objects are. With no ``objects`` the enclosing builder's
+    object is projected, the part of a BuildPart the sketch or line is nested
+    in, so that it can be brought into the sketch, enhanced there, and the
+    result used to modify it.
+    What a builder can hold decides what is drawn: BuildLine takes edges, so
+    a face or solid contributes its edges; BuildSketch takes faces, so a face
+    casts its shadow, whichever way it curves or faces, a face edge-on to the
+    plane is skipped and a solid, shell or compound casts its silhouette, the
+    shadows of all its faces fused, holes included. Points are projected and
+    returned, never drawn, so that lines can be built from them. Edges and
+    wires cannot be drawn into BuildSketch and raise unless ``mode`` is
+    ``Mode.PRIVATE``.
+
+    Args:
+        objects (Shape | VectorLike or Iterable of, optional): objects or points
+            to project. Points and shapes cannot be mixed in one call. Defaults
+            to the object of the builder the sketch or line is nested in.
+        workplane (Plane): plane to project onto. Required, in a builder
+            as well as in algebra mode.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: project_to_plane doesn't accept group_by
+        ValueError: A workplane is required
+        RuntimeError: project_to_plane applies to BuildLine and BuildSketch
+        ValueError: objects are required unless the builder is nested in another
+        ValueError: Points and shapes cannot be projected together
+        ValueError: Edges and wires can only be projected into BuildSketch
+            in PRIVATE mode
+    """
+    context: Builder | None = Builder._get_context("project_to_plane")
+
+    if isinstance(objects, GroupBy):
+        raise ValueError("project_to_plane doesn't accept group_by, did you miss [n]?")
+
+    if context is not None and not isinstance(context, (BuildLine, BuildSketch)):
+        raise RuntimeError(
+            "project_to_plane applies to BuildLine and BuildSketch; "
+            "use project_to_shape in BuildPart"
+        )
+    if workplane is None:
+        raise ValueError("project_to_plane requires a workplane to project onto")
+    plane = workplane
+    validate_inputs(context, "project_to_plane")
+
+    if objects is None:
+        # The enclosing builder's object, so that a part can be brought into a
+        # sketch or line nested in its BuildPart
+        parent = context.builder_parent if context is not None else None
+        if parent is None:
+            raise ValueError(
+                "project_to_plane needs objects unless the builder is nested in "
+                "another, whose object is then projected"
+            )
+        objects = parent._obj
+
+    shape_list: list[Shape] = []
+    point_list: list[Vector] = []
+    for obj in flatten_sequence(objects):
+        if isinstance(obj, Shape) and not isinstance(obj, Vertex):
+            shape_list.append(obj)
+        else:
+            point_list.append(Vector(obj))
+    if shape_list and point_list:
+        raise ValueError("Points and shapes cannot be projected together")
+    if shape_list and all(not obj for obj in shape_list):
+        # nothing projects to nothing, of the same dimension
+        return Shape.make_composite([], shape_list[0]._dim)
+    shape_list = [obj for obj in shape_list if obj]
+
+    if point_list:
+        # A point's shadow is its local position dropped onto the plane
+        local_points = [plane.to_local_coords(pnt) for pnt in point_list]
+        return ShapeList(Vector(pnt.X, pnt.Y, 0) for pnt in local_points)
+
+    # What the builder can hold decides what is projected into it
+    if isinstance(context, BuildLine):
+        shape_list = [
+            piece
+            for obj in shape_list
+            for piece in ([obj] if isinstance(obj, (Edge, Wire)) else obj.edges())
+        ]
+    elif isinstance(context, BuildSketch) and mode != Mode.PRIVATE:
+        if any(isinstance(obj, (Edge, Wire)) for obj in shape_list):
+            raise ValueError(
+                "Edges and wires can only be projected into BuildSketch "
+                "in PRIVATE mode"
+            )
+    input_dims = {obj._dim for obj in shape_list}
+
+    projected: list[Shape] = []
+    edge_shadows: list[Shape] = []
+    with_faces = [obj for obj in shape_list if not isinstance(obj, (Edge, Wire))]
+    if with_faces:
+        # For faces the plane itself is the target, as a face large enough to
+        # catch every shadow: the objects' footprint on the plane, padded
+        footprint = plane.to_local_coords(Compound(with_faces)).bounding_box(
+            optimal=False
+        )
+        screen_center = plane.from_local_coords(
+            Vector(footprint.center().X, footprint.center().Y, 0)
+        )
+        screen = Face.make_rect(
+            2 * footprint.size.X + 1,
+            2 * footprint.size.Y + 1,
+            plane=Plane(screen_center, plane.x_dir, plane.z_dir),
+        )
+    for obj in shape_list:
+        # Each object is projected from its own side of the plane
+        above = plane.to_local_coords(obj.center()).Z > 0
+        direction = -plane.z_dir if above else plane.z_dir
+        if isinstance(obj, (Edge, Wire)):
+            edge_shadows.extend(
+                shadow
+                for edge in obj.edges()
+                for shadow in curve_shadow(edge, plane, direction)
+            )
+            continue
+        # A face-bearing object casts one silhouette: the shadows of all its
+        # faces, fused
+        shadows = [
+            shadow
+            for face in obj.faces()
+            for shadow in face_shadow(face, screen, direction)
+        ]
+        if len(shadows) > 1:
+            projected.extend(shadows[0].fuse(*shadows[1:]).clean().faces())
+        else:
+            projected.extend(shadows)
+    # Edges are a drawing: coincident shadows, from one wire or many, become one
+    if len(edge_shadows) > 1:
+        projected.extend(edge_shadows[0].fuse(*edge_shadows[1:]).clean().edges())
+    else:
+        projected.extend(edge_shadows)
+
+    local_shapes = [plane.to_local_coords(shape) for shape in projected]
+    if context is not None:
+        context._add_to_context(*local_shapes, mode=mode)
+
+    dims = {shape._dim for shape in local_shapes} or input_dims
+    result: Curve | Sketch | Compound = Compound(local_shapes)
+    if dims == {2}:
+        result = Sketch(result.wrapped)
+    elif dims == {1}:
+        result = Curve(result.wrapped)
+    return result
+
+
+@deprecated(
+    "project is deprecated; use project_to_plane for a plane and "
+    "project_to_shape for a shape."
+)
 def project(
     objects: ProjectType | Iterable[ProjectType] | None = None,
     workplane: Plane | None = None,
@@ -873,6 +1068,10 @@ def project(
     mode: Mode = Mode.ADD,
 ) -> Curve | Sketch | Compound | ShapeList[Vector]:
     """Generic Operation: project
+
+    .. deprecated::
+        Use :func:`project_to_plane` to project onto a plane and
+        :func:`~operations_part.project_to_shape` to project onto a shape.
 
     Applies to 0, 1, and 2 dimensional objects.
 
@@ -1066,6 +1265,11 @@ def scale(
         scale_compound = Sketch(scale_compound.wrapped)
     elif all([obj._dim == 1 for obj in object_list]):
         scale_compound = Curve(scale_compound.wrapped)
+    if new_objects:
+        # the scaled object's attributes, its joints scaled with it
+        new_objects[0].copy_attributes_to(
+            scale_compound, ["wrapped", "_NodeMixin__children"]
+        )
     return scale_compound.unwrap(fully=False)
 
 
@@ -1075,7 +1279,7 @@ SplitType: TypeAlias = Edge | Wire | Face | Shell | Solid
 
 def split(
     objects: SplitType | Iterable[SplitType] | None = None,
-    bisect_by: Plane | Face | Shell = Plane.XZ,
+    bisect_by: Plane | Face | Shell | Iterable[Plane | Face | Shell] = Plane.XZ,
     keep: Keep = Keep.TOP,
     mode: Mode = Mode.REPLACE,
 ):
@@ -1083,12 +1287,18 @@ def split(
 
     Applies to 1, 2, and 3 dimensional objects.
 
-    Bisect object with plane and keep either top, bottom or both.
+    Bisect object with plane and keep either top, bottom or both. Several
+    surfaces may be given at once, in which case they are applied together
+    and all of the pieces are kept (``keep=Keep.ALL``).
+
+    The pieces are returned as a Part, Sketch or Curve by dimension, except
+    that a Shell - a sheet - stays a Shell, or a Compound of Shells when the
+    split cut it apart, so sheet operations can continue on the result.
 
     Args:
-        objects (Edge |  Wire |  Face |  Solid or Iterable of), objects to split
-        bisect_by (Plane |  Face, optional): plane to segment part.
-            Defaults to Plane.XZ.
+        objects (Edge |  Wire |  Face |  Shell |  Solid or Iterable of), objects to split
+        bisect_by (Plane |  Face | Shell or Iterable of, optional): surface(s) to
+            segment part. Defaults to Plane.XZ.
         keep (Keep, optional): selector for which segment to keep. Defaults to Keep.TOP.
         mode (Mode, optional): combination mode. Defaults to Mode.REPLACE.
 
@@ -1145,7 +1355,7 @@ def split(
                     split_faces.extend(piece.faces())
 
         untouched_faces = [face for face in current_faces if face not in selected_faces]
-        result = Shell.make_sheet(untouched_faces + split_faces)
+        result = Shell._make_sheet(untouched_faces + split_faces)
         if not result:
             raise ValueError("split removed the entire sheet")
         if mode == Mode.REPLACE:
@@ -1170,14 +1380,27 @@ def split(
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)
 
-    split_compound = Compound(new_objects)
-    if all([obj._dim == 3 for obj in object_list]):
-        return Part(split_compound.wrapped)
-    if all([obj._dim == 2 for obj in object_list]):
-        return Sketch(split_compound.wrapped)
-    if all([obj._dim == 1 for obj in object_list]):
-        return Curve(split_compound.wrapped)
-    return split_compound
+    kept: Shape
+    if all(isinstance(obj, Shell) for obj in object_list):
+        # A sheet stays a sheet: the one shell kept, or a compound of shells
+        # when the split cut it apart, as a sheet builder also gives
+        if not new_objects:
+            kept = Shell()
+        elif len(new_objects) == 1 and isinstance(new_objects[0], Shell):
+            kept = new_objects[0]
+        else:
+            kept = Compound(new_objects)
+        object_list[0].copy_attributes_to(kept, ["wrapped", "_NodeMixin__children"])
+    elif all([obj._dim == 3 for obj in object_list]):
+        kept = Part(Compound(new_objects).wrapped)
+        object_list[0].copy_attributes_to(kept, ["wrapped", "_NodeMixin__children"])
+    elif all([obj._dim == 2 for obj in object_list]):
+        kept = Sketch(Compound(new_objects).wrapped)
+    elif all([obj._dim == 1 for obj in object_list]):
+        kept = Curve(Compound(new_objects).wrapped)
+    else:
+        kept = Compound(new_objects)
+    return kept
 
 
 SweepType: TypeAlias = Compound | Edge | Wire | Face | Solid

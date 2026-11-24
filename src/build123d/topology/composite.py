@@ -59,7 +59,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from itertools import combinations
 from os import PathLike, fspath
 from typing import ClassVar
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from bd_materials import FinishedMaterial
 
@@ -100,12 +100,13 @@ from build123d.geometry import (
 )
 from build123d.text import FONT_ASPECT, FontManager
 
-from .one_d import Edge, Wire, Mixin1D
+from .one_d import Edge, Wire, Mixin1D, DrawingViewOutput
 from .history import ShapeHistory
 from .shape_core import (
     Shape,
     ShapeList,
     Joint,
+    JointDict,
     downcast,
     topods_dim,
     _make_topods_compound_from_shapes,
@@ -172,7 +173,7 @@ class Compound(Mixin3D[TopoDS_Compound]):
             parent=parent,
         )
         self.material = material
-        self.joints = {} if joints is None else joints
+        self.joints = JointDict(self, joints)
         self.children = [] if children is None else children
 
     # ---- Properties ----
@@ -495,12 +496,16 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
     # ---- Instance Methods ----
 
-    def __add__(self, other: None | Shape | Iterable[Shape]) -> Compound | Wire:
+    def __add__(
+        self, other: None | Shape | Joint | Iterable[Shape | Joint]
+    ) -> Compound | Wire:
         """Combine other to self `+` operator
 
         Note that if all of the objects are connected Edges/Wires the result
-        will be a Wire, otherwise a Shape.
+        will be a Wire, otherwise a Shape. Joints among other are bound to
+        the result.
         """
+        joints, other = self._joint_operands(other)
         if self._dim == 1:
             curve = Curve() if self.is_empty else Curve(self.wrapped)
             sum1d = curve + other
@@ -509,12 +514,14 @@ class Compound(Mixin3D[TopoDS_Compound]):
             else:
                 result1d = sum1d
             self.copy_attributes_to(result1d, ["wrapped", "_NodeMixin__children"])
-            return result1d
+            if joints and not isinstance(result1d, Compound):
+                raise TypeError("Joints cannot be added to a Wire")
+            return result1d._with_joints(joints) if joints else result1d
 
         summands: ShapeList[Shape] = ShapeList(Shape._operands(other))
         # If there is nothing to add return the original object
         if not summands:
-            return self
+            return self._with_joints(joints) if joints else self
 
         brought = summands
         summands = ShapeList(
@@ -538,7 +545,8 @@ class Compound(Mixin3D[TopoDS_Compound]):
             if not isinstance(result, Compound):
                 result = Shape.make_composite([result], self._dim)
 
-        return result
+        self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+        return result._with_joints(joints) if joints else result
 
     def __and__(self, other: Shape | Iterable[Shape]) -> Compound:
         """Intersect other to self `&` operator"""
@@ -636,15 +644,17 @@ class Compound(Mixin3D[TopoDS_Compound]):
         return shape_list[0]
 
     def compounds(self) -> ShapeList[Compound]:
-        """compounds - all the compounds in this Shape"""
+        """compounds - all the compounds in this Shape, however deeply nested,
+        each after the compounds it holds and this one last"""
         if self.is_empty:
             return ShapeList()
+        sub_compounds: list[Compound] = []
         if isinstance(self.wrapped, TopoDS_Compound):
             # pylint: disable=not-an-iterable
-            sub_compounds = [c for c in self if isinstance(c.wrapped, TopoDS_Compound)]
+            for member in self:
+                if isinstance(member.wrapped, TopoDS_Compound):
+                    sub_compounds.extend(member.compounds())
             sub_compounds.append(self)
-        else:
-            sub_compounds = []
         return ShapeList(sub_compounds)
 
     def do_children_intersect(
@@ -884,32 +894,56 @@ class Compound(Mixin3D[TopoDS_Compound]):
 
         return ShapeList(dict.fromkeys(results))
 
+    def drawing_view(
+        self,
+        viewpoint: VectorLike,
+        up: VectorLike = (0, 0, 1),
+        look_at: VectorLike | None = None,
+        focus: float | None = None,
+    ) -> DrawingViewOutput:
+        """drawing_view
+
+        The line drawing of this shape as seen from a viewpoint: its edges,
+        split into visible and hidden by hidden-line removal.
+
+        Each line of the drawing is returned once. Edges that lie on another
+        visible edge are dropped, as are hidden edges that lie under a visible
+        one, and the remaining edges that lie on the same curve and touch or
+        overlap, such as the two copies of the join between unfused parts or
+        the pieces of an edge split by hidden-line removal, are merged into
+        one. Visible and hidden edges are merged separately.
+
+        Edges that the kernel returns as splines but which are straight,
+        circular or elliptical come back as lines, circles and ellipses.
+
+        Args:
+            viewpoint (VectorLike): where the view is taken from
+            up (VectorLike, optional): direction of the view's y axis.
+                Defaults to (0, 0, 1).
+            look_at (VectorLike, optional): point the view is centred on.
+                Defaults to None (center of shape).
+            focus (float, optional): the focal length for a perspective view.
+                Defaults to None (orthographic view).
+
+        Returns:
+            DrawingViewOutput: visible and hidden edges
+        """
+        return Mixin1D.drawing_view(self, viewpoint, up, look_at, focus)
+
+    @deprecated("project_to_viewport is deprecated; use drawing_view instead.")
     def project_to_viewport(
         self,
         viewport_origin: VectorLike,
         viewport_up: VectorLike = (0, 0, 1),
         look_at: VectorLike | None = None,
         focus: float | None = None,
-    ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
+    ) -> DrawingViewOutput:
         """project_to_viewport
 
-        Project a shape onto a viewport returning visible and hidden Edges.
-
-        Args:
-            viewport_origin (VectorLike): location of viewport
-            viewport_up (VectorLike, optional): direction of the viewport y axis.
-                Defaults to (0, 0, 1).
-            look_at (VectorLike, optional): point to look at.
-                Defaults to None (center of shape).
-            focus (float, optional): the focal length for perspective projection
-                Defaults to None (orthographic projection)
-
-        Returns:
-            tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
+        .. deprecated::
+            Use :meth:`drawing_view` instead.
         """
-        return Mixin1D.project_to_viewport(
-            self, viewport_origin, viewport_up, look_at, focus
-        )
+        return self.drawing_view(viewport_origin, viewport_up, look_at, focus)
 
     def unwrap(self, fully: bool = True) -> Self | Shape:
         """Strip unnecessary Compound wrappers
@@ -946,24 +980,31 @@ class Compound(Mixin3D[TopoDS_Compound]):
         # If there are no elements or more than one element, return self
         return self
 
-    def _post_attach(self, parent: Compound):
-        """Method call after attaching to `parent`."""
-        logger.debug("Updated parent of %s to %s", self.label, parent.label)
-        parent._wrapped = _make_topods_compound_from_shapes(
-            [c.wrapped for c in parent.children]
-        )
+    def _rebuild_from_children(self) -> None:
+        """Rebuild the OCCT compound from the children at this Compound's location.
 
-    def _post_attach_children(self, children: Iterable[Shape]):
-        """Method call after attaching `children`."""
+        The children are placed relative to this Compound, so the new compound
+        keeps this Compound's location rather than starting at the origin.
+        """
         # _wrapped is initialized by Shape.__init__; pylint doesn't track it
         # through this hierarchy, though it does for a direct Shape subclass
         # pylint: disable=attribute-defined-outside-init
+        # pylint: disable=access-member-before-definition
+        compound = _make_topods_compound_from_shapes([c.wrapped for c in self.children])
+        compound.Location(self._wrapped.Location())
+        self._wrapped = compound
+
+    def _post_attach(self, parent: Compound):
+        """Method call after attaching to `parent`."""
+        logger.debug("Updated parent of %s to %s", self.label, parent.label)
+        parent._rebuild_from_children()
+
+    def _post_attach_children(self, children: Iterable[Shape]):
+        """Method call after attaching `children`."""
         if children:
             kids = ",".join([child.label for child in children])
             logger.debug("Adding children %s to %s", kids, self.label)
-            self._wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in self.children]
-            )
+            self._rebuild_from_children()
         # else:
         #     logger.debug("Adding no children to %s", self.label)
 
@@ -971,23 +1012,16 @@ class Compound(Mixin3D[TopoDS_Compound]):
         """Method call after detaching from `parent`."""
         logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         if parent.children:
-            parent._wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in parent.children]
-            )
+            parent._rebuild_from_children()
         # else:
         #     parent.wrapped = None
 
     def _post_detach_children(self, children):
         """Method call before detaching `children`."""
-        # _wrapped is initialized by Shape.__init__; pylint doesn't track it
-        # through this hierarchy, though it does for a direct Shape subclass
-        # pylint: disable=attribute-defined-outside-init
         if children:
             kids = ",".join([child.label for child in children])
             logger.debug("Removing children %s from %s", kids, self.label)
-            self._wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in self.children]
-            )
+            self._rebuild_from_children()
         # else:
         #     logger.debug("Removing no children from %s", self.label)
 
@@ -1054,7 +1088,7 @@ class Sketch(Compound):
     def _dim(self) -> int:
         return 2
 
-    def __iadd__(self, other: None | Shape | Iterable[Shape]) -> Sketch:
+    def __iadd__(self, other: None | Shape | Joint | Iterable[Shape | Joint]) -> Sketch:
         return self + other
 
 
@@ -1069,7 +1103,7 @@ class Part(Compound):
     def _dim(self) -> int:
         return 3
 
-    def __iadd__(self, other: None | Shape | Iterable[Shape]) -> Part:
+    def __iadd__(self, other: None | Shape | Joint | Iterable[Shape | Joint]) -> Part:
         return self + other
 
 

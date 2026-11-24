@@ -32,6 +32,8 @@ import sys
 from enum import Enum, IntEnum, auto, unique
 from typing import TypeAlias
 
+from typing_extensions import deprecated
+
 from OCP.GccEnt import (
     GccEnt_enclosed,
     GccEnt_enclosing,
@@ -233,6 +235,28 @@ class HeadType(Enum):
     STRAIGHT = auto()
     CURVED = auto()
     FILLETED = auto()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}.{self.name}>"
+
+
+class Hit(Enum):
+    """Which of the surfaces a projection passes through to keep
+
+    A projection onto a shape meets every surface in its path: a face cast
+    onto a plate lands on the near face and on the far face. ``ALL`` keeps
+    them all, nearest first; ``NEAREST`` and ``FARTHEST`` one end of that
+    list; ``VISIBLE`` what a viewer on the source's side sees, the surfaces
+    facing the viewer with the parts hidden behind nearer surfaces removed.
+    Where none of these fits, the projection operations also accept a
+    callable in place of a ``Hit``, given the surfaces met nearest first and
+    returning those to keep.
+    """
+
+    ALL = auto()
+    NEAREST = auto()
+    FARTHEST = auto()
+    VISIBLE = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
@@ -526,8 +550,20 @@ class Side(Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
+@deprecated(
+    "SortBy is deprecated; pass the shape property - Edge.length, Face.area, "
+    "Solid.volume - or use sort_by_distance instead."
+)
 class SortBy(Enum):
-    """Sorting criteria"""
+    """Sorting criteria
+
+    .. deprecated::
+        Pass the property itself to :meth:`~topology.ShapeList.sort_by` and
+        :meth:`~topology.ShapeList.group_by`: ``Edge.length``, ``Edge.radius``,
+        ``Face.area`` or ``Solid.volume``. In place of ``DISTANCE`` use
+        :meth:`~topology.ShapeList.sort_by_distance`, or the key
+        ``Vertex(0, 0, 0).distance_to`` with ``group_by``.
+    """
 
     LENGTH = auto()
     RADIUS = auto()

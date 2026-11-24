@@ -33,6 +33,7 @@ from io import BytesIO, StringIO
 from pathlib import Path
 from types import SimpleNamespace
 
+import ezdxf
 import pytest
 
 from build123d import import_dxf
@@ -182,6 +183,75 @@ def test_import_mtext(dxf_dir: Path):
 
 
 # Regression fixtures
+
+
+@pytest.mark.parametrize(
+    "add_entity, area, bbox_min, bbox_max",
+    [
+        pytest.param(
+            lambda msp: msp.add_solid([(0, 0), (10, 0), (10, 10)]),
+            50.0,
+            (0, 0, 0),
+            (10, 10, 0),
+            id="solid-3-points",
+        ),
+        pytest.param(
+            # SOLID and TRACE store the corners in the order 0, 1, 3, 2
+            lambda msp: msp.add_solid([(0, 0), (10, 0), (0, 5), (10, 5)]),
+            50.0,
+            (0, 0, 0),
+            (10, 5, 0),
+            id="solid-4-points",
+        ),
+        pytest.param(
+            # SOLID and TRACE corners are OCS points, here mirrored in x
+            lambda msp: msp.add_solid(
+                [(1, 2), (3, 2), (1, 4)], dxfattribs={"extrusion": (0, 0, -1)}
+            ),
+            2.0,
+            (-3, 2, 0),
+            (-1, 4, 0),
+            id="solid-ocs",
+        ),
+        pytest.param(
+            lambda msp: msp.add_trace([(0, 0), (10, 0), (0, 5), (10, 5)]),
+            50.0,
+            (0, 0, 0),
+            (10, 5, 0),
+            id="trace",
+        ),
+        pytest.param(
+            lambda msp: msp.add_3dface([(0, 0, 2), (10, 0, 2), (10, 5, 2), (0, 5, 2)]),
+            50.0,
+            (0, 0, 2),
+            (10, 5, 2),
+            id="3dface-4-points",
+        ),
+        pytest.param(
+            lambda msp: msp.add_3dface([(0, 0, 0), (10, 0, 0), (10, 10, 0)]),
+            50.0,
+            (0, 0, 0),
+            (10, 10, 0),
+            id="3dface-3-points",
+        ),
+    ],
+)
+def test_import_solid_trace_3dface(
+    tmp_path: Path, add_entity, area, bbox_min, bbox_max
+):
+    doc = ezdxf.new()
+    add_entity(doc.modelspace())
+    dxf_path = tmp_path / "filled.dxf"
+    doc.saveas(dxf_path)
+
+    result = import_dxf(str(dxf_path))
+    assert len(result) == 1
+    assert isinstance(result[0], Polygon)
+    assert len(result[0].faces()) == 1
+    assert result[0].area == pytest.approx(area)
+    bbox = result[0].bounding_box()
+    assert tuple(bbox.min) == pytest.approx(bbox_min)
+    assert tuple(bbox.max) == pytest.approx(bbox_max)
 
 
 def test_import_blocks(dxf_dir: Path):
@@ -490,31 +560,25 @@ def test_convert_hatch_edge_unsupported(import_dxf_module):
 
 
 def test_process_solid_trace_3dface(import_dxf_module):
-    vertices = {
-        "v0": SimpleNamespace(x=0.0, y=0.0, z=0.0),
-        "v1": SimpleNamespace(x=1.0, y=0.0, z=0.0),
-        "v2": SimpleNamespace(x=1.0, y=1.0, z=0.0),
-        "v3": SimpleNamespace(x=0.0, y=1.0, z=0.0),
-    }
-    entity = SimpleNamespace(dxf=SimpleNamespace(get=lambda key: vertices[key]))
+    vertices = [
+        SimpleNamespace(x=0.0, y=0.0, z=0.0),
+        SimpleNamespace(x=1.0, y=0.0, z=0.0),
+        SimpleNamespace(x=1.0, y=1.0, z=0.0),
+        SimpleNamespace(x=0.0, y=1.0, z=0.0),
+    ]
+    entity = SimpleNamespace(wcs_vertices=lambda close=False: vertices)
     result = import_dxf_module.process_solid_trace_3dface(entity)
     assert isinstance(result, Polygon)
     assert len(result.vertices()) == 4
 
 
 def test_process_solid_trace_3dface_three_vertices(import_dxf_module):
-    vertices = {
-        "v0": SimpleNamespace(x=0.0, y=0.0, z=0.0),
-        "v1": SimpleNamespace(x=1.0, y=0.0, z=0.0),
-        "v2": SimpleNamespace(x=0.0, y=1.0, z=0.0),
-    }
-
-    def get_vertex(key):
-        if key not in vertices:
-            raise AttributeError
-        return vertices[key]
-
-    entity = SimpleNamespace(dxf=SimpleNamespace(get=get_vertex))
+    vertices = [
+        SimpleNamespace(x=0.0, y=0.0, z=0.0),
+        SimpleNamespace(x=1.0, y=0.0, z=0.0),
+        SimpleNamespace(x=0.0, y=1.0, z=0.0),
+    ]
+    entity = SimpleNamespace(wcs_vertices=lambda close=False: vertices)
     result = import_dxf_module.process_solid_trace_3dface(entity)
     assert isinstance(result, Polygon)
     assert len(result.vertices()) == 3

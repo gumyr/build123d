@@ -34,9 +34,9 @@ from collections.abc import Iterable
 from scipy.spatial import Voronoi
 
 from build123d.build_common import flatten_sequence, validate_inputs
-from build123d.build_enums import Mode, SortBy, Transition
+from build123d.build_enums import Mode, Transition
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Plane, Vector
+from build123d.geometry import Plane, Vector, VectorLike
 from build123d.topology import (
     Compound,
     Curve,
@@ -45,6 +45,7 @@ from build123d.topology import (
     ShapeList,
     Shell,
     Sketch,
+    Vertex,
     Wire,
     topo_explore_connected_edges,
 )
@@ -180,7 +181,7 @@ def full_round(
     # Note that the longest wire must be the perimeter and others holes
     face_wires = Wire.combine(
         typed_trimmed_connected_edges + [new_arc] + other_edges
-    ).sort_by(SortBy.LENGTH, reverse=True)
+    ).sort_by(Wire.length, reverse=True)
     pending_face = Face(face_wires[0], face_wires[1:])
 
     # Flip the face to match the original parent
@@ -238,21 +239,29 @@ def make_face(
 
 
 def make_hull(
-    edges: Edge | Iterable[Edge] | None = None, mode: Mode = Mode.ADD
+    limits: (
+        Edge | Vertex | VectorLike | Iterable[Edge | Vertex | VectorLike] | None
+    ) = None,
+    mode: Mode = Mode.ADD,
 ) -> Sketch:
     """Sketch Operation: make_hull
 
-    Create a face from the convex hull of the given edges
+    Create a face from the convex hull of the given edges and points
 
     Args:
-        edges (Edge, optional): sequence of edges to hull. Defaults to all
-            sketch pending edges.
+        limits (Edge | Vertex | VectorLike, optional): sequence of edges and
+            points to hull, where a point is a vertex, a Vector or a tuple of
+            coordinates. A point on the hull becomes a sharp corner. Defaults
+            to all sketch pending edges.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
     context: BuildSketch | None = BuildSketch._get_context("make_hull")
 
-    if edges is not None:
-        hull_edges = flatten_sequence(edges)
+    if limits is not None:
+        hull_edges = ShapeList(
+            Vertex(obj) if isinstance(obj, (Vector, tuple)) else obj
+            for obj in flatten_sequence(limits)
+        )
     elif context is not None:
         hull_edges = context.pending_edges
         if context.sketch_local is not None:
@@ -260,7 +269,7 @@ def make_hull(
     else:
         raise ValueError("No objects to create a hull")
     if not hull_edges:
-        if edges is not None:
+        if limits is not None:
             return Sketch()  # a hull of no edges is nothing
         raise ValueError("No objects to create a hull")
 

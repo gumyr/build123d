@@ -1,5 +1,5 @@
 from build123d import *
-from ocp_vscode import show
+from ocp_viewer import show
 
 # 35x7.5mm DIN Rail Dimensions
 overall_width, top_width, height, thickness, fillet_radius = 35, 27, 7.5, 1, 0.8

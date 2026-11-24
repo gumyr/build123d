@@ -62,7 +62,7 @@ class BasePartObject(Part, BaseObject):
     Base class for all BuildPart objects & operations
 
     Args:
-        solid (Solid): object to create
+        part (Solid): object to create
         rotation (RotationLike, optional): angles to rotate about axes. Defaults to (0, 0, 0)
         align (Align | tuple[Align, Align, Align] | None, optional): align MIN, CENTER,
             or MAX of object. Defaults to None
@@ -106,8 +106,6 @@ class BasePartObject(Part, BaseObject):
             parent=part.parent,
             children=part.children,
         )
-        for joint in self.joints.values():
-            joint._reparent(self)
 
 
 class Box(BasePartObject):

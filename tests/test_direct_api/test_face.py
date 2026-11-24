@@ -27,7 +27,6 @@ license:
 """
 
 import math
-import os
 import platform
 import random
 import unittest
@@ -114,24 +113,21 @@ class TestFace(unittest.TestCase):
         rect = Face.make_rect(1, 1)
         self.assertAlmostEqual(rect.volume, 0, 5)
 
-    def test_project_to_face_with_compound_boolean_result(self):
+    def test_project_through_two_faces_gives_a_face_per_surface(self):
         source = Face.make_rect(1, 1, Plane.XY.offset(1))
-        target = Face.make_rect(3, 3)
-        boolean_result = Compound(
+        target = Compound(
             children=[
-                Face.make_rect(1, 1),
-                Face.make_rect(1, 1, Plane.XY.offset(-1)),
+                Face.make_rect(3, 3),
+                Face.make_rect(3, 3, Plane.XY.offset(-1)),
             ]
         )
 
-        with patch(
-            "build123d.topology.two_d._topods_bool_op",
-            return_value=boolean_result.wrapped,
-        ):
-            projected = source.project_to_shape(target, (0, 0, -1))
+        projected = source.project_to_shape(target, (0, 0, -1))
 
         self.assertEqual(len(projected), 2)
         self.assertTrue(all(isinstance(face, Face) for face in projected))
+        self.assertAlmostEqual(projected[0].center().Z, 0, 5)
+        self.assertAlmostEqual(projected[1].center().Z, -1, 5)
 
     def test_split_by_perimeter(self):
         def area_of(shape_or_shapes):
@@ -411,7 +407,7 @@ class TestFace(unittest.TestCase):
             Solid.make_cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0].is_planar
         )
         # Some of these faces have geom_type BSPLINE but are planar
-        mount = Solid.make_loft(
+        mount = Solid.loft(
             [
                 Rectangle((1 + 16 + 4), 20, align=(Align.MIN, Align.CENTER)).wire(),
                 Pos(1, 0, 4)
@@ -613,17 +609,42 @@ class TestFace(unittest.TestCase):
         square = Face.make_rect(10, 10)
         self.assertTrue(square.is_inside((1, 1)))
         self.assertFalse(square.is_inside((20, 1)))
+        # by normalized surface parameters, the boundary included
+        ring = Face.make_rect(10, 10) - Face.make_rect(4, 4)
+        self.assertTrue(ring.is_inside(0.1, 0.5))
+        self.assertFalse(ring.is_inside(0.5, 0.5))
+        self.assertTrue(ring.is_inside(0.3, 0.5))  # on the hole's edge
+        self.assertTrue(ring.is_inside(u=0.1, v=0.5, tolerance=1e-3))
+        with self.assertRaises(ValueError):
+            ring.is_inside(u=0.1)
+
+    def test_interior_point(self):
+        square = Face.make_rect(10, 10)
+        self.assertAlmostEqual(square.interior_point(), (0, 0, 0), 5)
+        # the centre of a ring is in its hole
+        ring = Face.make_rect(10, 10) - Face.make_rect(4, 4)
+        self.assertFalse(ring.is_inside(ring.center()))
+        self.assertTrue(ring.is_inside(ring.interior_point()))
+        # and of a crescent off to its concave side
+        crescent = Circle(10).face() - Pos(5, 0) * Circle(8).face()
+        self.assertTrue(crescent.is_inside(crescent.interior_point()))
+        # a curved face whose parameter range is cut away at its centre
+        top = (Box(10, 10, 10) - Cylinder(2, 20)).faces().sort_by(Axis.Z)[-1]
+        self.assertTrue(top.is_inside(top.interior_point()))
+        side = Cylinder(5, 10).faces().filter_by(GeomType.CYLINDER)[0]
+        self.assertTrue(side.is_inside(side.interior_point()))
+        sliver = Face.make_rect(10, 0.001)
+        self.assertTrue(sliver.is_inside(sliver.interior_point()))
 
     def test_import_stl(self):
         torus = Solid.make_torus(10, 1)
         # exporter = Mesher()
         # exporter.add_shape(torus)
         # exporter.write("test_torus.stl")
-        export_stl(torus, "test_torus.stl")
-        imported_torus = import_stl("test_torus.stl")
+        export_stl(torus, self.tmp_path / "test_torus.stl")
+        imported_torus = import_stl(self.tmp_path / "test_torus.stl")
         # The torus from stl is tessellated therefore the areas will only be close
         self.assertAlmostEqual(imported_torus.area, torus.area, 0)
-        os.remove("test_torus.stl")
 
     def test_is_coplanar(self):
         square = Face.make_rect(1, 1, plane=Plane.XZ)
@@ -1086,9 +1107,38 @@ class TestFace(unittest.TestCase):
 
         self.assertAlmostEqual(patch4.area, 164.618, 3)
 
+    def test_make_surface_patch_interior_edges(self):
+        corners = [(0, 0), (10, 0), (10, 10), (0, 10)]
+        perimeter = [
+            Edge.make_line(a, b) for a, b in zip(corners, corners[1:] + corners[:1])
+        ]
+        crest = Edge.make_three_point_arc((2, 5), (5, 5, 3), (8, 5))
+        spine = Edge.make_three_point_arc((0, 5), (5, 5, 3), (10, 5))
+        for interior_edge in (crest, spine):
+            patch = Face.make_surface_patch(
+                edge_constraints=perimeter, interior_edges=[interior_edge]
+            )
+            self.assertEqual(len(patch.edges()), 4)
+            self.assertAlmostEqual(patch.distance_to(interior_edge @ 0.5), 0, 3)
+
+        # Ends on the circle's seam vertex; as a perimeter edge it would be
+        # chained into the boundary and cut the patch in half
+        circle = Edge.make_circle(5)
+        arc = Edge.make_three_point_arc((-5, 0), (0, 0, 3), (5, 0))
+        patch = Face.make_surface_patch(edge_constraints=[circle], interior_edges=[arc])
+        self.assertEqual(len(patch.edges()), 1)
+        self.assertAlmostEqual(patch.distance_to(arc @ 0.5), 0, 3)
+        self.assertGreater(patch.area, math.pi * 5**2)
+
     def test_make_surface_patch_error_checking(self):
         with self.assertRaises(RuntimeError):
             Face.make_surface_patch(edge_constraints=[Edge.make_line((0, 0), (1, 0))])
+
+        # Interior edges alone don't bound anything
+        with self.assertRaises(RuntimeError):
+            Face.make_surface_patch(
+                interior_edges=[Edge.make_three_point_arc((0, 0), (1, 1, 1), (2, 0))]
+            )
 
         with self.assertRaises(RuntimeError):
             Face.make_surface_patch(edge_constraints=[])
@@ -1517,6 +1567,31 @@ class TestFace(unittest.TestCase):
 
         # Invalid
         self.assertIsNone(Face.make_rect(1, 1).axis_of_rotation)
+
+    def test_extrusion_direction_property(self):
+        profile = Spline((0, 0, 0), (1, 1, 0), (2, 0, 0))
+        swept = Face.extrude(profile, (0, 1, 3))
+        self.assertEqual(swept.geom_type, GeomType.EXTRUSION)
+        direction = swept.extrusion_direction
+        self.assertAlmostEqual(direction.length, 1, 5)
+        self.assertAlmostEqual(abs(direction.dot(Vector(0, 1, 3).normalized())), 1, 5)
+
+        # Geom_RectangularTrimmedSurface and Geom_OffsetSurface are unwrapped
+        trim_surf = Geom_RectangularTrimmedSurface(
+            swept.geom_adaptor(), 0.2, 0.8, 0.5, 2.5
+        )
+        trim_face = Face(BRepBuilderAPI_MakeFace(trim_surf, 1e-6).Face())
+        self.assertAlmostEqual(abs(trim_face.extrusion_direction.dot(direction)), 1, 5)
+        off_surf = Geom_OffsetSurface(swept.geom_adaptor(), 0.1)
+        off_face = Face(BRepBuilderAPI_MakeFace(off_surf, 1e-6).Face())
+        self.assertAlmostEqual(abs(off_face.extrusion_direction.dot(direction)), 1, 5)
+
+        # Other surfaces and nothing have no extrusion direction
+        self.assertIsNone(Face.make_rect(1, 1).extrusion_direction)
+        self.assertIsNone(
+            Cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0].extrusion_direction
+        )
+        self.assertIsNone(Face().extrusion_direction)
 
     def test_is_convex_concave(self):
 

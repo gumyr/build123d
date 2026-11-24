@@ -1,5 +1,5 @@
 from build123d import *
-from ocp_vscode import show_object
+from ocp_viewer import show_object
 
 # Extrude pending face by amount
 simple = extrude(Text("O", font_size=10), amount=5)

@@ -209,6 +209,10 @@ class Vector:
         ...
 
     @overload
+    def __init__(self, v: Vertex):  # pragma: no cover
+        ...
+
+    @overload
     def __init__(self):  # pragma: no cover
         ...
 
@@ -388,7 +392,7 @@ class Vector:
         based on this math: angle = atan2((Va × Vb) ⋅ Vn, Va ⋅ Vb)
 
         Args:
-            v (Vector): Second Vector
+            vec (Vector): Second Vector
             normal (Vector, optional): normal direction. Defaults to None.
 
         Returns:
@@ -399,6 +403,74 @@ class Vector:
         else:
             gp_normal = normal.wrapped
         return self.wrapped.AngleWithRef(vec.wrapped, gp_normal) * RAD2DEG
+
+    def is_normal(self, other: VectorLike, angular_tolerance: float = 1e-5) -> bool:
+        """are vectors normal
+
+        Returns True if this and another vector are normal to each other. That is, if
+        the angle between the two vectors is equal to 90° within the angular_tolerance.
+
+        Args:
+            other (VectorLike): vector to compare to
+            angular_tolerance (float, optional): max angular deviation in degrees.
+                Defaults to 1e-5.
+
+        Raises:
+            ValueError: vectors must be non null
+
+        Returns:
+            bool: vectors are normal
+        """
+        other = Vector(other)
+        if self.length == 0 or other.length == 0:
+            raise ValueError("vectors must be non null")
+        return self.wrapped.IsNormal(other.wrapped, radians(angular_tolerance))
+
+    def is_opposite(self, other: VectorLike, angular_tolerance: float = 1e-5) -> bool:
+        """are vectors opposite
+
+        Returns True if this and another vector are parallel with opposite directions.
+        That is, if the angle between the two vectors is equal to 180° within the
+        angular_tolerance.
+
+        Args:
+            other (VectorLike): vector to compare to
+            angular_tolerance (float, optional): max angular deviation in degrees.
+                Defaults to 1e-5.
+
+        Raises:
+            ValueError: vectors must be non null
+
+        Returns:
+            bool: vectors are opposite
+        """
+        other = Vector(other)
+        if self.length == 0 or other.length == 0:
+            raise ValueError("vectors must be non null")
+        return self.wrapped.IsOpposite(other.wrapped, radians(angular_tolerance))
+
+    def is_parallel(self, other: VectorLike, angular_tolerance: float = 1e-5) -> bool:
+        """are vectors parallel
+
+        Returns True if this and another vector are parallel with same orientation or
+        opposite orientation. That is, if the angle between the two vectors is equal
+        to 0° or 180° within the angular_tolerance.
+
+        Args:
+            other (VectorLike): vector to compare to
+            angular_tolerance (float, optional): max angular deviation in degrees.
+                Defaults to 1e-5.
+
+        Raises:
+            ValueError: vectors must be non null
+
+        Returns:
+            bool: vectors are parallel
+        """
+        other = Vector(other)
+        if self.length == 0 or other.length == 0:
+            raise ValueError("vectors must be non null")
+        return self.wrapped.IsParallel(other.wrapped, radians(angular_tolerance))
 
     def project_to_line(self, line: Vector) -> Vector:
         """Returns a new vector equal to the projection of this Vector onto the line
@@ -427,13 +499,10 @@ class Vector:
         """Vector is projected onto the plane provided as input.
 
         Args:
-          args: Plane object
-
-        Returns the projected vector.
-          plane: Plane:
+            plane (Plane): plane to project onto
 
         Returns:
-
+            Vector: the projected vector
         """
         base = plane.origin
         normal = plane.z_dir
@@ -1502,7 +1571,7 @@ class Color:
                                     alpha = int(hex_a, 16) / 0xFF
                             except ValueError as ex:
                                 raise ValueError(
-                                    f"Invald alpha hex string: {hex_a}"
+                                    f"Invalid alpha hex string: {hex_a}"
                                 ) from ex
                     case int():
                         color_code, alpha = fill_defaults(args, (color_code, alpha))
@@ -1562,6 +1631,20 @@ class Color:
     def __deepcopy__(self, _memo) -> Color:
         """Return deepcopy of self"""
         return Color(*tuple(self))
+
+    def __eq__(self, other: object) -> bool:
+        """Colors equal operator ==: the same red, green, blue and alpha"""
+        if not isinstance(other, Color):
+            return NotImplemented
+        return self._key() == other._key()
+
+    def __hash__(self) -> int:
+        """Hash of Color"""
+        return hash(self._key())
+
+    def _key(self) -> tuple[float, ...]:
+        """Canonical key used for equality and hashing."""
+        return tuple(self)
 
     def __str__(self) -> str:
         """Generate string"""
@@ -3585,15 +3668,11 @@ class Plane(metaclass=PlaneMeta):
         if isinstance(obj, (tuple, Vector)):
             return Vector(obj).transform(transform_matrix)
         if isinstance(obj, BoundBox):
-            global_bottom_left = Vector(obj.min.X, obj.min.Y, obj.min.Z)
-            global_top_right = Vector(obj.max.X, obj.max.Y, obj.max.Z)
-            local_bottom_left = global_bottom_left.transform(transform_matrix)
-            local_top_right = global_top_right.transform(transform_matrix)
-            local_bbox = Bnd_Box(
-                gp_Pnt(*local_bottom_left),
-                gp_Pnt(*local_top_right),
-            )
-            return BoundBox(local_bbox)
+            if obj.wrapped is None:
+                return BoundBox(Bnd_Box())
+            # the corners holding the extremes differ between the two frames,
+            # so the box is transformed as a whole and not corner by corner
+            return BoundBox(obj.wrapped.Transformed(transform_matrix.wrapped.Trsf()))
         if hasattr(obj, "wrapped") and isinstance(obj.wrapped, TopoDS_Shape):  # Shapes
             # return_value = obj.transform_shape(transform_matrix)
             downcast_lut: dict[

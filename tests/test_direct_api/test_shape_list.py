@@ -80,7 +80,7 @@ class TestShapeList(unittest.TestCase):
             self.assertEqual(actual_split, expected_split)
 
     def test_sort_by(self):
-        faces = Solid.make_box(1, 2, 3).faces() < SortBy.AREA
+        faces = Solid.make_box(1, 2, 3).faces() < Face.area
         self.assertAlmostEqual(faces[-1].area, 2, 5)
 
     def test_sort_by_lambda(self):
@@ -120,6 +120,36 @@ class TestShapeList(unittest.TestCase):
         self.assertEqual(len(box.faces().filter_by(Axis.X)), 2)
         self.assertEqual(len(box.edges().filter_by(Axis.X)), 4)
         self.assertEqual(len(box.vertices().filter_by(Axis.X)), 0)
+
+    def test_filter_by_axis_cylinder(self):
+        faces = Solid.make_cylinder(1, 2, Plane.YZ).faces()  # axis along X
+        along = faces.filter_by(Axis.X)
+        self.assertEqual(len(along), 3)  # the two caps and the cylinder
+        self.assertEqual(len(along.filter_by(GeomType.CYLINDER)), 1)
+        self.assertEqual(len(faces.filter_by(Axis.Z)), 0)
+        self.assertEqual(len(faces.filter_by(Axis.X, reverse=True)), 0)
+        # anti-parallel and offset axes match too
+        self.assertEqual(len(faces.filter_by(Axis((5, 5, 5), (-1, 0, 0)))), 3)
+
+    def test_filter_by_axis_of_rotation(self):
+        spline = Edge.make_spline([(1, 0, 0), (2, 0, 1), (1, 0, 2)])
+        for name, shape in {
+            "cone": Solid.make_cone(2, 1, 2, Plane.YZ),
+            "sphere": Solid.make_sphere(1, Plane.YZ),
+            "torus": Solid.make_torus(3, 1, Plane.YZ),
+            "revolution": Plane.YZ * Face.revolve(spline, 360, Axis.Z),
+        }.items():
+            with self.subTest(surface=name):
+                curved = shape.faces().filter_by(GeomType.PLANE, reverse=True)
+                self.assertEqual(len(curved), 1)
+                self.assertEqual(len(curved.filter_by(Axis.X)), 1)
+                self.assertEqual(len(curved.filter_by(Axis.Z)), 0)
+        # a face with no axis of rotation is never matched
+        freeform = Face.make_surface_from_array_of_points(
+            [[(0, 0, 0), (0, 1, 1)], [(1, 0, 1), (1, 1, 0)]]
+        )
+        for axis in (Axis.X, Axis.Y, Axis.Z):
+            self.assertEqual(len(ShapeList([freeform]).filter_by(axis)), 0)
 
     def test_filter_by_plane(self):
         c1 = Cylinder(1, 3)
@@ -219,10 +249,6 @@ class TestShapeList(unittest.TestCase):
     def test_filter_by_value_empty_list(self):
         self.assertEqual(ShapeList().filter_by_value(Edge.length, 30), [])
 
-    def test_filter_by_value_rejects_sort_by(self):
-        with self.assertRaises(ValueError):
-            Box(1, 1, 1).edges().filter_by_value(SortBy.LENGTH, 1)
-
     def test_first_last(self):
         vertices = (
             Solid.make_box(1, 1, 1).vertices().sort_by(Axis((0, 0, 0), (1, 1, 1)))
@@ -234,26 +260,28 @@ class TestShapeList(unittest.TestCase):
         vertices = Solid.make_box(1, 1, 1).vertices().group_by(Axis.Z)
         self.assertEqual(len(vertices[0]), 4)
 
-        edges = Solid.make_box(1, 1, 1).edges().group_by(SortBy.LENGTH)
+        edges = Solid.make_box(1, 1, 1).edges().group_by(Edge.length)
         self.assertEqual(len(edges[0]), 12)
 
         edges = (
             Solid.make_cone(2, 1, 2)
             .edges()
             .filter_by(GeomType.CIRCLE)
-            .group_by(SortBy.RADIUS)
+            .group_by(Edge.radius)
         )
         self.assertEqual(len(edges[0]), 1)
 
-        edges = (Solid.make_cone(2, 1, 2).edges() | GeomType.CIRCLE) << SortBy.RADIUS
+        edges = (Solid.make_cone(2, 1, 2).edges() | GeomType.CIRCLE) << Edge.radius
         self.assertAlmostEqual(edges[0].length, 2 * math.pi, 5)
 
-        vertices = Solid.make_box(1, 1, 1).vertices().group_by(SortBy.DISTANCE)
+        vertices = (
+            Solid.make_box(1, 1, 1).vertices().group_by(Vertex(0, 0, 0).distance_to)
+        )
         self.assertAlmostEqual(Vector(vertices[-1][0]), (1, 1, 1), 5)
 
         box = Solid.make_box(1, 1, 2)
-        self.assertEqual(len(box.faces().group_by(SortBy.AREA)[0]), 2)
-        self.assertEqual(len(box.faces().group_by(SortBy.AREA)[1]), 4)
+        self.assertEqual(len(box.faces().group_by(Face.area)[0]), 2)
+        self.assertEqual(len(box.faces().group_by(Face.area)[1]), 4)
 
         line = Edge.make_line((0, 0, 0), (1, 1, 2))
         vertices_by_line = box.vertices().group_by(line)
@@ -271,8 +299,8 @@ class TestShapeList(unittest.TestCase):
                 Box(1, 1, 1)
             with PolarLocations(100, 10):
                 Box(1, 1, 2)
-        self.assertEqual(len(boxes.solids().group_by(SortBy.VOLUME)[-1]), 10)
-        self.assertEqual(len((boxes.solids()) << SortBy.VOLUME), 9)
+        self.assertEqual(len(boxes.solids().group_by(Solid.volume)[-1]), 10)
+        self.assertEqual(len((boxes.solids()) << Solid.volume), 9)
 
         with self.assertRaises(ValueError):
             boxes.solids().group_by("AREA")
@@ -725,6 +753,67 @@ class TestShapeListAddition(unittest.TestCase):
         expected_sub = [e for e in edges if e not in set(removed)]
         self.assertEqual(len(difference), len(expected_sub))
         self.assertTrue(all(a is b for a, b in zip(difference, expected_sub)))
+
+
+class TestSortByDeprecation(unittest.TestCase):
+    """SortBy still works but warns, naming the replacement for the shapes sorted"""
+
+    def test_sort_by_still_sorts_and_names_the_property(self):
+        edges = Solid.make_box(1, 2, 3).edges()
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"use Edge\.length instead"
+        ) as cm:
+            by_length = edges.sort_by(SortBy.LENGTH)
+        self.assertEqual(by_length, edges.sort_by(Edge.length))
+        self.assertEqual(cm.filename, __file__)
+
+    def test_group_by_names_the_property(self):
+        faces = Solid.make_box(1, 1, 2).faces()
+        with self.assertWarnsRegex(DeprecationWarning, r"use Face\.area instead"):
+            self.assertEqual(len(faces.group_by(SortBy.AREA)[0]), 2)
+
+    def test_the_class_comes_from_the_shapes(self):
+        circles = Solid.make_cone(2, 1, 2).edges().filter_by(GeomType.CIRCLE)
+        with self.assertWarnsRegex(DeprecationWarning, r"use Edge\.radius instead"):
+            circles.sort_by(SortBy.RADIUS)
+        with self.assertWarnsRegex(DeprecationWarning, r"use Wire\.length instead"):
+            Solid.make_box(1, 2, 3).wires().sort_by(SortBy.LENGTH)
+        with self.assertWarnsRegex(DeprecationWarning, r"use Solid\.volume instead"):
+            Solid.make_box(1, 2, 3).solids().sort_by(SortBy.VOLUME)
+
+    def test_an_empty_list_falls_back_to_the_usual_class(self):
+        with self.assertWarnsRegex(DeprecationWarning, r"use Solid\.volume instead"):
+            self.assertEqual(ShapeList().sort_by(SortBy.VOLUME), [])
+        with self.assertWarnsRegex(DeprecationWarning, r"use Face\.area instead"):
+            self.assertEqual(len(ShapeList().group_by(SortBy.AREA)), 0)
+
+    def test_distance_points_at_the_method_or_the_key(self):
+        vertices = Solid.make_box(1, 1, 1).vertices()
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"sort_by_distance\(\(0, 0, 0\)\)"
+        ):
+            self.assertEqual(
+                vertices.sort_by(SortBy.DISTANCE), vertices.sort_by_distance((0, 0, 0))
+            )
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"Vertex\(0, 0, 0\)\.distance_to"
+        ) as cm:
+            groups = vertices.group_by(SortBy.DISTANCE)
+        self.assertAlmostEqual(Vector(groups[-1][0]), (1, 1, 1), 5)
+        self.assertIn("lambda s: s.center().length", str(cm.warning))
+
+    def test_operators_warn_at_the_callers_line(self):
+        box = Solid.make_box(1, 2, 3)
+        for expression in (
+            lambda: box.edges() > SortBy.LENGTH,
+            lambda: box.faces() < SortBy.AREA,
+            lambda: box.solids() >> SortBy.VOLUME,
+            lambda: box.vertices() << SortBy.DISTANCE,
+        ):
+            with self.subTest(expression=expression):
+                with self.assertWarns(DeprecationWarning) as cm:
+                    expression()
+                self.assertEqual(cm.filename, __file__)
 
 
 if __name__ == "__main__":

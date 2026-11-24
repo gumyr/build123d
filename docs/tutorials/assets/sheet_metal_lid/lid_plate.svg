@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="108.4mm" height="76.014784mm" viewBox="-74.361787 -52.145712 148.723573 104.291423" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(0,0,0)" stroke-width="0.5487954724560284" id="Visible">
+      <line x1="-32.584731" y1="-46.383359" x2="-68.599434" y2="-0.263542" />
+      <line x1="-32.584731" y1="-46.383359" x2="68.599434" y2="0.263542" />
+      <line x1="68.599434" y1="0.263542" x2="32.584731" y2="46.383359" />
+      <line x1="-68.599434" y1="-0.263542" x2="32.584731" y2="46.383359" />
+    </g>
+  </g>
+</svg>

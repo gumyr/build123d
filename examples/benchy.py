@@ -30,7 +30,7 @@ license:
 
 # [Imports]
 from build123d import *
-from ocp_vscode import *
+from ocp_viewer import *
 
 # [Parameters]
 # - none

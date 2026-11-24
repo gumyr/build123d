@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg width="110.7mm" height="79.30914mm" viewBox="-8.495294 -28.495294 51.631605 36.990589" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(1,-1)" stroke-linecap="round">
+    <g fill="none" stroke="rgb(30,78,163)" stroke-width="0.32648711305964284" id="Made">
+      <line x1="-3.0" y1="5.196152" x2="31.641016" y2="25.196152" />
+      <path d="M 31.641016,25.196152 A 6.0,6.0 120.00000000000001 0,0 37.641016,14.803848" />
+      <line x1="37.641016" y1="14.803848" x2="3.0" y2="-5.196152" />
+      <path d="M 3.0,-5.196152 A 6.0,6.0 -59.99999999999999 0,0 -3.0,5.196152" />
+    </g>
+    <g fill="none" stroke="rgb(99,99,99)" stroke-width="0.04197691453623979" id="Construction" stroke-dasharray="0.503723 0.125931">
+      <line x1="0.0" y1="0.0" x2="34.641016" y2="20.0" />
+    </g>
+  </g>
+</svg>

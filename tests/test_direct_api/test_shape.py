@@ -29,6 +29,7 @@ license:
 # Always equal to any other object, to test that __eq__ cooperation is working
 import unittest
 import math
+import copy
 from random import uniform
 from unittest.mock import PropertyMock, patch
 
@@ -59,6 +60,7 @@ from build123d.topology import (
     Solid,
     Vertex,
     Wire,
+    DrawingViewOutput,
 )
 from build123d.topology.composite import Part
 from build123d.joints import RigidJoint
@@ -202,7 +204,7 @@ class TestShape(unittest.TestCase):
                 (1, 2, 2, 1), (10, 0, 0, -10), (0, 0.33, 0.66, 1)
             )
         ]
-        solid = Solid.make_loft(sections)
+        solid = Solid.loft(sections)
         edge = (
             solid.edges()
             .group_by(Edge.length)[-1]
@@ -251,6 +253,61 @@ class TestShape(unittest.TestCase):
         self.assertTrue(isinstance(split_shape, ShapeList))
         self.assertEqual(len(split_shape), 2)
 
+    def test_split_shell(self):
+        """A split shell is one connected shell in the kernel, so its faces are
+        classified and each side reassembled into a shell, or shells"""
+        shell = Box(10, 10, 10).shell()
+        top = shell.split(Plane.XY, keep=Keep.TOP)
+        self.assertIsInstance(top, Shell)
+        self.assertEqual(len(top.faces()), 5)
+        self.assertAlmostEqual(top.bounding_box().min.Z, 0, 5)
+        top, bottom = shell.split(Plane.XY, keep=Keep.BOTH)
+        self.assertEqual(len(bottom.faces()), 5)
+        self.assertAlmostEqual(bottom.bounding_box().max.Z, 0, 5)
+        self.assertAlmostEqual(top.area + bottom.area, shell.area, 5)
+        self.assertEqual(len(shell.split(Plane.XY, keep=Keep.ALL)[0].faces()), 10)
+
+        # by a face: the half-space classification
+        top = shell.split(Face.make_rect(20, 20), keep=Keep.TOP)
+        self.assertIsInstance(top, Shell)
+        self.assertEqual(len(top.faces()), 5)
+        self.assertAlmostEqual(top.bounding_box().min.Z, 0, 5)
+
+        # a side in two separate pieces is a list of shells
+        box_faces = Box(10, 10, 10).faces()
+        u_shell = Shell(box_faces.filter_by(Axis.X) + [box_faces.sort_by(Axis.Z)[0]])
+        top = u_shell.split(Plane.XY, keep=Keep.TOP)
+        self.assertIsInstance(top, list)
+        self.assertEqual([type(piece) for piece in top], [Shell, Shell])
+        self.assertTrue(all(len(piece.faces()) == 1 for piece in top))
+        bottom = u_shell.split(Plane.XY, keep=Keep.BOTTOM)
+        self.assertIsInstance(bottom, Shell)
+        self.assertEqual(len(bottom.faces()), 3)
+
+        # the shell's attributes reach the pieces
+        shell.label = "box"
+        self.assertEqual(shell.split(Plane.XY, keep=Keep.TOP).label, "box")
+
+    def test_split_wire(self):
+        """A split wire is one connected wire in the kernel, so its edges are
+        classified and each side reassembled into a wire, or wires"""
+        # Plane.XZ's normal points to -Y, so its top is the -Y side
+        wire = Wire.make_rect(10, 10)
+        top = wire.split(Plane.XZ, keep=Keep.TOP)
+        self.assertIsInstance(top, Wire)
+        self.assertEqual(len(top.edges()), 3)
+        self.assertAlmostEqual(top.bounding_box().max.Y, 0, 5)
+        top, bottom = wire.split(Plane.XZ, keep=Keep.BOTH)
+        self.assertAlmostEqual(top.length + bottom.length, wire.length, 5)
+
+        # the open side of a U gives two separate pieces, a list of wires
+        u_wire = Wire.make_polygon([(-5, 5), (-5, -5), (5, -5), (5, 5)], close=False)
+        top = u_wire.split(Plane.XZ, keep=Keep.TOP)
+        self.assertIsInstance(top, Wire)
+        self.assertEqual(len(top.edges()), 3)
+        bottom = u_wire.split(Plane.XZ, keep=Keep.BOTTOM)
+        self.assertEqual([type(piece) for piece in bottom], [Wire, Wire])
+
     def test_split_edge_by_shell(self):
         edge = Edge.make_line((-5, 0, 0), (5, 0, 0))
         tool = Wire.make_rect(4, 4)
@@ -264,6 +321,53 @@ class TestShape(unittest.TestCase):
             Box(1, 1, 1).split(Plane.XY, keep=Keep.INSIDE)
         with self.assertRaises(ValueError):
             Box(1, 1, 1).split(Plane.XY, keep=Keep.OUTSIDE)
+
+    def test_split_by_several_planes(self):
+        pieces = Box(2, 2, 2).split([Plane.XY, Plane.YZ, Plane.XZ], keep=Keep.ALL)
+        self.assertEqual(len(pieces), 8)
+        for piece in pieces:
+            self.assertAlmostEqual(piece.volume, 1, 5)
+
+        # the planes are bounded around the shape, wherever it is
+        far_box = Pos(100, 50, 20) * Box(2, 2, 2)
+        pieces = far_box.split(
+            [Plane.XY.offset(20), Plane.YZ.offset(100)], keep=Keep.ALL
+        )
+        self.assertEqual(len(pieces), 4)
+        self.assertAlmostEqual(sum(p.volume for p in pieces), 8, 5)
+
+    def test_split_by_faces_that_cross(self):
+        # Neither face divides the box on its own, and together they seal off
+        # the quadrant x > 0, z > 0 only because they are intersected with
+        # each other
+        box = Box(4, 4, 4)
+        horizontal = Pos(X=1) * Face.make_rect(4, 6, Plane.XY)  # z=0, x in [-1, 3]
+        vertical = Pos(Z=1) * Face.make_rect(6, 4, Plane.YZ)  # x=0, z in [-1, 3]
+        pieces = box.split([horizontal, vertical], keep=Keep.ALL)
+        self.assertEqual(len(pieces), 2)
+        self.assertAlmostEqual(min(p.volume for p in pieces), 2 * 4 * 2, 5)
+        self.assertAlmostEqual(max(p.volume for p in pieces), 64 - 16, 5)
+
+        # an edge is split by several tools too
+        edge = Edge.make_line((-2, 0, 0), (2, 0, 0))
+        lengths = sorted(
+            p.length for p in edge.split([Plane.YZ, Plane.YZ.offset(1)], keep=Keep.ALL)
+        )
+        self.assertEqual(len(lengths), 3)
+        self.assertAlmostEqual(lengths[-1], 2, 5)
+
+    def test_split_by_several_tools_needs_keep_all(self):
+        box = Box(1, 1, 1)
+        with self.assertRaises(ValueError):
+            box.split([Plane.XY, Plane.YZ])
+        with self.assertRaises(ValueError):
+            box.split([Plane.XY, Plane.YZ], keep=Keep.BOTH)
+        with self.assertRaises(ValueError):
+            box.split([], keep=Keep.ALL)
+        with self.assertRaises(ValueError):
+            box.split([Plane.XY, Face()], keep=Keep.ALL)
+        # a list holding one tool behaves as that tool
+        self.assertAlmostEqual(box.split([Plane.XY], keep=Keep.TOP).volume, 0.5, 5)
 
     def test_distance(self):
         sphere1 = Solid.make_sphere(1, Plane((-5, 0, 0)))
@@ -314,8 +418,8 @@ class TestShape(unittest.TestCase):
         relocated_bounding_box = Plane.XZ.from_local_coords(bounding_box)
         self.assertAlmostEqual(relocated_bounding_box.min.X, -2, 5)
         self.assertAlmostEqual(relocated_bounding_box.max.X, 2, 5)
-        self.assertAlmostEqual(relocated_bounding_box.min.Y, 0, 5)
-        self.assertAlmostEqual(relocated_bounding_box.max.Y, -1, 5)
+        self.assertAlmostEqual(relocated_bounding_box.min.Y, -1, 5)
+        self.assertAlmostEqual(relocated_bounding_box.max.Y, 0, 5)
         self.assertAlmostEqual(relocated_bounding_box.min.Z, -2, 5)
         self.assertAlmostEqual(relocated_bounding_box.max.Z, 2, 5)
 
@@ -329,6 +433,21 @@ class TestShape(unittest.TestCase):
 
         box = Solid.make_box(1, 1, 1).moved(Pos(-2.5, 0, 0))
         self.assertAlmostEqual(box.located(Pos(1, 0, 0)).bounding_box().min.X, 1, 5)
+
+    def test_copy_vertex(self):
+        """A copy of a vertex keeps its location as well as its position."""
+        moved = Vertex(1, 0, 0).moved(Pos(10, 0, 0))
+
+        reference = copy.copy(moved)
+        self.assertAlmostEqual(reference.X, 11, 5)
+        self.assertEqual(reference, moved)
+        self.assertTrue(reference.wrapped.IsPartner(moved.wrapped))
+
+        duplicate = copy.deepcopy(moved)
+        self.assertAlmostEqual(duplicate.X, 11, 5)
+        self.assertAlmostEqual(duplicate.location.position.X, 10, 5)
+        self.assertFalse(duplicate.wrapped.IsPartner(moved.wrapped))
+        self.assertAlmostEqual(duplicate.scale(2).X, moved.scale(2).X, 5)
 
     def test_is_equal(self):
         box = Solid.make_box(1, 1, 1)
@@ -471,31 +590,53 @@ class TestShape(unittest.TestCase):
     #     self.assertAlmostEqual(bbox1.min, bbox2.min, 5)
     #     self.assertAlmostEqual(bbox1.max, bbox2.max, 5)
 
-    def test_project_to_viewport(self):
+    def test_view(self):
         # Basic test
         box = Solid.make_box(10, 10, 10)
-        visible, hidden = box.project_to_viewport((-20, 20, 20))
+        visible, hidden = box.drawing_view((-20, 20, 20))
         self.assertEqual(len(visible), 9)
         self.assertEqual(len(hidden), 3)
 
         # Contour edges
         cyl = Solid.make_cylinder(2, 10)
-        visible, hidden = cyl.project_to_viewport((-20, 20, 20))
-        # Note that some edges are broken into two
-        self.assertEqual(len(visible), 6)
-        self.assertEqual(len(hidden), 2)
+        visible, hidden = cyl.drawing_view((-20, 20, 20))
+        # The kernel splits the circles at the silhouette, the pieces are merged
+        self.assertEqual(len(visible), 4)
+        self.assertEqual(len(hidden), 1)
 
         # Hidden contour edges
         hole = box - cyl
-        visible, hidden = hole.project_to_viewport((-20, 20, 20))
-        self.assertEqual(len(visible), 13)
-        self.assertEqual(len(hidden), 6)
+        visible, hidden = hole.drawing_view((-20, 20, 20))
+        self.assertEqual(len(visible), 12)
+        self.assertEqual(len(hidden), 5)
 
         # Outline edges
         sphere = Solid.make_sphere(5)
-        visible, hidden = sphere.project_to_viewport((-20, 20, 20))
+        visible, hidden = sphere.drawing_view((-20, 20, 20))
         self.assertEqual(len(visible), 1)
         self.assertEqual(len(hidden), 0)
+
+    def test_view_output_by_name_and_by_position(self):
+        box = Solid.make_box(10, 10, 10)
+        output = box.drawing_view((-20, 20, 20))
+        self.assertIsInstance(output, DrawingViewOutput)
+        visible, hidden = output
+        self.assertEqual(len(output.visible), 9)
+        self.assertEqual(len(output.hidden), 3)
+        self.assertEqual(output.visible, visible)
+        self.assertEqual(output.hidden, hidden)
+
+    def test_project_to_viewport_is_deprecated(self):
+        box = Solid.make_box(10, 10, 10)
+        for shape in (box, box.shell(), box.edges()[0], Compound([box])):
+            with self.subTest(shape=type(shape).__name__):
+                with self.assertWarns(DeprecationWarning):
+                    old = shape.project_to_viewport(
+                        viewport_origin=(-20, 20, 20), viewport_up=(0, 0, 1)
+                    )
+                new = shape.drawing_view((-20, 20, 20))
+                self.assertEqual(len(old.visible), len(new.visible))
+                self.assertEqual(len(old.hidden), len(new.hidden))
 
     def test_vertex(self):
         v = Edge.make_circle(1).vertex()
