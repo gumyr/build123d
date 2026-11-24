@@ -98,40 +98,9 @@ Measure ``counter_bore_depth`` from the surface to the flat shoulder. Measure
 Counterdrill
 ------------
 
-build123d has no dedicated counterdrill object. To model one, place a
-:class:`~objects_part.CounterSinkHole` below the surface where the wider bore
-ends. The countersink cone forms the shoulder between the two bore diameters.
-Set ``counter_sink_radius`` to the wider bore's radius and ``counter_sink_angle``
-to the larger drill's included point angle.
-
-On the left, the cutter starts at the surface and forms a countersink. On the
-right, the same cutter starts 10 units below the surface, so the counterdrill's
-shoulder begins at that depth.
-
-.. code-block:: build123d
-
-    with BuildPart() as block:
-        Box(100, 100, 40, align=(Align.CENTER, Align.CENTER, Align.MAX))
-        with Locations((-20, 0, 0)):
-            CounterSinkHole(radius=5, counter_sink_radius=8, counter_sink_angle=118)
-        with Locations((20, 0, -10)):
-            CounterSinkHole(radius=5, counter_sink_radius=8, counter_sink_angle=118)
-        # Expose both profiles in section.
-        split(bisect_by=Plane.XZ, keep=Keep.BOTTOM)
-
-For a blind counterdrill, measure ``depth`` from the cutter location to the end
-of the narrow bore's full diameter. The wider cylinder extends the same distance
-back toward the surface, so set ``depth`` at least as large as the offset.
-
-.. image:: assets/holes/counter_drill_hole_section.svg
-    :align: center
-    :width: 60%
-    :alt: Blind counterdrill with the offset measured to the shoulder and depth measured from there.
-
-.. literalinclude:: holes.py
-    :language: build123d
-    :start-after: [Counter drill]
-    :end-before: [Counter drill]
+build123d has no dedicated counterdrill object. A
+:class:`~objects_part.CounterSinkHole` placed below the surface forms the
+conical shoulder. See :ref:`model_a_counterdrill` for through and blind examples.
 
 Drill points
 ------------

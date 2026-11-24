@@ -519,8 +519,7 @@ Reference
 Holes
 ^^^^^
 
-See :doc:`holes` for dimensioned cross sections, drill points, and an example
-of modeling a counterdrill.
+See :doc:`holes` for dimensioned cross sections and drill-point options.
 
 
 Reference

@@ -215,6 +215,47 @@ the part. In algebra mode the hole is placed with the face's plane and
 subtracted, and it needs a ``depth``, since on its own it has no part to
 go through.
 
+See :doc:`/reference/holes` for hole dimensions and drill-point options.
+
+.. _model_a_counterdrill:
+
+Model a counterdrill
+====================
+
+Place a :class:`~objects_part.CounterSinkHole` at the depth where the wider
+bore ends. Its cone forms the shoulder between the two bore diameters. Set
+``counter_sink_radius`` to the wider bore's radius and ``counter_sink_angle``
+to the larger drill's included point angle.
+
+On the left, the cutter starts at the surface and forms a countersink. On the
+right, the same cutter starts 10 units below the surface, so the counterdrill's
+shoulder begins at that depth.
+
+.. code-block:: build123d
+
+    with BuildPart() as block:
+        Box(100, 100, 40, align=(Align.CENTER, Align.CENTER, Align.MAX))
+        with Locations((-20, 0, 0)):
+            CounterSinkHole(radius=5, counter_sink_radius=8, counter_sink_angle=118)
+        with Locations((20, 0, -10)):
+            CounterSinkHole(radius=5, counter_sink_radius=8, counter_sink_angle=118)
+        # Expose both profiles in section.
+        split(bisect_by=Plane.XZ, keep=Keep.BOTTOM)
+
+For a blind counterdrill, measure ``depth`` from the cutter location to the end
+of the narrow bore's full diameter. The wider cylinder extends the same distance
+back toward the surface, so set ``depth`` at least as large as the offset.
+
+.. image:: /reference/assets/holes/counter_drill_hole_section.svg
+    :align: center
+    :width: 60%
+    :alt: Blind counterdrill with the offset measured to the shoulder and depth measured from there.
+
+.. literalinclude:: /reference/holes.py
+    :language: build123d
+    :start-after: [Counter drill]
+    :end-before: [Counter drill]
+
 *****************************
 Round and bevel the edges
 *****************************
