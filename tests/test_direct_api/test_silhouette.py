@@ -112,6 +112,32 @@ class TestSplitBySilhouette(unittest.TestCase):
         self.assertEqual(len(split.faces()), 2)
         self.assertAlmostEqual(area, 2 * pi * 10**2, delta=0.01)
 
+    def test_cuts_that_end_at_a_pole(self):
+        """Seen square to its axis a sphere's silhouette is two meridians from
+        pole to pole, and a cone's is two lines from its apex"""
+        for direction in ((1, 0, 0), (0, 1, 0), (1, 1, 0)):
+            with self.subTest(direction=direction):
+                area, split = front_area(Sphere(10), Viewer.along(direction))
+                self.assertTrue(split.is_valid)
+                self.assertAlmostEqual(area, 2 * pi * 10**2, delta=0.01)
+
+                cone = Cone(10, 0, 15)
+                area, split = front_area(cone, Viewer.along(direction))
+                self.assertTrue(split.is_valid)
+                # half of the side, the base being edge on
+                self.assertAlmostEqual(area, (cone.area - pi * 10**2) / 2, delta=0.01)
+
+    def test_cone_seen_along_its_axis(self):
+        """The side of a cone faces one way all round, so it has no contour;
+        the normal the kernel reads at the apex is not a turn of it"""
+        cone = Cone(10, 0, 15)
+        side = cone.area - pi * 10**2
+        for direction, area_seen in (((0, 0, 1), pi * 10**2), ((0, 0, -1), side)):
+            with self.subTest(direction=direction):
+                area, split = front_area(cone, Viewer.along(direction))
+                self.assertEqual(len(split.faces()), 2)
+                self.assertAlmostEqual(area, area_seen, delta=0.01)
+
     def test_cylinder_seen_from_the_side(self):
         area, split = front_area(Cylinder(5, 20), Viewer.along((1, 0.5, 0)))
         self.assertEqual(len(split.faces()), 5)  # two caps and the side in two

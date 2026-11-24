@@ -338,6 +338,48 @@ class TestWire(unittest.TestCase):
                 ):
                     wire.param_at_point((0, 0, 0), normalize=normalize)
 
+    def test_location_at_continuous(self):
+        """The CONTINUOUS frame doesn't roll from one edge of a wire to the next"""
+        line = Edge.make_line((0, 0, 0), (10, 0, 0))
+        arc = Edge.make_tangent_arc((10, 0, 0), (1, 0, 0), (20, 10, 0))
+        wire = Wire([line, arc])
+        join = line.length / wire.length
+
+        def x_dirs(method):
+            return [
+                Plane(wire.location_at(join + step, frame_method=method)).x_dir
+                for step in (-1e-6, 1e-6)
+            ]
+
+        before, after = x_dirs(FrameMethod.CONTINUOUS)
+        self.assertLess((after - before).length, 1e-4)
+        # the frames of the two edges, taken separately, are rolled apart
+        before, after = x_dirs(FrameMethod.CORRECTED)
+        self.assertGreater((after - before).length, 1)
+
+        # the frame stays on the wire and along its tangent
+        for u in (0, 0.2, join, 0.8, 1):
+            frame = Plane(wire.location_at(u, frame_method=FrameMethod.CONTINUOUS))
+            self.assertAlmostEqual(frame.origin, wire @ u, 6)
+            self.assertAlmostEqual(frame.z_dir, wire % u, 6)
+        self.assertAlmostEqual(
+            wire.location_at(
+                12.5, PositionMode.LENGTH, FrameMethod.CONTINUOUS
+            ).position,
+            wire.position_at(12.5, PositionMode.LENGTH),
+            6,
+        )
+
+        # on an edge, or with an x_dir fixing the roll, it is the CORRECTED frame
+        self.assertEqual(
+            arc.location_at(0.5, frame_method=FrameMethod.CONTINUOUS),
+            arc.location_at(0.5, frame_method=FrameMethod.CORRECTED),
+        )
+        self.assertEqual(
+            wire.location_at(0.2, frame_method=FrameMethod.CONTINUOUS, x_dir=(0, 0, 1)),
+            wire.location_at(0.2, frame_method=FrameMethod.CORRECTED, x_dir=(0, 0, 1)),
+        )
+
     def test_location_at_reversed_wire(self):
         """location_at agrees with position_at on a reversed wire"""
         wire = Wire(

@@ -1390,8 +1390,12 @@ class Mixin1D(Shape[TOPODS]):
             frame_method (FrameMethod, optional): moving frame calculation method.
                 The FRENET frame can “twist” or flip unexpectedly, especially near flat
                 spots. The CORRECTED frame behaves more like a “camera dolly” or
-                sweep profile would — it's smoother and more stable.
-                Defaults to FrameMethod.FRENET.
+                sweep profile would — it's smoother and more stable. Both are
+                worked out on one edge at a time, so along a Wire the frame can
+                roll about the tangent from one edge to the next. The CONTINUOUS
+                frame is the CORRECTED frame carried from edge to edge without
+                that roll, as a section swept along the Wire is carried; on an
+                Edge it is the CORRECTED frame. Defaults to FrameMethod.FRENET.
             x_dir (VectorLike, optional): override the x_dir to help with plane
                 creation along a 1D shape. Must be perpendicular to shapes tangent.
                 Defaults to None.
@@ -1407,6 +1411,12 @@ class Mixin1D(Shape[TOPODS]):
                 at the specified distance.
         """
         curve = self.geom_adaptor()
+
+        if frame_method == FrameMethod.CONTINUOUS:
+            if isinstance(self, Wire) and x_dir is None:
+                return self._continuous_location(distance, position_mode)
+            # One edge has nothing to carry, and an x_dir sets the roll itself
+            frame_method = FrameMethod.CORRECTED
 
         # param_at and _occt_param_at measure a reversed shape from its other end
         if isinstance(self, Wire):
@@ -4986,6 +4996,41 @@ class Wire(Mixin1D[TopoDS_Wire]):
             raise ValueError("Can't get geom adaptor of empty wire")
 
         return BRepAdaptor_CompCurve(self.wrapped)
+
+    def _continuous_location(
+        self, distance: float, position_mode: PositionMode
+    ) -> Location:
+        """The corrected frame carried along the wire from its start
+
+        The frame at the start of each edge has a roll of its own about the
+        tangent, so the frames of two edges can't be compared directly. Along
+        one edge the roll cancels: the motion from its start to a point on it
+        is the same however its frame is rolled. The frame at the start of the
+        wire is therefore carried by the motion along each edge in turn, which
+        is how the kernel carries a section swept along the wire.
+        """
+        remaining = distance
+        if position_mode == PositionMode.PARAMETER:
+            remaining *= self.length
+        remaining = min(max(remaining, 0.0), self.length)
+
+        *leading, edge = self.order_edges()
+        frame = (leading[0] if leading else edge).location_at(
+            0, frame_method=FrameMethod.CORRECTED
+        )
+        for passed in leading:
+            if remaining <= passed.length:
+                edge = passed
+                break
+            start = passed.location_at(0, frame_method=FrameMethod.CORRECTED)
+            end = passed.location_at(1, frame_method=FrameMethod.CORRECTED)
+            frame = end * start.inverse() * frame
+            remaining -= passed.length
+        start = edge.location_at(0, frame_method=FrameMethod.CORRECTED)
+        here = edge.location_at(
+            min(remaining, edge.length), PositionMode.LENGTH, FrameMethod.CORRECTED
+        )
+        return here * start.inverse() * frame
 
     def order_edges(self) -> ShapeList[Edge]:
         """Return the edges in self ordered by wire direction and orientation"""

@@ -74,6 +74,7 @@ from OCP.BRepFeat import BRepFeat_MakeDPrism
 from OCP.BRepFilletAPI import BRepFilletAPI_MakeChamfer, BRepFilletAPI_MakeFillet
 from OCP.BRepGProp import BRepGProp_Face
 from OCP.BRepOffset import BRepOffset_MakeOffset, BRepOffset_Skin
+from OCP.BRepTools import BRepTools_WireExplorer
 from OCP.BRepOffsetAPI import (
     BRepOffsetAPI_DraftAngle,
     BRepOffsetAPI_MakePipeShell,
@@ -96,7 +97,7 @@ from OCP.GProp import GProp_GProps
 from OCP.ShapeFix import ShapeFix_Solid
 from OCP.Standard import Standard_Failure, Standard_TypeMismatch
 from OCP.StdFail import StdFail_NotDone
-from OCP.TopExp import TopExp
+from OCP.TopExp import TopExp, TopExp_Explorer
 from OCP.TopoDS import (
     TopoDS,
     TopoDS_Compound,
@@ -115,6 +116,7 @@ from OCP.collections import (
 
 from build123d.build_enums import (
     CenterOf,
+    FrameMethod,
     GeomType,
     Keep,
     Kind,
@@ -885,6 +887,29 @@ def _fillet_failure_details(
     )
 
 
+def _check_sweep_profile(profile: Wire) -> None:
+    """Refuse a sweep profile that has a degenerate edge
+
+    A degenerate edge is a side of a surface collapsed to a point, at the pole
+    of a sphere face or the apex of a cone face. The kernel's pipe builder
+    cannot sweep a wire that holds one: depending on the face and the kind of
+    sweep it raises an error that says nothing useful, never returns, or
+    crashes the interpreter.
+
+    Raises:
+        ValueError: profile has a degenerate edge
+    """
+    explorer = TopExp_Explorer(profile.wrapped, ta.TopAbs_EDGE)
+    while explorer.More():
+        if BRep_Tool.Degenerated_s(TopoDS.Edge(explorer.Current())):
+            raise ValueError(
+                "A sweep profile can't have a degenerate edge, as the boundary "
+                "of a sphere or cone face has at its pole or apex. Sweep a "
+                "planar profile, or the Solid itself."
+            )
+        explorer.Next()
+
+
 def _forward_solid(solid: TopoDS_Solid) -> TopoDS_Solid:
     """The same solid with FORWARD flags on itself and its shells.
 
@@ -1298,6 +1323,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
             inner_wires = section.inner_wires()
         else:
             outer_wire = section
+        for wire in [outer_wire] + inner_wires:
+            _check_sweep_profile(wire)
 
         # make straight spine
         straight_spine_e = Edge.make_line(center, center.add(normal))
@@ -1960,7 +1987,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
     @classmethod
     def sweep(
         cls,
-        section: Face | Wire,
+        section: Face | Wire | Solid,
         path: Wire | Edge,
         inner_wires: list[Wire] | None = None,
         make_solid: bool = True,
@@ -1971,6 +1998,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
         """Sweep
 
         Sweep the given cross section into a prismatic solid along the provided path
+
+        A Solid can be swept in place of a cross section. It is carried by the
+        frame of the path, so the profile it presents along the path does not
+        change: the result is that profile swept along the path, capped by the
+        solid at each end. This is the space the solid passes through when the
+        path is straight or the solid is a sphere; on a bend, the parts of a long
+        solid ahead of and behind the path swing slightly outside its swept
+        profile. The edges of the path must join tangentially, the silhouette of
+        the solid as seen along the start of the path must be a single closed
+        loop, as it is for any convex solid, and only section and path apply.
 
         The is_frenet parameter controls how the profile orientation changes as it
         follows along the sweep path. If is_frenet is False, the orientation of the
@@ -1988,7 +2025,8 @@ class Solid(Mixin3D[TopoDS_Solid]):
         http://en.wikipedia.org/wiki/Frenet%E2%80%93Serret_formulas.
 
         Args:
-            section (Union[Face, Wire]): cross section to sweep
+            section (Union[Face, Wire, Solid]): cross section to sweep, or a
+                solid positioned where the sweep starts
             path (Union[Wire, Edge]): sweep path
             inner_wires (list[Wire]): holes - only used if section is a wire
             make_solid (bool, optional): return Solid or Shell. Defaults to True.
@@ -1998,9 +2036,28 @@ class Solid(Mixin3D[TopoDS_Solid]):
             transition (Transition, optional): handling of profile orientation at C1 path
                 discontinuities. Defaults to Transition.TRANSFORMED.
 
+        Raises:
+            ValueError: the section has a degenerate edge, as the boundary of a
+                sphere or cone face has
+            ValueError: an argument other than path given with a Solid section
+            ValueError: the path has a corner and the section is a Solid
+            ValueError: the silhouette of a Solid section along path is not one
+                closed loop
+
         Returns:
             Solid: the swept cross section
         """
+        if isinstance(section, Solid):
+            if (
+                inner_wires
+                or not make_solid
+                or is_frenet
+                or mode is not None
+                or transition != Transition.TRANSFORMED
+            ):
+                raise ValueError("Only section and path apply when sweeping a Solid")
+            return cls._sweep_solid(section, path)
+
         if isinstance(section, Face):
             outer_wire = section.outer_wire()
             inner_wires = section.inner_wires()
@@ -2010,6 +2067,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         shapes: list[Mixin3D[TopoDS_Shape]] = []
         for wire in [outer_wire] + inner_wires:
+            _check_sweep_profile(wire)
             builder = BRepOffsetAPI_MakePipeShell(Wire(path).wrapped)
 
             rotate = False
@@ -2046,6 +2104,84 @@ class Solid(Mixin3D[TopoDS_Solid]):
                 stacklevel=2,
             )
         return outer_shape
+
+    @classmethod
+    def _sweep_solid(cls, solid: Solid, path: Wire | Edge) -> Solid:
+        """Sweep a solid along a path, as described in :meth:`Solid.sweep`
+
+        The faces of the solid are split along its silhouette as seen along the
+        start of the path. Those looking backward stay where they are, the edges
+        between them and the rest are swept along the path, and the rest are
+        carried to the end of the path. The three are sewn into the result.
+
+        Args:
+            solid (Solid): the solid to sweep, positioned where the sweep starts
+            path (Wire | Edge): the path to follow
+
+        Raises:
+            ValueError: the edges of path do not join tangentially
+            ValueError: the silhouette of solid along path is not one closed loop
+            RuntimeError: the swept faces do not close into a valid solid
+
+        Returns:
+            Solid: the swept solid
+        """
+        path = Wire([path]) if isinstance(path, Edge) else path
+        # At a corner the solid would have to turn on the spot, sweeping a
+        # volume this method doesn't build
+        edges = path.order_edges()
+        for before, after in zip(edges, edges[1:]):
+            arriving, leaving = before % 1, after % 0
+            if arriving.dot(leaving) < 0 or arriving.cross(leaving).length > 1e-6:
+                raise ValueError(
+                    "The edges of the path must join tangentially to sweep a "
+                    f"Solid, but there is a corner at {tuple(before @ 1)}: "
+                    "fillet the path there"
+                )
+        viewer = Viewer.along(path % 0)
+
+        # Viewed along the direction of travel, the faces toward the viewer are
+        # those looking backward: they stay behind as the start of the result.
+        # The others, with any parallel to the travel, are carried to the end.
+        split, _ = split_by_silhouette(solid, viewer)
+        faces = split.faces()
+        start_cap = front_facing(faces, viewer)
+        end_cap = ShapeList(face for face in faces if face not in start_cap)
+
+        # The rim, where the two caps meet, is swept along the path
+        end_edges = set(end_cap.edges())
+        rims = Wire.combine(edge for edge in start_cap.edges() if edge in end_edges)
+        if len(rims) != 1:
+            raise ValueError(
+                "The silhouette of the solid along the path must be one closed "
+                f"loop, found {len(rims)}"
+            )
+        (rim,) = rims
+        # The rim is tied to the start of the path. Left to place a section that
+        # lies off the path, as the rim does behind its start, the kernel may
+        # start the sweep from another point of a path that returns close by.
+        path_start = BRepTools_WireExplorer(path.wrapped).CurrentVertex()
+        builder = BRepOffsetAPI_MakePipeShell(path.wrapped)
+        # pylint: disable-next=no-member
+        builder.Add(rim.wrapped, path_start, False, False)
+        builder.Build()
+        if not builder.IsDone():
+            raise RuntimeError("Unable to sweep the silhouette along the path")
+        swept = Shape.cast(builder.Shape()).faces()
+
+        # The end cap follows the frame that carried the rim
+        start = path.location_at(0, frame_method=FrameMethod.CONTINUOUS)
+        end = path.location_at(1, frame_method=FrameMethod.CONTINUOUS)
+        motion = end * start.inverse()
+        carried = [face.moved(motion) for face in end_cap]
+
+        shell = Shell(start_cap + swept + carried)
+        result = Solid(shell)
+        if not result.is_valid:
+            raise RuntimeError("The swept faces do not close into a valid solid")
+        if result.volume < 0:  # the faces were sewn inside out
+            result = Solid(-shell)  # pylint: disable=invalid-unary-operand-type
+        return result
 
     @classmethod
     def sweep_multi(
@@ -2099,12 +2235,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
             builder.SetMode(is_frenet)
 
         for profile in profiles:
-            path_as_wire = (
-                profile.wrapped
-                if isinstance(profile, Wire)
-                else profile.outer_wire().wrapped
+            profile_wire = (
+                profile if isinstance(profile, Wire) else profile.outer_wire()
             )
-            builder.Add(path_as_wire, translate, rotate)
+            _check_sweep_profile(profile_wire)
+            builder.Add(profile_wire.wrapped, translate, rotate)
 
         builder.Build()
 

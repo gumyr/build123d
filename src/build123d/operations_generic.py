@@ -1423,8 +1423,14 @@ def sweep(
     Sweep pending 1D or 2D objects along path. The faces swept out by a 1D
     section are returned in a Sketch that holds them as a Shell.
 
+    A 3D section, a Solid or a Part, is swept as a solid: it is carried by the
+    frame of the path and the result is the profile it presents along the path,
+    swept, and capped by the solid at each end. See :meth:`Solid.sweep` for what
+    can be swept this way. Only sections, path, clean and mode apply to it.
+
     Args:
-        sections (Compound |  Edge |  Wire |  Face |  Solid): cross sections to sweep into object
+        sections (Compound |  Edge |  Wire |  Face |  Solid): cross sections to sweep
+            into object, or solids positioned where the sweep starts
         path (Curve |  Edge |  Wire, optional): path to follow.
             Defaults to context pending_edges.
         multisection (bool, optional): sweep multiple on path. Defaults to False.
@@ -1435,6 +1441,10 @@ def sweep(
         binormal (Edge |  Wire, optional): guide rotation along path. Defaults to None.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination. Defaults to Mode.ADD.
+
+    Raises:
+        ValueError: an option that shapes the sweep of a cross section given with
+            a 3D section
     """
     context: Builder | None = Builder._get_context("sweep")
 
@@ -1488,29 +1498,45 @@ def sweep(
 
     edge_list: list[Edge] = []
     face_list: list[Face] = []
+    solid_list: list[Solid] = []
     for sec in section_list:
         if isinstance(sec, (Curve, Wire, Edge)):
             edge_list.extend(sec.edges())
+        elif sec.solids():
+            solid_list.extend(sec.solids())
         else:
             face_list.extend(sec.faces())
 
     # sweep to create solids
     new_solids = []
     binormal_mode: Wire | Vector | None
+    if binormal is None and normal is not None:
+        binormal_mode = Vector(normal)
+    elif isinstance(binormal, Edge):
+        binormal_mode = Wire([binormal])
+    else:
+        binormal_mode = binormal
+    if solid_list:
+        if multisection:
+            raise ValueError("multisection doesn't apply when sweeping a Solid")
+        new_solids = [
+            Solid.sweep(
+                section=solid,
+                path=path_wire,
+                is_frenet=is_frenet,
+                mode=binormal_mode,
+                transition=transition,
+            )
+            for solid in solid_list
+        ]
     if face_list:
-        if binormal is None and normal is not None:
-            binormal_mode = Vector(normal)
-        elif isinstance(binormal, Edge):
-            binormal_mode = Wire([binormal])
-        else:
-            binormal_mode = binormal
         if multisection:
             sections = [face.outer_wire() for face in face_list]
-            new_solids = [
+            new_solids += [
                 Solid.sweep_multi(sections, path_wire, True, is_frenet, binormal_mode)
             ]
         else:
-            new_solids = [
+            new_solids += [
                 Solid.sweep(
                     section=face,
                     path=path_wire,

@@ -1078,6 +1078,30 @@ class SplitReturnTypeTests(unittest.TestCase):
 
 
 class TestSweep(unittest.TestCase):
+    def test_3d_section(self):
+        # A solid is swept as a solid, not face by face
+        line = Edge.make_line((0, 0, 0), (10, 0, 0))
+        for section in (Box(2, 2, 2), Solid.make_box(2, 2, 2)):
+            swept = sweep(section, line)
+            self.assertIsInstance(swept, Part)
+            self.assertEqual(len(swept.solids()), 1)
+            self.assertAlmostEqual(swept.volume, 8 + 4 * 10, 5)
+
+        with BuildPart() as tool_path:
+            Box(2, 2, 2)
+            sweep(tool_path.part, line)
+        self.assertAlmostEqual(tool_path.part.volume, 8 + 4 * 10, 5)
+
+        # a face of a solid is still a cross section
+        end = Box(2, 2, 2).faces().sort_by(Axis.X)[0]
+        self.assertAlmostEqual(sweep(end, line).volume, 4 * 10, 5)
+
+        # the options for the sweep of a cross section don't apply
+        with self.assertRaises(ValueError):
+            sweep(Box(2, 2, 2), line, multisection=True)
+        with self.assertRaises(ValueError):
+            sweep(Box(2, 2, 2), line, is_frenet=True)
+
     def test_return_is_cleaned_inside_a_builder(self):
         # Issue #451: a path of two collinear lines sweeps seams between the
         # side faces; clean removes them from the returned shape in both modes
