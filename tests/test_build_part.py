@@ -470,65 +470,6 @@ class TestCounterBoreHole(unittest.TestCase):
         self.assertAlmostEqual(cone.bounding_box().min.Z, -2, 5)
 
 
-class TestCounterDrillHole(unittest.TestCase):
-    # radius 2 under a radius 3 counter drill with a 90 degree step: a frustum of height 1
-    step = pi * 1 / 3 * (3**2 + 3 * 2 + 2**2)
-
-    def test_fixed_depth(self):
-        with BuildPart() as test:
-            Box(10, 10, 10)
-            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
-                CounterDrillHole(2, 3, 2, 6, counter_drill_angle=90)
-        self.assertAlmostEqual(
-            test.part.volume, 1000 - 9 * 2 * pi - self.step - 4 * 3 * pi, 5
-        )
-        self.assertEqual(len(test.faces().filter_by(GeomType.CONE)), 1)
-
-    def test_through_hole(self):
-        with BuildPart() as test:
-            Box(10, 10, 10)
-            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
-                CounterDrillHole(2, 3, 2, counter_drill_angle=90)
-        self.assertAlmostEqual(
-            test.part.volume, 1000 - 9 * 2 * pi - self.step - 4 * 7 * pi, 5
-        )
-
-    def test_point_angle(self):
-        with BuildPart() as test:
-            Box(10, 10, 10)
-            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
-                CounterDrillHole(2, 3, 2, 6, counter_drill_angle=90, point_angle=90)
-        point = pi * 2**2 * 2 / 3
-        self.assertAlmostEqual(
-            test.part.volume, 1000 - 9 * 2 * pi - self.step - 4 * 3 * pi - point, 5
-        )
-        self.assertEqual(len(test.faces().filter_by(GeomType.CONE)), 2)
-
-    def test_default_angle(self):
-        with BuildPart() as test:
-            Box(10, 10, 10)
-            with Locations(test.faces().filter_by(Axis.Z)[-1].center()):
-                hole = CounterDrillHole(2, 3, 2, 6)
-        self.assertEqual(hole.counter_drill_angle, 118)
-        cone = test.faces().filter_by(GeomType.CONE)[0]
-        step_height = 1 / tan(radians(59))
-        self.assertAlmostEqual(cone.bounding_box().min.Z, 3 - step_height, 5)
-
-    def test_errors(self):
-        with self.assertRaises(ValueError):
-            with BuildPart():
-                Box(10, 10, 10)
-                CounterDrillHole(3, 3, 2, 6)
-        with self.assertRaises(ValueError):
-            with BuildPart():
-                Box(10, 10, 10)
-                CounterDrillHole(2, 3, 2, 2.5, counter_drill_angle=90)
-        with self.assertRaises(ValueError):
-            with BuildPart():
-                Box(10, 10, 10)
-                CounterDrillHole(2, 3, 2, 6, counter_drill_angle=180)
-
-
 class TestCounterSinkHole(unittest.TestCase):
     def test_fixed_depth(self):
         with BuildPart() as test:

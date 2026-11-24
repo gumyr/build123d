@@ -173,7 +173,6 @@ __all__ = [
     "Cone",
     "ConvexPolyhedron",
     "CounterBoreHole",
-    "CounterDrillHole",
     "CounterSinkHole",
     "Cylinder",
     "Hole",

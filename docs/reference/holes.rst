@@ -2,12 +2,12 @@
 Holes
 #####
 
-build123d has four hole objects, one for each common way of drilling a hole for
+build123d has three hole objects, one for each common way of drilling a hole for
 a fastener. Each one is a part object whose ``mode`` defaults to
 ``Mode.SUBTRACT``: it removes a solid of revolution from the part at every active
 location.
 
-.. image:: assets/hole_types.svg
+.. image:: assets/holes/hole_types.svg
     :align: center
 
 The section above is of this plate:
@@ -22,9 +22,6 @@ The section above is of this plate:
   so a flat-head screw sits flush with the surface.
 * :class:`~objects_part.CounterBoreHole`: a hole under a wider, flat-bottomed bore,
   so a socket-head screw sits below the surface.
-* :class:`~objects_part.CounterDrillHole`: a counterbore made with a drill instead
-  of a flat-bottomed cutter, so the step down to the hole is the cone left by the
-  larger drill's point.
 
 Placing holes
 -------------
@@ -61,7 +58,7 @@ arguments that set it.
 Hole
 ^^^^
 
-.. image:: assets/hole_section.svg
+.. image:: assets/holes/hole_section.svg
     :align: center
     :width: 60%
 
@@ -77,7 +74,7 @@ CounterSinkHole
 ``counter_sink_angle`` its included angle, 82° by default as for an inch flat-head
 screw; metric (ISO) heads take 90°. ``depth`` is measured from the surface, through the cone.
 
-.. image:: assets/counter_sink_hole_section.svg
+.. image:: assets/holes/counter_sink_hole_section.svg
     :align: center
     :width: 60%
 
@@ -91,7 +88,7 @@ CounterBoreHole
 
 Both ``counter_bore_depth`` and ``depth`` are measured from the surface.
 
-.. image:: assets/counter_bore_hole_section.svg
+.. image:: assets/holes/counter_bore_hole_section.svg
     :align: center
     :width: 60%
 
@@ -100,34 +97,39 @@ Both ``counter_bore_depth`` and ``depth`` are measured from the surface.
     :start-after: [CounterBoreHole]
     :end-before: [CounterBoreHole]
 
-CounterDrillHole
-^^^^^^^^^^^^^^^^
+Counter drill
+^^^^^^^^^^^^^
 
-``counter_drill_depth`` is measured to the end of the larger drill's full
-diameter, as a ``C'DRILL ⌀ ↧ × angle`` callout gives it. The cone below it has
-the included angle ``counter_drill_angle``, 118° by default for a standard twist
-drill. A blind hole must reach past that cone.
+A counter drill is a counterbore made with a drill instead of a flat-bottomed
+cutter, so the step down to the hole is the cone left by the larger drill's
+point. It is a :class:`~objects_part.CounterSinkHole` placed at the counter
+drill's depth: the countersink's cone becomes the step, and the cylinder of
+``counter_sink_radius`` it carries above its mouth runs up to the surface. The
+location's depth is then the counter drill's depth, measured to the end of the
+larger drill's full diameter as a ``C'DRILL ⌀ ↧ × angle`` callout gives it, and
+``counter_sink_angle`` is that drill's point angle, 118° for a standard twist
+drill. ``depth`` is measured from the location.
 
-.. image:: assets/counter_drill_hole_section.svg
+.. image:: assets/holes/counter_drill_hole_section.svg
     :align: center
     :width: 60%
 
 .. literalinclude:: holes.py
     :language: build123d
-    :start-after: [CounterDrillHole]
-    :end-before: [CounterDrillHole]
+    :start-after: [Counter drill]
+    :end-before: [Counter drill]
 
 Drill points
 ------------
 
 A blind hole made by a twist drill ends in a cone whose included angle is the
 drill's point angle, 118° for a standard drill. Giving ``point_angle`` to any of
-the four holes adds that cone below the hole; without it, the bottom stays flat.
+the three holes adds that cone below the hole; without it, the bottom stays flat.
 As on a drawing, ``depth`` is measured to the end of the full diameter, so the
 cone adds ``radius / tan(point_angle / 2)`` below it. A drill point needs a
 ``depth``, because a through hole has no bottom.
 
-.. image:: assets/hole_drill_point.svg
+.. image:: assets/holes/hole_drill_point.svg
     :align: center
     :width: 60%
 
@@ -136,7 +138,7 @@ cone adds ``radius / tan(point_angle / 2)`` below it. A drill point needs a
     :start-after: [Drill point]
     :end-before: [Drill point]
 
-The drawings on this page are made by ``docs/holes.py``.
+The drawings on this page are made by ``docs/reference/holes.py``.
 
 Reference
 ---------
@@ -144,4 +146,3 @@ Reference
 * :class:`~objects_part.Hole`
 * :class:`~objects_part.CounterSinkHole`
 * :class:`~objects_part.CounterBoreHole`
-* :class:`~objects_part.CounterDrillHole`

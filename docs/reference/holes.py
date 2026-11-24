@@ -1,6 +1,6 @@
 """
-Section drawings for the Holes page: the four kinds of hole side by side in one
-plate, then each one alone, dimensioned with the arguments that set it, then a
+Section drawings for the Holes page: the three kinds of hole side by side in one
+plate, then each one alone, then a counter drill made from a countersink, dimensioned with the arguments that set it, then a
 blind hole with a drill point.
 """
 
@@ -8,7 +8,7 @@ from math import radians, sin, tan
 
 from build123d import *
 
-drafting_options = Draft(
+drafting_options = Drafting(
     font_size=1.4, arrow_length=1.2, line_width=0.1, pad_around_text=0.6
 )
 
@@ -22,7 +22,7 @@ def section(part: Part) -> tuple[Face | Compound, ShapeList[Edge]]:
     far_half = part & Box(
         1000, 1000, 1000, align=(Align.CENTER, Align.MIN, Align.CENTER)
     )
-    visible, _ = far_half.project_to_viewport((0, -1000, 0), look_at=(0, 0, 0))
+    visible, _ = far_half.drawing_view((0, -1000, 0), look_at=(0, 0, 0))
     return cut, visible
 
 
@@ -38,7 +38,7 @@ def write_section(name: str, part: Part, dimensions=(), centers=(), scale=4):
     exporter.add_shape(visible, layer="Visible")
     exporter.add_shape(list(dimensions), layer="Dimensions")
     exporter.add_shape(list(centers), layer="Center")
-    exporter.write(f"assets/{name}.svg")
+    exporter.write(f"assets/holes/{name}.svg")
 
 
 def width(x: float, y: float, offset: float, label: str) -> ExtensionLine:
@@ -76,18 +76,16 @@ def axis(top: float, bottom: float, x: float = 0) -> Edge:
 
 # [Hole types]
 with BuildPart() as plate:
-    Box(100, 20, 12, align=(Align.CENTER, Align.CENTER, Align.MAX))
-    with Locations((-37.5, 0)):
+    Box(80, 20, 12, align=(Align.CENTER, Align.CENTER, Align.MAX))
+    with Locations((-25, 0)):
         Hole(radius=3)
-    with Locations((-12.5, 0)):
+    with Locations((0, 0)):
         CounterSinkHole(radius=3, counter_sink_radius=6)
-    with Locations((12.5, 0)):
+    with Locations((25, 0)):
         CounterBoreHole(radius=3, counter_bore_radius=6, counter_bore_depth=5)
-    with Locations((37.5, 0)):
-        CounterDrillHole(radius=3, counter_drill_radius=6, counter_drill_depth=4)
 # [Hole types]
-hole_x = (-37.5, -12.5, 12.5, 37.5)
-names = ("Hole", "CounterSinkHole", "CounterBoreHole", "CounterDrillHole")
+hole_x = (-25, 0, 25)
+names = ("Hole", "CounterSinkHole", "CounterBoreHole")
 write_section(
     "hole_types",
     plate.part,
@@ -171,17 +169,16 @@ write_section(
     centers=[axis(0, -depth)],
 )
 
-# [CounterDrillHole]
+# [Counter drill]
 with BuildPart() as counter_drill:
     Box(60, 60, 42, align=(Align.CENTER, Align.CENTER, Align.MAX))
-    CounterDrillHole(
-        radius=5,
-        counter_drill_radius=10,
-        counter_drill_depth=16,
-        depth=32,
-        counter_drill_angle=118,
-    )
-# [CounterDrillHole]
+    # The countersink's mouth sits at the counter drill's depth, and its
+    # counter_sink_radius cylinder runs on up to the surface
+    with Locations((0, 0, -16)):
+        CounterSinkHole(
+            radius=5, counter_sink_radius=10, depth=16, counter_sink_angle=118
+        )
+# [Counter drill]
 drill_depth, drill_angle = 16, 118
 drill_tip = Vector(0, -drill_depth - counter_radius / tan(radians(drill_angle / 2)))
 # The angle spans the step itself: the arc's ends lie on the cone, across the hole
@@ -190,17 +187,23 @@ write_section(
     "counter_drill_hole_section",
     counter_drill.part,
     dimensions=[
-        width(counter_radius, 0, 5, "2 × counter_drill_radius"),
+        width(counter_radius, 0, 5, "2 × counter_sink_radius"),
         width(radius, -depth, 4, "2 × radius"),
         height(
             counter_radius,
             0,
             -drill_depth,
             outside - counter_radius,
-            "counter_drill_depth",
+            "location depth",
         ),
-        height(-counter_radius, 0, -depth, counter_radius - outside, "depth"),
-        cone_angle(drill_tip, drill_angle, drill_arc, "counter_drill_angle"),
+        height(
+            -counter_radius,
+            -drill_depth,
+            -depth,
+            counter_radius - outside,
+            "depth",
+        ),
+        cone_angle(drill_tip, drill_angle, drill_arc, "counter_sink_angle"),
     ],
     centers=[axis(0, -depth)],
 )

@@ -516,6 +516,14 @@ Reference
         Wedge defined by lengths along multiple Axes
 
 
+Holes
+^^^^^
+
+:class:`~objects_part.Hole`, :class:`~objects_part.CounterSinkHole` and
+:class:`~objects_part.CounterBoreHole` have a page of their own, :doc:`holes`,
+with a dimensioned section of each, a counter drill and their drill points.
+
+
 Reference
 ^^^^^^^^^
 .. py:module:: objects_part
