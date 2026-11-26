@@ -633,6 +633,56 @@ class TestExtrude(unittest.TestCase):
         self.assertAlmostEqual(column.volume, 10 * 10 * 10 - pi * 3**2 * 5, 3)
         self.assertAlmostEqual(column.bounding_box().min.Z, 10, 5)
 
+    def test_extrude_until_with_taper(self):
+        # Issue #603: the taper was ignored when extruding until a target
+        low = (Align.CENTER, Align.CENTER, Align.MIN)
+        profile = Rectangle(10, 10)
+        above = Pos(Z=25) * Box(60, 60, 10, align=low)
+        below = Pos(Z=-35) * Box(60, 60, 10, align=low)
+        cases = [
+            (Until.NEXT, above, 25, 5),
+            (Until.NEXT, above, 25, -5),
+            (Until.LAST, above + Pos(Z=50) * Box(60, 60, 10, align=low), 60, 3),
+            (Until.PREVIOUS, below, -25, 5),
+            (Until.FIRST, below + Pos(Z=-60) * Box(60, 60, 10, align=low), -60, -3),
+        ]
+        for until, target, depth, taper in cases:
+            with self.subTest(until=until, taper=taper):
+                tapered = extrude(profile, until=until, target=target, taper=taper)
+                expected = Solid.extrude_taper(profile.face(), (0, 0, depth), taper)
+                self.assertTrue(tapered.is_valid)
+                self.assertAlmostEqual(tapered.volume, expected.volume, 4)
+
+    def test_extrude_until_with_taper_in_a_builder(self):
+        with BuildPart() as tower:
+            Box(60, 60, 10, align=(Align.CENTER, Align.CENTER, Align.MAX))
+            with Locations((0, 0, 25)):
+                Box(60, 60, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
+            with BuildSketch():
+                Rectangle(10, 10)
+            extrude(until=Until.NEXT, both=False, taper=5)
+        column = Solid.extrude_taper(Face.make_rect(10, 10), (0, 0, 25), 5)
+        self.assertAlmostEqual(tower.part.volume, 72000 + column.volume, 4)
+
+    def test_extrude_until_with_taper_stops_at_what_the_wider_sides_meet(self):
+        low = (Align.CENTER, Align.CENTER, Align.MIN)
+        plate = Pos(Z=25) * Box(60, 60, 10, align=low)
+        target = plate + Pos(9, 0, 15) * Box(6, 60, 10, align=low)  # a boss beside
+        widened = extrude(Rectangle(10, 10), until=Until.NEXT, target=target, taper=-5)
+        self.assertTrue(widened.is_valid)
+        self.assertAlmostEqual((widened & target).volume, 0, 5)
+        self.assertLess(
+            widened.volume,
+            Solid.extrude_taper(Face.make_rect(10, 10), (0, 0, 25), -5).volume,
+        )
+
+    def test_extrude_until_with_taper_that_closes_the_profile(self):
+        plate = Pos(Z=25) * Box(
+            60, 60, 10, align=(Align.CENTER, Align.CENTER, Align.MIN)
+        )
+        with self.assertRaises(RuntimeError):
+            extrude(Rectangle(10, 10), until=Until.NEXT, target=plate, taper=15)
+
     def test_extrude_until_errors(self):
         with self.assertRaises(ValueError):
             extrude(

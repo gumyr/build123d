@@ -1461,6 +1461,7 @@ class Solid(Mixin3D[TopoDS_Solid]):
         target: Compound | Solid,
         direction: VectorLike,
         until: Until = Until.NEXT,
+        taper: float = 0.0,
     ) -> Solid | Compound:
         """extrude_until
 
@@ -1489,6 +1490,11 @@ class Solid(Mixin3D[TopoDS_Solid]):
         extrusion leaves it. A sketch drawn on a face of the target extrudes
         into the material to the next surface within.
 
+        With a ``taper`` the sides of the extrusion lean as they do for
+        :meth:`Solid.extrude_taper`, and it is the tapered extrusion that is
+        stopped by the target: one that widens stops at what its wider sides
+        run into.
+
         Note:
             The bounding surface on the target must be large enough to
             completely cover the extruded profile at the contact region.
@@ -1500,11 +1506,16 @@ class Solid(Mixin3D[TopoDS_Solid]):
             direction (VectorLike): Extrusion direction.
             until (Until, optional): Surface selection mode controlling which
                 intersection to stop at. Defaults to ``Until.NEXT``.
+            taper (float, optional): taper angle in degrees. A positive angle
+                narrows the extrusion as it moves away from the profile.
+                Defaults to 0.0.
 
         Raises:
             ValueError: If the provided profile does not intersect the target,
                 or the target only touches the extrusion and no surface of it
                 cuts the extrusion.
+            RuntimeError: The tapered extrusion could not be built, as when the
+                taper collapses the profile before it reaches the target.
 
         Returns:
             Solid | Compound: The extruded and limited solid. A profile that
@@ -1519,7 +1530,23 @@ class Solid(Mixin3D[TopoDS_Solid]):
 
         # Extrude the profile far enough to pass right through the target
         reach = find_max_dimension([profile, target])
-        extrusion = Solid.extrude(profile, direction * reach)
+        if taper == 0:
+            extrusion = Solid.extrude(profile, direction * reach)
+        else:
+            try:
+                extrusion = Solid.extrude_taper(profile, direction * reach, taper)
+            except RuntimeError:
+                # The taper closes the profile before it is through the target.
+                # A narrowing extrusion stays inside the straight one, so it
+                # need go no deeper than the straight one does
+                straight = cls.extrude_until(profile, target, direction, until)
+                ahead = Plane(profile.center(), z_dir=direction)
+                depth = 1.05 * ahead.to_local_coords(straight.bounding_box()).max.Z
+                extrusion = Solid.extrude_taper(
+                    profile, direction.normalized() * depth, taper
+                )
+            # The tapered extrusion's own base face is the one followed
+            profile = extrusion.faces().sort_by(Axis(profile.center(), direction))[0]
 
         if until == Until.NEXT:
             return cls._extrusion_until_next(
