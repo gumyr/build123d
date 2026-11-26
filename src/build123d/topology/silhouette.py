@@ -44,9 +44,8 @@ from typing import TYPE_CHECKING, cast
 
 from OCP.BRep import BRep_Tool
 from OCP.BRepAdaptor import BRepAdaptor_Surface
-from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Splitter
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace
-from OCP.BRepFeat import BRepFeat_SplitShape
 from OCP.BRepTopAdaptor import BRepTopAdaptor_TopolTool
 from OCP.Contap import Contap_Contour, Contap_IType, Contap_Line
 from OCP.Geom import Geom_Plane
@@ -292,10 +291,13 @@ def _normal_turns_through(face: Face, viewer: Viewer) -> bool:
     # kernel evaluates one there anyway, pointing wherever its limit went, so
     # an anchor on a pole says nothing about the face
     poles = [Vector(v) for edge in _degenerate_edges(face) for v in edge.vertices()]
+
+    def on_a_pole(point: Vector) -> bool:
+        return any((point - pole).length < TOLERANCE for pole in poles)
+
     for point in anchors:
-        if any((point - pole).length < TOLERANCE for pole in poles):
-            continue
-        note(face.normal_at(point), point)
+        if not on_a_pole(point):
+            note(face.normal_at(point), point)
     u_min, u_max, v_min, v_max = face._uv_bounds()
     sampler = BRepTopAdaptor_TopolTool(BRepAdaptor_Surface(face.wrapped))
     sampler.ComputeSamplePoints()
@@ -305,7 +307,10 @@ def _normal_turns_through(face: Face, viewer: Viewer) -> bool:
         u = (uv_sample.X() - u_min) / (u_max - u_min)
         v = (uv_sample.Y() - v_min) / (v_max - v_min)
         if face.is_inside(u, v):
-            note(face.normal_at(u, v), face.position_at(u, v))
+            # the kernel samples the far edge of a cone's surface, its apex
+            point = face.position_at(u, v)
+            if not on_a_pole(point):
+                note(face.normal_at(u, v), point)
     return len(signs) == 2
 
 
@@ -327,21 +332,26 @@ def split_by_silhouette(shape: Shape, viewer: Viewer) -> tuple[Shape, ShapeHisto
     which face became which fragments.
 
     A face with no contour is left as it is.
+
+    The contour edges cut the shape through the kernel's boolean splitter. Its
+    feature splitter, which takes each cut with the face it belongs to, fails
+    on a cut that ends at a pole of the surface: the two meridians of a sphere
+    seen square to its axis, or the lines from the apex of a cone.
     """
-    splitter = BRepFeat_SplitShape(shape.wrapped)
-    added = 0
+    tools = List_TopoDS_Shape()
     for face in shape.faces():
-        # The kernel walks a contour in pieces that meet at interior points;
-        # chained into wires they share those vertices, which the splitter
-        # needs to carry a cut from one piece to the next
-        for wire in Wire.combine(silhouette_edges(face, viewer)):
-            splitter.Add(wire.wrapped, face.wrapped)
-            added += 1
-    if added == 0:
+        for edge in silhouette_edges(face, viewer):
+            tools.Append(edge.wrapped)
+    if tools.Size() == 0:
         return shape, ShapeHistory(before=[shape.wrapped])
+    arguments = List_TopoDS_Shape()
+    arguments.Append(shape.wrapped)
+    splitter = BRepAlgoAPI_Splitter()
+    splitter.SetArguments(arguments)
+    splitter.SetTools(tools)
     splitter.Build()
     result = downcast(splitter.Shape())
-    history = ShapeHistory.from_algorithm(splitter, [shape.wrapped], result)
+    history = ShapeHistory.from_boolean(splitter, [shape.wrapped])
     return Shape.cast(result), history
 
 

@@ -683,6 +683,19 @@ class TestExtrude(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             extrude(Rectangle(10, 10), until=Until.NEXT, target=plate, taper=15)
 
+    def test_extrude_until_a_sphere_or_cone_from_the_side(self):
+        # seen square to its axis the silhouette of a sphere runs from pole to
+        # pole, and that of a cone from its apex
+        profile = Pos(-20, 0, 0) * (Plane.YZ * Rectangle(3, 3))
+        for target in (Sphere(5), Cone(5, 0, 8)):
+            with self.subTest(target=type(target).__name__):
+                column = extrude(
+                    profile, until=Until.NEXT, dir=(1, 0, 0), target=target
+                )
+                self.assertTrue(column.is_valid)
+                self.assertGreater(column.volume, 9 * 15)
+                self.assertAlmostEqual((column & target).volume, 0, 5)
+
     def test_extrude_until_errors(self):
         with self.assertRaises(ValueError):
             extrude(
