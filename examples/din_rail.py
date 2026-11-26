@@ -5,10 +5,10 @@ by:   Gumyr
 date: July 14th 2022
 
 desc:
-
-    This example demonstrates multiple vertex filtering techniques including
-    a fully custom filter. It also shows how a workplane can be replaced
-    with another in a different orientation for further work.
+    A 35 x 7.5 mm top hat DIN rail made the way it is manufactured: as sheet
+    metal. A flat strip is stepped down along both long edges, the slots are
+    cut in its top, and the sheet is thickened into the part and unfolded
+    into the blank it is formed from.
 
 license:
 
@@ -27,60 +27,39 @@ license:
     limitations under the License.
 """
 
-import logging
+# [Code]
+
 from build123d import *
 from ocp_viewer import show
 
-logging.basicConfig(
-    filename="din_rail.log",
-    level=logging.INFO,
-    format="%(name)s-%(levelname)s %(asctime)s - [%(filename)s:%(lineno)s - %(funcName)20s() ] - %(message)s",
-)
-logging.info("Starting to create din rail")
-
-# 35x7.5mm DIN Rail Dimensions
-overall_width, top_width, height, thickness, fillet_radius = 35, 27, 7.5, 1, 0.8
-rail_length = 1000
+# 35 x 7.5 mm DIN rail dimensions
+overall_width, top_width, height = 35, 27, 7.5
+thickness, bend_radius = 1, 0.8
+rail_length = 250
 slot_width, slot_length, slot_pitch = 6.2, 15, 25
 
+# The flat beyond each lower bend, which makes the rail its overall width
+lip = (overall_width - top_width) / 2 - bend_radius
+
 with BuildPart() as rail:
-    with BuildSketch(Plane.XZ) as din:
-        Rectangle(overall_width, thickness, align=(Align.CENTER, Align.MIN))
-        Rectangle(top_width, height, align=(Align.CENTER, Align.MIN))
-        Rectangle(
-            top_width - 2 * thickness,
-            height - thickness,
-            align=(Align.CENTER, Align.MIN),
-            mode=Mode.SUBTRACT,
+    with BuildSheet(thickness=thickness, bend_radius=bend_radius) as sheet:
+        # The top of the rail, drawn to the outside of its walls
+        with BuildSketch():
+            Rectangle(rail_length, top_width)
+        # Each long edge steps down to a lip level with the mounting surface
+        jog(
+            sheet.rims().filter_by(Axis.X),
+            offset=-(height - thickness),
+            length=lip,
+            position=BendPosition.MATERIAL_OUTSIDE,
         )
-        inside_vertices = (
-            din.vertices()
-            .filter_by_position(Axis.Y, 0.0, height, inclusive=(False, False))
-            .filter_by_position(
-                Axis.X,
-                -overall_width / 2,
-                overall_width / 2,
-                inclusive=(False, False),
-            )
-        )
-        fillet(inside_vertices, radius=fillet_radius)
-        outside_vertices = filter(
-            lambda v: (v.Y == 0.0 or v.Y == height)
-            and -overall_width / 2 < v.X < overall_width / 2,
-            din.vertices(),
-        )
-        fillet(outside_vertices, radius=fillet_radius + thickness)
-    extrude(amount=rail_length / 2, both=True)
+        # A sketch object drawn in a sheet cuts the face it lies on
+        with GridLocations(slot_pitch, 0, rail_length // slot_pitch - 1, 1):
+            SlotOverall(slot_length, slot_width, mode=Mode.SUBTRACT)
+    thicken()
 
-    with BuildSketch(Plane.XY) as slots:
-        with GridLocations(
-            0,
-            slot_pitch,
-            1,
-            rail_length // slot_pitch - 1,
-        ):
-            SlotOverall(slot_length, slot_width, rotation=90)
-    extrude(amount=height, mode=Mode.SUBTRACT)
+# The strip the rail is formed from, slots included
+blank = unfold(sheet.sheet, sheet.sheet_parameters).flat
 
-# assert abs(rail.part.volume - 42462.863388694714) < 1e-3
-show(rail, names=["rail"])
+show(rail, Pos(0, 2 * overall_width, 0) * blank, names=["rail", "blank"])
+# [End]
