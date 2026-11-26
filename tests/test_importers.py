@@ -1,5 +1,6 @@
 from io import BytesIO, StringIO
 import ctypes
+from math import pi, sqrt
 import os
 from os import fsencode, fsdecode
 import unittest
@@ -115,6 +116,32 @@ class ImportSVG(unittest.TestCase):
         )
 
         self.assertEqual(builder_name, "builder")
+
+    def test_import_svg_as_buildline_code_preserves_circular_arc_sweep(self):
+        """SVG's large-arc and sweep flags select one of four circular arcs."""
+        radius_component = 10 / sqrt(2)
+        for large, sweep, middle in (
+            (0, 0, 10 - radius_component),
+            (0, 1, radius_component),
+            (1, 0, -radius_component),
+            (1, 1, 10 + radius_component),
+        ):
+            with self.subTest(large=large, sweep=sweep):
+                svg = self.tmp_path / "arc.svg"
+                svg.write_text(
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    f'<path d="M 10 0 A 10 10 0 {large} {sweep} 0 10"/>'
+                    "</svg>",
+                    encoding="utf-8",
+                )
+                code, name = import_svg_as_buildline_code(svg)
+                namespace = {}
+                exec(code, namespace)
+                (arc,) = namespace[name].edges()
+                self.assertAlmostEqual(arc.length, (1 + 2 * large) * 5 * pi)
+                self.assertLess(
+                    (arc.position_at(0.5) - Vector(middle, middle, 0)).length, 1e-7
+                )
 
     def test_import_svg(self):
         svg_file = Path(__file__).parent / "../tests/svg_import_test.svg"
