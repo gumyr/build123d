@@ -753,6 +753,13 @@ def offset(
     objects, the openings parameter allows selected faces to be open, like
     a hollow box with no lid.
 
+    A Face that is not planar is offset within its own surface, as
+    :meth:`Face.offset_2d <topology.Face.offset_2d>` describes: its boundary
+    moves ``amount`` along the surface and the result lies on that surface.
+    On a cylinder or a cone every ``kind`` is available; on any other curved
+    surface only ``Kind.ARC``. ``min_edge_length`` applies to planar faces
+    only.
+
     Args:
         objects (Edge |  Face |  Solid |  Compound  or Iterable of): objects to offset
         amount (float): positive values external, negative internal
@@ -769,6 +776,9 @@ def offset(
     Raises:
         ValueError: missing objects
         ValueError: Invalid object type
+        ValueError: a non-planar Face cannot be offset as asked: nothing is
+            left of it, ``kind`` is not available on its surface, or it or
+            its offset reaches the apex of a cone or a pole
     """
     context: Builder | None = Builder._get_context("offset")
 
@@ -801,8 +811,12 @@ def offset(
         else:
             raise TypeError(f"Unsupported type {type(obj)} for {obj}")
 
-    new_faces = []
+    new_faces: list[Face] = []
     for face in faces:
+        if not face.is_planar:
+            # a curved face is offset within its own surface
+            new_faces.extend(face.offset_2d(amount, kind=kind))
+            continue
         outer_wire = face.outer_wire().offset_2d(amount, kind=kind)
         if min_edge_length is not None:
             outer_wire = outer_wire.fix_degenerate_edges(min_edge_length)

@@ -73,3 +73,5 @@ See also
   and thickens it into blocks.
 * :ref:`projection_shape` projects a sketch along one direction, with no
   path.
+* :ref:`offsetting_faces` grows or shrinks a face once it is on the
+  surface, for a border round a label or a margin inside it.

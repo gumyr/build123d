@@ -1700,26 +1700,33 @@ class TestFace(unittest.TestCase):
             Face().wrap(planar_edge, target)
 
     def test_wrap_across_the_seam(self):
-        """A face over the seam comes back as a shell of one face per period,
-        and the shell thickens and fuses as one solid"""
+        """A face over the seam comes back as one face, which thickens and
+        fuses into the solid"""
         cylinder = Cylinder(5, 10)
         surface = cylinder.faces().filter_by(GeomType.CYLINDER)[0]
         target = surface.location_at(0.0, 0.5, x_dir=(0, 1, 0))
         planar = (Rectangle(6, 3) - Circle(0.8)).face()
         wrapped = surface.wrap(planar, target)
-        self.assertIsInstance(wrapped, Shell)
-        self.assertEqual(len(wrapped.faces()), 2)
+        self.assertIsInstance(wrapped, Face)
         self.assertAlmostEqual(wrapped.area, planar.area, 4)
         raised = Solid.thicken(wrapped, 0.5)
         self.assertTrue(raised.is_valid)
         embossed = cylinder.fuse(raised)
         self.assertTrue(embossed.is_valid)
-        self.assertGreater(embossed.volume, cylinder.volume)
+        self.assertAlmostEqual(
+            embossed.volume, cylinder.volume + planar.area * 0.5, delta=0.5
+        )
+        # a helical band running over a turn is a shell of a face per period
+        band = Face(Polyline((0, 0), (3, 0), (43, 4), (40, 4), close=True))
+        helical = surface.wrap(band, target)
+        self.assertIsInstance(helical, Shell)
+        self.assertEqual(len(helical.faces()), 2)
+        self.assertAlmostEqual(helical.area, band.area, 4)
         # a wire gets a vertex where it crosses the seam
         outline = surface.wrap(planar.outer_wire(), target)
         self.assertTrue(outline.is_closed)
         self.assertEqual(len(outline.edges()), 6)
-        # but not a whole turn
+        # but not more than a whole turn
         with self.assertRaisesRegex(ValueError, "whole turn"):
             surface.wrap(Rectangle(40, 2).face(), target)
 
