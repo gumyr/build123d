@@ -141,6 +141,7 @@ from build123d.build_enums import (
     GeomType,
     Hit,
     Keep,
+    Kind,
     Transition,
     Unit,
 )
@@ -202,6 +203,7 @@ from .utils import (
     _topods_face_position,
     _topods_point_on_face,
 )
+from .uv_offset import offset_face_2d
 from .uv_write import UVFrame
 from .zero_d import Vertex
 
@@ -749,6 +751,10 @@ class Mixin2D(ABC, Shape[TOPODS]):
         zero area and is rejected. Offsetting further turns the surface inside
         out, which OpenCascade reports as success and this method does not
         detect: offsetting a radius 5 cylinder by 6 yields a radius 1 cylinder.
+
+        To grow or shrink a face within its own surface, moving its boundary
+        and not the face, use
+        :meth:`Face.offset_2d <topology.Face.offset_2d>`.
 
         Args:
             amount (float): distance to offset, positive along the normal
@@ -2697,6 +2703,68 @@ class Face(Mixin2D[TopoDS_Face]):
 
         return Vector(normal).normalized()
 
+    def offset_2d(
+        self, amount: float, kind: Kind = Kind.ARC, tolerance: float = 1e-4
+    ) -> ShapeList[Face]:
+        """offset_2d
+
+        Grow or shrink this face within its own surface.
+
+        The boundary moves ``amount`` along the surface, square to itself:
+        outwards for a positive amount, which grows the face and shrinks its
+        holes, and inwards for a negative one. The result lies on the same
+        surface, with the face's normal. This is the companion of
+        :meth:`Wire.offset_2d <topology.Wire.offset_2d>` for a face, and is
+        not :meth:`Face.offset <topology.Face.offset>`, which moves the whole
+        face along its normals onto another surface.
+
+        A planar, cylindrical or conical face is laid out flat, offset there
+        and written back, so the offset is exact and ``kind`` shapes its
+        corners as it does those of a planar offset. A face grown until it
+        meets itself round a cylinder or a cone comes back as one face all
+        the way round, and one that goes all the way round stays so.
+
+        A face on any other surface is offset by following geodesics: the
+        boundary moves the distance along the geodesics that leave it square
+        to itself, and its corners are rounded by geodesic circles, so only
+        ``Kind.ARC`` is available there. A face grown past the end of its
+        surface, the edge of a spline patch, ends there.
+
+        The apex of a cone and the pole of a sphere or of any surface of
+        revolution that closes at its axis are points no face written this
+        way can include: a face that reaches one, or an offset that would,
+        is refused. A face that goes round a cone too nearly flat, or too
+        near its apex, to be laid out is followed along geodesics instead,
+        and so with ``Kind.ARC`` only.
+
+        Shrinking can part a face, so a list is returned: every face of the
+        result.
+
+        Args:
+            amount (float): how far the boundary moves along the surface;
+                positive grows the face, negative shrinks it
+            kind (Kind, optional): offset corner transition. Defaults to
+                Kind.ARC.
+            tolerance (float, optional): largest 3D error allowed where a
+                curve has to be interpolated. Defaults to 1e-4.
+
+        Raises:
+            ValueError: empty face
+            ValueError: nothing is left of the face
+            ValueError: ``kind`` is not ``Kind.ARC`` where only that is
+                available
+            ValueError: the face or its offset reaches the apex of a cone or
+                a pole of its surface
+            RuntimeError: the planar offset failed with corners that are
+                not arcs, or the offset could not be built along geodesics
+
+        Returns:
+            ShapeList[Face]: the faces of the result
+        """
+        if self.is_empty:
+            raise ValueError("Can't offset an empty face")
+        return offset_face_2d(self, amount, kind, tolerance)
+
     def outer_wire(self) -> Wire:
         """Extract the perimeter wire from this Face"""
         self._needs_geometry("outer wire")
@@ -2947,13 +3015,17 @@ class Face(Mixin2D[TopoDS_Face]):
         shape is distorted increasingly with distance from the origin, so
         place the origin near the middle of the shape.
 
-        A shape crossing the seam of a periodic surface is split there, as
-        the kernel's own faces are: a wire gets a vertex at the seam, and a
-        face comes back as a Shell of one face per period it reaches into,
-        which thickens and fuses as one. A shape may span more than a whole
-        turn when it is sheared along the surface, as a helical band is; one
-        that would overlap itself once wrapped, or one surrounding a pole of
-        the surface, is refused.
+        A face may lie across the seam of a periodic surface and comes back
+        as one face, as the kernel's own faces there are; a wire gets a
+        vertex at the seam. A band that goes exactly once round the surface,
+        its two sides meeting, comes back as one face too, closed along a
+        seam edge. A shape may span more than a whole turn when it is sheared
+        along the surface, as a helical band is, and a face that does comes
+        back as a Shell of one face per period it reaches into, which
+        thickens and fuses as one. A shape that would overlap itself once
+        wrapped, or one surrounding a pole of the surface, is refused, as is
+        a band going once round whose sides meet along only part of their
+        length.
 
         :meth:`uv_frame` gives the frame behind this, which can also punch an
         outline into the face.
@@ -2968,6 +3040,9 @@ class Face(Mixin2D[TopoDS_Face]):
         Raises:
             ValueError: empty face, or the shape would overlap itself wrapped
                 around the surface or surrounds a pole
+            ValueError: the shape goes once round the surface but its two
+                sides do not meet along their whole length, or it also lies
+                across the surface's other seam
             TypeError: planar_shape is not an Edge, Wire or Face
 
         Returns:
@@ -3011,9 +3086,10 @@ class Face(Mixin2D[TopoDS_Face]):
         lands that far on from its start, so a row of faces can begin anywhere
         on the path.
 
-        A face that crosses the seam of a periodic surface comes back as one
-        face per period it reaches into, as :meth:`wrap` describes, so the
-        result can hold more faces than were given.
+        A face that spans more than a whole turn of a periodic surface comes
+        back as one face per period it reaches into, as :meth:`wrap`
+        describes, so the result can hold more faces than were given. One
+        that lies across a seam, or goes exactly once round, stays one face.
 
         The path must lie on this one face. For a path that runs over several
         faces of a shape, a label round a filleted corner, use

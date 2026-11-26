@@ -51,6 +51,7 @@ from build123d import (
     BuildSketch,
     CenterArc,
     Circle,
+    Cone,
     Cylinder,
     Edge,
     Ellipse,
@@ -196,6 +197,34 @@ class TestBooleanSeams(unittest.TestCase):
             mirror(about=Plane.XZ)
         self.assertTrue(part.part.is_valid)
         self.assertAlmostEqual(part.part.volume, 2 * half_volume, 3)
+
+
+class TestProjectionOntoCone(unittest.TestCase):
+    """A closed curve across the seam of a cone is projected onto the cone
+    wrongly, with its ends a period away from the rest of it"""
+
+    @occt_defect(1597, "a boolean of cone faces with a closed edge on the seam")
+    def test_cut_of_round_faces_across_a_cone_seam(self):
+        """The cut does nothing, and raises the tolerance of the smaller
+        face's edge to about the diameter of the cone
+
+        The faces are the kernel's own: the piece of the cone inside a
+        cylinder standing on its seam is one face with one closed edge.
+        ``UVFrame`` writes such an edge as two to keep clear of this.
+        """
+        solid = Cone(12, 5, 6)
+        cone = solid.faces().filter_by(GeomType.CONE)[0]
+        on_seam = cone.location_at(0.0, 0.5)
+
+        def cap(radius: float) -> Face:
+            inside = solid & (on_seam * Cylinder(radius, 6))
+            (face,) = inside.faces().filter_by(GeomType.CONE)
+            return face
+
+        big, small = cap(3), cap(2)
+        self.assertEqual((len(big.edges()), len(small.edges())), (1, 1))
+        ring_area = big.area - small.area
+        self.assertAlmostEqual((big - small).area, ring_area, 3)
 
 
 class TestBooleanClassification(unittest.TestCase):
