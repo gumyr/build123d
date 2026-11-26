@@ -516,6 +516,12 @@ Reference
         Wedge defined by lengths along multiple Axes
 
 
+Holes
+^^^^^
+
+See :doc:`holes` for dimensioned cross sections and drill-point options.
+
+
 Reference
 ^^^^^^^^^
 .. py:module:: objects_part
