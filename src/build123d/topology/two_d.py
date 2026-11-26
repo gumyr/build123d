@@ -917,9 +917,9 @@ class Face(Mixin2D[TopoDS_Face]):
             elif isinstance(args[0], TopoDS_Shape):
                 obj, label, color, parent = args[:4] + (None,) * (4 - l_a)
             elif isinstance(args[0], Wire):
-                outer_wire, inner_wires, label, color, parent, surface = args[
-                    :6
-                ] + (None,) * (6 - l_a)
+                outer_wire, inner_wires, label, color, parent, surface = args[:6] + (
+                    None,
+                ) * (6 - l_a)
 
         unknown_args = ", ".join(
             set(kwargs.keys()).difference(
@@ -2179,7 +2179,8 @@ class Face(Mixin2D[TopoDS_Face]):
 
         chamfered_face = self.__class__(chamfered_wires[0], chamfered_wires[1:])
         if self.normal_at() != chamfered_face.normal_at():
-            chamfered_face = -chamfered_face  # pylint: disable=invalid-unary-operand-type
+            # pylint: disable-next=invalid-unary-operand-type
+            chamfered_face = -chamfered_face
         chamfered_face._made_by(
             record.add_modified(self.wrapped, chamfered_face.wrapped)
         )
@@ -3006,6 +3007,10 @@ class Face(Mixin2D[TopoDS_Face]):
         with flat x running along the path's tangent there, so a line of
         text follows the path. The faces themselves are left as they are.
 
+        A closed path is followed round: a face that would land past its end
+        lands that far on from its start, so a row of faces can begin anywhere
+        on the path.
+
         A face that crosses the seam of a periodic surface comes back as one
         face per period it reaches into, as :meth:`wrap` describes, so the
         result can hold more faces than were given.
@@ -3038,6 +3043,8 @@ class Face(Mixin2D[TopoDS_Face]):
             bbox = face.bounding_box()
             centre_x = (bbox.min.X + bbox.max.X) / 2
             along = start + (centre_x - leftmost) / path_length
+            if path.is_closed:
+                along %= 1.0  # past the end of a closed path is on round from its start
             path_position = path.position_at(along)
             surface_location = Location(
                 Plane(

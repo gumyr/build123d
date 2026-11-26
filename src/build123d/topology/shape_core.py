@@ -2228,6 +2228,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         that normal with :meth:`~topology.Face.project_to_shape`; the nearest
         surface met is kept. A line of text follows the path this way.
 
+        A closed path is followed round: a face that would land past its end
+        lands that far on from its start, so a row of faces can begin anywhere
+        on the path.
+
         This is the tool for a target with several faces: a face that straddles
         the boundary between two faces of the target, a glyph running round a
         filleted corner, comes back as a Shell with a piece on each. For a
@@ -2276,6 +2280,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
             relative_position_on_wire = (
                 start + (face_center_x - first_face_min_x) / path_length
             )
+            if path.is_closed:
+                # past the end of a closed path is on round from its start
+                relative_position_on_wire %= 1.0
             path_position = path.position_at(relative_position_on_wire)
             path_tangent = path.tangent_at(relative_position_on_wire)
             projection_axis = Axis(path_position, shape_center - path_position)
