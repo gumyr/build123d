@@ -271,6 +271,28 @@ class _BaseHole(BasePartObject):
         )
         return context.max_dimension + origin_distance
 
+    @staticmethod
+    def _check_point_angle(point_angle: float | None, depth: float | None):
+        """Raise if a drill point is asked for a through hole or with an impossible angle"""
+        if point_angle is None:
+            return
+        if depth is None:
+            raise ValueError("A drill point needs a blind hole: provide a depth")
+        if not 0 < point_angle < 180:
+            raise ValueError(
+                f"point_angle must be between 0 and 180 degrees, not {point_angle}"
+            )
+
+    @staticmethod
+    def _drill_point(radius: float, depth: float, point_angle: float) -> Solid:
+        """The cone a drill point leaves below the full diameter of a blind hole"""
+        return Solid.make_cone(
+            radius,
+            0.0,
+            radius / tan(radians(point_angle / 2.0)),
+            Plane(origin=(0, 0, -depth), z_dir=(0, 0, -1)),
+        )
+
 
 class CounterBoreHole(_BaseHole):
     """Part Operation: Counter Bore Hole
@@ -281,7 +303,12 @@ class CounterBoreHole(_BaseHole):
         radius (float): hole radius
         counter_bore_radius (float): counter bore radius
         counter_bore_depth (float): counter bore depth
-        depth (float, optional): hole depth, through part if None. Defaults to None
+        depth (float, optional): distance from the location to the end of the
+            cylindrical bore. Defaults to None for an automatically sized through hole
+            in Builder mode.
+        point_angle (float, optional): included angle of the drill point in degrees,
+            strictly between 0 and 180. Requires an explicit depth. Defaults to None
+            for a flat-bottomed blind hole.
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT
     """
 
@@ -293,26 +320,32 @@ class CounterBoreHole(_BaseHole):
         counter_bore_radius: float,
         counter_bore_depth: float,
         depth: float | None = None,
+        point_angle: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
+        self._check_point_angle(point_angle, depth)
         self.radius = radius
         self.counter_bore_radius = counter_bore_radius
         self.counter_bore_depth = counter_bore_depth
+        self.point_angle = point_angle
         if depth is not None:
             self.hole_depth = depth
         else:
             self.hole_depth = self._through_hole_depth()
         self.mode = mode
 
-        fused = Solid.make_cylinder(
-            radius, self.hole_depth, Plane(origin=(0, 0, 0), z_dir=(0, 0, -1))
-        ).fuse(
+        cutters = [
             Solid.make_cylinder(
                 counter_bore_radius,
                 counter_bore_depth + self.hole_depth,
                 Plane((0, 0, -counter_bore_depth)),
             )
-        )
+        ]
+        if point_angle is not None:
+            cutters.append(self._drill_point(radius, self.hole_depth, point_angle))
+        fused = Solid.make_cylinder(
+            radius, self.hole_depth, Plane(origin=(0, 0, 0), z_dir=(0, 0, -1))
+        ).fuse(*cutters)
         if isinstance(fused, ShapeList):
             solid = Part(fused)
         else:
@@ -329,8 +362,14 @@ class CounterSinkHole(_BaseHole):
     Args:
         radius (float): hole radius
         counter_sink_radius (float): countersink radius
-        depth (float, optional): hole depth, through part if None. Defaults to None
-        counter_sink_angle (float, optional): cone angle. Defaults to 82
+        depth (float, optional): distance from the location to the end of the
+            cylindrical bore. Defaults to None for an automatically sized through hole
+            in Builder mode.
+        counter_sink_angle (float, optional): included angle of the countersink in degrees.
+            Defaults to 82.
+        point_angle (float, optional): included angle of the drill point in degrees,
+            strictly between 0 and 180. Requires an explicit depth. Defaults to None
+            for a flat-bottomed blind hole.
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT
     """
 
@@ -342,8 +381,10 @@ class CounterSinkHole(_BaseHole):
         counter_sink_radius: float,
         depth: float | None = None,
         counter_sink_angle: float = 82,  # Common tip angle
+        point_angle: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
+        self._check_point_angle(point_angle, depth)
         self.radius = radius
         self.counter_sink_radius = counter_sink_radius
         if depth is not None:
@@ -351,12 +392,11 @@ class CounterSinkHole(_BaseHole):
         else:
             self.hole_depth = self._through_hole_depth()
         self.counter_sink_angle = counter_sink_angle
+        self.point_angle = point_angle
         self.mode = mode
         cone_height = counter_sink_radius / tan(radians(counter_sink_angle / 2.0))
 
-        fused = Solid.make_cylinder(
-            radius, self.hole_depth, Plane(origin=(0, 0, 0), z_dir=(0, 0, -1))
-        ).fuse(
+        cutters = [
             Solid.make_cone(
                 counter_sink_radius,
                 0.0,
@@ -364,7 +404,12 @@ class CounterSinkHole(_BaseHole):
                 Plane(origin=(0, 0, 0), z_dir=(0, 0, -1)),
             ),
             Solid.make_cylinder(counter_sink_radius, self.hole_depth),
-        )
+        ]
+        if point_angle is not None:
+            cutters.append(self._drill_point(radius, self.hole_depth, point_angle))
+        fused = Solid.make_cylinder(
+            radius, self.hole_depth, Plane(origin=(0, 0, 0), z_dir=(0, 0, -1))
+        ).fuse(*cutters)
         if isinstance(fused, ShapeList):
             solid = Part(fused)
         else:
@@ -426,7 +471,12 @@ class Hole(_BaseHole):
 
     Args:
         radius (float): hole radius
-        depth (float, optional): hole depth, through part if None. Defaults to None
+        depth (float, optional): distance from the location to the end of the
+            cylindrical bore. Defaults to None for an automatically sized through hole
+            in Builder mode.
+        point_angle (float, optional): included angle of the drill point in degrees,
+            strictly between 0 and 180. Requires an explicit depth. Defaults to None
+            for a flat-bottomed blind hole.
         mode (Mode, optional): combination mode. Defaults to Mode.SUBTRACT
     """
 
@@ -436,9 +486,12 @@ class Hole(_BaseHole):
         self,
         radius: float,
         depth: float | None = None,
+        point_angle: float | None = None,
         mode: Mode = Mode.SUBTRACT,
     ):
+        self._check_point_angle(point_angle, depth)
         self.radius = radius
+        self.point_angle = point_angle
         if depth is not None:
             self.hole_depth = 2 * depth
         else:
@@ -453,9 +506,24 @@ class Hole(_BaseHole):
         solid = Solid.make_cylinder(
             radius, self.hole_depth, Plane(origin=hole_start, z_dir=(0, 0, -1))
         )
+        align: tuple[Align, Align, Align] | None = (
+            Align.CENTER,
+            Align.CENTER,
+            Align.CENTER,
+        )
+        if point_angle is not None:
+            # Centring would move the cone's tip into the middle, so place the
+            # cylinder where centring leaves it, depth above and below
+            half_depth = self.hole_depth / 2
+            solid = Solid.make_cylinder(
+                radius,
+                self.hole_depth,
+                Plane(origin=(0, 0, half_depth), z_dir=(0, 0, -1)),
+            ).fuse(self._drill_point(radius, half_depth, point_angle))
+            align = None
         super().__init__(
             part=solid,
-            align=(Align.CENTER, Align.CENTER, Align.CENTER),
+            align=align,
             rotation=(0, 0, 0),
             mode=mode,
         )

@@ -846,7 +846,7 @@ def offset(
             inner_faces = [Face(w) for w in inner_wires]
             subtraction = new_face.cut(*inner_faces)
             if isinstance(subtraction, Compound):
-                new_faces.append(new_face.unwrap(fully=True))
+                new_faces.extend(subtraction.faces())
             elif isinstance(subtraction, ShapeList):
                 new_faces.extend(subtraction)
             else:
@@ -1435,7 +1435,10 @@ def sweep(
     """Generic Operation: sweep
 
     Sweep pending 1D or 2D objects along path. The faces swept out by a 1D
-    section are returned in a Sketch that holds them as a Shell.
+    section are returned in a Sketch that holds them as a Shell. Cross sections
+    can be positioned along ``path`` using :meth:`~topology.Mixin1D.location_at`
+    or the caret operator ``^`` (for example, ``path ^ 0`` places a location at
+    the start of the path facing along its tangent).
 
     Args:
         sections (Compound |  Edge |  Wire |  Face |  Solid): cross sections to sweep into object

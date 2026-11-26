@@ -395,11 +395,12 @@ def import_svg_as_buildline_code(
         rotation = float(curve.rotation)
 
         if abs(x_radius - y_radius) <= TOLERANCE:
+            radius = x_radius if curve.large_arc == curve.sweep else -x_radius
             return (
                 "RadiusArc("
                 f"({start.real:0.{precision}g}, {start.imag:0.{precision}g}), "
                 f"({end.real:0.{precision}g}, {end.imag:0.{precision}g}), "
-                f"{x_radius:0.{precision}g}, "
+                f"{radius:0.{precision}g}, "
                 f"{not curve.large_arc})"
             )
 

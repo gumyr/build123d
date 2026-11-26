@@ -846,6 +846,13 @@ class OffsetTests(unittest.TestCase):
         self.assertAlmostEqual(b.area, 1**2 + 2 * 0.125 * 2 + pi * 0.125**2, 5)
         self.assertEqual(len(b.face().inner_wires()), 0)
 
+    def test_offset_face_split_by_inner_wire(self):
+        # the grown slot crosses the shrunk outline, leaving two strips
+        sk = Rectangle(20, 20) - Rectangle(16, 1)
+        sk2 = offset(sk, -2, kind=Kind.INTERSECTION)
+        self.assertEqual(len(sk2.faces()), 2)
+        self.assertAlmostEqual(sk2.area, 2 * 16 * 5.5, 5)
+
     def test_offset_face_with_min_length(self):
         c = Circle(0.5)
         c = offset(c, amount=0.125, min_edge_length=0.1)

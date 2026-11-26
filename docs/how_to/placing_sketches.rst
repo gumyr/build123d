@@ -345,8 +345,8 @@ its Z direction along the path.
             :start-after: [along_algebra]
             :end-before: [along_algebra]
 
-``^`` takes a position along the edge or wire from 0 to 1, so
-``rail ^ 0.5`` is a place halfway along, facing along the path there. It
+The caret operator (``^``) takes a position along the edge or wire from 0 to 1,
+so ``rail ^ 0.5`` is a place halfway along, facing along the path there. It
 is short for :meth:`~topology.Mixin1D.location_at`, which has more
 control over how the place is turned about the path. A location serves
 wherever a plane does: ``BuildSketch`` accepts it, and a sketch can be

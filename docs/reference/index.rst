@@ -20,6 +20,7 @@ and the :ref:`explanation <explanation>` do that.
 
     cheat_sheet.rst
     objects.rst
+    holes.rst
     operations.rst
     Sheet Metal Reference <sheet_metal.rst>
     Projection Reference <projection.rst>
