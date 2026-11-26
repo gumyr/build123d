@@ -368,6 +368,14 @@ class ImportSTEP(unittest.TestCase):
             ["Hylle - test", "box.front (a)"],
         )
 
+    def test_label_path_separator_replaced_on_import(self):
+        # a "/" separates the levels of a label path, so a label cannot hold one
+        part = Solid.make_box(1, 1, 1)
+        part.label = "left/right (a)"
+        export_step(Compound(children=[part]), self.tmp_path / "test.step")
+        imported = import_step(self.tmp_path / "test.step")
+        self.assertEqual([c.label for c in imported.children], ["left_right (a)"])
+
     def test_roundtrip_component_color_overrides_parent(self):
         c1 = Solid.make_sphere(1)
         c1.label = "c1"
