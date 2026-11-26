@@ -418,8 +418,8 @@ class TestShape(unittest.TestCase):
         relocated_bounding_box = Plane.XZ.from_local_coords(bounding_box)
         self.assertAlmostEqual(relocated_bounding_box.min.X, -2, 5)
         self.assertAlmostEqual(relocated_bounding_box.max.X, 2, 5)
-        self.assertAlmostEqual(relocated_bounding_box.min.Y, 0, 5)
-        self.assertAlmostEqual(relocated_bounding_box.max.Y, -1, 5)
+        self.assertAlmostEqual(relocated_bounding_box.min.Y, -1, 5)
+        self.assertAlmostEqual(relocated_bounding_box.max.Y, 0, 5)
         self.assertAlmostEqual(relocated_bounding_box.min.Z, -2, 5)
         self.assertAlmostEqual(relocated_bounding_box.max.Z, 2, 5)
 
