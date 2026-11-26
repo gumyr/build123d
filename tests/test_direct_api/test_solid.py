@@ -322,6 +322,23 @@ class TestSolid(unittest.TestCase):
         )
         self.assertAlmostEqual(swept.volume, 20.75, 2)
 
+    def test_sweep_refuses_a_degenerate_profile(self):
+        # The boundary of a sphere or cone face has an edge collapsed to a point,
+        # which crashes or hangs the kernel's sweep
+        path = Edge.make_circle(30, start_angle=0, end_angle=90)
+        sphere_face = Solid.make_sphere(3).faces()[0]
+        cone_face = Solid.make_cone(3, 0, 5).faces().filter_by(GeomType.CONE)[0]
+        for face in (sphere_face, cone_face):
+            with self.subTest(face.geom_type):
+                with self.assertRaisesRegex(ValueError, "degenerate edge"):
+                    Solid.sweep(face, path)
+                with self.assertRaisesRegex(ValueError, "degenerate edge"):
+                    Solid.sweep(face.outer_wire(), path)
+                with self.assertRaisesRegex(ValueError, "degenerate edge"):
+                    Solid.sweep_multi([face, Pos(0, 30, 0) * face], path)
+                with self.assertRaisesRegex(ValueError, "degenerate edge"):
+                    Solid.extrude_linear_with_rotation(face, (0, 0, 0), (0, 0, 10), 90)
+
     def test_sweep_warns_when_invalid(self):
         # The kernel reports success for a sweep that folds over itself
         path = Wire.make_polygon([(0, 20), (20, 20), (20, 0)], close=False)
