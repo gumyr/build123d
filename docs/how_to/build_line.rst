@@ -256,10 +256,11 @@ A path is drawn like an outline and left open. The spline is given
 smooth path.
 
 The profile has to stand across the start of the path, and ``path ^ 0``
-is the place for it: a location at the start of the path, facing along
-it. In builder mode the path and the sketch are both made inside the
-``BuildPart``, which passes them to ``sweep``. In algebra mode ``sweep``
-is given the two. :ref:`placing_sketches` has more on ``^``.
+(the caret operator) is the place for it: a location at the start of the
+path, facing along it. In builder mode the path and the sketch are both
+made inside the ``BuildPart``, which passes them to ``sweep``. In algebra
+mode ``sweep`` is given the two. :ref:`placing_sketches` has more on
+``^``.
 
 **************************************
 Draw on another plane, or in space

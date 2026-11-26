@@ -1047,7 +1047,7 @@ class Mixin1D(Shape[TOPODS]):
         return self.tangent_at(position)
 
     def __xor__(self, position: float) -> Location:
-        """Location on wire operator ^"""
+        """Location on wire caret operator ^"""
         return self.location_at(position)
 
     def center(self, center_of: CenterOf = CenterOf.GEOMETRY) -> Vector:
@@ -1381,7 +1381,8 @@ class Mixin1D(Shape[TOPODS]):
     ) -> Location:
         """Locations along curve
 
-        Generate a location along the underlying curve.
+        Generate a location along the underlying curve (also available via the
+        caret operator ``^``, e.g., ``edge ^ 0.5``).
 
         Args:
             distance (float): normalized parameter or length value
