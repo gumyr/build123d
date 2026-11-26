@@ -44,8 +44,6 @@ TOLERANCE = 1e-3
 KNOWN_DIFFERENCES = {
     "boxes_on_faces": "the two versions give their result different names",
     "build123d_customizable_logo": "the two versions lay the logo out differently",
-    "extrude": "the two versions number their examples differently",
-    "intersecting_chamfers": "the algebra version's result is blocks2, not blocks",
 }
 
 # Pairs held to a looser tolerance, each with the reason.
