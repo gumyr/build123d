@@ -1069,7 +1069,7 @@ class Curve(Compound):
         return Wire(self.edges()).tangent_at(position)
 
     def __xor__(self, position: float) -> Location:
-        """Location on wire operator ^ - only works if continuous"""
+        """Location on wire caret operator ^ - only works if continuous"""
         return Wire(self.edges()).location_at(position)
 
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:  # type: ignore

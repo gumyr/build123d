@@ -194,7 +194,7 @@ Cheat Sheet
     +----------+---------------------+-----------------------------------------+---------------------------------+
     | %        | float               | :meth:`~topology.Mixin1D.tangent_at`    | Tangent as Vector along object  |
     +----------+---------------------+-----------------------------------------+---------------------------------+
-    | ^        | float               | :meth:`~topology.Mixin1D.location_at`   | Location along object           |
+    | ^        | float               | :meth:`~topology.Mixin1D.location_at`   | Location along object (caret)   |
     +----------+---------------------+-----------------------------------------+---------------------------------+
 
     These operators normally use values from 0.0 to 1.0. Outside that range,
