@@ -89,7 +89,7 @@ def render_lines(
     )
     exporter.add_layer("Done", line_weight=0.6)
     exporter.add_layer("New", line_color=0xCC0000, line_weight=0.8)
-    exporter.add_layer("Ends", fill_color=0x000000, line_weight=0.1)
+    exporter.add_layer("Ends", fill_color="white", line_weight=0.1)
     exporter.add_layer(
         "Names", fill_color=0x3465A4, line_color=0x3465A4, line_weight=0.1
     )
