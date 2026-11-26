@@ -200,6 +200,7 @@ class FrameMethod(Enum):
 
     FRENET = auto()
     CORRECTED = auto()
+    CONTINUOUS = auto()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
