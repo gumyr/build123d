@@ -3668,15 +3668,11 @@ class Plane(metaclass=PlaneMeta):
         if isinstance(obj, (tuple, Vector)):
             return Vector(obj).transform(transform_matrix)
         if isinstance(obj, BoundBox):
-            global_bottom_left = Vector(obj.min.X, obj.min.Y, obj.min.Z)
-            global_top_right = Vector(obj.max.X, obj.max.Y, obj.max.Z)
-            local_bottom_left = global_bottom_left.transform(transform_matrix)
-            local_top_right = global_top_right.transform(transform_matrix)
-            local_bbox = Bnd_Box(
-                gp_Pnt(*local_bottom_left),
-                gp_Pnt(*local_top_right),
-            )
-            return BoundBox(local_bbox)
+            if obj.wrapped is None:
+                return BoundBox(Bnd_Box())
+            # the corners holding the extremes differ between the two frames,
+            # so the box is transformed as a whole and not corner by corner
+            return BoundBox(obj.wrapped.Transformed(transform_matrix.wrapped.Trsf()))
         if hasattr(obj, "wrapped") and isinstance(obj.wrapped, TopoDS_Shape):  # Shapes
             # return_value = obj.transform_shape(transform_matrix)
             downcast_lut: dict[

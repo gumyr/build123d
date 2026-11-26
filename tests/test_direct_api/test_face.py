@@ -1752,6 +1752,20 @@ class TestFace(unittest.TestCase):
         self.assertEqual([f.center() for f in text.faces()], before)
         self.assertEqual(surface.wrap_faces([], path), [])
 
+    def test_wrap_faces_round_a_closed_path(self):
+        # two squares 10 apart, started near the end of a circle round a cylinder
+        cylinder = Solid.make_cylinder(10, 20).faces().filter_by(GeomType.CYLINDER)[0]
+        circle = Wire([Edge.make_circle(10, Plane.XY.offset(10))])
+        squares = [Pos(x, 0) * Rectangle(2, 2).face() for x in (1, 11)]
+        first, second = cylinder.wrap_faces(squares, circle, 0.9)
+        # the second would land past the end, and is carried on from the start
+        for square, along in (
+            (first, 0.9 + 1 / circle.length),
+            (second, 11 / circle.length - 0.1),
+        ):
+            self.assertLess(abs(square.center() - circle @ along), 0.1)
+            self.assertAlmostEqual(square.area, 4, 4)
+
     def test_revolve(self):
         l1 = Edge.make_line((3, 0), (3, 2))
         revolved = Face.revolve(l1, 360, Axis.Y)

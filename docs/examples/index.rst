@@ -56,6 +56,11 @@ algebra mode. The folder holds further scripts that are not shown here.
             :link: clock_face
             :link-type: ref
 
+    .. grid-item-card:: DIN Rail
+            :img-top: /examples/assets/din_rail.png
+            :link: examples-din_rail
+            :link-type: ref
+
     .. grid-item-card:: Fast Grid Holes
             :img-top: /examples/assets/fast_grid_holes.png
             :link: fast_grid_holes
@@ -104,6 +109,11 @@ algebra mode. The folder holds further scripts that are not shown here.
     .. grid-item-card:: Playing Cards
             :img-top: /examples/assets/playing_cards.png
             :link: playing_cards
+            :link-type: ref
+
+    .. grid-item-card:: Python Logo
+            :img-top: /examples/assets/python_logo.png
+            :link: examples-python_logo
             :link-type: ref
 
     .. grid-item-card:: Spring
@@ -480,6 +490,47 @@ polar patterns.
                 :start-after: [Code]
                 :end-before: [End]
 
+.. _examples-din_rail:
+
+DIN Rail
+--------
+.. image:: /examples/assets/din_rail.png
+    :align: center
+
+A 35 x 7.5 mm top hat DIN rail, modelled as the sheet metal part it is, with
+the blank it is formed from beside it. :ref:`sheet_metal` covers the
+techniques.
+
+The top of the rail is a rectangle, and :func:`~operations_sheet.jog` steps
+each of its long edges down to a lip (:ref:`sheet_metal_jog`). The rectangle
+is drawn to the outside of the walls and ``BendPosition.MATERIAL_OUTSIDE``
+puts the corner of the formed part on its edge, so the rail's dimensions are
+used as a drawing gives them. The slots are cut in the top face
+(:ref:`sheet_metal_cutouts`), :func:`~operations_sheet.thicken` makes the
+part, and :func:`~operations_sheet.unfold` returns the blank, slots included
+(:ref:`sheet_metal_unfold`). The inside radius of all four bends comes from
+the sheet's bend radius.
+
+.. dropdown:: Code
+
+    .. tab-set::
+
+        .. tab-item:: Builder
+            :sync: builder
+
+            .. literalinclude:: /../examples/din_rail.py
+                :language: build123d
+                :start-after: [Code]
+                :end-before: [End]
+
+        .. tab-item:: Algebra
+            :sync: algebra
+
+            .. literalinclude:: /../examples/din_rail_algebra.py
+                :language: build123d
+                :start-after: [Code]
+                :end-before: [End]
+
 .. _fast_grid_holes:
 
 Fast Grid Holes
@@ -799,6 +850,44 @@ the middle.
             :sync: algebra
 
             .. literalinclude:: /../examples/playing_cards_algebra.py
+                :language: build123d
+                :start-after: [Code]
+                :end-before: [End]
+
+.. _examples-python_logo:
+
+Python Logo
+-----------
+.. image:: /examples/assets/python_logo.png
+    :align: center
+
+The Python logo as a custom sketch object, ``PythonLogo``, made as
+:ref:`custom_objects` describes. The outline of one snake is thirteen Bézier
+curves, lines and polylines, each starting where the one before ends.
+
+The outline was traced from a drawing whose origin is at a corner. In the
+builder version the :class:`~build_line.BuildLine` is given a placement that
+moves the centre of the logo to the origin, so the curves keep the
+coordinates of the drawing; the algebra version moves the finished outline
+with ``Pos``. The second snake is the first turned half way round the
+centre, and the two are separate faces so that each can be given its colour.
+
+.. dropdown:: Code
+
+    .. tab-set::
+
+        .. tab-item:: Builder
+            :sync: builder
+
+            .. literalinclude:: /../examples/python_logo.py
+                :language: build123d
+                :start-after: [Code]
+                :end-before: [End]
+
+        .. tab-item:: Algebra
+            :sync: algebra
+
+            .. literalinclude:: /../examples/python_logo_algebra.py
                 :language: build123d
                 :start-after: [Code]
                 :end-before: [End]

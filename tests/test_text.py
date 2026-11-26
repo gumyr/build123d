@@ -125,6 +125,26 @@ class TestFontManager(unittest.TestCase):
             aspect = next(a for a in FONT_ASPECT.values() if face.HasFontAspect(a))
             self.assertEqual(face.FontFaceId(aspect), face_index)
 
+    def test_font_face_of_a_large_family(self):
+        """Issue #1485: a font giving its family both ways is named by the full
+        family and the full style, so the weights of a family stay apart."""
+        font = self._bundled_font(0)
+        names = font["name"]
+        for name_id, value in (
+            (1, "Family Black"),
+            (2, "Regular"),
+            (16, "Family"),
+            (17, "Black"),
+        ):
+            names.setName(value, name_id, 3, 1, 0x409)
+            names.setName(value, name_id, 1, 0, 0)
+        (face,) = FontManager()._get_font_faces(font, "black.ttf")
+        self.assertEqual(face.FontName().ToCString(), "Family Black")
+
+        names.names = [record for record in names.names if record.nameID != 17]
+        (face,) = FontManager()._get_font_faces(font, "black.ttf")
+        self.assertEqual(face.FontName().ToCString(), "Family")
+
     def test_font_faces_of_a_variable_font(self):
         """Issue #1485: one face per named instance, numbered from 1 in the
         font's order, however many languages name each instance."""

@@ -184,6 +184,32 @@ meshes without the extras.
 To lay several parts out on the bed before saving them, see
 :ref:`packing`.
 
+Print in two colours
+====================
+
+A printer with more than one filament prints each body of a 3MF file in
+its own material, so a part in two colours is two bodies, each with its
+colour, saved in one file. Here a ring and a disc are inlaid flush with the
+top of a tile:
+
+.. image:: /how_to/assets/import_export/two_colour_tile.png
+    :align: center
+
+.. literalinclude:: /how_to/import_export.py
+    :language: build123d
+    :start-after: [two_colour]
+    :end-before: [two_colour]
+
+The two bodies must fill the part between them without overlapping, which
+is why both come from the one sketch: the inlay is the motif extruded, and
+the field is the tile with the same motif subtracted. A slicer that is
+handed overlapping bodies has to decide which filament the shared volume
+gets.
+
+``add_shape`` takes the two bodies as a list and writes each as a mesh of
+its own, with its label and colour. The slicer reads them as the parts of
+one object, in place, and a filament is then assigned to each.
+
 ********************************************
 Show a model on the web or in a renderer
 ********************************************

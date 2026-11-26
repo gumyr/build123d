@@ -144,8 +144,8 @@ def extrude(
         taper (float, optional): taper angle in degrees. A positive angle narrows
             the extrusion as it moves away from the face and a negative angle
             widens it. The sides are drafted where they are planes, cylinders or
-            cones, which keeps sharp corners sharp, and lofted otherwise. Only
-            applied when extruding by an amount. Defaults to 0.0.
+            cones, which keeps sharp corners sharp, and lofted otherwise. With
+            until, the tapered extrusion is what the target stops. Defaults to 0.0.
         clean (bool, optional): Remove extraneous internal structure. Defaults to True.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
 
@@ -245,6 +245,7 @@ def extrude(
                         target=target_object,
                         direction=plane.z_dir * direction,
                         until=until,
+                        taper=taper,
                     )
                 )
 

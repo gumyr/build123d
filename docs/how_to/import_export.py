@@ -157,6 +157,34 @@ assert 0 < abs(plate_mesh.volume - plate.volume) < 0.001 * plate.volume
 assert any(item["value"] == "hello world" for item in importer.get_meta_data())
 
 # ---------------------------------------------------------------------------
+# 3MF for a printer with more than one filament: an inlay in a second colour
+# ---------------------------------------------------------------------------
+
+# [two_colour]
+# a tile with a ring and a disc inlaid flush with its top
+motif = Circle(9) - Circle(6) + Circle(3)
+
+field = extrude(Rectangle(40, 24) - motif, amount=1)
+field.label = "field"
+field.color = Color(0x234E70)  # teal
+
+inlay = extrude(motif, amount=1)
+inlay.label = "inlay"
+inlay.color = Color(0xFAF8BF)  # pale gold
+
+exporter = Mesher()
+exporter.add_shape([field, inlay])
+exporter.write("tile.3mf")
+# [two_colour]
+
+# the two bodies fill the tile between them and share no volume
+assert abs(field.volume + inlay.volume - 40 * 24) < 1e-6
+assert not (field & inlay)
+tile_meshes = Mesher().read("tile.3mf")
+assert [mesh.label for mesh in tile_meshes] == ["field", "inlay"]
+assert [mesh.color for mesh in tile_meshes] == [Color(0x234E70), Color(0xFAF8BF)]
+
+# ---------------------------------------------------------------------------
 # glTF and OBJ: meshes for viewers and renderers
 # ---------------------------------------------------------------------------
 

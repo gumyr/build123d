@@ -172,9 +172,12 @@ def import_step(filename: PathLike | str | bytes) -> Compound:
             TDataStd_Name.GetID_s(), std_name
         ):
             name = TCollection_AsciiString(std_name.Get()).ToCString()
-        # Remove characters that cause ocp_vscode to fail
+        # Control characters are dropped. A "/" separates the levels of a
+        # label path, in the viewer's object tree as in an assembly, so a
+        # label cannot hold one; other punctuation is kept so that labels
+        # survive a STEP round trip unchanged (#1548)
         clean_name = "".join(ch for ch in name if unicodedata.category(ch)[0] != "C")
-        return clean_name.translate(str.maketrans(" .()", "____"))
+        return clean_name.replace("/", "_")
 
     def get_shape_color_from_cache(obj: TopoDS_Shape) -> Quantity_ColorRGBA | None:
         """Get the color of a shape from a cache"""

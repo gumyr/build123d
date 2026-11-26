@@ -353,6 +353,29 @@ class ImportSTEP(unittest.TestCase):
         self.assertEqual(tuple(by_label["sphere"].color), (1, 0, 0, 1))
         self.assertEqual(tuple(by_label["box"].color), (0, 0, 1, 1))
 
+    def test_roundtrip_label_punctuation_preserved(self):
+        # Regression test for #1548: import_step must not rewrite printable
+        # punctuation (spaces, ".", "(", ")") in labels to underscores.
+        a = Solid.make_box(1, 1, 1)
+        a.label = "box.front (a)"
+        b = Solid.make_sphere(1)
+        b.label = "Hylle - test"
+        root = Compound(children=[a, b])
+        export_step(root, self.tmp_path / "test.step")
+        imported = import_step(self.tmp_path / "test.step")
+        self.assertEqual(
+            sorted(c.label for c in imported.children),
+            ["Hylle - test", "box.front (a)"],
+        )
+
+    def test_label_path_separator_replaced_on_import(self):
+        # a "/" separates the levels of a label path, so a label cannot hold one
+        part = Solid.make_box(1, 1, 1)
+        part.label = "left/right (a)"
+        export_step(Compound(children=[part]), self.tmp_path / "test.step")
+        imported = import_step(self.tmp_path / "test.step")
+        self.assertEqual([c.label for c in imported.children], ["left_right (a)"])
+
     def test_roundtrip_component_color_overrides_parent(self):
         c1 = Solid.make_sphere(1)
         c1.label = "c1"

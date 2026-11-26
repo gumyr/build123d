@@ -6,7 +6,8 @@ by:   Gumyr
 date: October 2nd 2023
 
 desc:
-    This python module creates the Python logo as a Sketch object.
+    The Python logo as a custom sketch object, drawn from the Bezier curves
+    of the logo's outline, with each snake given its colour.
 
 license:
 
@@ -25,41 +26,43 @@ license:
     limitations under the License.
 
 """
+
+# [Code]
+
 from build123d import *
 from ocp_viewer import show
 
 
 class PythonLogo(BaseSketchObject):
-    """PythonLogo
+    """Sketch Object: Python Logo
+
+    The two snakes of the Python logo, each a face of its own.
 
     Args:
-        size (float): max size (Y direction - although the logo is almost square)
-        rotation (float, optional): angles to rotate objects. Defaults to 0.
-        align (Union[Align, tuple[Align, Align]], optional): align min, center, or max of object.
-            Defaults to None.
+        size (float): height of the logo, its larger dimension
+        rotation (float, optional): angle in degrees. Defaults to 0.
+        align (Align | tuple[Align, Align], optional): align MIN, CENTER, or MAX
+            of object. Defaults to (Align.CENTER, Align.CENTER).
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     _applies_to = [BuildSketch._tag]
-    _logo_colors = {
-        "Cyan-Blue Azure": Color(75 / 255, 139 / 255, 190 / 255),
-        "Lapis Lazuli": Color(48 / 255, 105 / 255, 152 / 255),
-        "Shandy": Color(255 / 255, 232 / 255, 115 / 255),
-        "Sunglow": Color(255 / 255, 212 / 255, 59 / 255),
-        "Granite Gray": Color(100 / 255, 100 / 255, 100 / 255),
-    }
 
     def __init__(
         self,
         size: float,
         rotation: float = 0,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
+        # The outline is in the units of the drawing it was traced from, with
+        # the centre of the logo here and the y axis pointing down
         center = Vector(55.5806770629664, 56.194501214517224)
+        eye = Vector(40.418785, 13.3290442)
 
-        with BuildSketch() as logo:
-            with BuildLine(mode=Mode.PRIVATE) as snake:
+        with BuildSketch() as snake:
+            # Placing the line builder puts the centre of the logo at the origin
+            with BuildLine(Pos(-center)):
                 l1 = Bezier(
                     (54.918785, 0.00091927389),
                     (50.335132, 0.02221727),
@@ -125,19 +128,25 @@ class PythonLogo(BaseSketchObject):
                     (59.502438, -0.02037903),
                     (54.918785, 0.00091927389),
                 )
-
-            with Locations(-center):
-                insert(snake)
             make_face()
-            with Locations(Vector(40.418785, 13.3290442) - center):
+            with Locations(eye - center):
                 Ellipse(10.0625002 / 2, 10.2187498 / 2, mode=Mode.SUBTRACT)
-            insert(logo.sketch, rotation=180)
-            mirror(about=Plane.YZ, mode=Mode.REPLACE)
-            current_size = max(*tuple(logo.sketch.bounding_box().size))
-            scale(by=size / current_size)
+            mirror(about=Plane.XZ, mode=Mode.REPLACE)  # y axis up
+            scale(by=size / (2 * snake.sketch.bounding_box().max.Y))
 
-        super().__init__(obj=logo.sketch, rotation=rotation, align=align, mode=mode)
+        # The second snake is the first turned half way round the centre
+        upper = snake.sketch.face()
+        logo = Sketch([upper, upper.rotate(Axis.Z, 180)])
+        super().__init__(obj=logo, rotation=rotation, align=align, mode=mode)
 
 
-if __name__ == "__main__":
-    show(PythonLogo(10))
+with BuildSketch() as logo:
+    PythonLogo(10)
+
+# Each snake is a face, and is given its colour from the logo
+blue, yellow = logo.faces().sort_by(Axis.Y, reverse=True)
+blue.color = Color(0x306998)
+yellow.color = Color(0xFFD43B)
+
+show(blue, yellow)
+# [End]

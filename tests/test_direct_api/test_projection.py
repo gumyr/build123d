@@ -108,6 +108,19 @@ class TestProjection(unittest.TestCase):
             self.assertGreater(curved.bounding_box().min.X, widest.X - 1)
             self.assertAlmostEqual(curved.area / flat.area, 1, delta=0.02)
 
+    def test_faces_round_a_closed_path(self):
+        # two squares 10 apart, started near the end of a circle round a cylinder
+        cylinder = Solid.make_cylinder(10, 20)
+        circle = Wire([Edge.make_circle(10, Plane.XY.offset(10))])
+        squares = [Pos(x, 0) * Face.make_rect(2, 2) for x in (1, 11)]
+        first, second = cylinder.project_faces(squares, circle, start=0.9)
+        # the second would land past the end, and is carried on from the start
+        for square, along in (
+            (first, 0.9 + 1 / circle.length),
+            (second, 11 / circle.length - 0.1),
+        ):
+            self.assertLess(abs(square.center() - circle @ along), 0.1)
+
     def test_error_handling(self):
         sphere = Solid.make_sphere(50)
         circle = Wire.make_circle(1)
