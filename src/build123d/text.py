@@ -242,7 +242,7 @@ class FontManager:
                 collection. Defaults to 0.
         """
 
-        family, sub, preferred = "", "", ""
+        family, sub, preferred, preferred_sub = "", "", "", ""
         for record in ft_font["name"].names:
             try:
                 value = record.toUnicode()
@@ -255,8 +255,15 @@ class FontManager:
                 sub = value
             elif record.nameID == 16 and preferred == "":
                 preferred = value
+            elif record.nameID == 17 and preferred_sub == "":
+                preferred_sub = value
 
-        family = preferred if preferred != "" else family
+        # A font of a large family names itself twice: once to fit four styles
+        # ("Avenir Black", "Regular") and once in full ("Avenir", "Black"). The
+        # full family goes with the full style, or every weight is "Avenir"
+        if preferred != "":
+            family = preferred
+            sub = preferred_sub if preferred_sub != "" else sub
 
         # The font as it stands, then each named instance of a variable font.
         # Instances are numbered from 1, in the order the font lists them; an
