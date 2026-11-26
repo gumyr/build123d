@@ -846,7 +846,7 @@ def offset(
             inner_faces = [Face(w) for w in inner_wires]
             subtraction = new_face.cut(*inner_faces)
             if isinstance(subtraction, Compound):
-                new_faces.append(new_face.unwrap(fully=True))
+                new_faces.extend(subtraction.faces())
             elif isinstance(subtraction, ShapeList):
                 new_faces.extend(subtraction)
             else:
