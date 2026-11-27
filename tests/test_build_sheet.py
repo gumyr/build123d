@@ -1169,6 +1169,65 @@ class TestFlangeNegativeGaps(unittest.TestCase):
         self.assertTrue(bp.part.is_valid)
         self.assertEqual(len(bp.part.solids()), 1)
 
+    @staticmethod
+    def doubled(flat) -> float:
+        """How much of a flat pattern lies under more than one of its faces."""
+        faces = flat.faces()
+        union = faces[0].fuse(*faces[1:])
+        return sum(precise_area(f) for f in faces) - precise_area(union)
+
+    def test_flanges_extended_at_a_corner_are_mitered_on_the_blank(self):
+        """Two flanges run past a corner would cover the same patch of the
+        blank. Each is cut back to the bisector, so no material is there
+        twice, and what is cut is the patch they shared"""
+        allowance = pi / 2 * 2.25  # r=1.5, t=1.5, K=0.5
+        # the shared patch is a kite: the gap squared times the tangent of
+        # half the corner's angle
+        for sides, shared in ((4, 1.3**2), (3, 1.3**2 * tan(radians(30)))):
+            with self.subTest(sides=sides):
+                with BuildSheet(thickness=1.5, bend_radius=1.5) as bs:
+                    with BuildSketch():
+                        RegularPolygon(60, sides)
+                    base = bs.sheet.area
+                    edge = bs.rims()[0].length
+                    flange(bs.rims(), 40, gaps=-1.3)
+                    flat, _ = unfold()
+                self.assertTrue(bs.sheet.is_valid)
+                self.assertAlmostEqual(self.doubled(flat), 0, 5)
+                extended = sides * (edge + 2 * 1.3) * (allowance + 40)
+                self.assertAlmostEqual(
+                    precise_area(flat), base + extended - sides * shared, 4
+                )
+
+    def test_flanges_extended_toward_each_other_share_the_overlap(self):
+        """Two flanges off edges in line, each run past its end into the
+        other, are cut where they meet"""
+        with BuildSheet(thickness=1.5, bend_radius=1.5) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+                with Locations((0, 30)):
+                    Rectangle(4, 10, mode=Mode.SUBTRACT)
+            flange(bs.rims().group_by(Axis.Y)[-1], 20, gaps=(-3, -3))
+            flat, _ = unfold()
+        self.assertEqual(len(bs.bends()), 2)
+        self.assertAlmostEqual(self.doubled(flat), 0, 5)
+
+    def test_a_narrow_relief_runs_along_the_miter_through_the_bend(self):
+        """A slot along the diagonal used to cut slivers off the doubled
+        corner and was refused once it reached through the bend"""
+        with BuildSheet(thickness=1.5, bend_radius=1.5) as bs:
+            with BuildSketch():
+                Rectangle(100, 100)
+            flange(bs.rims(), 40, gaps=-1.3)
+            corners = (
+                bs.flats().filter_by(Axis.Z).vertices().filter_by(Convexity.CONVEX)
+            )
+            corner_relief(corners, relief_type=ReliefType.OBROUND, length=8, width=0.5)
+            flat, _ = unfold()
+        self.assertEqual(len(bs.sheet.faces()), 9)
+        self.assertTrue(bs.sheet.is_valid)
+        self.assertAlmostEqual(self.doubled(flat), 0, 5)
+
     def test_walls_that_touch_close_the_sheet(self):
         """At exactly the radius the walls meet and are sewn together into a
         sharp corner with no bend in it, which the unfold refuses"""

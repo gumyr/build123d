@@ -248,17 +248,72 @@ def _flange_faces(
         position, angle, inside_radius, sheet_parameters.thickness, allowance
     )
     zoned, additions, replaced = _bend_zones(target, edges, gaps, setback)
-    for zone, taken in zoned:
-        if setback < TOLERANCE:
+    # the new material each flange is made of, flat: from the edge on
+    reach = allowance - setback + leg_length
+    beyond = [
+        [_orient_face(Face.extrude(zone.edge, zone.outward * reach), zone.normal)]
+        for zone, _ in zoned
+    ]
+    mitred = [False] * len(zoned)
+    if min(gaps) < 0:
+        # Flanges run past the ends of their edges can lie over each other on
+        # the blank, which is one sheet and cannot be there twice. Each gives
+        # up its share of the overlap along the miter line between them
+        for first, second in combinations(range(len(zoned)), 2):
+            if not beyond[first] or not beyond[second]:
+                continue
+            zones = (zoned[first][0], zoned[second][0])
+            overlap = [
+                piece
+                for face in beyond[first]
+                for piece in _planar_pieces(face.intersect(*beyond[second]))
+            ]
+            bisector = zones[0].outward + zones[1].outward
+            if not overlap or bisector.length < TOLERANCE:
+                continue
+            starts = [zone.edge.position_at(0) for zone in zones]
+            along = [zone.edge.tangent_at() for zone in zones]
+            crossing = along[0].cross(along[1]).dot(zones[0].normal)
+            if abs(crossing) < TOLERANCE:  # edges in line: split the overlap
+                corner = overlap[0].center()
+            else:  # the corner the two edges make, where their lines meet
+                corner = starts[0] + along[0] * (
+                    (starts[1] - starts[0]).cross(along[1]).dot(zones[0].normal)
+                    / crossing
+                )
+            across = bisector.cross(zones[0].normal)
+            middles = [zone.edge.position_at(0.5) - corner for zone in zones]
+            sides = [middle.dot(across) for middle in middles]
+            if sides[0] * sides[1] >= 0:
+                continue
+            # at an inside corner the flanges overlap whatever their gaps
+            # are, which is not what a negative gap is being asked to close
+            if abs(crossing) >= TOLERANCE and (
+                middles[1].dot(zones[0].outward) > 0
+                or middles[0].dot(zones[1].outward) > 0
+            ):
+                continue
+            for index, own in ((first, sides[0]), (second, sides[1])):
+                lost = [
+                    part
+                    for piece in overlap
+                    for part in _fold_pieces(piece, corner, across, own < 0)
+                ]
+                beyond[index] = [
+                    kept
+                    for face in beyond[index]
+                    for kept in _planar_pieces(face.cut(*lost))
+                ]
+                mitred[index] = True
+    for (zone, taken), new, cut in zip(zoned, beyond, mitred):
+        if setback < TOLERANCE and not cut:
             additions += _bend_and_leg(zone, angle, radius, leg_length)
             continue
         # the flat the bend and its wall are made from: what came out of the
         # face behind the edge, and new material from the edge on
-        beyond = Face.extrude(
-            zone.edge, zone.outward * (allowance - setback + leg_length)
+        additions += _bend_and_leg(
+            zone, angle, radius, leg_length, (taken + new, allowance)
         )
-        flat = taken + [_orient_face(beyond, zone.normal)]
-        additions += _bend_and_leg(zone, angle, radius, leg_length, (flat, allowance))
     return additions, replaced
 
 
@@ -621,9 +676,12 @@ def flange(
             the bend and wall past the end of the edge instead: a wall wider
             than the edge it folds from, or walls off two edges meeting at
             a corner that reach each other once a corner relief has cleared
-            the bends there. Those walls must stop short of each other by a
-            clearance; walls that touch are sewn together and the sheet can
-            no longer be unfolded. Defaults to 0.
+            the bends there. Flanges extended this way would lie over
+            each other on the blank at an outside corner, so each is cut
+            back to the miter line between them, the bisector of the corner,
+            and the blank has no material there twice. Those walls must stop
+            short of each other by a clearance; walls that touch are sewn
+            together and the sheet can no longer be unfolded. Defaults to 0.
         position: Where the bend sits relative to the edge. Defaults to
             ``BEND_OUTSIDE``, the whole bend past the edge.
         length_mode: Which side of the triangle the wall makes with its face
