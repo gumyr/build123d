@@ -26,4 +26,5 @@ want to deepen your understanding rather than get something done.
     location_arithmetic.rst
     center.rst
     constraints.rst
+    geometry_and_topology.rst
     surface_modeling.rst
