@@ -810,6 +810,75 @@ write_layout(
     "corner_relief_types",
 )
 
+# [corner_relief_offset]
+GAP = 1.95  # the walls stop 0.05 short of each other's inside face
+MITER = GAP * 2**0.5  # how far the cut between the two flanges runs
+
+
+def closed_corner_blank(offset: float) -> Shell:
+    """The flat pattern of a tray with closed corners, each relieved by a
+    narrow slot ``offset`` along its miter line."""
+    with BuildSheet(thickness=1, bend_radius=2) as tray:
+        with BuildSketch():
+            Rectangle(60, 40)
+        flange(tray.rims(), length=15, gaps=-GAP)
+        base = tray.flats().sort_by(Axis.Z)[0]
+        corner_relief(
+            base.vertices().filter_by(Convexity.CONVEX),
+            ReliefType.OBROUND,
+            length=1.6,
+            width=0.5,
+            offset=offset,
+        )
+        return unfold(align=Align.MIN).flat
+
+
+at_the_corner = closed_corner_blank(0)
+halfway = closed_corner_blank(MITER / 2)
+at_the_end = closed_corner_blank(MITER)
+# [corner_relief_offset]
+
+builder_blanks = [at_the_corner, halfway, at_the_end]
+
+
+# [corner_relief_offset_algebra]
+def closed_corner_blank_algebra(offset: float) -> Shell:
+    """The flat pattern of a tray with closed corners, each relieved by a
+    narrow slot ``offset`` along its miter line."""
+    parameters = SheetMetalParameters(thickness=1, bend_radius=2)
+    blank = Rectangle(60, 40)
+    sheet = flange(blank.edges(), length=15, gaps=-GAP, sheet_parameters=parameters)
+    base = sheet.flats().sort_by(Axis.Z)[0]
+    sheet = corner_relief(
+        base.vertices().filter_by(Convexity.CONVEX),
+        ReliefType.OBROUND,
+        length=1.6,
+        width=0.5,
+        offset=offset,
+        sheet_parameters=parameters,
+    )
+    return unfold(sheet, sheet_parameters=parameters, align=Align.MIN).flat
+
+
+at_the_corner = closed_corner_blank_algebra(0)
+halfway = closed_corner_blank_algebra(MITER / 2)
+at_the_end = closed_corner_blank_algebra(MITER)
+# [corner_relief_offset_algebra]
+
+for builder_blank, algebra_blank in zip(
+    builder_blanks, [at_the_corner, halfway, at_the_end]
+):
+    assert same_sheet(builder_blank, algebra_blank)
+
+write_layout(
+    [
+        drawn(at_the_corner, "offset=0", base_corner_window(at_the_corner, 9)),
+        drawn(halfway, "offset=MITER / 2", base_corner_window(halfway, 9)),
+        drawn(at_the_end, "offset=MITER", base_corner_window(at_the_end, 9)),
+    ],
+    "corner_relief_offset",
+)
+
 # ---------------------------------------------------------------------------
 # bend relief
 # ---------------------------------------------------------------------------

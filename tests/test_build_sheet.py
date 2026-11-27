@@ -3662,6 +3662,99 @@ class TestCornerRelief(unittest.TestCase):
             any((Vector(v) - corner).length < TOLERANCE for v in result.vertices())
         )
 
+    def test_offset_moves_the_relief_along_the_miter_line(self):
+        """The distance is measured from the corner along the bisector of the
+        two bends, whatever angle the corner makes, and a negative one goes
+        into the base"""
+        for sides in (3, 4, 6):
+            with self.subTest(sides=sides):
+                with BuildSheet(thickness=1, bend_radius=2) as builder:
+                    with BuildSketch():
+                        RegularPolygon(40, sides)
+                    flange(builder.rims(), 10, gaps=3)
+                    base = builder.flats().filter_by(Axis.Z)[0]
+                    corner = base.vertices().sort_by(Axis.X)[-1]
+                    corner_relief(corner, ReliefType.ROUND, radius=1, offset=-5)
+                    (hole,) = builder.flats().filter_by(Axis.Z)[0].inner_wires()
+                # the corner is at (40, 0) and its bisector is the X axis
+                self.assertAlmostEqual(hole.bounding_box().center(), (35, 0, 0), 5)
+                # moved clear of the corner, the relief leaves it in place
+                self.assertTrue(
+                    any(
+                        (Vector(v) - Vector(40, 0, 0)).length < TOLERANCE
+                        for v in builder.sheet.vertices()
+                    )
+                )
+
+    def test_a_relief_keeps_its_shape_and_place_at_any_corner_angle(self):
+        """The corner is laid out on the blank's own square axes, so a relief
+        is the same shape on the blank whatever angle the corner makes, on
+        the base, across the bends and into the flanges, and an offset is a
+        true distance along the miter either way"""
+
+        def blank(flat: Shell):
+            faces = flat.faces()
+            return faces[0].fuse(*faces[1:])
+
+        for sides in (3, 6):
+            for offset in (-3, 0, 2):
+                with self.subTest(sides=sides, offset=offset):
+                    with BuildSheet(thickness=1, bend_radius=2) as builder:
+                        with BuildSketch():
+                            RegularPolygon(40, sides)
+                        flange(builder.rims(), 12, gaps=3)
+                        before = blank(unfold().flat)
+                        base = builder.flats().filter_by(Axis.Z)[0]
+                        corner = base.vertices().sort_by(Axis.X)[-1]
+                        corner_relief(corner, ReliefType.ROUND, radius=7, offset=offset)
+                        after = blank(unfold().flat)
+                    # the corner is at (40, 0) and its miter is the X axis
+                    expected = before - Pos(40 + offset, 0) * Circle(7)
+                    self.assertAlmostEqual(after.area, expected.area, 3)
+                    self.assertAlmostEqual((after - expected).area, 0, 3)
+
+    def test_an_offset_relief_sits_on_the_miter_of_a_closed_corner(self):
+        """Between two flanges closed over a corner, a relief moved halfway
+        along their miter lies wholly in the two bends: the blank loses the
+        whole circle and the base nothing"""
+        with BuildSheet(thickness=1.5, bend_radius=1.5) as builder:
+            with BuildSketch():
+                Rectangle(100, 100)
+            flange(builder.rims(), 40, gaps=-1.3)
+            before = precise_area(unfold().flat)
+            base = builder.flats().filter_by(Axis.Z)[0]
+            corners = base.vertices().filter_by(Convexity.CONVEX)
+            corner_relief(
+                corners, ReliefType.ROUND, radius=0.3, offset=1.3 * sqrt(2) / 2
+            )
+            after = precise_area(unfold().flat)
+            self.assertAlmostEqual(
+                builder.flats().filter_by(Axis.Z)[0].area, base.area, 6
+            )
+        self.assertTrue(builder.sheet.is_valid)
+        self.assertAlmostEqual(before - after, 4 * pi * 0.3**2, 4)
+
+    def test_offset_is_refused_where_it_means_nothing(self):
+        sheet = self.two_flange_sheet().sheet_local
+        corner = self.shared_corner(sheet)
+        with self.assertRaisesRegex(ValueError, "does not accept offset"):
+            corner_relief(
+                corner,
+                ReliefType.CONSTANT_WIDTH,
+                depth=2,
+                offset=1,
+                sheet_parameters=self.PARAMETERS,
+            )
+        # past both bends with no flange there, the relief has nothing to cut
+        with self.assertRaisesRegex(ValueError, "removed nothing"):
+            corner_relief(
+                corner,
+                ReliefType.ROUND,
+                radius=1,
+                offset=30,
+                sheet_parameters=self.PARAMETERS,
+            )
+
     def test_builder_mode(self):
         with BuildSheet(thickness=1, bend_radius=2) as builder:
             with BuildSketch():

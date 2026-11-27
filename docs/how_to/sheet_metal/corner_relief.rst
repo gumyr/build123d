@@ -96,6 +96,55 @@ Each shape has its own keyword and the others are refused: ``ROUND`` takes
 ``radius``, ``SQUARE`` takes ``size``, ``OBROUND`` takes ``length`` and
 ``width``, and ``CONSTANT_WIDTH`` takes only ``depth``.
 
+A corner need not be square. The shapes are laid out on the blank either
+side of the corner's miter line, the bisector of the two bends, so a round
+relief is a circle on the blank at any corner angle and an obround lies along
+the miter. A ``SQUARE`` is aligned to both fold lines only where they are at
+right angles; elsewhere it stays a true square, set symmetrically about the
+miter.
+
+******************************
+Moving it along the miter line
+******************************
+
+``ROUND``, ``SQUARE`` and ``OBROUND`` are centred on the corner. ``offset``
+moves the centre along the corner's miter line, the bisector of the two
+bends, by a distance measured on the blank: positive is outward, between the
+two flanges, and negative is into the base.
+
+This is for a **closed corner**. Flanges given a negative
+:ref:`gap <sheet_metal_flange>` reach past the corner toward each other and
+are cut back to the miter line where they would overlap on the blank. That
+cut has no width, and a narrow slot laid on it, as a laser would cut one,
+gives it some. ``offset`` says where along the cut the slot sits:
+
+.. image:: /how_to/assets/sheet_metal/corner_relief_offset.svg
+    :align: center
+
+.. tab-set::
+
+    .. tab-item:: Builder
+        :sync: builder
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [corner_relief_offset]
+            :end-before: [corner_relief_offset]
+
+    .. tab-item:: Algebra
+        :sync: algebra
+
+        .. literalinclude:: /how_to/sheet_metal/sheet_metal_examples.py
+            :language: build123d
+            :start-after: [corner_relief_offset_algebra]
+            :end-before: [corner_relief_offset_algebra]
+
+The miter runs from the corner for the length of the gap along each edge, so
+its own length is the gap times the square root of two at a square corner. A
+relief moved clear of the corner leaves the corner vertex in place, so the
+same vertex can be selected again. ``CONSTANT_WIDTH`` has no centre to move
+and refuses ``offset``.
+
 *****************
 Corners at a hole
 *****************
@@ -123,6 +172,7 @@ What it refuses
   out.
 * A relief that would cut the corner of the sheet loose, or reach through a
   flange.
+* A relief moved so far along the miter line that it removes nothing.
 
 ********
 See also
