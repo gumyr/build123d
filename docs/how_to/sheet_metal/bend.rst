@@ -104,6 +104,10 @@ Whatever the blank's outline does across that strip, a taper, a corner round,
 a notch, a hole, rolls into the bend with it, so the strip need not be the
 same width at both ends.
 
+A hole or slot lying on the line itself leaves the line in several stretches,
+one each side of the cut-out. Any one of them names the fold, and the sheet
+folds along them all.
+
 ***************
 What it refuses
 ***************

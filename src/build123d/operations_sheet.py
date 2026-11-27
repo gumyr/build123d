@@ -756,6 +756,8 @@ def bend(
     part on it. Whatever the blank's outline does across that strip - a taper,
     a corner round, a notch, a hole - rolls into the bend with it, so the strip
     need not be the same width at both ends and ``unfold`` gives the blank back.
+    A hole or slot lying on the line leaves it in several stretches; any one of
+    them names the fold, and the sheet folds along them all.
 
     Sizes are measured on the reference surface, as everywhere else in
     ``BuildSheet``, so the sheet is the reference surface of the part you get
@@ -3082,8 +3084,9 @@ def _fold_site(
     and ``reach`` how far past the line the flat the fold consumes ends. The
     face across the line is cut at those two lines and its pieces sorted by
     what they are joined to: a piece between the lines that meets the fold
-    line rolls into the fold; a piece before the near line that meets a rolled
-    piece stays flat, hinged to it; everything else is carried rigidly with
+    line, or another stretch of it past a cut-out, rolls into the fold; a
+    piece before the near line that meets a rolled piece stays flat, hinged
+    to it; everything else is carried rigidly with
     the far side, whichever side of the lines it lies on - a blank widening
     past the line's ends, or the rest of a body that a tear has freed from
     the fold. A piece that would have to stay flat but is also joined to what
@@ -3105,7 +3108,24 @@ def _fold_site(
     for piece in _fold_pieces(partner, near, across, True):
         band += _planar_pieces(_fold_pieces(piece, far, across, False))
         onward += _planar_pieces(_fold_pieces(piece, far, across, True))
-    rolled = [piece for piece in band if _touch_along_an_edge(piece, line)]
+    # A cut-out on the line leaves it in several stretches, each an edge the
+    # two faces share. They are one fold: folding only the stretch that was
+    # selected would tear the sheet along the others
+    start, direction = line.position_at(0), line.tangent_at()
+    stretches = [
+        edge
+        for edge in face.edges().filter_by(GeomType.LINE)
+        if any(other.is_same(partner) for other in _neighbours(edge, shell))
+        and all(
+            (edge.position_at(t) - start).cross(direction).length < TOLERANCE
+            for t in (0, 1)
+        )
+    ]
+    rolled = [
+        piece
+        for piece in band
+        if any(_touch_along_an_edge(piece, stretch) for stretch in stretches)
+    ]
     stays = [
         piece
         for piece in before

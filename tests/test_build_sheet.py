@@ -2274,6 +2274,51 @@ class TestFoldExtent(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "would tear"):
                 bend(tab.fold_lines()[0], 90)
 
+    def test_a_cut_out_on_the_line_folds_on_both_sides_of_it(self):
+        """A hole or slot that divides the strip leaves the line in two
+        stretches. Either one names the fold, and the sheet folds along both
+        rather than tearing along the one not selected."""
+        cases = (
+            ("hole", BendPosition.CENTER, lambda: Circle(5, mode=Mode.SUBTRACT)),
+            (
+                "slot",
+                BendPosition.BEND_OUTSIDE,
+                lambda: Rectangle(30, 4, mode=Mode.SUBTRACT),
+            ),
+        )
+        for name, position, cut_out in cases:
+            for stretch in (0, 1):
+                with self.subTest(cut_out=name, stretch=stretch):
+                    with BuildSheet(thickness=1, bend_radius=4) as bs:
+                        with BuildSketch():
+                            Rectangle(60, 30)
+                            cut_out()
+                        blank_area = bs.sheet.area
+                        split(bs.flats()[0], bisect_by=Plane.YZ, keep=Keep.BOTH)
+                        lines = bs.flats().sort_by(Axis.X)[0].fold_lines()
+                        self.assertEqual(len(lines), 2)
+                        bend(lines[stretch], 90, position=position)
+                        lower, upper = bs.bends().sort_by(Axis.Y)
+                        self.assertAlmostEqual(lower.bounding_box().min.Y, -15, 5)
+                        self.assertAlmostEqual(upper.bounding_box().max.Y, 15, 5)
+                        self.assertAlmostEqual(lower.area, upper.area, 5)
+                    self.assertTrue(bs.sheet.is_valid)
+                    flat = unfold(bs.sheet, bs.sheet_parameters).flat
+                    self.assertAlmostEqual(precise_area(flat), blank_area, 6)
+
+    def test_a_jog_folds_on_both_sides_of_a_cut_out_on_its_line(self):
+        with BuildSheet(thickness=1, bend_radius=2) as bs:
+            with BuildSketch():
+                Rectangle(100, 60)
+                Rectangle(40, 6, mode=Mode.SUBTRACT)
+            blank_area = bs.sheet.area
+            split(bs.flats()[0], bisect_by=Plane.YZ, keep=Keep.BOTH)
+            jog(bs.flats().sort_by(Axis.X)[0].fold_lines()[0], offset=10)
+            self.assertEqual(len(bs.bends()), 4)  # two bends, each side of the slot
+        self.assertTrue(bs.sheet.is_valid)
+        flat = unfold(bs.sheet, bs.sheet_parameters).flat
+        self.assertAlmostEqual(precise_area(flat), blank_area, 6)
+
 
 class TestStaleSelections(unittest.TestCase):
     """Every operation resews the shell, so a selection made before one is stale
