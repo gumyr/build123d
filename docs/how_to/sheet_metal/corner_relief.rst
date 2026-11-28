@@ -71,7 +71,10 @@ Shape               What it is and when to use it
                     formed part rather than the blank, so its width is
                     measured from the sheet, not supplied, and it is only
                     meaningful where two flanges meet on a corner the sheet
-                    stops at.
+                    stops at. Flanges closed over the corner with a
+                    negative ``gaps`` cross the line of the slot once
+                    formed; what it cuts free of them is dropped, as it
+                    would fall from the blank.
 ==================  ===========================================================
 
 .. tab-set::
@@ -172,6 +175,8 @@ What it refuses
   out.
 * A relief that would cut the corner of the sheet loose, or reach through a
   flange.
+* A ``CONSTANT_WIDTH`` relief where the two flanges touch, since there is no
+  gap left to continue.
 * A relief moved so far along the miter line that it removes nothing.
 
 ********

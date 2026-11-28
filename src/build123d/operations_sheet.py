@@ -2035,7 +2035,9 @@ def corner_relief(
     * ``CONSTANT_WIDTH`` requires ``depth``. Its width is measured from the
       part - it is the gap the flanges already leave - so that the separation
       carries on unchanged through the relief. It is only defined where the two
-      flange edges are parallel.
+      flange edges are parallel and apart. Where flanges closed over the
+      corner with a negative ``gaps`` cross the line of the relief, what it
+      cuts free of them is dropped, as it would fall from the blank.
 
     The first three are cut in the flat pattern and keep their shape on the
     developed blank: one wide enough to pass through a bend carries on into
@@ -2165,7 +2167,15 @@ def _cut_corner_relief(
     if relief_type is ReliefType.CONSTANT_WIDTH:
         cutter = _constant_width_cutter(shell, at, depth)
         cut = shell.cut(cutter)
-        result = cut if isinstance(cut, Shell) else Shell(_faces_of(cut))
+        if isinstance(cut, Shell):
+            result = cut
+        else:
+            # Flanges closed over the corner with a negative gap cross the
+            # line of the relief, and the slot cuts free what lies beyond it.
+            # That falls out of the blank as it is cut, so only the piece
+            # the base is part of is kept
+            far = max(base.vertices(), key=lambda v: (Vector(v) - corner).length)
+            result = min(cut.shells(), key=lambda piece: piece.distance_to(far))
     elif profile is not None:
         if offset:
             # the corner's flat axes are the miter line turned 45 degrees each
@@ -2686,6 +2696,16 @@ def _flange_gap(shell: Shell, at: _Corner, faces: list | None = None) -> float:
     ]
     if len(walls) != 2:
         raise ValueError(f"corner carries {len(walls)} wall(s), expected 2")
+
+    if any(
+        walls[1].is_same(other)
+        for edge in walls[0].edges()
+        for other in _neighbours(edge, shell)
+    ):
+        raise ValueError(
+            "the flanges touch at this corner, so there is no gap between them "
+            "to carry through - a constant width relief is not defined here"
+        )
 
     edges = []
     for wall in walls:

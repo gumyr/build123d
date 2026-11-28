@@ -1228,6 +1228,49 @@ class TestFlangeNegativeGaps(unittest.TestCase):
         self.assertTrue(bs.sheet.is_valid)
         self.assertAlmostEqual(self.doubled(flat), 0, 5)
 
+    def test_a_constant_width_relief_drops_what_it_cuts_free(self):
+        """Formed, each mitered bend curls across the corner's mirror plane.
+        The slot between the walls cuts those tips free, which used to be
+        refused as a sheet in pieces; they fall out, and what is left of each
+        flange keeps to its own side"""
+        with BuildSheet(thickness=1.5, bend_radius=1.5) as bs:
+            with BuildSketch():
+                Rectangle(100, 100)
+            flange(bs.rims(), 40, gaps=-1.4)
+            crossing = self.across_the_miter(bs.sheet)
+            corners = (
+                bs.flats().filter_by(Axis.Z).vertices().filter_by(Convexity.CONVEX)
+            )
+            corner_relief(corners, relief_type=ReliefType.CONSTANT_WIDTH, depth=3)
+            flat, _ = unfold()
+        self.assertEqual(crossing, 2)
+        self.assertEqual(self.across_the_miter(bs.sheet), 0)
+        self.assertEqual(len(bs.sheet.faces()), 9)
+        self.assertTrue(bs.sheet.is_valid)
+        self.assertAlmostEqual(self.doubled(flat), 0, 5)
+
+    @staticmethod
+    def across_the_miter(sheet) -> int:
+        """How many bends reach both sides of the mirror plane of the corner
+        at (50, 50)."""
+        count = 0
+        for bend in sheet.faces().filter_by(GeomType.CYLINDER):
+            sides = [v.X - v.Y for v in bend.vertices() if v.X > 49 and v.Y > 49]
+            if sides and min(sides) < -1e-6 and max(sides) > 1e-6:
+                count += 1
+        return count
+
+    def test_a_constant_width_relief_needs_a_gap_to_continue(self):
+        bs = self.box(gaps=-1.5, relieve=False)
+        corner = bs.flats().filter_by(Axis.Z).vertices().filter_by(Convexity.CONVEX)[0]
+        with self.assertRaisesRegex(ValueError, "flanges touch at this corner"):
+            corner_relief(
+                corner,
+                ReliefType.CONSTANT_WIDTH,
+                depth=3,
+                sheet_parameters=bs.sheet_parameters,
+            )
+
     def test_walls_that_touch_close_the_sheet(self):
         """At exactly the radius the walls meet and are sewn together into a
         sharp corner with no bend in it, which the unfold refuses"""
